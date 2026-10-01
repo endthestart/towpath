@@ -1,6 +1,6 @@
 # Integrations
 
-Status: **candidates only.** Nothing in this document is adopted. Each entry needs its current behavior, API, license, and maintenance checked before Towpath depends on it, and that check should be recorded in [decisions](decisions.md). Projects change quickly; earlier impressions of them are not evidence.
+Status: **candidates, researched 2026-10-01, not yet adopted.** Findings and sources are in the [October 2026 tooling review](research/2026-10-tooling-review.md). Each entry still needs a hands-on check of the exact API calls Towpath will use before it becomes a dependency; record that in [decisions](decisions.md).
 
 **License policy.** Towpath itself is MIT. A component it uses must have its source code published and be free to use for personal self-hosting with Towpath's goals:
 
@@ -29,68 +29,76 @@ For every candidate, record:
 
 ## Mail
 
-| Need | Candidate | Kind | Notes |
-| --- | --- | --- | --- |
-| Gmail read and tier 1 actions | Gmail API with Google's official Python client libraries | Library | Accepted direction ([D3](decisions.md#d3-first-real-mail-source)); thin Towpath adapter in `towpath-connect` and `towpath-act` |
-| MIME parsing | Python standard library `email` and `mailbox` | Library | Also reads Maildir and mbox |
-| Other providers | IMAP client libraries; JMAP clients | Library | Later; IMAP grants all-or-nothing access |
-| Local mail sync and indexing | Gmail-to-Maildir sync tools paired with a local mail indexer | Bundled service | Considered, not proposed: they keep a full local copy of the mailbox, which conflicts with [fetching narrowly](architecture.md#design-rules) and is not Towpath's purpose |
-| Rules, unsubscribe review, reply tracking, classification | Inbox Zero | Possible optional service | License class: open source with personal-use terms (AGPL-3.0 plus added commercial-use and organization-size restrictions; free for personal use). Fit under review: models, permissions, automatic actions |
-| Generated rules | Gmail's filter import file format; Sieve for other providers | Format | Verify Gmail's current import format |
-| Unsubscribe metadata | `List-Unsubscribe` (RFC 2369) and one-click (RFC 8058) headers | Standard | No tool needed |
+| Need | Candidate | License class | Role | Finding |
+| --- | --- | --- | --- | --- |
+| Gmail read and tier 1 actions | Google API Python client | Open source (Apache-2.0) | Library in `towpath-connect` and `towpath-act` | `gmail.readonly` gives part structure without attachment bytes; `gmail.modify` can also send, so the action runner enforces a call allowlist |
+| MIME parsing | Python `email` and `mailbox`; optionally mail-parser | Open source | Library | Standard library is enough for the first slice |
+| Clean text for reply detection and drafting | talon | Open source (Apache-2.0) | Optional library | Strips quoted replies and signatures |
+| Filter files (D12) | Towpath's own small XML writer, using gmailctl as the format reference; optionally the gmailctl binary for export only | Open source (MIT) | Library or bundled CLI | Importing through Gmail settings needs no API permission |
+| Unsubscribe parsing, bulk detection, awaiting-reply | Towpath code | — | — | No maintained library; standard headers and thread history |
+| Rules, reply tracking, unsubscribe, drafting design | Inbox Zero | Personal-use terms | Design reference | Requires write scopes, runs rules automatically (including sending), needs Postgres and Redis; not bundled ([review](research/2026-10-tooling-review.md#mail-management)) |
+| Other providers, later | IMAPClient or imap_tools; JMAP clients | Open source | Library | IMAP credentials are all-or-nothing |
+| Full local Gmail sync | lieer with notmuch, Got Your Back | Open source | Not used | Full-copy model and broad scopes do not fit fetching narrowly |
 
 ## Documents
 
-| Need | Candidate | Kind | Notes |
-| --- | --- | --- | --- |
-| Document system as destination and evidence source | Paperless-ngx | Existing deployment or bundled service | Verify: API token scopes, listing documents with checksums for duplicate detection, upload with metadata, consume-folder behavior |
+| Need | Candidate | License class | Role | Finding |
+| --- | --- | --- | --- | --- |
+| Document system | Paperless-ngx | Open source (GPL-3.0) | Existing deployment or bundled service, over its REST API | Tokens carry all of a user's permissions, so use a view-only user for `towpath-connect` and a separate add-only user for `towpath-act`. Checksum lookup (SHA-256 in version 3, MD5 in version 2) for duplicate checks; upload with metadata; `created` is date-only. Deliver through the API or consume folder; never read through the consume folder |
 
 ## Photos
 
-| Need | Candidate | Kind | Notes |
-| --- | --- | --- | --- |
-| Photo library as destination and evidence source | Immich | Existing deployment or bundled service | Verify: API key permissions, asset listing with dates, locations and checksums, upload, and whether recognized people are exposed |
-| Alternative | PhotoPrism | Existing deployment or bundled service | Same checks |
+| Need | Candidate | License class | Role | Finding |
+| --- | --- | --- | --- | --- |
+| Photo library | Immich | Open source (AGPL-3.0) | Existing deployment or bundled service, over its API | Scoped API keys allow a read-only key and a separate upload key. SHA-1 checksums with a bulk "already present?" check; capture time, time zone, GPS, recognized people; incremental sync |
+| Photo library, alternative | PhotoPrism | Open source (AGPL-3.0) | Connector | SHA-1 lookup; date and place source priority worth copying as a design |
+
+Destinations report different hash algorithms, so presence checks compute the algorithm each destination uses ([scans and destinations](scans-and-destinations.md#destination-connectors)).
 
 ## Sources
 
-| Source | Candidate | Kind | Notes |
+| Source | Candidate | License class | Notes |
 | --- | --- | --- | --- |
-| Contacts | Google People API (read-only); CardDAV; vCard files | API, standard | Gmail users' contacts first |
-| Calendars | iCalendar files; CalDAV; Google Calendar API | Standard, API | |
-| Local mail archive | Maildir or mbox, read with the standard library | Standard | An ordinary optional source for anyone who has one; no special features |
+| Contacts | Google People API (`contacts.readonly`, plus `contacts.other.readonly` for automatically saved contacts); CardDAV through vdirsyncer and vobject | Open source libraries | Incremental sync tokens |
+| Calendars | Google Calendar read-only scopes; caldav and icalendar | Open source libraries | |
+| Location history | Dawarich API | Open source (AGPL-3.0) | Suggested, confirmed, and declined visits match Towpath's review model |
+| Personal data exports | HPI; google_takeout_parser | Open source (MIT) | Library importers |
+| Local mail archive | Maildir or mbox through the standard library | Open source | An ordinary optional source |
 
-## Life stream sources
+## Life stream
 
-| Need | Candidate | Kind | Notes |
+| Need | Candidate | License class | Role |
 | --- | --- | --- | --- |
-| Importing personal data exports into a timeline | Timelinize | Possible importer or evidence index | Not Towpath's core: it would supply evidence references, while claims and review stay in Towpath. Verify data model, API, and license |
-| Packaging a future family or archive edition | BagIt (RFC 8493) directory layout | Standard | Candidate format for exports with checksums |
+| Claims, citations, review | Towpath code | — | No surveyed project combines evidence spans, uncertain dates, contradictions, and durable review |
+| Uncertain dates | python-edtf (EDTF, ISO 8601-2) | Open source (MIT) | Library: EDTF string as canonical value, bounds as indexed columns, plus Towpath's provenance field |
+| Matching people | Deterministic keys, then splink | Open source (MIT) | Library; results are proposals, never merges |
+| Timeline import and design ideas | Timelinize | Open source (AGPL-3.0) | Ideas now; optional read-only importer once its schema stabilizes |
+| Auditable corrections, evidence locators | Perkeep, promnesia | Open source | Design references |
+| Relationships | Monica | Open source (AGPL-3.0) | Optional connector |
+| Export packages, later | BagIt (RFC 8493) layout | Standard | Candidate format |
 
 ## Models
 
-| Need | Candidate | Kind | Notes |
+| Need | Candidate | License class | Notes |
 | --- | --- | --- | --- |
-| Model endpoint | Any OpenAI-compatible endpoint the person configures | Existing deployment | See [model providers](model-providers.md); Poundlock is one optional choice |
-| Bundled local model server | llama.cpp server; Ollama's OpenAI-compatible API; vLLM on GPU hosts | Bundled service | Verify structured-output and embeddings support per server with the [capability probe](model-providers.md#capability-probing) |
+| Endpoint | Any OpenAI-compatible endpoint the person configures | — | [Model providers](model-providers.md); Poundlock optional |
+| Bundled local server | llama.cpp server, Ollama, vLLM, LocalAI | Open source (MIT, MIT, Apache-2.0, MIT) | All support `json_schema`; embeddings and other features vary, so probe each |
+| Client | openai Python library | Open source (Apache-2.0) | Always pass base URL and key explicitly; never rely on its environment defaults |
+| Validation and fallbacks | Pydantic, jsonschema, json-repair | Open source (MIT) | Towpath's own fallback ladder on top; instructor as a reference |
+| Gateway | None bundled | — | Towpath's thin gateway enforces data policy; a person may register LiteLLM or another gateway as an ordinary endpoint |
 
-## Search
+## Foundation
 
-| Need | Candidate | Kind | Notes |
+| Need | Candidate | License class | Notes |
 | --- | --- | --- | --- |
-| Full-text search | SQLite FTS5 | Library | First choice; no extra service |
-| Larger-scale or typo-tolerant search | Meilisearch, Typesense | Bundled service | Only if FTS5 proves insufficient |
-| Semantic search | Embeddings from a configured endpoint, stored with SQLite | Library | Off unless an embeddings endpoint is bound |
-
-## Web platform
-
-| Need | Candidate | Kind | Notes |
-| --- | --- | --- | --- |
-| Web framework | None in the first builds; Django is the leading candidate for the later login and review UI | Library | [D13](decisions.md#d13-web-framework) |
-| Background jobs | A SQLite-backed task queue, or the framework's own task support | Library | Verify behavior across containers |
-| Login | Built-in single-user login first; optional OpenID Connect or forward-auth from an existing identity provider | Library, existing deployment | Multi-person households later |
-| Routing setup endpoints | A bundled reverse proxy such as Caddy or Traefik | Bundled service | Lets connection setup reach `towpath-connect` and `towpath-act` through one address |
+| CLI | Typer | Open source (MIT) | |
+| Storage and migrations | Standard-library `sqlite3`, numbered SQL files with `PRAGMA user_version` | Open source | sqlite-utils as an optional helper |
+| Search | SQLite FTS5; sqlite-vec later for vectors | Open source | sqlite-vec is pre-1.0 |
+| Background jobs | huey with SQLite storage, or a jobs table | Open source (MIT) | Not needed in the first slice |
+| Later web UI | Django ([D13](decisions.md#d13-web-framework)) | Open source (BSD-3) | Starlette or FastAPI with Jinja2 and htmx as lighter alternatives |
+| Login, later | Built-in single-user login; optional OpenID Connect or forward-auth | Open source | |
+| Secrets | Compose secrets as files; `file:` and `env:` references | — | Never stored in SQLite or the ledger |
 
 ## What Towpath writes itself
 
-The web UI and review workflow; adapters to each tool above; the proposal, approval, and receipt model; the action runner; the evidence, claim, and correction model of the [life stream](life-stream.md); the model gateway; and the Compose file.
+The UI and review workflow; adapters to each tool above; unsubscribe, bulk-mail, and awaiting-reply rules; the filter file writer; the proposal, approval, and receipt model; the action runner and its allowlist; the evidence, claim, and correction model of the [life stream](life-stream.md); the model gateway and fallback ladder; and the Compose file.

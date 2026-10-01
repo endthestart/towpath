@@ -46,7 +46,7 @@ Human decisions are kept apart from everything rebuildable, so backups can focus
 | Action ledger | `towpath-act` | web | Execution attempts and per-item receipts | No; audit record |
 | Secrets | Each credential-holding service, its own volume | That service only | OAuth tokens, API keys | Not in any store above |
 
-SQLite files, one per store, are the first implementation. Two points need verification before relying on them: SQLite's write-ahead log across containers with read-only mounts, and concurrent appends to the work queue. If either fails, readers go through a small read API on the owning service instead.
+SQLite files, one per store, are the first implementation. All services must share one host and a local filesystem. A reader whose volume is mounted read-only may fail to open a database in write-ahead-log mode unless its side files already exist ([tooling review](research/2026-10-tooling-review.md#light-python-foundation)); options are to mount read-write and open read-only in code (weaker), or to give readers a small read API on the owning service (stronger). Decide when building the Compose file; the CLI slices run as separate processes on one host and open read-only in code.
 
 ## Permission matrix
 

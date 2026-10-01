@@ -54,13 +54,13 @@ A destination has two halves, so neither web nor worker holds its credential:
 | Read | `towpath-connect`, as an ordinary [source connector](interfaces.md#1-source-connector-inside-towpath-connect) of kind `document-system` or `photo-library` | `enumerate` returns what the destination already holds, with hashes where available | Destination read access only |
 | Write | `towpath-act` | `deliver(artifact, metadata) -> destination ID and receipt` | Destination write access only |
 
-"Is this already there?" is then an ordinary cross-source match between a scan's candidate part and the destination index, by SHA-256 of the exact bytes. When a destination cannot report hashes, the match is `unknown` and Towpath falls back to its own delivery ledger, so the same file is not proposed twice. A destination index is refreshed like any sync, so presence is an observation at a run, not a guarantee.
+"Is this already there?" is then an ordinary cross-source match between a scan's candidate part and the destination index, by a hash of the exact bytes. Destinations report different algorithms (for example SHA-256 or MD5 for a document system, base64 SHA-1 for a photo library), so Towpath computes whichever algorithm each destination reports, alongside its own SHA-256. When a destination cannot report hashes, the match is `unknown` and Towpath falls back to its own delivery ledger, so the same file is not proposed twice. A destination index is refreshed like any sync, so presence is an observation at a run, not a guarantee.
 
 | Destination kind | Read half | Write half | First? |
 | --- | --- | --- | --- |
 | Folder | Hash the directory's files | Write the file plus a JSON sidecar into a directory another tool watches or imports | First, because it needs no third-party API and suits synthetic tests |
-| Document system API | List documents with checksums | Upload with metadata | Next; candidate in [integrations](integrations.md#documents) |
-| Photo library API | List assets with checksums | Upload | Next; candidate in [integrations](integrations.md#photos) |
+| Document system API | List documents with checksums, using a view-only identity | Upload with metadata, using a separate add-only identity | Next; candidate in [integrations](integrations.md#documents) |
+| Photo library API | List assets with checksums, using a read-only key | Upload, using a separate upload key | Next; candidate in [integrations](integrations.md#photos) |
 
 The same connection serves the life stream: a document system or photo library connected as a destination is also an evidence source, read through its own grant. Towpath stores the destination's IDs as references and never takes over its originals.
 

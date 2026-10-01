@@ -21,6 +21,13 @@ These are built into the current documents. The owner can accept or overturn eac
 | R11 | No write credential before roadmap milestone 5; permanent deletion is never a Towpath action | [mail management](mail-management.md#action-tiers) | Nothing now |
 | R12 | First slice is synthetic, read-only, no models, no network | [first slice](first-slice.md) | Starting implementation |
 | R13 | License policy (accepted 2026-10-01): components must publish source and be free for personal use. Unrestricted open source can be required or bundled; components with personal-use terms stay optional, labeled, and never copied into Towpath | [integrations](integrations.md) | Every integration choice |
+| R14 | Light first stack: Typer, standard-library `sqlite3` with SQL migrations, FTS5, the openai library with explicit endpoints only, Pydantic, jsonschema, json-repair | [tooling review](research/2026-10-tooling-review.md#light-python-foundation) | First slice |
+| R15 | No bundled model gateway; Towpath's thin gateway enforces data policy, and any gateway can be registered as an ordinary endpoint | [tooling review](research/2026-10-tooling-review.md#model-endpoints) | Slice 1b |
+| R16 | The action runner allows only specific Gmail calls (label changes and label definitions), because `gmail.modify` can also send | [mail management](mail-management.md#action-runner-contract) | Milestone 5 |
+| R17 | First Gmail index is incremental, resumable, newest first, with progress, because new Cloud projects get lower quotas | [tooling review](research/2026-10-tooling-review.md#gmail-access) | Milestone 3 |
+| R18 | Towpath writes Gmail filter XML itself, using gmailctl as the format reference | [integrations](integrations.md#mail) | Milestone 4 |
+| R19 | Document and photo systems use separate read and write identities; presence checks use each destination's hash algorithm | [scans and destinations](scans-and-destinations.md#destination-connectors) | Milestones 4 and 5 |
+| R20 | Dates as EDTF with computed bounds and a provenance field; people matched by deterministic keys, then splink, as proposals only | [life stream](life-stream.md#the-evidence-rule), [integrations](integrations.md#life-stream) | Milestone 6 |
 
 ## Decisions
 
@@ -78,25 +85,35 @@ These are built into the current documents. The owner can accept or overturn eac
 
 ### D14. Gmail access for other self-hosters
 
-- **Issue:** Gmail read access (`gmail.readonly`) is a restricted OAuth scope. Google allows limited personal use without verification, but a public OAuth app using restricted scopes faces verification and possibly a security assessment when restricted data is stored or transmitted on a server ([Gmail scopes](https://developers.google.com/workspace/gmail/api/auth/scopes), [restricted scope verification](https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification)).
-- **Working assumption:** Towpath never operates a shared OAuth client. Each self-hoster registers their own Google OAuth client and uses it only for their own accounts, which is the personal-use pattern. The setup guide must explain the steps and the unverified-app warning.
-- **Open:** exact personal-use conditions, refresh-token lifetime in testing status, and whether IMAP with an app password is a reasonable fallback. Research in progress.
-- **Blocks:** the real Gmail connection (roadmap milestone 3) for anyone other than the owner.
+Research: [Gmail access](research/2026-10-tooling-review.md#gmail-access).
+
+- **Settled by research:** Towpath never operates a shared OAuth client, because public use of restricted Gmail scopes needs Google verification and a yearly security assessment. Each self-hoster creates their own Google Cloud project and OAuth client, requests `gmail.readonly` for `towpath-connect`, and publishes the app to production unverified (clicking through Google's warning), since an app left in testing status loses its refresh token every 7 days. This follows the personal-use exception and the documented pattern of other self-hosted Gmail tools. The setup guide must walk through it.
+- **Open question:** should Towpath also offer IMAP with a Google app password as an optional quick start? It needs no Cloud project and indexes quickly, but the password allows full access, including sending and deleting, and read-only behavior would rest on Towpath's code alone.
+- **Recommended:** Gmail API only at first; consider the IMAP quick start after the Gmail API path works.
+- **Blocks:** the setup guide for milestone 3.
+
+### D15. Role of Inbox Zero
+
+- **Finding:** under the [license policy](integrations.md) it qualifies as an optional component with personal-use terms. It covers most of Towpath's mail features, but requires write scopes, runs its rules automatically (including sending, forwarding, and deleting), and needs Postgres and Redis ([review](research/2026-10-tooling-review.md#mail-management)).
+- **Options:** design reference only; an optional Compose profile for people who accept its model; or deeper reuse.
+- **Recommended:** design reference only, because running it would bypass Towpath's read-first, approve-before-act model.
+- **Blocks:** nothing before milestone 4.
 
 ## Facts to verify before implementation
 
 | Claim used in the design | Affects |
 | --- | --- |
-| Gmail's narrowest scope that can change labels or archive also permits reading and sending | D1 analysis |
+| Gmail's narrowest scope that can change labels or archive also permits reading and sending | Confirmed from Gmail's API discovery document (2026-10-01) |
 | Creating Gmail drafts needs a scope that also permits sending (Google's scope documentation says `gmail.compose` includes sending) | D11 (accepted on that basis) |
-| Creating Gmail filters needs a separate settings scope; Gmail imports filters from a file | D12 |
-| A read-only Gmail scope allows full message reads; a metadata-only scope restricts search | First Gmail connector |
-| Gmail lists a message's part structure, with attachment sizes and IDs, without downloading attachment bytes | D5 |
-| OAuth clients in testing status issue short-lived refresh tokens; exact personal-use exception conditions | D14 |
-| Gmail incremental-sync cursors can expire, requiring a full sync | Connector cursor handling |
+| Creating Gmail filters needs a separate settings scope; Gmail imports filters from a file | Confirmed (discovery document; gmailctl documentation) |
+| A read-only Gmail scope allows full message reads; a metadata-only scope restricts search | Confirmed; metadata-only also blocks part structure |
+| Gmail lists a message's part structure, with attachment sizes and IDs, without downloading attachment bytes | Confirmed (`format=full`) |
+| OAuth clients in testing status issue short-lived refresh tokens; exact personal-use exception conditions | Secondary sources agree (7 days; personal use by a few known users, under 100); confirm against Google's pages when writing the setup guide |
+| Gmail incremental-sync cursors can expire, requiring a full sync | Confirmed (404 on an expired cursor) |
 | One-click unsubscribe uses a `List-Unsubscribe-Post` header (RFC 8058) | D8 |
-| SQLite write-ahead logging works across containers with read-only mounts on one host | Store layout ([components](components.md#stores-and-ownership)) |
-| Each candidate in [integrations](integrations.md) meets the evaluation checklist | Any adoption |
+| SQLite write-ahead logging works across containers with read-only mounts on one host | Likely not without existing side files; see [components](components.md#stores-and-ownership) |
+| Each candidate in [integrations](integrations.md) meets the evaluation checklist | Researched 2026-10-01; hands-on check of exact API calls still needed before adoption |
+| Quotas for new Google Cloud projects make a first full index slow (hours for a large mailbox) | Secondary; measure during milestone 3 |
 
 ## Decision log
 
@@ -118,3 +135,4 @@ These are built into the current documents. The owner can accept or overturn eac
 | 2026-10-01 | Audience and model use split into separate settings | Accepted (owner review) |
 | 2026-10-01 | FOSS only for everything Towpath includes or bundles; Inbox Zero excluded (license adds commercial and enterprise restrictions) | Superseded the same day |
 | 2026-10-01 | License policy: open source and free for personal use qualifies; personal-use-only components stay optional and labeled; Inbox Zero becomes a candidate again | Accepted |
+| 2026-10-01 | Tooling review completed; recommendations R14 to R20 added; D14 partly settled; D15 opened | Research |

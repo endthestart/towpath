@@ -61,7 +61,7 @@ So the action runner's narrowness comes from: being the only service with the wr
 - While acting: rate-limit; stop the batch on an unexpected error class; never retry a non-idempotent action without a fresh recheck.
 - After acting: write a receipt per item; generate an inverse proposal for undo; return changed or failed items for review.
 - Safeguards for mailbox changes: per-batch cap and a dry-run mode that rechecks without acting.
-- Never: permanent deletion, sending mail, or changing account settings outside an allowlisted rule type.
+- Never: permanent deletion, sending mail, or changing account settings outside an allowlisted rule type. Because `gmail.modify` also permits sending, the runner allows only specific API calls (message label changes and label definitions), and tests assert that no send, draft, or delete call exists in its code path.
 
 ## Prompt injection and model output
 

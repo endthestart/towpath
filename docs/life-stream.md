@@ -10,12 +10,12 @@ AI proposes facts; evidence establishes them.
 
 - Every claim cites evidence: a span of a message, a photo, a document, a calendar entry, or a recollection.
 - A claim records what the evidence supports. A booking confirmation supports "a trip was planned", not "the trip happened"; a photo taken at a place supports "was there on that date".
-- Dates carry their precision: an exact time, a day, a month, a season, a range, or "before 2010".
+- Dates carry their precision: an exact time, a day, a month, a season, a range, or "before 2010". The candidate representation is the Extended Date/Time Format (EDTF, part of ISO 8601-2), stored with computed earliest and latest bounds and a provenance field recording where the date came from; manual corrections outrank estimates.
 - Contradictory evidence is kept side by side and shown, not resolved silently.
 - A person's correction or acceptance is durable and survives reprocessing and model changes.
 - Recollections keep their original wording and author, and are cited as attributed memory, not as verified fact.
 
-No reviewed graph or timeline project combined evidence-level citations, uncertain dates, conflicting claims, and durable human review, so this layer is the core of Towpath's own code. Importers and indexes around it should be existing tools where possible ([integrations](integrations.md#life-stream-sources)).
+No reviewed graph or timeline project combined evidence-level citations, uncertain dates, conflicting claims, and durable human review, so this layer is the core of Towpath's own code. Importers and indexes around it should be existing tools where possible ([integrations](integrations.md#life-stream)).
 
 ## Sources
 

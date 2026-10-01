@@ -30,6 +30,7 @@ Moving mail out of a provider is not part of Towpath.
 | [Interfaces](docs/interfaces.md) | Records that cross service boundaries |
 | [Model providers](docs/model-providers.md) | Endpoint profiles, destinations, grants, capability probes, fallbacks |
 | [First slice](docs/first-slice.md) | Smallest read-only synthetic email build and its checks |
+| [Tooling review, October 2026](docs/research/2026-10-tooling-review.md) | Research on existing tools, licenses, Gmail access rules, and model servers, with sources |
 | [Decisions](docs/decisions.md) | Accepted, withdrawn, and open decisions; facts to verify |
 | [Roadmap](docs/roadmap.md) | Dependency map of milestones |
 | [Publication](docs/publication.md) | What belongs in this public repository and what stays private |
