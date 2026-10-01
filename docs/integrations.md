@@ -76,7 +76,7 @@ For every candidate, record:
 
 | Need | Candidate | Kind | Notes |
 | --- | --- | --- | --- |
-| Web framework | Django (built-in auth, admin, migrations, SQLite support); or FastAPI with server-rendered pages | Library | Open: [D13](decisions.md#d13-web-framework) |
+| Web framework | None in the first builds; Django is the leading candidate for the later login and review UI | Library | [D13](decisions.md#d13-web-framework) |
 | Background jobs | A SQLite-backed task queue, or the framework's own task support | Library | Verify behavior across containers |
 | Login | Built-in single-user login first; optional OpenID Connect or forward-auth from an existing identity provider | Library, existing deployment | Multi-person households later |
 | Routing setup endpoints | A bundled reverse proxy such as Caddy or Traefik | Bundled service | Lets connection setup reach `towpath-connect` and `towpath-act` through one address |

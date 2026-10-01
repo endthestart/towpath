@@ -11,10 +11,10 @@ The slice should prove or disprove these design claims:
 3. Indexing every message while fetching content only on request is enough for triage and scans.
 4. The first mail management features can be computed deterministically: categories, important-and-unanswered, unsubscribe review, and digest candidates.
 5. Proposals freeze exact targets and observed state, become stale correctly, have no execution path, and lose to a person's corrections.
-6. Human decisions survive deletion and rebuild of all derived data, and `private` items stay out of exports.
+6. Human decisions, including audience and model-use settings, survive deletion and rebuild of all derived data.
 7. `towpath-connect` and `towpath-worker` work as separate processes that share only stores, with the worker reading the source index read-only.
 
-It leaves out models (see slice 1b), the life stream, the web UI, real provider APIs, deliveries, and the action runner. Commands run from a CLI; the web UI arrives with the real Gmail connection ([roadmap](roadmap.md) milestone 3).
+It leaves out models (see slice 1b), the life stream, the web UI, real provider APIs, deliveries, and the action runner. Commands run from a CLI; a minimal web UI comes after the mail features work ([roadmap](roadmap.md) milestone 4).
 
 ## Synthetic data
 
@@ -51,7 +51,7 @@ Message cases the generator must include:
 | Stores | SQLite files for the source index, work queue, derived store, and decisions store ([components](components.md#stores-and-ownership)) |
 | Worker rules | Categories, important-and-unanswered, unsubscribe review list, digest candidates; proposals of type `label.add`, `archive`, and `deliver`, none executable |
 | Scan engine | Selector by media type and item filters; content requests; presence check against the document folder |
-| Decisions | Recorded corrections, dismissals, review decisions, and visibility settings, entered through the CLI |
+| Decisions | Recorded corrections, dismissals, review decisions, and audience and model-use settings, entered through the CLI |
 | CLI | `connect sync`, `connect fetch-requests`, `mail triage`, `mail unanswered`, `mail unsubscribe-review`, `mail digest`, `mail correct`, `mail export-checklist`, `scan run` (working names) |
 
 Not built: approvals that reach an action runner, deliveries, preserved artifacts, write paths, network access, model calls, life-stream tables, web UI, Compose file.
@@ -76,7 +76,7 @@ Each check is an automated test against the generated fixtures.
 | 12 | Proposals hold item IDs, native IDs, and preconditions; their digest is stable across processes | 5 |
 | 13 | No module, configuration key, or dependency for provider writes exists | 5 |
 | 14 | Deleting the derived store and rerunning reproduces the same proposals, while corrections and review decisions remain | 6 |
-| 15 | An item marked `private` is excluded from the exported checklist | 6 |
+| 15 | An item set to model use `excluded` is never placed in the model-input queue, and the setting survives rebuilding the derived store | 6 |
 | 16 | `connect` commands and worker commands run as separate processes; the worker opens the source index read-only | 7 |
 | 17 | The prompt-injection fixture is classified by the same rules as any other message | 5 |
 | 18 | Rerunning triage and scans creates no duplicate requests or proposals | 2, 3 |
@@ -93,7 +93,7 @@ Adds the inference gateway against a stub OpenAI-compatible server started by th
 | 1b-3 | Structured output falls back `json_schema` → `json_object` → prompt-only with validation, then to manual review |
 | 1b-4 | A `this-machine` profile with a non-loopback host is rejected |
 | 1b-5 | A `self-hosted` profile without a ledger grant refuses `content` and `metadata` calls |
-| 1b-6 | A `private` item is refused even with every grant in place |
+| 1b-6 | An item with model use `excluded` is refused even with every grant in place; a `local-only` item is refused by a `self-hosted` endpoint |
 | 1b-7 | Changing the profile's model voids its grants and fails queued work instead of rerouting |
 | 1b-8 | The prompt-injection fixture produces at most a proposal, never an approval or other record type |
 
@@ -104,4 +104,4 @@ Adds the inference gateway against a stub OpenAI-compatible server started by th
 - Whether separating the decisions store from derived data is worth it in practice.
 - What the proposal record needs before the action runner is built.
 
-Next: the real read-only Gmail connection with the web UI and Compose default profile ([D3](decisions.md#d3-first-real-mail-source), [D13](decisions.md#d13-web-framework)).
+Next: the real read-only Gmail connection, still CLI-only ([D3](decisions.md#d3-first-real-mail-source), [D14](decisions.md#d14-gmail-access-for-other-self-hosters)).

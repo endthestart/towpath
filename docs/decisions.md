@@ -14,7 +14,7 @@ These are built into the current documents. The owner can accept or overturn eac
 | R4 | One connection per source, used by features through explicit grants | [components](components.md#permission-matrix) | First slice |
 | R5 | Items recorded per source with dated observations; duplicates linked, never merged | [interfaces](interfaces.md#occurrence) | First slice |
 | R6 | Human decisions kept in their own store, apart from rebuildable derived data | [components](components.md#stores-and-ownership) | First slice |
-| R7 | Visibility classes (`private`, `personal`, `shareable`) from the first release; private items never reach models or exports | [life stream](life-stream.md#visibility-and-authorship) | First slice schema |
+| R7 | Two separate settings from the first release: audience (`owner`, `shareable`) decides who may see an item; model use (`follow-grants`, `local-only`, `excluded`) decides where it may be processed | [life stream](life-stream.md#audience-and-model-use) | First slice schema |
 | R8 | Accepted claims capture cited excerpts; a person can also preserve a full item or attachment (owner request) | [preserved artifacts](scans-and-destinations.md#preserved-artifacts) | Life stream |
 | R9 | Scans with selectors; destinations as existing tools with a read half in `towpath-connect` and a write half in `towpath-act` | [scans and destinations](scans-and-destinations.md) | Attachment routing |
 | R10 | Model endpoints with destination class, data-class grants, capability probes, and same-endpoint fallbacks only | [model providers](model-providers.md) | Slice 1b |
@@ -29,7 +29,7 @@ These are built into the current documents. The owner can accept or overturn eac
 
 ### D2. Implementation language and storage
 
-**Accepted 2026-10-01.** Python, with SQLite files (one per store) for Towpath's own data. The web framework is [D13](#d13-web-framework).
+**Accepted 2026-10-01.** Python, with SQLite files (one per store) for Towpath's own data. Keep it light: the first builds use the standard library and small libraries, with no web framework. See [D13](#d13-web-framework).
 
 ### D3. First real mail source
 
@@ -45,9 +45,7 @@ These are built into the current documents. The owner can accept or overturn eac
 
 ### D6. Remote model use
 
-- **Question:** may a remote endpoint (`self-hosted` elsewhere, or `third-party`) receive message content or life-stream data in the owner's deployment, and should the public UI offer third-party grants for those classes at all?
-- **Recommended:** allow `self-hosted` grants per endpoint; require a second confirmation for `third-party` content grants. `private` items never go anywhere.
-- **Blocks:** slice 1b wording; not the gateway design.
+**Accepted 2026-10-01.** Towpath supports third-party OpenAI-compatible endpoints for anyone who configures them, but personal data classes are off by default for every endpoint that is not `this-machine` or `bundled`. An owner grants particular data classes to a named endpoint. A server elsewhere on the owner's network, including Poundlock, counts as remote (`self-hosted`) for these grants. For the owner's own deployment, the initial plan is to grant only endpoints the owner controls. Item-level [model use](life-stream.md#audience-and-model-use) can narrow this further.
 
 ### D7. Coverage report home
 
@@ -55,14 +53,11 @@ These are built into the current documents. The owner can accept or overturn eac
 
 ### D8. Unsubscribe handling
 
-- **Options:** show the sender's unsubscribe link and let the person act; Towpath performs one-click unsubscribes after per-sender approval; never.
-- **Recommended:** show the link. One-click execution sends a request to the sender and confirms the address is live, which is outside D1's scope.
-- **Blocks:** roadmap milestone 4 wording only.
+**Accepted 2026-10-01.** Towpath shows each sender's declared unsubscribe methods and their destinations (an HTTPS link, a one-click endpoint, or a mailto address) and the person acts. Towpath does not visit links or send unsubscribe requests in the first release. One-click unsubscribe ([RFC 8058](https://www.rfc-editor.org/rfc/rfc8058)) is an HTTPS POST, which an ordinary link cannot perform, so the UI says when a method cannot be completed by clicking and what the person's options are.
 
 ### D9. Life-stream sources after mail
 
-- **Recommended:** contacts first (people are the backbone), then read connections to the person's photo library and document system as evidence sources, with recollections available from the start of the life stream.
-- **Blocks:** roadmap milestone 7 ordering.
+**Accepted 2026-10-01.** Contacts first (they resolve who appears in mail), then calendars (dated evidence for planned events), then photo libraries and document systems as their integrations are ready. Each source stays independently usable.
 
 ### D10. Order
 
@@ -70,35 +65,33 @@ These are built into the current documents. The owner can accept or overturn eac
 
 ### D11. Draft replies
 
-- **Options:** (a) Towpath generates draft text that the person edits and copies; (b) after approval, `towpath-act` creates a draft in Gmail, never sending it.
-- **Tradeoff:** (b) is smoother, but the Gmail permission for creating drafts appears also to allow sending (to verify), so the runner would hold a send-capable credential with sending excluded only by its allowlist.
-- **Recommended:** (a) first; decide (b) after verifying the scope.
-- **Blocks:** roadmap milestone 5 scope.
+**Accepted 2026-10-01.** Towpath generates editable reply text for the person to copy into Gmail. Creating drafts directly is deferred until its convenience justifies a credential that can also send: Google's `gmail.compose` scope includes sending ([Gmail scopes](https://developers.google.com/workspace/gmail/api/auth/scopes)).
 
 ### D12. Smart rules
 
-For mail that is important but does not need reading every day.
-
-- **Options:** (a) generate a Gmail filter file the person imports; (b) `towpath-act` creates filters after approval, which needs a settings permission; (c) a Towpath digest page that summarizes that mail on a schedule and flags anything needing attention, with no mailbox change.
-- **Recommended:** (c) plus (a) first; (b) later if importing filters proves tedious.
-- **Blocks:** roadmap milestone 4 scope.
+**Accepted 2026-10-01.** Start with a Towpath digest for important-but-not-daily mail and a preview of each proposed rule, which the person creates in Gmail themselves. Add filter-file export only after a generated file has been tested through Gmail's [filter import](https://support.google.com/mail/answer/6579) flow. Creating filters through the API comes later, if at all: it needs a separate settings permission and changes future mail automatically.
 
 ### D13. Web framework
 
-- **Options:** Django (built-in authentication, admin, migrations, SQLite support); FastAPI with server-rendered pages (lighter, more assembly).
-- **Recommended:** Django, because login, configuration screens, and review lists are most of the first UI, and Django supplies them.
-- **Blocks:** first slice, if it includes the web UI; otherwise milestone 3.
+**Accepted direction 2026-10-01.** No web framework in the first builds; Towpath stays a light Python and SQLite CLI until the workflows work. When the login and review UI is built, Django is the leading candidate, with Towpath's own views for its workflows (Django's admin is for internal management only, per its [documentation](https://docs.djangoproject.com/en/stable/ref/contrib/admin/)). Confirm at that milestone.
+
+### D14. Gmail access for other self-hosters
+
+- **Issue:** Gmail read access (`gmail.readonly`) is a restricted OAuth scope. Google allows limited personal use without verification, but a public OAuth app using restricted scopes faces verification and possibly a security assessment when restricted data is stored or transmitted on a server ([Gmail scopes](https://developers.google.com/workspace/gmail/api/auth/scopes), [restricted scope verification](https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification)).
+- **Working assumption:** Towpath never operates a shared OAuth client. Each self-hoster registers their own Google OAuth client and uses it only for their own accounts, which is the personal-use pattern. The setup guide must explain the steps and the unverified-app warning.
+- **Open:** exact personal-use conditions, refresh-token lifetime in testing status, and whether IMAP with an app password is a reasonable fallback. Research in progress.
+- **Blocks:** the real Gmail connection (roadmap milestone 3) for anyone other than the owner.
 
 ## Facts to verify before implementation
 
 | Claim used in the design | Affects |
 | --- | --- |
 | Gmail's narrowest scope that can change labels or archive also permits reading and sending | D1 analysis |
-| Creating Gmail drafts needs a scope that also permits sending | D11 |
+| Creating Gmail drafts needs a scope that also permits sending (Google's scope documentation says `gmail.compose` includes sending) | D11 (accepted on that basis) |
 | Creating Gmail filters needs a separate settings scope; Gmail imports filters from a file | D12 |
 | A read-only Gmail scope allows full message reads; a metadata-only scope restricts search | First Gmail connector |
 | Gmail lists a message's part structure, with attachment sizes and IDs, without downloading attachment bytes | D5 |
-| OAuth clients in testing status issue short-lived refresh tokens; restricted scopes require verification for public distribution | Self-hosted setup guide |
+| OAuth clients in testing status issue short-lived refresh tokens; exact personal-use exception conditions | D14 |
 | Gmail incremental-sync cursors can expire, requiring a full sync | Connector cursor handling |
 | One-click unsubscribe uses a `List-Unsubscribe-Post` header (RFC 8058) | D8 |
 | SQLite write-ahead logging works across containers with read-only mounts on one host | Store layout ([components](components.md#stores-and-ownership)) |
@@ -119,3 +112,6 @@ For mail that is important but does not need reading every day.
 | 2026-10-01 | Towpath is a self-hosted front end that integrates existing tools, deployed with Docker Compose, able to bundle tools or point at existing ones | Accepted direction (R1, R2) |
 | 2026-10-01 | Moving mail out of Gmail is a separate personal project, outside Towpath | Accepted |
 | 2026-10-01 | D4 and D7 | Withdrawn; they served only that separate project |
+| 2026-10-01 | D6, D8, D9, D11, D12 | Accepted as recommended in owner review |
+| 2026-10-01 | D13: no framework for now; Django leading candidate for the later UI | Accepted direction |
+| 2026-10-01 | Audience and model use split into separate settings | Accepted (owner review) |

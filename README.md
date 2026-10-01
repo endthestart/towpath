@@ -13,7 +13,7 @@ Towpath is an open-source, self-hosted web application for managing your digital
 
 Towpath is the front end and coordinator. It connects to tools people already run (for example a document system or photo library) or bundles open-source tools in its Docker Compose file, and writes code only where nothing suitable exists. See [integrate first](docs/architecture.md#integrate-first).
 
-Model features use explicitly configured OpenAI-compatible endpoints: base URL, credential, model, and destination. Poundlock is one optional endpoint; a bundled local model server or any compatible API works the same way. Nothing is sent to a remote model by default, and items marked private are never sent at all. See [model providers](docs/model-providers.md).
+Model features use explicitly configured OpenAI-compatible endpoints: base URL, credential, model, and destination. Poundlock is one optional endpoint; a bundled local model server or any compatible API works the same way. Personal data is not sent to any endpoint outside the machine unless the owner grants it, and items can be kept local-only or excluded from models entirely. See [model providers](docs/model-providers.md).
 
 Moving mail out of a provider is not part of Towpath.
 
@@ -24,7 +24,7 @@ Moving mail out of a provider is not part of Towpath.
 | [Architecture](docs/architecture.md) | What Towpath is, integrate-first, design rules, what is out of scope |
 | [Services](docs/components.md) | Compose services and profiles, stores, credentials, permission matrix |
 | [Mail management](docs/mail-management.md) | Features, action tiers, provider permissions, execution options |
-| [Life stream](docs/life-stream.md) | Evidence rule, sources, claims, review, visibility, cited answers |
+| [Life stream](docs/life-stream.md) | Evidence rule, sources, claims, review, audience and model use, cited answers |
 | [Scans and destinations](docs/scans-and-destinations.md) | Finding items in mail, routing them to other tools, preserving evidence |
 | [Integrations](docs/integrations.md) | Candidate existing tools and libraries per need, with an evaluation checklist |
 | [Interfaces](docs/interfaces.md) | Records that cross service boundaries |

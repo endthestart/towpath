@@ -49,19 +49,30 @@ Claims start as `proposed`. A person can accept, edit, reject, or mark them `con
 
 ## Questions with cited answers
 
-A person asks a question such as "When did we first visit Example City?" Worker retrieves accepted claims and granted evidence, sends what the endpoint's data-class grant allows to the bound model, and returns an answer in which every sentence cites a claim or evidence item. Sentences without a citation are flagged as unsupported. An answer can propose new claims, which enter review like any other proposal. Without a model endpoint, the same question runs as a search over claims and evidence.
+A person asks a question such as "When did we first visit Example City?" Worker retrieves accepted claims and granted evidence, sends what the endpoint's grants and each item's model use allow to the bound model, and returns an answer in which every sentence cites a claim or evidence item. Sentences without a citation are flagged as unsupported. An answer can propose new claims, which enter review like any other proposal. Without a model endpoint, the same question runs as a search over claims and evidence.
 
-## Visibility and authorship
+## Audience and model use
 
-Visibility is set from the first release, because a family edition later depends on it.
+Two separate settings exist from the first release, because a family edition later depends on them and because who may *see* an item is a different question from where it may be *processed*.
 
-| Class | Model requests | Exports and shared editions |
-| --- | --- | --- |
-| `private` | Never sent to any endpoint | Never included |
-| `personal` (default) | Allowed within endpoint grants | Only the owner's own exports |
-| `shareable` | Allowed within endpoint grants | Eligible for a shared edition after release review |
+**Audience** decides who may see an item or claim:
 
-Visibility applies to sources, individual items, and claims; the most restrictive applicable class wins. Every recollection, correction, and review decision records its author, so a later multi-person household or family edition can show who said what.
+| Audience | Meaning |
+| --- | --- |
+| `owner` (default) | Only the owner, and the owner's own exports and backups |
+| `shareable` | Eligible for a shared edition, such as a family story, after release review |
+
+**Model use** decides where an item may be processed:
+
+| Model use | Meaning |
+| --- | --- |
+| `follow-grants` (default) | May go to any endpoint whose data-class grant covers it ([D6](decisions.md#d6-remote-model-use)) |
+| `local-only` | Only `this-machine` or `bundled` endpoints ([destination classes](model-providers.md#destination-classes)) |
+| `excluded` | Never sent to any model; rules and search still work |
+
+An owner-only item can still be fine for a local model; a shareable item can still be excluded from models. Both settings apply to sources, individual items, and claims, and the most restrictive applicable value wins. A claim derived from an item inherits at least that item's restrictions.
+
+**Authorship.** Every recollection, correction, and review decision records its author, so a later multi-person household or family edition can show who said what.
 
 ## Views
 
@@ -71,4 +82,4 @@ Visibility applies to sources, individual items, and claims; the most restrictiv
 
 ## Family edition (long term)
 
-A curated selection of accepted, `shareable` claims and recollections, released after review, exported in an open format with its citations. Not designed in detail yet.
+A curated selection of accepted claims with `shareable` audience and recollections, released after review, exported in an open format with its citations. Not designed in detail yet.

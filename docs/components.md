@@ -40,7 +40,7 @@ Human decisions are kept apart from everything rebuildable, so backups can focus
 | Source index | `towpath-connect` | worker, web, act (IDs only) | Connections, sync runs, cursors, item metadata and part structure, dated observations (labels, folders), content cache, external references (document and photo IDs) | Mostly, by resyncing |
 | Work queue | web and worker (append only) | `towpath-connect` | Content requests: which item or part to fetch, for which feature | Yes |
 | Derived store | worker | web | Classifications, sender and list profiles, triage results, proposals, scans and matches, people and event candidates, proposed claims, embeddings | Yes |
-| Decisions store | web | worker, act | Approvals with frozen proposal copies, rejections, corrections, accepted claims, recollections, visibility settings, source grants, model endpoint grants, preservation choices | **No.** Back this up |
+| Decisions store | web | worker, act | Approvals with frozen proposal copies, rejections, corrections, accepted claims, recollections, audience and model-use settings, source grants, model endpoint grants, preservation choices | **No.** Back this up |
 | Preserved artifacts | worker, on a recorded preservation choice | web | Exact bytes a person chose to keep, content-addressed, with provenance ([preserved artifacts](scans-and-destinations.md#preserved-artifacts)) | **No.** Back this up |
 | Model ledger | worker | web | Endpoint profiles in use, capability reports, call records | No; audit record |
 | Action ledger | `towpath-act` | web | Execution attempts and per-item receipts | No; audit record |

@@ -213,14 +213,15 @@ The action runner (`towpath-act`), where deployed, recomputes the digest, refuse
     {"external": {"source_id": "src_photos", "kind": "photo-library", "native_id": "asset-7f3e"},
      "observed": "taken 2026-05-15, Example City"}
   ],
-  "visibility": "personal",
+  "audience": "owner",
+  "model_use": "follow-grants",
   "producer": "rules/travel-confirmation@0",
   "state": "proposed",
   "uncertainty": "A booking confirmation supports a plan, not that travel occurred."
 }
 ```
 
-`modality` distinguishes `plan`, `occurred`, `recollected`, and `inferred`. An `external` citation references an item another system owns, such as a photo or document, by its native ID; Towpath does not copy it. `visibility` is `private`, `personal`, or `shareable` ([life stream](life-stream.md#visibility-and-authorship)). `captured_excerpt` is filled when the claim is accepted. `preserved` is optional: the person can also keep the whole message (`item`) or one attachment (`part`) as a [preserved artifact](scans-and-destinations.md#preserved-artifacts) when the source itself is valuable. A recollection citation points to a recollection version, with its author, in the decisions store.
+`modality` distinguishes `plan`, `occurred`, `recollected`, and `inferred`. An `external` citation references an item another system owns, such as a photo or document, by its native ID; Towpath does not copy it. `audience` is `owner` or `shareable`; `model_use` is `follow-grants`, `local-only`, or `excluded` ([life stream](life-stream.md#audience-and-model-use)). `captured_excerpt` is filled when the claim is accepted. `preserved` is optional: the person can also keep the whole message (`item`) or one attachment (`part`) as a [preserved artifact](scans-and-destinations.md#preserved-artifacts) when the source itself is valuable. A recollection citation points to a recollection version, with its author, in the decisions store.
 
 ## 5. Inference gateway (inside worker)
 
@@ -228,7 +229,7 @@ The action runner (`towpath-act`), where deployed, recomputes the digest, refuse
 infer(task, input_parts, data_class, output_schema | none) -> InferenceResult | Disabled(reason) | Failed(reason)
 ```
 
-The caller names a task (for example `mail.classify`), never an endpoint. The gateway looks up the task binding, checks the endpoint's destination class and data-class grant, picks the structured-output method from the endpoint's capability report, validates the output, and writes a ledger record. Input parts with `private` visibility are refused whatever the grants. See [model providers](model-providers.md). Model output enters the derived store only as a proposal.
+The caller names a task (for example `mail.classify`), never an endpoint. The gateway looks up the task binding, checks the endpoint's destination class and data-class grant, picks the structured-output method from the endpoint's capability report, validates the output, and writes a ledger record. Input parts whose model use forbids this endpoint are refused whatever the grants. See [model providers](model-providers.md). Model output enters the derived store only as a proposal.
 
 ## 6. Scans, destinations, and preserved artifacts
 
@@ -236,4 +237,4 @@ Selector, delivery proposal, and artifact records are defined in [scans and dest
 
 ## 7. Export
 
-Towpath can export approved proposals, preserved artifacts with provenance, and accepted claims with citations as JSON Lines using the schemas above. Exports exclude `private` items, and shared editions include only `shareable` ones. Nothing in an export grants authority to act.
+Towpath can export approved proposals, preserved artifacts with provenance, and accepted claims with citations as JSON Lines using the schemas above. The owner's own exports include everything; shared editions include only items and claims with `shareable` audience. Nothing in an export grants authority to act.

@@ -89,7 +89,7 @@ An endpoint that returns an error, times out, or produces invalid output repeate
 The inference gateway runs in `towpath-worker` and is the only Towpath code that makes outbound model calls ([interfaces](interfaces.md#5-inference-gateway-inside-worker)). For each call it:
 
 1. Resolves the task binding; no binding means `Disabled`.
-2. Refuses any input with `private` [visibility](life-stream.md#visibility-and-authorship), then checks the data class against the profile ceiling and, for non-local destinations, the ledger grant.
+2. Refuses any input whose [model use](life-stream.md#audience-and-model-use) is `excluded`, or `local-only` when the endpoint is not `this-machine` or `bundled`; then checks the data class against the profile ceiling and, for non-local destinations, the ledger grant.
 3. Selects the structured-output method from the latest capability report.
 4. Sends the minimal input the task needs (for example, metadata only for list detection).
 5. Validates the output and records endpoint fingerprint, model, served model if reported, prompt version, input fingerprint, outcome, and usage if available.
