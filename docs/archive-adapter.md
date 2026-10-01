@@ -1,6 +1,6 @@
 # Optional mail archive adapter
 
-Status: **designed, not built.** The archive format depends on tools the independent Gmail evacuation project has not finalized, so this design accepts standard formats first.
+Status: **designed, not built.** Towpath reads standard mail files plus an optional manifest, so it does not depend on which archive tool the independent Gmail evacuation chooses.
 
 ## Where it fits
 
@@ -35,7 +35,7 @@ None of these is required for Towpath to work, and the evacuation does not need 
 | 3. Archive tool's own database or API | The tool's index, database, or HTTP API | Richest metadata, no duplicate export | Couples Towpath to one tool's internal format and version |
 | 4. Local IMAP served by the archive | Reuse the IMAP connector against a local server | No new code path | Provenance depends on the server preserving headers; adds a running service |
 
-**Recommendation:** implement option 1 first (it is also the synthetic test path), specify option 2's manifest as a small public schema, and treat option 3 as a plugin only if the evacuation settles on a tool whose format is documented and stable.
+**Decision ([D4](decisions.md#d4-archive-input), accepted):** implement option 1 first (it is also the synthetic test path) and option 2's manifest as a small public schema. Option 3 is not planned; option 4 remains possible through a future IMAP connector.
 
 ### Draft manifest row
 
@@ -55,7 +55,7 @@ The archive changes as new mail is appended. The adapter scans incrementally by 
 - It does not import mail into Towpath as a new archive of record. Towpath's content cache follows the retention policy and is not a backup.
 - It does not require the archive to exist before Towpath's provider-based mail management or life summary can be used.
 
-## Open questions for the owner
+## Remaining questions
 
-- Which archive tool and format the evacuation chooses, and whether it can write a manifest ([decision D4](decisions.md#d4-archive-input)).
+- Whether the evacuation's chosen tool writes Maildir or mbox directly, or needs an export step and a manifest writer. That is the evacuation's choice; Towpath's input is fixed by [D4](decisions.md#d4-archive-input).
 - Whether the advisory coverage report belongs in Towpath, in the evacuation tooling, or both ([decision D7](decisions.md#d7-coverage-report-home)).

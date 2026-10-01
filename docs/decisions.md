@@ -15,7 +15,7 @@ These are built into the current documents. The owner can accept or overturn eac
 | R5 | No mailbox write credential until D1 is decided; ship proposal review, checklist export, and generated filters first | [mailbox actions](mail-boundaries.md#recommendation) | Nothing now |
 | R6 | Permanent deletion is never a Towpath action | [mailbox actions](mail-boundaries.md#action-tiers) | Nothing now |
 | R7 | Endpoint profiles with destination class, data-class ceiling, ledger grants, capability probes, same-endpoint fallbacks only | [model providers](model-providers.md) | Slice 1b |
-| R8 | Archive adapter reads standard mail files first, with an optional manifest | [archive adapter](archive-adapter.md#input-options) | Archive connector |
+| R8 | Archive adapter reads standard mail files with an optional manifest (accepted as D4) | [archive adapter](archive-adapter.md#input-options) | Archive connector |
 | R9 | First slice is synthetic, read-only, no models, no network | [first slice](first-slice.md) | Starting implementation |
 | R10 | Generic scans (selectors), destination connectors with a read half in `towpath-connect` and a write half in `towpath-act`, and delivery as an approved action | [scans and destinations](scans-and-destinations.md) | Find-and-route features |
 
@@ -44,10 +44,7 @@ Options for mailbox changes are compared in [mailbox actions](mail-boundaries.md
 
 ### D4. Archive input
 
-- **Question:** which archive tool and format the evacuation chooses, and whether it can write the [manifest](archive-adapter.md#draft-manifest-row).
-- **Recommended:** keep Towpath on Maildir or mbox plus manifest regardless of tool.
-- **Status:** to be asked separately with context.
-- **Blocks:** roadmap milestone 8; not the synthetic Maildir connector.
+**Accepted 2026-10-01.** Towpath reads the archive as standard mail files (Maildir or mbox) plus the optional [manifest](archive-adapter.md#draft-manifest-row), whatever archive tool the evacuation chooses. The evacuation can add a manifest writer if its tool does not produce one. A tool-specific plugin is not planned.
 
 ### D5. Content retention
 
@@ -107,5 +104,6 @@ These affect the design but could not be confirmed from primary documentation wh
 | 2026-10-01 | D2: Python and SQLite | Accepted |
 | 2026-10-01 | D10: real read-only mail connector before life summary without email | Accepted |
 | 2026-10-01 | D3: Gmail API, read-only scope, for the first real connector | Accepted |
+| 2026-10-01 | D4: archive read as Maildir or mbox plus optional manifest, independent of archive tool | Accepted |
 | 2026-10-01 | D5: read access to all mail, index everything, fetch per item on demand; generic scans and destinations | Accepted |
 | 2026-10-01 | Preservation of the full item or attachment, not only excerpts, as a foundation for a later archive package | Accepted as a requirement; design in R4 |
