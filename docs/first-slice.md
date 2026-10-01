@@ -33,7 +33,8 @@ Message cases the generator must include:
 | --- | --- |
 | Monthly statements with PDF attachments, one already in the document folder | Scan, presence by SHA-256, delivery proposals |
 | Messages with photo attachments, one already in the photo folder | Presence by the photo library's SHA-1 |
-| Large attachment and inline images | Part listing without download; selectors by disposition and size |
+| Large attachment and inline images | Part listing without storing content; selectors by disposition and size |
+| Small attachment whose bytes arrive inline instead of as an attachment ID; deeply nested multipart (four or more levels) | Field mask covers every level; inline data is discarded, never cached ([D16](decisions.md#d16-gmail-structure-without-content)) |
 | Newsletters, person-to-person threads, notifications | Ordinary indexed mail that scans must ignore |
 | Same Message-ID in both accounts | Two items, one link, no merge |
 | No Message-ID; malformed `Date`; non-UTF-8 charset; encoded-word subject | Parser robustness and `unparseable` reporting |
@@ -45,7 +46,7 @@ Message cases the generator must include:
 | Piece | Scope in this slice |
 | --- | --- |
 | Connector interface | `describe`, `probe`, `enumerate`, `fetch` ([interfaces](interfaces.md#1-source-connector-inside-towpath-connect)) |
-| Adapters | `fixture-gmail` (lists part structure without attachment bytes until fetched; can simulate interruption and cursor expiry); `folder-documents` and `folder-photos` (standing in for the read halves of a document system and photo library) |
+| Adapters | `fixture-gmail` (mimics Gmail's response shapes, including inline body data, so the field mask and discard logic are tested; can simulate interruption and cursor expiry); `folder-documents` and `folder-photos` (standing in for the read halves of a document system and photo library) |
 | Stores | SQLite files for the source index, work queue, derived store, and decisions store ([components](components.md#stores-and-ownership)) |
 | Scan engine | Selectors by media type, size, disposition, and item filters; content requests; per-destination hashing; presence matches; `deliver` proposals that no code can execute |
 | Decisions | Dismissals of matches, review decisions, audience and model-use settings, entered through the CLI |
@@ -65,7 +66,7 @@ Each check is an automated test against the generated fixtures.
 | 4 | The deleted message is recorded `absent_since_run`, keeps its history, and makes proposals targeting it `stale` | 2, 5 |
 | 5 | Labels changed between runs are recorded as dated observations; earlier observations are kept | 2 |
 | 6 | The shared Message-ID yields two items and one match record | 1 |
-| 7 | After a sync, every part is listed but no attachment bytes are cached | 3 |
+| 7 | After a sync, every part is listed, including deeply nested ones, and no body or attachment data is stored, even where the fixture returned it inline | 3 |
 | 8 | A PDF scan fetches only matching parts; other messages' bodies are never fetched | 3 |
 | 9 | The PDF already in the document folder and the image already in the photo folder are `present`, each found by that destination's own hash algorithm | 4 |
 | 10 | The remaining matches become `deliver` proposals with item IDs, part IDs, hashes, and the destination | 4, 5 |

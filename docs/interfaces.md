@@ -71,7 +71,7 @@ One record per item per source. Observed state is a dated observation, not a fac
 }
 ```
 
-`parts` comes from the provider's structure listing where available, without downloading attachments; a part's `sha256` is filled when its bytes are first fetched. `raw_sha256` covers the exact bytes the source returned. `normalized_sha256` covers decoded headers that survive export (From, To, Cc, Date, Subject, Message-ID) and decoded body parts, so copies of one message in different sources (for example two accounts that both received it) can be recognized even when headers differ. The normalization algorithm is part of the schema version.
+`parts` comes from the provider's structure listing. Providers do not necessarily separate structure from content: Gmail's `format=full` response parses body content and can carry a part's bytes inline instead of an attachment ID. The connector must request a field mask that excludes body data at every nesting level, and tests must prove it ([D16](decisions.md#d16-gmail-structure-without-content)); any inline data that still arrives is discarded, not cached. A part's `sha256` is filled when its bytes are deliberately fetched. `raw_sha256` covers the exact bytes the source returned. `normalized_sha256` covers decoded headers that survive export (From, To, Cc, Date, Subject, Message-ID) and decoded body parts, so copies of one message in different sources (for example two accounts that both received it) can be recognized even when headers differ. The normalization algorithm is part of the schema version.
 
 ### Cross-source match
 
@@ -231,10 +231,47 @@ infer(task, input_parts, data_class, output_schema | none) -> InferenceResult | 
 
 The caller names a task (for example `mail.classify`), never an endpoint. The gateway looks up the task binding, checks the endpoint's destination class and data-class grant, picks the structured-output method from the endpoint's capability report, validates the output, and writes a ledger record. Input parts whose model use forbids this endpoint are refused whatever the grants. See [model providers](model-providers.md). Model output enters the derived store only as a proposal.
 
-## 6. Scans, destinations, and preserved artifacts
+## 6. Mail-management provider
+
+A mail-management provider is an integrated tool that manages a mailbox with its own write access ([mail management](mail-management.md)). Towpath talks to it through an adapter with this contract, so another tool, or Towpath's own features, can take its place.
+
+```text
+describe()             -> ProviderDescriptor: name, version, license class, base URL, accounts it manages
+probe()                -> which capabilities below are reachable with the configured key, or why not
+overview(period)       -> counts and response-time statistics            (optional capability)
+rules()                -> rule names, conditions, and actions, read-only (optional capability)
+links()                -> deep links into the provider's own screens for each feature
+receive_event(payload) -> a hint that something happened to a message    (optional capability)
+```
+
+Rules for the adapter:
+
+- It runs in `towpath-connect` with a **read-only** provider key. Towpath does not call provider endpoints that change a mailbox; such calls would be actions through `towpath-act` and need a new decision.
+- Every feature Towpath shows is either backed by an endpoint listed below or shown as a link to the provider's own screen. Nothing is implied to be integrated when it is a link.
+- Events are hints. Towpath acknowledges quickly, queues the event, and confirms what happened from its own Gmail sync before showing or using it.
+- The UI labels each control with the application that owns it, so a person knows whether Towpath or the provider will act.
+
+### Inbox Zero mapping
+
+Checked against Inbox Zero's source and API documentation at commit `c4edc85` (2026-10-01); not yet exercised against a running instance. Its external API must be enabled on a self-hosted instance, and keys are bound to one inbox account with selected scopes.
+
+| Towpath view | Inbox Zero support | How Towpath provides it |
+| --- | --- | --- |
+| Activity overview | `GET /api/v1/stats/by-period`, `GET /api/v1/stats/response-time` (scope `STATS_READ`) | API |
+| Rules list and details | `GET /api/v1/rules`, `GET /api/v1/rules/{id}` (scope `RULES_READ`) | API, read-only |
+| Categories per message | No public API | Link to Inbox Zero |
+| Important and unanswered | No public API | Link to Inbox Zero |
+| Drafts | No public API (its assistant connector can create drafts, but is meant for chat assistants) | Link to Inbox Zero; drafts also appear in Gmail |
+| Digest | No public API | Link to Inbox Zero |
+| Unsubscribe status | No read API; `POST /api/v1/senders/unsubscribe` exists (scope `SENDERS_UNSUBSCRIBE`) | Link to Inbox Zero; Towpath does not call the write endpoint |
+| Rule-triggered events | "Call webhook" rule action: POST with message and thread IDs, subject, from, and the rule that ran; `X-Webhook-Secret` header; 1-second timeout; no retries | Optional `receive_event`. Delivery to an address on the same private network requires `WEBHOOK_ALLOW_PRIVATE_IPS=true`, which Inbox Zero documents as disabling its SSRF protection for webhooks; only on a trusted single-tenant deployment |
+
+The Towpath key holds only `STATS_READ` and `RULES_READ`.
+
+## 7. Scans, destinations, and preserved artifacts
 
 Selector, delivery proposal, and artifact records are defined in [scans and destinations](scans-and-destinations.md).
 
-## 7. Export
+## 8. Export
 
 Towpath can export approved proposals, preserved artifacts with provenance, and accepted claims with citations as JSON Lines using the schemas above. The owner's own exports include everything; shared editions include only items and claims with `shareable` audience. Nothing in an export grants authority to act.

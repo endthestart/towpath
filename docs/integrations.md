@@ -7,7 +7,7 @@ Status: **candidates, researched 2026-10-01, not yet adopted.** Findings and sou
 | Class | Meaning | How Towpath may use it |
 | --- | --- | --- |
 | Open source | OSI-approved license with no added restrictions (MIT, Apache-2.0, BSD, GPL, AGPL, and similar) | Required dependency, bundled service, or optional integration |
-| Open source, personal-use terms | Source published and free for personal use, but with added limits on commercial use, organization size, or field of use | Optional integration or optional Compose profile only, labeled with its terms; never required by Towpath's core features; its code is never copied into Towpath |
+| Source available with use restrictions | Source published and free for personal self-hosting, but with added limits (for example on commercial use or organization size) that conflict with the [Open Source Definition](https://opensource.org/osd) | Optional integration or optional Compose profile only, labeled with its terms; never required by Towpath's core features; its code is never copied into Towpath |
 | Not open source | No published source, or no free personal use | Not bundled. A person may still connect a service they choose, such as their mail provider or a hosted model API |
 
 The middle class keeps Towpath's own code usable by anyone while still letting a personal deployment benefit from tools that are free for that use.
@@ -31,8 +31,8 @@ For every candidate, record:
 
 | Need | Candidate | License class | Role | Finding |
 | --- | --- | --- | --- | --- |
-| Mail management (categories, reply tracking, unsubscribe, drafts, rules, digest) | Inbox Zero | Personal-use terms | Optional Compose service `mail`: Towpath's first mail-management provider ([D15](decisions.md#d15-role-of-inbox-zero)) | Holds its own Gmail write access; rules act automatically; accepts an OpenAI-compatible endpoint; API and webhook action to verify ([mail management](mail-management.md#integration-points)) |
-| Gmail read access for Towpath | Google API Python client | Open source (Apache-2.0) | Library in `towpath-connect` | `gmail.readonly` gives part structure without attachment bytes |
+| Mail management (categories, reply tracking, unsubscribe, drafts, rules, digest) | Inbox Zero | Source available with use restrictions | Optional Compose service `mail`: Towpath's first mail-management provider ([D15](decisions.md#d15-role-of-inbox-zero)) | Holds its own Gmail write access; rules act automatically; accepts an OpenAI-compatible endpoint; API and webhook action to verify ([mail management](mail-management.md#integration-points)) |
+| Gmail read access for Towpath | Google API Python client | Open source (Apache-2.0) | Library in `towpath-connect` | `gmail.readonly` with a field mask that must exclude body data at every level ([D16](decisions.md#d16-gmail-structure-without-content)) |
 | MIME parsing | Python `email` and `mailbox`; optionally mail-parser | Open source | Library | Standard library is enough for the first slice |
 | Clean text for life-stream extraction | talon | Open source (Apache-2.0) | Optional library | Strips quoted replies and signatures |
 | Alternatives or Towpath-built replacements, later | gmailctl (filter export), MailScrub and gmail-cleaner (unsubscribe ideas) | Open source (MIT) | Reference | Only if the provider stops fitting |

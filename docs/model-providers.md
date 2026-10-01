@@ -96,7 +96,7 @@ The inference gateway runs in `towpath-worker` and is the only Towpath code that
 
 Endpoints receive no tools and no credentials for other services. Output is treated as a proposal.
 
-**Integrated tools have their own model settings.** A tool such as the mail-management provider calls its own configured model directly, outside this gateway, so Towpath's grants and item-level model use do not govern it. Towpath's setup points such tools at an endpoint the owner chooses and shows which endpoint each one uses ([mail management](mail-management.md#caveats)).
+**Integrated tools have their own model settings.** A tool such as the mail-management provider calls its own configured model directly, outside this gateway, so Towpath's grants and item-level model use do not govern it. Pointing such a tool at a local endpoint controls where its requests go, not which items it sends. Towpath's setup configures every model role and fallback the tool has, shows which endpoint each uses, and makes no privacy claim for the tool until that configuration has been verified ([mail management](mail-management.md#caveats)).
 
 ## Endpoint examples
 

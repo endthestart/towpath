@@ -75,7 +75,7 @@ Source grants decide which features may use which source: a mailbox connected fo
 
 ## One message, end to end
 
-1. `towpath-connect` indexes a message: native IDs, labels observed at this sync, dates, and MIME part structure. No body or attachment is downloaded yet.
+1. `towpath-connect` indexes a message: native IDs, labels observed at this sync, dates, and MIME part structure, requested with a field mask that excludes body data ([D16](decisions.md#d16-gmail-structure-without-content)). No body or attachment is stored yet.
 2. A scan needs the attachment's bytes to hash it, so worker enqueues a content request; `towpath-connect` fetches that one part and caches it.
 3. A scan for PDF statements matches its attachment, and the document system does not hold that file yet, so worker proposes a delivery.
 4. Separately, the mail-management tool may label or archive the same message under its own rules; the next sync observes that as a dated change.

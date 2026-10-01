@@ -11,7 +11,7 @@ Towpath is an open-source, self-hosted web application for managing your digital
 
 ## How it is built
 
-Towpath is the front end and coordinator. It connects to tools people already run (for example a document system or photo library) or bundles open-source tools in its Docker Compose file, and writes code only where nothing suitable exists. Everything Towpath uses is open source and free for personal use; components with personal-use-only terms stay optional ([license policy](docs/integrations.md)). See [integrate first](docs/architecture.md#integrate-first).
+Towpath is the front end and coordinator. It connects to tools people already run (for example a document system or photo library) or bundles open-source tools in its Docker Compose file, and writes code only where nothing suitable exists. Everything Towpath requires is open source; optional components may be source available with use restrictions if they are free for personal self-hosting ([license policy](docs/integrations.md)). See [integrate first](docs/architecture.md#integrate-first).
 
 Model features use explicitly configured OpenAI-compatible endpoints: base URL, credential, model, and destination. Poundlock is one optional endpoint; a bundled local model server or any compatible API works the same way. Personal data is not sent to any endpoint outside the machine unless the owner grants it, and items can be kept local-only or excluded from models entirely. See [model providers](docs/model-providers.md).
 
@@ -31,6 +31,7 @@ Moving mail out of a provider is not part of Towpath.
 | [Model providers](docs/model-providers.md) | Endpoint profiles, destinations, grants, capability probes, fallbacks |
 | [First slice](docs/first-slice.md) | Smallest read-only synthetic email build and its checks |
 | [Tooling review, October 2026](docs/research/2026-10-tooling-review.md) | Research on existing tools, licenses, Gmail access rules, and model servers, with sources |
+| [Inbox Zero evaluation plan](docs/evaluations/inbox-zero-plan.md) | Checks to run on a dedicated test mailbox before relying on the integration |
 | [Decisions](docs/decisions.md) | Accepted, withdrawn, and open decisions; facts to verify |
 | [Roadmap](docs/roadmap.md) | Dependency map of milestones |
 | [Publication](docs/publication.md) | What belongs in this public repository and what stays private |

@@ -7,41 +7,44 @@ Status: **designed, not built.** Nothing in this repository accesses or changes 
 Mail management needs write access to the mailbox: labeling, archiving, unsubscribing, drafting, and rules all change it. The life stream does not. So the two are handled differently:
 
 - **Mail management uses an integrated mail-management tool** that already does the work well, running as an optional service in Towpath's Docker Compose file and holding its own Gmail write access. The first is [Inbox Zero](https://github.com/elie222/inbox-zero) ([D15](decisions.md#d15-role-of-inbox-zero)). Towpath integrates with it rather than rebuilding it.
-- **Towpath's own mail access is read-only** (`gmail.readonly` in `towpath-connect`), used for the life stream and for finding attachments to route to other tools.
+- **Towpath's own mail access is read-only** (`gmail.readonly` in `towpath-connect`, from a Google Cloud project separate from the mail-management tool's), used for the life stream and for finding attachments to route to other tools.
 
 The integration sits behind a *mail-management provider* interface, so an alternative tool can be added, or Towpath can build its own features and replace the provider later, without changing the rest of Towpath.
 
 ## Who does what
 
-| Feature | Provided by | Notes |
+| Feature | Provided by | How it appears in Towpath |
 | --- | --- | --- |
-| Categorize, with corrections | Inbox Zero | Its rules and learned corrections |
-| Important and unanswered | Inbox Zero | Its reply tracking ("to reply", "awaiting reply") |
-| Unsubscribe | Inbox Zero | Its bulk unsubscriber |
-| Draft replies | Inbox Zero | Drafts created in Gmail; sending stays with the person, per the rules they configure |
-| Smart rules and digest | Inbox Zero | Its rules and digest action |
+| Categorize, with corrections | Inbox Zero | Link to Inbox Zero |
+| Important and unanswered | Inbox Zero (reply tracking) | Link to Inbox Zero |
+| Unsubscribe | Inbox Zero (bulk unsubscriber) | Link to Inbox Zero |
+| Draft replies | Inbox Zero (drafts created in Gmail) | Link to Inbox Zero; drafts also visible in Gmail |
+| Smart rules and digest | Inbox Zero | Rules listed read-only from its API; digest by link |
+| Activity overview | Inbox Zero statistics | Read from its API |
 | Route PDFs and photos to a document system or photo library | Towpath | [Scans and destinations](scans-and-destinations.md); Inbox Zero files only to cloud drives |
 | Search across mail and other sources | Towpath | Full-text search over Towpath's index, linked to life-stream evidence |
-| Overview in Towpath's front end | Towpath | Status, links into Inbox Zero, and summaries read from its API |
+
+The [provider contract](interfaces.md#6-mail-management-provider) lists the exact Inbox Zero endpoints behind each row. Where no endpoint exists, Towpath links to Inbox Zero's own screen and does not present the feature as integrated.
 
 ## Integration points
 
-| Point | Direction | Purpose | Status |
-| --- | --- | --- | --- |
-| Compose profile `mail` | — | Runs Inbox Zero with its database and cache; can instead point at an existing instance | To build |
-| Google Cloud project | Shared setup | One project per self-hoster with two OAuth consents: Inbox Zero's (write scopes) and Towpath's (`gmail.readonly`). Separate tokens, separate containers | To document |
-| Model endpoint | Configuration | Inbox Zero accepts an OpenAI-compatible base URL; Towpath's setup points it at an endpoint the owner chooses | To verify |
-| Inbox Zero API | Towpath reads | Rules, senders and unsubscribe status, statistics for Towpath's overview | To verify |
-| Inbox Zero webhook action | Inbox Zero calls Towpath | A rule can notify Towpath, for example "receipt with a PDF arrived", to trigger a scan | To verify |
-| Links | Towpath to Inbox Zero | Open Inbox Zero's own screens for detailed work | To build |
+| Point | Purpose | Status |
+| --- | --- | --- |
+| Compose profile `mail` | Runs Inbox Zero with its database and cache; or Towpath points at an existing instance | To build |
+| Google Cloud projects | **Separate projects** for Inbox Zero (its write scopes) and Towpath (`gmail.readonly`). Google treats consent as belonging to a project, and incremental authorization can combine grants across clients in one project, so separate tokens alone are not enough evidence of separation. Towpath checks the scopes actually granted at connection time and refuses anything beyond `gmail.readonly` | To document and test |
+| Inbox Zero API | Statistics and rules, read-only, with a key scoped to `STATS_READ` and `RULES_READ` | Checked in source; to exercise |
+| Webhook action | Optional hints to Towpath when a rule runs | Checked in source; requires a setting that disables Inbox Zero's SSRF protection for private addresses; to evaluate |
+| Model roles | Every Inbox Zero model role set explicitly (below) | To configure and verify |
+| Links | Deep links into Inbox Zero's screens | To build |
 
 ## Caveats
 
-- **Automatic actions.** Inbox Zero's rules run automatically and can label, archive, draft, reply, forward, send, or delete, depending on how the person configures them. Towpath's approve-before-act model does not apply inside Inbox Zero; its own settings do. The setup guide should recommend starting with rules limited to labeling, archiving, and drafting.
-- **Model policy.** Towpath's endpoint grants and item-level model use ([model providers](model-providers.md), [life stream](life-stream.md#audience-and-model-use)) do not govern what Inbox Zero sends to its model. Pointing it at an endpoint the owner controls is how [D6](decisions.md#d6-remote-model-use) applies to it.
+- **Automatic actions.** Inbox Zero's rules run automatically and can label, archive, draft, reply, forward, send, or delete, depending on how they are configured. Towpath's approve-before-act model does not apply inside Inbox Zero; its own settings do. The setup guide should recommend starting with rules limited to labeling, archiving, and drafting.
+- **Model policy.** Pointing Inbox Zero at a local endpoint controls where its requests go, but does not enforce Towpath's item-level model use: it cannot know that a message is `excluded` or `local-only`. Inbox Zero has five model roles (default, economy, chat, draft, and a lightweight role for classification), each an ordered list with fallbacks, and unset roles fall back to others. Setup must set every role and every fallback explicitly, and the evaluation must confirm no request reaches any other endpoint, before Towpath makes any privacy statement about it. Its optional sensitive-data setting redacts or blocks likely credentials and card numbers; it is not item-level exclusion.
+- **Who controls what.** Towpath's screens label each control with the application that owns it, so it is clear when a setting belongs to Inbox Zero.
 - **Its own copy of data.** Inbox Zero stores data about mail in its own database. That data belongs to Inbox Zero's service, not to Towpath's stores, and is backed up or deleted with it.
-- **License.** Inbox Zero is AGPL-3.0 with added terms that are free for personal use but restrict commercial use and organizations of five or more business users. Under the [license policy](integrations.md) it is an optional profile, labeled with those terms; Towpath's code does not depend on or copy it.
-- **Fit must be confirmed.** Before relying on it, a hands-on evaluation on the owner's own account should check the points marked "to verify" above, which actions can be disabled, and how well its classification works with a local model.
+- **License.** Inbox Zero is *source available with use restrictions*: AGPL-3.0 with added terms restricting commercial monetization and requiring an enterprise license for organizations of five or more business users, with exemptions including personal, educational, and research use and smaller organizations. These terms conflict with the [Open Source Definition](https://opensource.org/osd). Under the [license policy](integrations.md) it is an optional profile, labeled with its terms; Towpath's code does not depend on or copy it.
+- **Fit must be confirmed.** A focused evaluation on a dedicated test mailbox comes before use with a primary account ([evaluation plan](evaluations/inbox-zero-plan.md)).
 
 ## If Towpath builds its own features later
 
