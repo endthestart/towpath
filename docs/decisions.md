@@ -18,22 +18,24 @@ These are built into the current documents. The owner can accept or overturn eac
 | R8 | Accepted claims capture cited excerpts; a person can also preserve a full item or attachment (owner request) | [preserved artifacts](scans-and-destinations.md#preserved-artifacts) | Life stream |
 | R9 | Scans with selectors; destinations as existing tools with a read half in `towpath-connect` and a write half in `towpath-act` | [scans and destinations](scans-and-destinations.md) | Attachment routing |
 | R10 | Model endpoints with destination class, data-class grants, capability probes, and same-endpoint fallbacks only | [model providers](model-providers.md) | Slice 1b |
-| R11 | No write credential before roadmap milestone 5; permanent deletion is never a Towpath action | [mail management](mail-management.md#action-tiers) | Nothing now |
+| R11 | Towpath's own services hold no mailbox write credential; mailbox changes belong to the integrated mail-management tool; permanent deletion is never a Towpath action | [mail management](mail-management.md#approach) | Nothing now |
 | R12 | First slice is synthetic, read-only, no models, no network | [first slice](first-slice.md) | Starting implementation |
 | R13 | License policy (accepted 2026-10-01): components must publish source and be free for personal use. Unrestricted open source can be required or bundled; components with personal-use terms stay optional, labeled, and never copied into Towpath | [integrations](integrations.md) | Every integration choice |
 | R14 | Light first stack: Typer, standard-library `sqlite3` with SQL migrations, FTS5, the openai library with explicit endpoints only, Pydantic, jsonschema, json-repair | [tooling review](research/2026-10-tooling-review.md#light-python-foundation) | First slice |
 | R15 | No bundled model gateway; Towpath's thin gateway enforces data policy, and any gateway can be registered as an ordinary endpoint | [tooling review](research/2026-10-tooling-review.md#model-endpoints) | Slice 1b |
-| R16 | The action runner allows only specific Gmail calls (label changes and label definitions), because `gmail.modify` can also send | [mail management](mail-management.md#action-runner-contract) | Milestone 5 |
-| R17 | First Gmail index is incremental, resumable, newest first, with progress, because new Cloud projects get lower quotas | [tooling review](research/2026-10-tooling-review.md#gmail-access) | Milestone 3 |
-| R18 | Towpath writes Gmail filter XML itself, using gmailctl as the format reference | [integrations](integrations.md#mail) | Milestone 4 |
-| R19 | Document and photo systems use separate read and write identities; presence checks use each destination's hash algorithm | [scans and destinations](scans-and-destinations.md#destination-connectors) | Milestones 4 and 5 |
+| R16 | If Towpath ever holds a Gmail write token, its action runner allows only specific calls, because `gmail.modify` can also send | [mail management](mail-management.md#if-towpath-builds-its-own-features-later) | Only if Towpath builds mailbox actions |
+| R17 | First Gmail index is incremental, resumable, newest first, with progress, because new Cloud projects get lower quotas | [tooling review](research/2026-10-tooling-review.md#gmail-access) | Milestone 4 |
+| R18 | If Towpath builds rules itself, it writes Gmail filter XML using gmailctl as the format reference | [integrations](integrations.md#mail) | Only if Towpath builds rules |
+| R19 | Document and photo systems use separate read and write identities; presence checks use each destination's hash algorithm | [scans and destinations](scans-and-destinations.md#destination-connectors) | Milestone 5 |
 | R20 | Dates as EDTF with computed bounds and a provenance field; people matched by deterministic keys, then splink, as proposals only | [life stream](life-stream.md#the-evidence-rule), [integrations](integrations.md#life-stream) | Milestone 6 |
 
 ## Decisions
 
 ### D1. Mailbox and destination execution
 
-**Accepted 2026-10-01.** `towpath-act`, the separate action runner, executes approved deliveries to destinations and tier 1 mailbox changes: add or remove labels, archive, mark read or unread ([action tiers](mail-management.md#action-tiers)). Its allowlist is configured at the runner; it executes only frozen, human-approved proposals, rechecks each target, writes receipts and an inverse proposal, and has a per-batch cap and dry-run mode. Drafts are [D11](#d11-draft-replies), rules are [D12](#d12-smart-rules), unsubscribes are [D8](#d8-unsubscribe-handling), and trash needs its own decision. The Gmail credential this requires is broader than the allowed actions; that is accepted, with the runner's separation and allowlist as the control.
+**Revised 2026-10-01 (with D15).** Mail management needs write access; the life stream does not. Mailbox changes (labels, archive, unsubscribe, drafts, rules) are carried out by the integrated mail-management tool under its own settings, starting with Inbox Zero ([mail management](mail-management.md)). `towpath-act` executes approved deliveries to destinations such as a document system or photo library, under the [action runner contract](mail-management.md#if-towpath-builds-its-own-features-later). If Towpath later builds its own mailbox actions, they go through `towpath-act` with a call allowlist ([R16](#recommendations-in-this-design)). Permanent deletion is never a Towpath action.
+
+*Earlier version (accepted the same day):* `towpath-act` would also execute tier 1 mailbox changes itself.
 
 ### D2. Implementation language and storage
 
@@ -61,6 +63,8 @@ These are built into the current documents. The owner can accept or overturn eac
 
 ### D8. Unsubscribe handling
 
+*Scope after D15:* applies to any unsubscribe feature Towpath builds itself. When Inbox Zero provides unsubscribing, its behavior applies.
+
 **Accepted 2026-10-01.** Towpath shows each sender's declared unsubscribe methods and their destinations (an HTTPS link, a one-click endpoint, or a mailto address) and the person acts. Towpath does not visit links or send unsubscribe requests in the first release. One-click unsubscribe ([RFC 8058](https://www.rfc-editor.org/rfc/rfc8058)) is an HTTPS POST, which an ordinary link cannot perform, so the UI says when a method cannot be completed by clicking and what the person's options are.
 
 ### D9. Life-stream sources after mail
@@ -73,9 +77,13 @@ These are built into the current documents. The owner can accept or overturn eac
 
 ### D11. Draft replies
 
+*Scope after D15:* applies to drafting Towpath builds itself. Inbox Zero creates drafts in Gmail.
+
 **Accepted 2026-10-01.** Towpath generates editable reply text for the person to copy into Gmail. Creating drafts directly is deferred until its convenience justifies a credential that can also send: Google's `gmail.compose` scope includes sending ([Gmail scopes](https://developers.google.com/workspace/gmail/api/auth/scopes)).
 
 ### D12. Smart rules
+
+*Scope after D15:* applies to rules Towpath builds itself. Inbox Zero provides its own rules and digest.
 
 **Accepted 2026-10-01.** Start with a Towpath digest for important-but-not-daily mail and a preview of each proposed rule, which the person creates in Gmail themselves. Add filter-file export only after a generated file has been tested through Gmail's [filter import](https://support.google.com/mail/answer/6579) flow. Creating filters through the API comes later, if at all: it needs a separate settings permission and changes future mail automatically.
 
@@ -90,14 +98,11 @@ Research: [Gmail access](research/2026-10-tooling-review.md#gmail-access).
 - **Settled by research:** Towpath never operates a shared OAuth client, because public use of restricted Gmail scopes needs Google verification and a yearly security assessment. Each self-hoster creates their own Google Cloud project and OAuth client, requests `gmail.readonly` for `towpath-connect`, and publishes the app to production unverified (clicking through Google's warning), since an app left in testing status loses its refresh token every 7 days. This follows the personal-use exception and the documented pattern of other self-hosted Gmail tools. The setup guide must walk through it.
 - **Open question:** should Towpath also offer IMAP with a Google app password as an optional quick start? It needs no Cloud project and indexes quickly, but the password allows full access, including sending and deleting, and read-only behavior would rest on Towpath's code alone.
 - **Recommended:** Gmail API only at first; consider the IMAP quick start after the Gmail API path works.
-- **Blocks:** the setup guide for milestone 3.
+- **Blocks:** the setup guides for milestones 3 and 4.
 
 ### D15. Role of Inbox Zero
 
-- **Finding:** under the [license policy](integrations.md) it qualifies as an optional component with personal-use terms. It covers most of Towpath's mail features, but requires write scopes, runs its rules automatically (including sending, forwarding, and deleting), and needs Postgres and Redis ([review](research/2026-10-tooling-review.md#mail-management)).
-- **Options:** design reference only; an optional Compose profile for people who accept its model; or deeper reuse.
-- **Recommended:** design reference only, because running it would bypass Towpath's read-first, approve-before-act model.
-- **Blocks:** nothing before milestone 4.
+**Accepted 2026-10-01.** If an existing tool meets the need now and works well, Towpath uses it. Inbox Zero becomes Towpath's first mail-management provider: an optional Compose profile (or an existing instance) that Towpath integrates with, holding its own Gmail write access. Alternatives can be added behind the same provider interface, and Towpath may later build its own features and replace it. Caveats recorded in [mail management](mail-management.md#caveats): its rules act automatically, Towpath's model policy does not govern it, it keeps its own data, and its license has personal-use terms. A hands-on evaluation on the owner's account confirms fit before the profile is relied on.
 
 ## Facts to verify before implementation
 
@@ -136,3 +141,4 @@ Research: [Gmail access](research/2026-10-tooling-review.md#gmail-access).
 | 2026-10-01 | FOSS only for everything Towpath includes or bundles; Inbox Zero excluded (license adds commercial and enterprise restrictions) | Superseded the same day |
 | 2026-10-01 | License policy: open source and free for personal use qualifies; personal-use-only components stay optional and labeled; Inbox Zero becomes a candidate again | Accepted |
 | 2026-10-01 | Tooling review completed; recommendations R14 to R20 added; D14 partly settled; D15 opened | Research |
+| 2026-10-01 | D15: Inbox Zero integrated as an optional Compose service for mail management; D1 revised so `towpath-act` handles deliveries; D8, D11, D12 scoped to Towpath-built features | Accepted |

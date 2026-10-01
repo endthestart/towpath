@@ -11,7 +11,7 @@ Towpath is one Python codebase ([D2](decisions.md#d2-implementation-language-and
 | `towpath-web` | Login, UI, review and approval screens, configuration; links to each service's connection setup | None for external accounts | Yes |
 | `towpath-worker` | Analysis jobs, scans, classification, draft generation, claim proposals, question answering; the only service that calls models | Model endpoints only | Yes |
 | `towpath-connect` | Read adapters for mail, contacts, document systems, photo libraries, calendars; fetches content on request; runs read-only connection setup | Read access to connected accounts and tools | Yes, once anything is connected |
-| `towpath-act` | Executes approved, frozen proposals: mailbox changes, drafts if allowed, deliveries to document or photo systems; runs write-access connection setup | Write access, per allowlisted action | No; added in [roadmap](roadmap.md) milestone 5 |
+| `towpath-act` | Executes approved, frozen proposals: deliveries to document or photo systems; runs write-access connection setup for them | Write access to destinations, per allowlisted action | No; added with attachment routing ([roadmap](roadmap.md)) |
 
 **Why web and worker hold no account credentials.** Worker parses untrusted mail and sends it to models; web renders it. If injected content or a bug subverts either, it should find nothing that can read more of an account or change one.
 
@@ -22,7 +22,8 @@ Towpath is one Python codebase ([D2](decisions.md#d2-implementation-language-and
 | Compose profile | Services | Purpose |
 | --- | --- | --- |
 | default | `towpath-web`, `towpath-worker`, `towpath-connect` | Mail management review and life stream, read-only |
-| `actions` | `towpath-act` | Approved mailbox changes and deliveries |
+| `mail` | The mail-management provider, Inbox Zero first, with its database and cache ([mail management](mail-management.md)) | Mail management with its own Gmail write access; can instead point at an existing instance |
+| `actions` | `towpath-act` | Approved deliveries to destinations |
 | `models` | A bundled OpenAI-compatible model server ([candidates](integrations.md#models)) | For people without an existing endpoint |
 | `documents` | A bundled document system ([candidates](integrations.md#documents)) | For people without an existing one |
 | `photos` | A bundled photo library ([candidates](integrations.md#photos)) | For people without an existing one |
@@ -39,7 +40,7 @@ Human decisions are kept apart from everything rebuildable, so backups can focus
 | --- | --- | --- | --- | --- |
 | Source index | `towpath-connect` | worker, web, act (IDs only) | Connections, sync runs, cursors, item metadata and part structure, dated observations (labels, folders), content cache, external references (document and photo IDs) | Mostly, by resyncing |
 | Work queue | web and worker (append only) | `towpath-connect` | Content requests: which item or part to fetch, for which feature | Yes |
-| Derived store | worker | web | Classifications, sender and list profiles, triage results, proposals, scans and matches, people and event candidates, proposed claims, embeddings | Yes |
+| Derived store | worker | web | Classifications, proposals, scans and matches, people and event candidates, proposed claims, embeddings | Yes |
 | Decisions store | web | worker, act | Approvals with frozen proposal copies, rejections, corrections, accepted claims, recollections, audience and model-use settings, source grants, model endpoint grants, preservation choices | **No.** Back this up |
 | Preserved artifacts | worker, on a recorded preservation choice | web | Exact bytes a person chose to keep, content-addressed, with provenance ([preserved artifacts](scans-and-destinations.md#preserved-artifacts)) | **No.** Back this up |
 | Model ledger | worker | web | Endpoint profiles in use, capability reports, call records | No; audit record |
@@ -65,8 +66,8 @@ Source grants decide which features may use which source: a mailbox connected fo
 
 | Mode | Services | Notes |
 | --- | --- | --- |
-| Mail management, review only | default profile | Approved items export as checklists or generated filter files |
-| Mail management with actions | adds `actions` | Tier 1 mailbox changes and deliveries per [D1](decisions.md#d1-mailbox-and-destination-execution) |
+| Mail management | `mail` profile (or an existing Inbox Zero instance) | Towpath shows an overview and links into it |
+| Attachment routing | default profile plus `actions` | Approved deliveries to a document system or photo library |
 | Life stream from mail | default profile | Needs a life grant on the mail connection |
 | Life stream without mail | default profile | Contacts, photo library, document system, calendars, recollections |
 | Existing tools | default profile plus connections | Point at existing document or photo systems and model endpoints |
@@ -75,7 +76,7 @@ Source grants decide which features may use which source: a mailbox connected fo
 ## One message, end to end
 
 1. `towpath-connect` indexes a message: native IDs, labels observed at this sync, dates, and MIME part structure. No body or attachment is downloaded yet.
-2. Worker's triage rules need the body, so worker enqueues a content request; `towpath-connect` fetches that one message and caches it.
-3. Worker classifies it and, if a model task is bound and the data class is granted, calls the endpoint. It proposes a label and notes a PDF attachment that a scan matches for the document system.
-4. The person approves the label in the web UI and approves sending the PDF to their document system. Web records both approvals with frozen copies.
-5. `towpath-act` rechecks the message's labels, applies the label, uploads the PDF, and writes receipts. The next sync observes the new label; the document system now holds the PDF, and Towpath stores its document ID as a reference.
+2. A scan needs the attachment's bytes to hash it, so worker enqueues a content request; `towpath-connect` fetches that one part and caches it.
+3. A scan for PDF statements matches its attachment, and the document system does not hold that file yet, so worker proposes a delivery.
+4. Separately, the mail-management tool may label or archive the same message under its own rules; the next sync observes that as a dated change.
+5. The person approves sending the PDF to their document system. Web records the approval with a frozen copy; `towpath-act` checks the document system for the file's hash, uploads it, and writes a receipt. Towpath stores the new document ID as a reference.

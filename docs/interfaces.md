@@ -163,7 +163,7 @@ A proposal is created by worker (rules or a model). It describes one action type
 }
 ```
 
-Action types allowlisted by [D1](decisions.md#d1-mailbox-and-destination-execution): `label.add`, `label.remove`, `archive`, `mark.read`, `mark.unread`, and `deliver` ([scans and destinations](scans-and-destinations.md#delivery-proposal)). `draft.create` and `filter.create` depend on [D11](decisions.md#d11-draft-replies) and [D12](decisions.md#d12-smart-rules).
+Towpath's action runner currently allows only `deliver` ([scans and destinations](scans-and-destinations.md#delivery-proposal)); mailbox changes belong to the integrated mail-management tool ([D1](decisions.md#d1-mailbox-and-destination-execution)). The `label.add` example shows the shape a mailbox action would take if Towpath builds its own later.
 
 States: `proposed` → `approved` or `rejected`; `approved` → `executed`, `partially-executed`, `failed`, or `stale`; any open proposal → `expired`. A later sync that changes a target's state makes an unexecuted proposal `stale`.
 

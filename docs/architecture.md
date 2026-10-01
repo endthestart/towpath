@@ -10,10 +10,10 @@ It has two capabilities that share one application:
 
 | Capability | What a person does with it | First source | Changes anything outside Towpath? |
 | --- | --- | --- | --- |
-| [Mail management](mail-management.md) | Review unsubscribes, find important unanswered mail, draft replies, categorize, create smart rules, route attachments to the tools that should hold them | A Gmail account (more providers later) | Only approved actions, through the separate action runner |
+| [Mail management](mail-management.md) | Unsubscribe, find important unanswered mail, draft replies, categorize, run smart rules and digests (through an integrated mail-management tool, Inbox Zero first); route attachments to the tools that should hold them (Towpath) | A Gmail account (more providers later) | Yes: the integrated tool changes the mailbox under its own settings; Towpath's deliveries go through its action runner after approval |
 | [Life stream](life-stream.md) | Find people, events, places, photos, and documents across connected sources; review claims with citations and uncertain dates; ask questions with cited answers; later, curate a story to share | Mail, then contacts, photo libraries, document systems, calendars, and recollections | No |
 
-Mail management is useful on its own. The life stream is built after it and starts from mail, but its design does not depend on mail: any connected source can supply evidence.
+Mail management needs write access to the mailbox; the life stream does not. Mail management is useful on its own. The life stream is built after it and starts from mail, but its design does not depend on mail: any connected source can supply evidence.
 
 ## Integrate first
 
@@ -40,7 +40,7 @@ flowchart LR
         Connect[towpath-connect: read adapters, read credentials]
         Act[towpath-act: action runner, write credentials]
         DB[(Towpath stores)]
-        Bundled[Optional bundled tools: model server, search, document system, photo library]
+        Bundled[Optional bundled tools: mail management, model server, document system, photo library]
     end
 
     subgraph External[Already deployed or hosted elsewhere]
@@ -62,7 +62,7 @@ flowchart LR
     Worker --> Bundled
     Web --> DB
     Web -- approved, frozen proposals --> Act
-    Act --> Mail
+    Bundled -- mail-management tool, own write access --> Mail
     Act --> Docs
     Act --> Photos
 ```
@@ -72,8 +72,8 @@ Each external tool can be replaced by its bundled equivalent, or left out. [Comp
 ## Design rules
 
 1. **AI proposes; evidence establishes.** Rules and models produce proposals. A fact is accepted only by a person, against cited evidence. A booking email supports "a trip was planned", not "the trip happened".
-2. **Proposals, not actions.** Every change outside Towpath (a label, a draft, a document upload) is a proposal until a person approves it, and only the action runner carries it out. Model output can never become an approval.
-3. **Credentials follow services.** The service that parses untrusted content and calls models holds no account credential. Read credentials live in `towpath-connect`; write credentials live only in `towpath-act`. Each credential-holding service runs its own connection setup, so the web UI never handles the token.
+2. **Proposals, not actions, in Towpath.** Every change Towpath itself makes outside its own stores (for example a document upload) is a proposal until a person approves it, and only the action runner carries it out. Model output can never become an approval. An integrated tool, such as the mail-management provider, acts under its own settings, which the owner configures.
+3. **Credentials follow services.** The service that parses untrusted content and calls models holds no account credential. Read credentials live in `towpath-connect`; Towpath's write credentials live only in `towpath-act`; an integrated tool keeps its own credentials in its own container. Each credential-holding service runs its own connection setup, so the web UI never handles the token.
 4. **Index broadly, fetch narrowly.** With read access to a whole mailbox, Towpath indexes metadata and part structure and fetches content one item at a time when a feature needs it. Read access is not a copy.
 5. **Reference what others own.** Photos, documents, and messages stay in their systems. Towpath stores stable references and, only by explicit choice, a preserved copy of evidence that might otherwise disappear.
 6. **Audience and model use from the start.** Every item and claim has an audience (who may see it) and a model-use setting (where it may be processed), set independently. Items excluded from model use never go to a model, whatever endpoint grants exist ([life stream](life-stream.md#audience-and-model-use)).
@@ -84,7 +84,7 @@ Each external tool can be replaced by its bundled equivalent, or left out. [Comp
 
 **Moving mail out of a provider.** The owner may someday move historical Gmail into a local archive. That is a separate personal project with its own tools. Towpath never requires it, does not plan around it, and has no features for it. If someone later has a local mail archive, Towpath can read it as an ordinary optional source like any other ([integrations](integrations.md#sources)).
 
-**Replacing existing tools.** Towpath does not aim to be a document manager, photo library, mail server, or archive.
+**Replacing existing tools.** Towpath does not aim to be a document manager, photo library, mail server, or archive, and it uses an existing mail-management tool while that tool fits.
 
 ## Public deployment contract
 

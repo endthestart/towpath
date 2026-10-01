@@ -31,12 +31,11 @@ For every candidate, record:
 
 | Need | Candidate | License class | Role | Finding |
 | --- | --- | --- | --- | --- |
-| Gmail read and tier 1 actions | Google API Python client | Open source (Apache-2.0) | Library in `towpath-connect` and `towpath-act` | `gmail.readonly` gives part structure without attachment bytes; `gmail.modify` can also send, so the action runner enforces a call allowlist |
+| Mail management (categories, reply tracking, unsubscribe, drafts, rules, digest) | Inbox Zero | Personal-use terms | Optional Compose service `mail`: Towpath's first mail-management provider ([D15](decisions.md#d15-role-of-inbox-zero)) | Holds its own Gmail write access; rules act automatically; accepts an OpenAI-compatible endpoint; API and webhook action to verify ([mail management](mail-management.md#integration-points)) |
+| Gmail read access for Towpath | Google API Python client | Open source (Apache-2.0) | Library in `towpath-connect` | `gmail.readonly` gives part structure without attachment bytes |
 | MIME parsing | Python `email` and `mailbox`; optionally mail-parser | Open source | Library | Standard library is enough for the first slice |
-| Clean text for reply detection and drafting | talon | Open source (Apache-2.0) | Optional library | Strips quoted replies and signatures |
-| Filter files (D12) | Towpath's own small XML writer, using gmailctl as the format reference; optionally the gmailctl binary for export only | Open source (MIT) | Library or bundled CLI | Importing through Gmail settings needs no API permission |
-| Unsubscribe parsing, bulk detection, awaiting-reply | Towpath code | — | — | No maintained library; standard headers and thread history |
-| Rules, reply tracking, unsubscribe, drafting design | Inbox Zero | Personal-use terms | Design reference | Requires write scopes, runs rules automatically (including sending), needs Postgres and Redis; not bundled ([review](research/2026-10-tooling-review.md#mail-management)) |
+| Clean text for life-stream extraction | talon | Open source (Apache-2.0) | Optional library | Strips quoted replies and signatures |
+| Alternatives or Towpath-built replacements, later | gmailctl (filter export), MailScrub and gmail-cleaner (unsubscribe ideas) | Open source (MIT) | Reference | Only if the provider stops fitting |
 | Other providers, later | IMAPClient or imap_tools; JMAP clients | Open source | Library | IMAP credentials are all-or-nothing |
 | Full local Gmail sync | lieer with notmuch, Got Your Back | Open source | Not used | Full-copy model and broad scopes do not fit fetching narrowly |
 
@@ -101,4 +100,4 @@ Destinations report different hash algorithms, so presence checks compute the al
 
 ## What Towpath writes itself
 
-The UI and review workflow; adapters to each tool above; unsubscribe, bulk-mail, and awaiting-reply rules; the filter file writer; the proposal, approval, and receipt model; the action runner and its allowlist; the evidence, claim, and correction model of the [life stream](life-stream.md); the model gateway and fallback ladder; and the Compose file.
+The UI and review workflow; adapters to each tool above, including the mail-management provider interface; the proposal, approval, and receipt model; the action runner and its allowlist; the evidence, claim, and correction model of the [life stream](life-stream.md); the model gateway and fallback ladder; and the Compose file.

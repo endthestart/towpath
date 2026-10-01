@@ -1,6 +1,6 @@
 # Tooling review, October 2026
 
-Status: **research, not adopted architecture.** This note records what existing tools could do for Towpath as of 2026-10-01. Decisions taken from it are in [decisions](../decisions.md); the working candidate list is [integrations](../integrations.md). Re-check anything here before depending on it.
+Status: **research, not adopted architecture.** After this review the owner chose to integrate Inbox Zero as the first mail-management provider ([D15](../decisions.md#d15-role-of-inbox-zero)), superseding recommendation 5 below. This note records what existing tools could do for Towpath as of 2026-10-01. Decisions taken from it are in [decisions](../decisions.md); the working candidate list is [integrations](../integrations.md). Re-check anything here before depending on it.
 
 ## Method
 

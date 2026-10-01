@@ -2,73 +2,75 @@
 
 Status: **designed, not built.** Nothing in this repository accesses or changes a live mailbox.
 
-Mail management is Towpath's first capability: a person connects a mailbox (Gmail first, [D3](decisions.md#d3-first-real-mail-source)) and works through suggestions that help them handle mail that stays at the provider. No single existing mail-management application covers this well enough to adopt wholesale, so Towpath builds the review experience and borrows ideas and libraries where they fit ([integrations](integrations.md#mail)).
+## Approach
 
-## Features
+Mail management needs write access to the mailbox: labeling, archiving, unsubscribing, drafting, and rules all change it. The life stream does not. So the two are handled differently:
 
-| Feature | What the person sees | Signals used | Model needed? | Output |
-| --- | --- | --- | --- | --- |
-| Categorize | Mail grouped into people, lists and newsletters, receipts and transactions, notifications, promotions, travel, and custom categories | Headers (`List-Id`, `List-Unsubscribe`, `Precedence`), sender history, provider categories observed at sync, person's corrections | Optional, for ambiguous mail | Category labels proposed; Towpath-only tags immediately |
-| Important and unanswered | Threads where a real person wrote to them, expects a reply, and has not had one | Direct addressing, sender is a known correspondent, earlier replies, question detection, age | Optional, for "does this need a reply?" | A review list; nothing changes in the mailbox |
-| Unsubscribe review | Senders and lists ranked by volume and engagement, with each declared unsubscribe method and its destination | Volume, unread ratio, last opened or replied, `List-Unsubscribe` and one-click headers | No | The person acts; the UI says when a method (such as a one-click POST) cannot be completed by following a link ([D8](decisions.md#d8-unsubscribe-handling)) |
-| Draft replies | A suggested reply for a chosen thread, editable in Towpath | Thread content, person's past replies to this correspondent (if granted) | Yes | Text to copy into Gmail ([D11](decisions.md#d11-draft-replies)); never sent by Towpath |
-| Smart rules | "Important but not daily" mail, such as statements or school updates, handled without inbox noise | Categories plus the person's corrections | Optional | A Towpath digest, plus a preview of the matching Gmail filter for the person to create ([D12](decisions.md#d12-smart-rules)) |
-| Route attachments | PDFs and photos found in mail, compared against the document system or photo library | Part structure, content hashes, destination contents | No | Delivery proposals ([scans and destinations](scans-and-destinations.md)) |
-| Search | Full-text search across indexed and fetched mail | Index, cached content | No | Results with links to the message at the provider |
+- **Mail management uses an integrated mail-management tool** that already does the work well, running as an optional service in Towpath's Docker Compose file and holding its own Gmail write access. The first is [Inbox Zero](https://github.com/elie222/inbox-zero) ([D15](decisions.md#d15-role-of-inbox-zero)). Towpath integrates with it rather than rebuilding it.
+- **Towpath's own mail access is read-only** (`gmail.readonly` in `towpath-connect`), used for the life stream and for finding attachments to route to other tools.
 
-Corrections are first-class. When a person moves a message to another category or dismisses an "unanswered" item, the correction is stored in the decisions store and outranks rules and models on the next run.
+The integration sits behind a *mail-management provider* interface, so an alternative tool can be added, or Towpath can build its own features and replace the provider later, without changing the rest of Towpath.
 
-## Action tiers
+## Who does what
 
-Actions differ in reversibility, in whether they affect future mail, and in whether they reach a third party.
+| Feature | Provided by | Notes |
+| --- | --- | --- |
+| Categorize, with corrections | Inbox Zero | Its rules and learned corrections |
+| Important and unanswered | Inbox Zero | Its reply tracking ("to reply", "awaiting reply") |
+| Unsubscribe | Inbox Zero | Its bulk unsubscriber |
+| Draft replies | Inbox Zero | Drafts created in Gmail; sending stays with the person, per the rules they configure |
+| Smart rules and digest | Inbox Zero | Its rules and digest action |
+| Route PDFs and photos to a document system or photo library | Towpath | [Scans and destinations](scans-and-destinations.md); Inbox Zero files only to cloud drives |
+| Search across mail and other sources | Towpath | Full-text search over Towpath's index, linked to life-stream evidence |
+| Overview in Towpath's front end | Towpath | Status, links into Inbox Zero, and summaries read from its API |
 
-| Tier | Examples | Reversible? | Effects outside the account | Home |
-| --- | --- | --- | --- | --- |
-| 0. Towpath only | Tags, notes, triage status, dismissals | Yes | None | `towpath-web`; no provider permission |
-| 1. Message state | Add or remove a label, mark read, archive (leave the inbox) | Yes, by the inverse action | None | `towpath-act` ([D1](decisions.md#d1-mailbox-and-destination-execution), accepted) |
-| 1d. Draft | Create a draft reply in the mailbox | Yes, delete the draft | None until a person sends it themselves | Deferred ([D11](decisions.md#d11-draft-replies)): the needed scope also allows sending |
-| 2. Standing rules | Create a filter or server-side rule | Yes, but it silently affects future mail | None | Previewed for the person to create; file export after testing; API creation later at most ([D12](decisions.md#d12-smart-rules)) |
-| 3. External requests | Unsubscribe by one-click POST or by sending mail | No | Confirms to the sender that the address is live | Person acts on the presented link ([D8](decisions.md#d8-unsubscribe-handling)) |
-| 4. Trash | Move to Trash | Within the provider's retention window | None | Needs its own decision |
-| 5. Permanent deletion | Delete bypassing Trash | No | None | Never a Towpath action |
+## Integration points
 
-## Provider permission realities
+| Point | Direction | Purpose | Status |
+| --- | --- | --- | --- |
+| Compose profile `mail` | — | Runs Inbox Zero with its database and cache; can instead point at an existing instance | To build |
+| Google Cloud project | Shared setup | One project per self-hoster with two OAuth consents: Inbox Zero's (write scopes) and Towpath's (`gmail.readonly`). Separate tokens, separate containers | To document |
+| Model endpoint | Configuration | Inbox Zero accepts an OpenAI-compatible base URL; Towpath's setup points it at an endpoint the owner chooses | To verify |
+| Inbox Zero API | Towpath reads | Rules, senders and unsubscribe status, statistics for Towpath's overview | To verify |
+| Inbox Zero webhook action | Inbox Zero calls Towpath | A rule can notify Towpath, for example "receipt with a PDF arrived", to trigger a scan | To verify |
+| Links | Towpath to Inbox Zero | Open Inbox Zero's own screens for detailed work | To build |
 
-A narrow provider credential is only partly possible, so the boundary is built from Towpath's own service and data controls.
+## Caveats
 
-- **Gmail API.** The scope needed to apply labels or archive appears also to allow reading and sending; creating drafts needs `gmail.compose`, which Google documents as including sending; filters need a separate settings scope. Reading can use a read-only scope. Each self-hoster registers their own OAuth client, and unverified clients face consent-screen and token-lifetime limits. All of this is on the [facts to verify](decisions.md#facts-to-verify-before-implementation) list.
-- **IMAP with an app password.** All-or-nothing: the password can read, change, and delete everything.
-- **JMAP providers.** Some issue read-only API tokens, which suits reading. Write tokens are still broad within mail.
+- **Automatic actions.** Inbox Zero's rules run automatically and can label, archive, draft, reply, forward, send, or delete, depending on how the person configures them. Towpath's approve-before-act model does not apply inside Inbox Zero; its own settings do. The setup guide should recommend starting with rules limited to labeling, archiving, and drafting.
+- **Model policy.** Towpath's endpoint grants and item-level model use ([model providers](model-providers.md), [life stream](life-stream.md#audience-and-model-use)) do not govern what Inbox Zero sends to its model. Pointing it at an endpoint the owner controls is how [D6](decisions.md#d6-remote-model-use) applies to it.
+- **Its own copy of data.** Inbox Zero stores data about mail in its own database. That data belongs to Inbox Zero's service, not to Towpath's stores, and is backed up or deleted with it.
+- **License.** Inbox Zero is AGPL-3.0 with added terms that are free for personal use but restrict commercial use and organizations of five or more business users. Under the [license policy](integrations.md) it is an optional profile, labeled with those terms; Towpath's code does not depend on or copy it.
+- **Fit must be confirmed.** Before relying on it, a hands-on evaluation on the owner's own account should check the points marked "to verify" above, which actions can be disabled, and how well its classification works with a local model.
 
-So the action runner's narrowness comes from: being the only service with the write token; an action allowlist configured at the runner, not in the web or worker; acting only on frozen, human-approved proposals; and rechecking provider state per item.
+## If Towpath builds its own features later
 
-## Options for executing mailbox changes
+If Inbox Zero stops fitting, or a Towpath-native feature replaces part of it, the earlier design applies. It is kept here so the provider interface does not paint Towpath into a corner.
 
-| Option | Description | Boundary strength | Usefulness | Cost | Main risk |
-| --- | --- | --- | --- | --- | --- |
-| A. Review only | Approved proposals export as a checklist or search query for manual use | Strongest; no write credential | Low for bulk work | Lowest | Tedious; people grant broad access to another tool instead |
-| B. Writes in web or worker | The service that handles untrusted content also holds the write credential | Weakest | High | Low | Prompt injection or a bug reaches a write path |
-| C. Separate action runner | `towpath-act` with its own credential, allowlist, recheck, and receipts | Strong | High | Medium | Runner bugs; broad provider scopes |
-| D. External executor | Another tool consumes Towpath's approved proposals | Strong for Towpath | Depends on the tool | Split across projects | Proposal format becomes a public contract early |
-| E. Provider-native rules | Towpath generates filters the person installs; the provider applies them | Strong for Towpath | High for recurring mail; none for backlog | Low | Rules act silently on future mail |
+**Action tiers**
 
-**Decision ([D1](decisions.md#d1-mailbox-and-destination-execution), accepted):** C for tier 1 changes and for deliveries; rules start as previews the person creates ([D12](decisions.md#d12-smart-rules)). Until the action runner exists (roadmap milestone 5), mail management works in A plus E mode with no write credential anywhere.
+| Tier | Examples | Reversible? | Effects outside the account |
+| --- | --- | --- | --- |
+| 0. Towpath only | Tags, notes, triage status | Yes | None |
+| 1. Message state | Labels, mark read, archive | Yes, by the inverse action | None |
+| 1d. Draft | Create a draft reply | Yes, delete the draft | None until sent |
+| 2. Standing rules | Create a filter | Yes, but silently affects future mail | None |
+| 3. External requests | Unsubscribe by one-click POST or mail | No | Confirms the address is live to the sender |
+| 4. Trash | Move to Trash | Within the retention window | None |
+| 5. Permanent deletion | Delete bypassing Trash | No | None |
 
-## Action runner contract
+**Provider permissions.** No Gmail scope allows labeling or archiving without also allowing sending (`gmail.modify`); drafts need `gmail.compose`, which also sends; filters need `gmail.settings.basic` ([tooling review](research/2026-10-tooling-review.md#gmail-access)).
+
+**Options for executing changes.** Review-only export; writes inside the service that parses mail (weakest); a separate action runner with its own credential and allowlist (`towpath-act`); an external executor such as an integrated tool; or provider-native filters the person installs. Towpath now uses the integrated-tool option for mailbox changes and keeps `towpath-act` for deliveries to destinations ([D1](decisions.md#d1-mailbox-and-destination-execution)).
+
+**Action runner contract** (applies to `towpath-act` today for deliveries, and to any future Towpath mailbox actions):
 
 - Inputs: approval records with their frozen proposals, and the runner's own allowlist. It ignores classifications, model output, and life-stream data.
-- Before acting: verify the proposal digest; refuse action types not allowlisted and expired proposals; recheck each target with the provider.
+- Before acting: verify the proposal digest; refuse action types not allowlisted and expired proposals; recheck each target.
 - While acting: rate-limit; stop the batch on an unexpected error class; never retry a non-idempotent action without a fresh recheck.
-- After acting: write a receipt per item; generate an inverse proposal for undo; return changed or failed items for review.
-- Safeguards for mailbox changes: per-batch cap and a dry-run mode that rechecks without acting.
-- Never: permanent deletion, sending mail, or changing account settings outside an allowlisted rule type. Because `gmail.modify` also permits sending, the runner allows only specific API calls (message label changes and label definitions), and tests assert that no send, draft, or delete call exists in its code path.
+- After acting: write a receipt per item; generate an inverse proposal where one exists; return changed or failed items for review.
+- If it ever holds a Gmail write token: allow only specific API calls, with tests asserting that no send or delete call exists in its code path ([R16](decisions.md#recommendations-in-this-design)).
 
 ## Prompt injection and model output
 
-Mail is untrusted input. Model endpoints receive no tools. A model can suggest a category, a reason, or draft text, and the result records that it was model-produced. A model cannot approve, change an allowlist, or reach the action runner. Review screens show exact targets and observed state, not only a model summary. Draft text is shown in full before any draft is created.
-
-## Example
-
-1. Towpath finds 40 recurring newsletters. It ranks them by volume and engagement and shows each one's unsubscribe link. The person unsubscribes from 12 using the shown methods, and creates the previewed "Newsletters, skip inbox" filter in Gmail for the rest.
-2. It finds 6 threads from known correspondents asking questions, with no reply. The person drafts replies for two in Towpath and copies them into Gmail.
-3. A scan finds 30 PDF statements; 22 are already in the document system. The person approves delivering the other 8, and `towpath-act` records each new document ID.
+Mail is untrusted input. In Towpath, model endpoints receive no tools; a model can suggest a category, a reason, or text, and the result records that it was model-produced. It cannot approve anything or reach the action runner. Inbox Zero's own handling of model output is governed by its rules and settings, which is one more reason to start it with limited actions.

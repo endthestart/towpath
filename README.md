@@ -6,7 +6,7 @@ Towpath is an open-source, self-hosted web application for managing your digital
 
 ## What it will do
 
-- **Mail management:** connect a mailbox (Gmail first) and review suggestions: unsubscribe candidates, important mail still waiting for your reply, draft replies, categories, smart rules for mail that matters but doesn't need daily reading, and attachments that belong in your document system or photo library. Approved, reversible changes run through a separately permissioned action runner; permanent deletion is never a Towpath action.
+- **Mail management:** unsubscribing, important mail still waiting for your reply, draft replies, categories, and smart rules come from an integrated mail-management tool (Inbox Zero first) running in Towpath's Compose setup with its own Gmail access. Towpath adds routing attachments to your document system or photo library, through a separately permissioned action runner after you approve.
 - **Life stream:** find people, events, places, photos, and documents across connected sources and turn them into reviewable claims with citations, uncertain dates, and visible contradictions. Ask questions and get cited answers. In the long term, curate a story to share with family. It starts from mail but works with any source.
 
 ## How it is built

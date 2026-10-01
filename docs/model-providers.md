@@ -96,6 +96,8 @@ The inference gateway runs in `towpath-worker` and is the only Towpath code that
 
 Endpoints receive no tools and no credentials for other services. Output is treated as a proposal.
 
+**Integrated tools have their own model settings.** A tool such as the mail-management provider calls its own configured model directly, outside this gateway, so Towpath's grants and item-level model use do not govern it. Towpath's setup points such tools at an endpoint the owner chooses and shows which endpoint each one uses ([mail management](mail-management.md#caveats)).
+
 ## Endpoint examples
 
 All of these are configured the same way and none is preferred by Towpath: a local llama.cpp or other compatible server, Ollama's OpenAI-compatible API, Poundlock or another self-hosted gateway, or OpenAI's API ([chat completions reference](https://developers.openai.com/api/reference/cli/resources/chat/subresources/completions), [embeddings guide](https://developers.openai.com/api/docs/guides/embeddings)) configured with a `third-party` destination.
