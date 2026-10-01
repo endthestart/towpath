@@ -28,11 +28,11 @@ A run that ends early records `complete: false`; the coverage report shows the g
   "display_name": "Synthetic account A",
   "authority": "read",
   "capabilities": ["enumerate", "fetch_raw", "labels", "incremental_cursor"],
-  "retention": "full-content"
+  "retention": "on-demand"
 }
 ```
 
-`kind` is one of `mail-provider`, `mail-archive`, `calendar-file`, `document`, `media-metadata`. `retention` is one of `metadata-only`, `full-content`, `on-demand` (content fetched when needed and evicted later); the choice is an [owner decision](decisions.md#d5-content-retention).
+`kind` is one of `mail-provider`, `mail-archive`, `calendar-file`, `document`, `media-metadata`, `destination-index`. Every item's metadata and part structure is always indexed. `retention` controls content: `on-demand` (the default: fetched when a rule, scan, or person needs it, then evictable), `full-content`, or `metadata-only`. See [decision D5](decisions.md#d5-content-retention). Durable copies are a separate, explicit choice ([preserved artifacts](scans-and-destinations.md#preserved-artifacts)).
 
 ### Occurrence
 
@@ -60,13 +60,18 @@ One record per item per source. Observed state is a dated observation, not a fac
     "labels": ["INBOX", "Newsletters-Candidate"],
     "unread": true
   },
+  "parts": [
+    {"part_id": "1", "media_type": "text/plain", "bytes": 2210, "disposition": "inline"},
+    {"part_id": "2", "media_type": "application/pdf", "bytes": 48213, "disposition": "attachment",
+     "file_name": "issue-42.pdf", "sha256": null}
+  ],
   "first_seen_run": "run_0003",
   "absent_since_run": null,
   "content_ref": "cache:sha256/3b1f…"
 }
 ```
 
-`raw_sha256` covers the exact bytes the source returned. `normalized_sha256` covers decoded headers that survive export (From, To, Cc, Date, Subject, Message-ID) and decoded body parts, so a provider copy and an archive copy can match even when the archive adds headers. The normalization algorithm is part of the schema version.
+`parts` comes from the provider's structure listing where available, without downloading attachments; a part's `sha256` is filled when its bytes are first fetched. `raw_sha256` covers the exact bytes the source returned. `normalized_sha256` covers decoded headers that survive export (From, To, Cc, Date, Subject, Message-ID) and decoded body parts, so a provider copy and an archive copy can match even when the archive adds headers. The normalization algorithm is part of the schema version.
 
 ### Cross-source match
 
@@ -81,7 +86,7 @@ One record per item per source. Observed state is a dated observation, not a fac
 }
 ```
 
-`strength` is one of `exact-raw`, `normalized-content`, `message-id-only`, `conflict` (same Message-ID, different content). A match links occurrences; it never merges them.
+Matches also link a candidate attachment to a destination index entry by SHA-256 ([destinations](scans-and-destinations.md#destination-connectors)). `strength` is one of `exact-raw`, `normalized-content`, `message-id-only`, `conflict` (same Message-ID, different content). A match links occurrences; it never merges them.
 
 ### Coverage report
 
@@ -100,6 +105,23 @@ One record per item per source. Observed state is a dated observation, not a fac
   "advisory": "Report only. Not an authorization to delete provider mail."
 }
 ```
+
+### Content request
+
+The app cannot fetch from a source. It asks `towpath-connect` through the work queue:
+
+```json
+{
+  "schema": "towpath.content-request/0",
+  "request_id": "req_0301",
+  "occurrence_id": "occ_0071",
+  "part_id": "2",
+  "requested_by": "scan_0011",
+  "priority": "background"
+}
+```
+
+`towpath-connect` fetches only that occurrence or part, verifies or records its hash, caches it, and marks the request done or failed. Scans process mail one item at a time this way, so read access to a whole account does not mean copying the whole account.
 
 ## 2. Source read API (app reads the source store)
 
@@ -187,7 +209,8 @@ The executor, if one exists, recomputes the digest, refuses action types not on 
   "when": {"expression": "mid-May 2026", "earliest": "2026-05-10", "latest": "2026-05-20", "precision": "range"},
   "citations": [
     {"occurrence_id": "occ_0055", "part": "text/plain", "span": [120, 188],
-     "excerpt_sha256": "77ab…", "captured_excerpt": "Your booking for Example City, 14–17 May, is confirmed."}
+     "excerpt_sha256": "77ab…", "captured_excerpt": "Your booking for Example City, 14–17 May, is confirmed.",
+     "preserved": {"level": "item", "artifact_sha256": "a90c…"}}
   ],
   "producer": "rules/travel-confirmation@0",
   "state": "proposed",
@@ -195,7 +218,7 @@ The executor, if one exists, recomputes the digest, refuses action types not on 
 }
 ```
 
-`modality` distinguishes `plan`, `occurred`, `recollected`, and `inferred`. `captured_excerpt` is filled when the claim is accepted, subject to the retention policy. A recollection citation points to a recollection version in the life store instead of an occurrence.
+`modality` distinguishes `plan`, `occurred`, `recollected`, and `inferred`. `captured_excerpt` is filled when the claim is accepted. `preserved` is optional: the person can also keep the whole message (`item`) or one attachment (`part`) as a [preserved artifact](scans-and-destinations.md#preserved-artifacts) when the source itself is valuable. A recollection citation points to a recollection version in the life store instead of an occurrence.
 
 ## 5. Inference gateway (inside the app)
 
@@ -203,8 +226,12 @@ The executor, if one exists, recomputes the digest, refuses action types not on 
 infer(task, input_parts, data_class, output_schema | none) -> InferenceResult | Disabled(reason) | Failed(reason)
 ```
 
-The caller names a task (for example `mail.classify`), never an endpoint. The gateway looks up the task binding, checks the endpoint's destination class and data-class grant, picks the structured-output method from the endpoint's capability report, validates the output, and writes a ledger record. See [model providers](model-providers.md). Model output enters the mail store or life store only as a proposal.
+The caller names a task (for example `mail.classify`), never an endpoint. The gateway looks up the task binding, checks the endpoint's destination class and data-class grant, picks the structured-output method from the endpoint's capability report, validates the output, and writes a ledger record. See [model providers](model-providers.md). Model output enters the mail, scan, or life store only as a proposal.
 
-## 6. Export for an independent archive or migration
+## 6. Scans, destinations, and preserved artifacts
 
-Towpath can export proposals, coverage reports, and accepted claims with citations as JSON Lines using the schemas above. An external tool, including the Gmail evacuation project, may consume these files. Nothing in an export grants authority to act.
+Selector, delivery proposal, and artifact records are defined in [scans and destinations](scans-and-destinations.md).
+
+## 7. Export for an independent archive or migration
+
+Towpath can export proposals, coverage reports, preserved artifacts with provenance, and accepted claims with citations as JSON Lines using the schemas above. An external tool, including the Gmail evacuation project, may consume these files. Nothing in an export grants authority to act.

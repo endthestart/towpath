@@ -10,10 +10,11 @@ The slice should prove or disprove these design claims before any real mailbox i
 2. Occurrences, dated observations, and absence records hold up under resync, interruption, and deletion at the source.
 3. Cross-source matching with strengths produces an honest coverage report.
 4. Proposals freeze exact targets and observed state, become stale correctly, and have no execution path.
-5. The mail module runs with the life module disabled, and never writes outside its own store.
-6. The connector role and the app role can run as separate invocations that share only the source store.
+5. Indexing every item while fetching content only on request supports generic scans, such as "find PDF attachments not already in a destination".
+6. The mail module runs with the life module disabled, and never writes outside its own store.
+7. The connector role and the app role can run as separate invocations that share only the source store.
 
-It deliberately leaves out models, the life module, any UI beyond a CLI, real provider APIs, and the executor.
+It deliberately leaves out models, the life module, any UI beyond a CLI, real provider APIs, deliveries, and the action runner.
 
 ## Synthetic data
 
@@ -23,6 +24,7 @@ A seeded generator produces the same fixture on every run. Fixtures use reserved
 | --- | --- | --- |
 | Provider A | JSON file simulating a provider: native IDs, thread IDs, labels, received times, a change cursor, raw RFC 5322 bytes | About 30 messages |
 | Provider B | Same form, second account | About 10 messages, one sharing a Message-ID with provider A |
+| Destination folder | Plain directory of files simulating a document system's import folder | A few PDFs, one byte-identical to a fixture attachment |
 | Archive | Maildir plus the draft manifest from [archive adapter](archive-adapter.md#draft-manifest-row) | A subset of provider A, with deliberate gaps and one altered copy |
 
 Message cases the generator must include:
@@ -32,6 +34,7 @@ Message cases the generator must include:
 | Recurring newsletter with `List-Id` and `List-Unsubscribe` (including a one-click variant) | Rule-based list detection and unsubscribe-method display |
 | Person-to-person thread where the account holder has not replied | "Possibly missed" triage |
 | Automated receipt and a travel booking confirmation | Category rules; the travel message is a future life-claim test case |
+| PDF and image attachments, one PDF already present in the destination folder | Part index, on-demand fetch, presence match by hash |
 | Same Message-ID in two accounts | Occurrences stay separate |
 | Archive copy with added headers | `normalized-content` match, not `exact-raw` |
 | Archive copy with changed body under the same Message-ID | `conflict` |
@@ -45,13 +48,15 @@ Message cases the generator must include:
 | Piece | Scope in this slice |
 | --- | --- |
 | Connector interface | `describe`, `probe`, `enumerate`, `fetch` as in [interfaces](interfaces.md#1-source-connector-inside-towpath-connect) |
-| Connectors | `fixture-provider` (reads the provider JSON, can simulate cursor expiry and interruption) and `maildir` (with optional manifest) |
-| Source store | SQLite file; occurrences, observations, runs, cursors, content cache, matches, coverage |
+| Connectors | `fixture-provider` (reads the provider JSON, lists part structure without returning attachment bytes until fetched, can simulate cursor expiry and interruption), `maildir` (with optional manifest), and `folder` as a destination index |
+| Work queue | Content requests from the app, fulfilled by the connector role one item or part at a time |
+| Scan engine | Selector by media type and item filters; matches; presence check against the destination index; delivery proposals that cannot be executed |
+| Source store | SQLite file; occurrences with part structure, observations, runs, cursors, content cache, matches, coverage |
 | Mail module | Deterministic rules: list detection, sender grouping, awaiting-reply, category; proposals of type `label.add` and `archive` only |
 | Mail store | Separate SQLite file; classifications and proposals; no approvals yet beyond a recorded review decision |
-| CLI | `connect run <source>`, `report coverage <source> [--compare <source>]`, `mail triage`, `mail proposals`, `mail export-checklist` (working names) |
+| CLI | `connect run <source>`, `connect fetch-requests`, `report coverage <source> [--compare <source>]`, `mail triage`, `mail proposals`, `mail export-checklist`, `scan run <selector>` (working names) |
 
-Not built: approvals that reach an executor, any provider write path, network access, model calls, life module tables, web UI.
+Not built: approvals that reach an action runner, deliveries, preserved artifacts, any provider write path, network access, model calls, life module tables, web UI.
 
 ## Acceptance checks
 
@@ -68,10 +73,14 @@ Each check is an automated test against the generated fixture.
 | 7 | Coverage of provider A against the archive reports the expected counts for each match strength and `missing`, and is labeled advisory | 3 |
 | 8 | Proposals contain occurrence IDs, native IDs, and preconditions; the proposal digest is stable across processes | 4 |
 | 9 | No module, configuration key, or dependency for provider writes exists; a test asserts the executor role is absent | 4 |
-| 10 | With the life module disabled, no life store file is created and the mail module's writes touch only the mail store | 5 |
-| 11 | The connector run and the app commands work as separate processes with the app opening the source store read-only | 6 |
+| 10 | With the life module disabled, no life store file is created and the mail module's writes touch only the mail store | 6 |
+| 11 | The connector run and the app commands work as separate processes with the app opening the source store read-only | 7 |
 | 12 | The prompt-injection fixture is classified by the same rules as any other message, with no change to proposals | 4 |
 | 13 | A repository check rejects fixture addresses outside reserved domains | publication rule |
+| 14 | After a sync, every part is listed but no attachment bytes are in the cache | 5 |
+| 15 | A PDF scan creates content requests only for matching parts; the connector role fulfills them and records part hashes | 5, 7 |
+| 16 | The PDF already in the destination folder is reported `present`; the others become delivery proposals that no code can execute | 4, 5 |
+| 17 | Rerunning the scan creates no duplicate requests or proposals | 2, 5 |
 
 ## Slice 1b: model endpoint contract (optional, still synthetic)
 
@@ -94,4 +103,4 @@ Adds the inference gateway against a stub OpenAI-compatible server started by th
 - Whether three process roles are worth their complexity before any credential exists.
 - What the proposal record needs before choosing an [execution option](mail-boundaries.md#options-for-mailbox-execution).
 
-After the slice, the next step is either a real read-only connector for one provider ([decision D3](decisions.md#d3-first-real-mail-source)) or the life-summary slice without email (recollections and a calendar file), depending on the owner's priority.
+After the slice, the next step is a real read-only mail connector ([decision D10](decisions.md#d10-order-after-the-first-slice)); its protocol is [decision D3](decisions.md#d3-first-real-mail-source).

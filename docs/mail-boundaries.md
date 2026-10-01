@@ -1,6 +1,6 @@
 # Mailbox actions and authority
 
-Status: **designed, not built, and not settled.** The owner tentatively agrees that Towpath proposes mailbox changes for review and that a separately permissioned component executes approved actions. How much execution belongs in Towpath is an [open decision](decisions.md#d1-mailbox-execution). Nothing in this repository accesses or changes a live mailbox.
+Status: **designed, not built, and not settled.** The owner tentatively agrees that Towpath proposes mailbox changes for review and that a separately permissioned component executes approved actions. How much execution belongs in Towpath is an [open decision](decisions.md#d1-mailbox-and-destination-execution). Nothing in this repository accesses or changes a live mailbox.
 
 "Mailbox authority" means permission to change what is in an account at Gmail, Fastmail, or another provider.
 
@@ -36,6 +36,8 @@ Consequence: even with the best available scope, the executor's narrowness comes
 | C. Internal executor | `towpath-act`, a separate process in this codebase with its own credential, allowlist, recheck, and receipts | Strong if deployed at enforcement level 3 ([components](components.md#enforcement-levels)) | High | Medium; provider APIs, rate limits, and reconciliation | Executor bugs; coarse provider scopes |
 | D. External executor | A separate project (possibly the owner's migration tooling) consumes Towpath's proposal and approval files | Strong; Towpath stays read-only | High for whoever runs it | Towpath low; total effort higher across two projects | Two release cycles; the proposal format becomes a public contract early |
 | E. Provider-native rules | Towpath generates filters or server rules the person installs; the provider applies them to future mail | Strong for Towpath; the provider acts | High for recurring mail; none for backlog | Low | Rules act silently on future mail; syntax differs per provider |
+
+Deliveries of files to other systems ([destinations](scans-and-destinations.md)) use the same proposal, approval, and receipt pattern but never change the mailbox, so they can be decided separately from mailbox writes.
 
 These options combine. A, D, and E share the same proposal and approval records, so choosing A first does not block C or D later.
 
