@@ -12,7 +12,9 @@ requires-python = ">=3.11"
 dependencies = ["typer>=0.12"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.6"]
+models = ["openai>=1.40", "jsonschema>=4.20", "json-repair>=0.30"]
+gmail = ["google-api-python-client>=2.100", "google-auth>=2.30", "google-auth-oauthlib>=1.2"]
+dev = ["pytest>=8", "ruff>=0.6", "towpath[models,gmail]"]
 
 [project.scripts]
 towpath = "towpath.cli:app"

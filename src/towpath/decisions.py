@@ -48,3 +48,23 @@ def set_item(config, item_id: str, author: str = "local-user", **values: str | N
     db.commit()
     db.close()
     return changed
+
+
+def grant_model(config, endpoint_id: str, data_class: str, author: str = "local-user") -> str:
+    """Allow a data class on one endpoint, tied to its current fingerprint."""
+    from towpath.config import DATA_CLASSES
+    from towpath.models.profiles import fingerprint
+
+    if data_class not in DATA_CLASSES:
+        raise ValueError(f"data class must be one of {sorted(DATA_CLASSES)}")
+    endpoint = config.endpoints[endpoint_id]
+    fp = fingerprint(endpoint)
+    db = open_store(config.store_dir, "decisions", ROLE)
+    db.execute("INSERT OR REPLACE INTO model_grants (endpoint_id, fingerprint, data_class, author, at) "
+               "VALUES (?,?,?,?,?)", (endpoint_id, fp, data_class, author, now()))
+    db.execute("INSERT INTO decision_log (kind, target_id, detail, author, at) VALUES ('model-grant', ?, ?, ?, ?)",
+               (endpoint_id, json.dumps({"fingerprint": fp, "data_class": data_class,
+                                         "destination": endpoint.destination}), author, now()))
+    db.commit()
+    db.close()
+    return fp

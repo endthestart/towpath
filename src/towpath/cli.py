@@ -21,11 +21,13 @@ scan_app = typer.Typer(no_args_is_help=True, help="towpath-worker: scans and pre
 proposals_app = typer.Typer(no_args_is_help=True, help="Inspect and export proposals.")
 item_app = typer.Typer(no_args_is_help=True, help="Record decisions about items.")
 fixtures_app = typer.Typer(no_args_is_help=True, help="Generate and change synthetic fixtures.")
+model_app = typer.Typer(no_args_is_help=True, help="Model endpoints: probe, grant, and run queued work.")
 app.add_typer(connect_app, name="connect")
 app.add_typer(scan_app, name="scan")
 app.add_typer(proposals_app, name="proposals")
 app.add_typer(item_app, name="item")
 app.add_typer(fixtures_app, name="fixtures")
+app.add_typer(model_app, name="model")
 
 ConfigOpt = typer.Option(Path("towpath.toml"), "--config", "-c", help="Configuration file.")
 
@@ -158,3 +160,43 @@ def fixtures_check(paths: list[Path]):
     for path, bad in found.items():
         typer.echo(f"{path}: {', '.join(bad)}")
     raise typer.Exit(1 if found else 0)
+
+
+@model_app.command("probe")
+def model_probe(endpoint: str, config: Path = ConfigOpt, as_json: bool = typer.Option(False, "--json")):
+    """Probe an endpoint with synthetic prompts and record its capabilities (worker)."""
+    from towpath.models import gateway
+    from towpath.models.profiles import ProfileError
+
+    try:
+        report = gateway.probe(_load(config), endpoint)
+    except ProfileError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    _emit(report, as_json)
+
+
+@model_app.command("grant")
+def model_grant(endpoint: str, data_class: str, config: Path = ConfigOpt):
+    """Allow a data class on a named endpoint's current profile (web role decision)."""
+    try:
+        fp = decisions.grant_model(_load(config), endpoint, data_class)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(f"granted {data_class} on {endpoint} (profile {fp}); changing the profile voids this grant")
+
+
+@model_app.command("run-queue")
+def model_run_queue(config: Path = ConfigOpt, as_json: bool = typer.Option(False, "--json")):
+    """Process queued model work through the gateway (worker)."""
+    from towpath.models import gateway
+
+    _emit(gateway.run_queue(_load(config)), as_json)
+
+
+@model_app.command("check")
+def model_check(task: str, data_class: str = typer.Option("metadata", "--data-class"), config: Path = ConfigOpt):
+    """Show whether the gateway would allow a task, without calling any model."""
+    from towpath.models import gateway
+
+    status, reason, endpoint = gateway.check_policy(_load(config), task, data_class, [])
+    typer.echo(f"{status}: {reason or 'allowed'} (endpoint {getattr(endpoint, 'id', None)})")

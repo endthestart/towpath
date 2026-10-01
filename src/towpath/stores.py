@@ -6,6 +6,7 @@
 | queue     | worker, web (append only) | connect |
 | derived   | worker  | web            |
 | decisions | web     | worker, connect |
+| ledger    | worker  | web            |
 
 Readers open with ``mode=ro`` so the database itself refuses writes.
 """
@@ -18,6 +19,7 @@ WRITERS = {
     "queue": {"worker", "web"},
     "derived": {"worker"},
     "decisions": {"web"},
+    "ledger": {"worker"},
 }
 
 SCHEMAS = {
@@ -56,6 +58,9 @@ CREATE TABLE IF NOT EXISTS destination_entries (
 CREATE TABLE IF NOT EXISTS matches (
   left_item TEXT NOT NULL, right_item TEXT NOT NULL, strength TEXT NOT NULL, basis TEXT NOT NULL,
   run_id TEXT NOT NULL, PRIMARY KEY (left_item, right_item));
+CREATE TABLE IF NOT EXISTS destination_lookups (
+  source_id TEXT NOT NULL, algorithm TEXT NOT NULL, checksum TEXT NOT NULL, present INTEGER NOT NULL,
+  remote_id TEXT, checked_run TEXT NOT NULL, checked_at TEXT NOT NULL, PRIMARY KEY (source_id, algorithm, checksum));
 CREATE TABLE IF NOT EXISTS coverage (
   run_id TEXT PRIMARY KEY, source_id TEXT NOT NULL, complete INTEGER NOT NULL, items_seen INTEGER NOT NULL,
   items_new INTEGER NOT NULL, items_absent INTEGER NOT NULL, items_indexed_total INTEGER NOT NULL,
@@ -66,6 +71,10 @@ CREATE TABLE IF NOT EXISTS content_requests (
   seq INTEGER PRIMARY KEY AUTOINCREMENT, item_id TEXT NOT NULL, part_id TEXT NOT NULL,
   requested_by TEXT NOT NULL, priority TEXT NOT NULL, created_at TEXT NOT NULL,
   UNIQUE (item_id, part_id));
+CREATE TABLE IF NOT EXISTS presence_requests (
+  seq INTEGER PRIMARY KEY AUTOINCREMENT, destination_id TEXT NOT NULL, algorithm TEXT NOT NULL,
+  checksum TEXT NOT NULL, requested_by TEXT NOT NULL, created_at TEXT NOT NULL,
+  UNIQUE (destination_id, algorithm, checksum));
 """,
     "derived": """
 CREATE TABLE IF NOT EXISTS scans (
@@ -80,7 +89,10 @@ CREATE TABLE IF NOT EXISTS proposals (
   state TEXT NOT NULL, updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS model_input_queue (
   item_id TEXT NOT NULL, part_id TEXT NOT NULL, task TEXT NOT NULL, status TEXT NOT NULL,
-  PRIMARY KEY (item_id, part_id, task));
+  endpoint_fingerprint TEXT, detail TEXT, PRIMARY KEY (item_id, part_id, task));
+CREATE TABLE IF NOT EXISTS model_results (
+  item_id TEXT NOT NULL, part_id TEXT NOT NULL, task TEXT NOT NULL, output TEXT NOT NULL, endpoint_id TEXT NOT NULL,
+  endpoint_fingerprint TEXT NOT NULL, method TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (item_id, part_id, task));
 """,
     "decisions": """
 CREATE TABLE IF NOT EXISTS dismissals (
@@ -88,9 +100,21 @@ CREATE TABLE IF NOT EXISTS dismissals (
 CREATE TABLE IF NOT EXISTS settings (
   target_id TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, author TEXT NOT NULL, at TEXT NOT NULL,
   PRIMARY KEY (target_id, key));
+CREATE TABLE IF NOT EXISTS model_grants (
+  endpoint_id TEXT NOT NULL, fingerprint TEXT NOT NULL, data_class TEXT NOT NULL, author TEXT NOT NULL,
+  at TEXT NOT NULL, PRIMARY KEY (endpoint_id, fingerprint, data_class));
 CREATE TABLE IF NOT EXISTS decision_log (
   seq INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, target_id TEXT NOT NULL, detail TEXT NOT NULL,
   author TEXT NOT NULL, at TEXT NOT NULL);
+""",
+    "ledger": """
+CREATE TABLE IF NOT EXISTS capability_reports (
+  endpoint_id TEXT NOT NULL, fingerprint TEXT NOT NULL, at TEXT NOT NULL, report TEXT NOT NULL,
+  PRIMARY KEY (endpoint_id, fingerprint));
+CREATE TABLE IF NOT EXISTS calls (
+  seq INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, task TEXT NOT NULL, endpoint_id TEXT,
+  fingerprint TEXT, destination TEXT, model TEXT, served_model TEXT, prompt_version TEXT, input_sha256 TEXT,
+  data_class TEXT, method TEXT, outcome TEXT NOT NULL, detail TEXT, usage TEXT);
 """,
 }
 

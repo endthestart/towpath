@@ -32,6 +32,18 @@ class Workspace:
         connect.fetch_requests(self.config)
         return self.scan_all()
 
+    def add_config(self, text: str):
+        path = self.root / "towpath.toml"
+        path.write_text(path.read_text() + "\n" + text)
+        self.config = config_mod.load(path)
+        return self.config
+
+    def replace_config(self, old: str, new: str):
+        path = self.root / "towpath.toml"
+        path.write_text(path.read_text().replace(old, new))
+        self.config = config_mod.load(path)
+        return self.config
+
     def advance(self):
         self.summary = generator.advance(self.root)
         return self.summary
@@ -55,3 +67,18 @@ class Workspace:
 @pytest.fixture
 def ws(tmp_path):
     return Workspace(tmp_path)
+
+
+@pytest.fixture
+def openai_stub():
+    from tests.stubs import OpenAIStub
+    stubs = []
+
+    def make(**kwargs):
+        stub = OpenAIStub(**kwargs)
+        stubs.append(stub)
+        return stub
+
+    yield make
+    for stub in stubs:
+        stub.close()
