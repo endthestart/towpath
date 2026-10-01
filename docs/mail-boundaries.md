@@ -1,6 +1,6 @@
 # Mailbox actions and authority
 
-Status: **designed, not built, and not settled.** The owner tentatively agrees that Towpath proposes mailbox changes for review and that a separately permissioned component executes approved actions. How much execution belongs in Towpath is an [open decision](decisions.md#d1-mailbox-and-destination-execution). Nothing in this repository accesses or changes a live mailbox.
+Status: **designed, not built.** Towpath proposes mailbox changes for review, and a separately permissioned action runner, `towpath-act`, executes approved tier 1 changes ([decision D1](decisions.md#d1-mailbox-and-destination-execution), accepted 2026-10-01). Nothing in this repository accesses or changes a live mailbox.
 
 "Mailbox authority" means permission to change what is in an account at Gmail, Fastmail, or another provider.
 
@@ -11,8 +11,8 @@ Actions differ in reversibility, in whether they affect future mail, and in whet
 | Tier | Examples | Reversible? | Side effects outside the account | Proposed home |
 | --- | --- | --- | --- | --- |
 | 0. Local only | Towpath tags, notes, triage status | Yes | None | App; no provider permission |
-| 1. Message state | Add or remove a label, mark read, archive (leave the inbox) | Yes, by the inverse action | None | Executor, if built |
-| 2. Standing rules | Create a filter or server-side rule | Yes, but it silently affects future mail | None | Generate for the person to install; executor later at most |
+| 1. Message state | Add or remove a label, mark read, archive (leave the inbox) | Yes, by the inverse action | None | `towpath-act` (accepted, milestone 7) |
+| 2. Standing rules | Create a filter or server-side rule | Yes, but it silently affects future mail | None | Generate for the person to install |
 | 3. External requests | Unsubscribe by one-click POST or by sending mail | No | Confirms to the sender that the address is live | Present the link and the sender's stated method; person acts |
 | 4. Trash | Move to Trash | Within the provider's retention window | None | Deferred; needs a separate decision |
 | 5. Permanent deletion | Delete bypassing Trash; empty Trash | No | None | Never in Towpath. Belongs to the evacuation project's own verified process |
@@ -41,19 +41,21 @@ Deliveries of files to other systems ([destinations](scans-and-destinations.md))
 
 These options combine. A, D, and E share the same proposal and approval records, so choosing A first does not block C or D later.
 
-## Recommendation
+## Decision
 
-1. **Releases up to the first real connector: A plus E.** Proposal review, manual-action export, and generated filter files. No write credential exists anywhere in Towpath.
-2. **Then decide between C and D for tier 1 only,** using evidence from real (private) use of A: how many approved actions people actually execute and how painful manual execution is.
-3. **If C is chosen:** tier 1 only at first; executor runs at enforcement level 3; per-batch cap; dry-run mode that rechecks preconditions without acting; an inverse proposal generated for every executed batch so it can be undone.
+The owner chose option C for tier 1 mailbox changes, alongside folder deliveries ([D1](decisions.md#d1-mailbox-and-destination-execution)). It is staged so no write credential exists before milestone 7:
+
+1. **Up to milestone 6: A plus E.** Proposal review, manual-action export, and generated filter files. No write credential exists anywhere in Towpath.
+2. **Milestone 7: option C for tier 1 only,** alongside folder deliveries. The runner operates at enforcement level 3, with a per-batch cap, a dry-run mode that rechecks preconditions without acting, and an inverse proposal for every executed batch so it can be undone.
+3. **Tier 2 filters stay generated files** the person installs.
 4. **Tier 3 unsubscribes stay person-driven.** Towpath shows the sender's declared unsubscribe method and flags risky ones (unknown domains, mailto that would send from the account).
 5. **Tier 4 needs its own decision. Tier 5 never belongs to Towpath.**
 
-The tradeoff: A plus E delays bulk convenience in exchange for shipping useful mail management with no write authority at all. C gives the best experience but makes Towpath responsible for code that changes accounts.
+The accepted tradeoff: Towpath becomes responsible for code that changes accounts and holds a Gmail credential broader than the actions it allows. The runner's separation, allowlist, frozen approvals, rechecks, and receipts are the controls.
 
-## Executor contract (if option C is chosen)
+## Action runner contract
 
-- Inputs: approval records, their proposals, and the executor's own allowlist. It ignores classifications, model output, and life data.
+- Inputs: approval records, their proposals, and the runner's own allowlist. It ignores classifications, model output, and life data.
 - Before acting: recompute the proposal digest; refuse any action type not allowlisted; refuse expired proposals; recheck each target's precondition with the provider.
 - While acting: rate-limit; stop the batch on an unexpected provider error class; never retry a non-idempotent action without a fresh recheck.
 - After acting: write a receipt per item; generate the inverse proposal; return changed or failed items for review.
@@ -70,10 +72,10 @@ Preserving the owner's historical Gmail in a local living archive, and possibly 
 Towpath relates to it in two ways only:
 
 - Towpath can read the resulting archive through the [archive adapter](archive-adapter.md).
-- Towpath can produce an advisory coverage report comparing a provider source with an archive source. The migration may use that report as one input, but it carries no deletion authority, and Towpath's executor (if any) never deletes because an archive copy exists.
+- Towpath can produce an advisory coverage report comparing a provider source with an archive source. The migration may use that report as one input, but it carries no deletion authority, and Towpath's action runner never deletes, whether or not an archive copy exists.
 
 ## Example flow
 
-1. Towpath finds 40 recurring newsletters. It proposes labels and generates a filter file. The person approves 32 label proposals and exports them as a checklist (option A) or, if an executor exists, sends them to `towpath-act`, which records receipts.
+1. Towpath finds 40 recurring newsletters. It proposes labels and generates a filter file. The person approves 32 label proposals and exports them as a checklist (option A) or, where `towpath-act` is deployed, sends them to it for execution with receipts.
 2. Towpath finds 8,000 old promotions and marks them low value. It does not propose deletion. If an archive source is configured, the coverage report says how many have strong archive matches. What to do with provider copies is the evacuation project's decision.
 3. Towpath sees a travel confirmation in a mailbox that has a life grant. The life module proposes a *plan* claim. Accepting it captures the citation. That acceptance grants no mailbox permission.

@@ -6,7 +6,7 @@ Towpath is an open-source project building tools to manage your digital life, st
 
 ## Three separate concerns
 
-1. **Mail management (Towpath):** help people understand and manage mail that may stay at Gmail or another provider. Towpath reads, classifies, finds items such as attachments, and proposes changes or deliveries to other tools for review. Whether and how Towpath ever executes approved changes is an [open decision](docs/decisions.md#d1-mailbox-and-destination-execution).
+1. **Mail management (Towpath):** help people understand and manage mail that may stay at Gmail or another provider. Towpath reads, classifies, finds items such as attachments, and proposes changes or deliveries to other tools for review. A separate action runner will execute approved, reversible mailbox changes and file deliveries ([decision D1](docs/decisions.md#d1-mailbox-and-destination-execution)); permanent deletion is never a Towpath action.
 2. **Life summary (Towpath):** connect selected sources into reviewable claims about people, events, places, and time, with citations and uncertainty. It works without email.
 3. **Personal Gmail evacuation (not Towpath):** one person's project to preserve historical Gmail in a local living archive and possibly remove provider copies. Towpath may read such an archive through an optional [adapter](docs/archive-adapter.md); it never requires the migration.
 

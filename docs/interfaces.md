@@ -181,7 +181,7 @@ An approval freezes the proposal by digest. Only a person, through the review UI
 }
 ```
 
-The executor, if one exists, recomputes the digest, refuses action types not on its own allowlist, rechecks each precondition against the provider, and writes a receipt.
+The action runner (`towpath-act`), where deployed, recomputes the digest, refuses action types not on its own allowlist, rechecks each precondition against the provider, and writes a receipt.
 
 ```json
 {
@@ -195,7 +195,7 @@ The executor, if one exists, recomputes the digest, refuses action types not on 
 }
 ```
 
-`result` is one of `applied`, `skipped-precondition`, `skipped-not-allowlisted`, `failed`. Without an executor, an approved proposal can be exported as a checklist for manual action.
+`result` is one of `applied`, `skipped-precondition`, `skipped-not-allowlisted`, `failed`. Without the action runner, an approved proposal can be exported as a checklist for manual action.
 
 ## 4. Life evidence and claims
 

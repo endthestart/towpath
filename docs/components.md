@@ -10,7 +10,7 @@ Towpath is one codebase with three process roles. A small deployment can run all
 | --- | --- | --- | --- |
 | `towpath` app | CLI and later web UI, review workflows, mail module, life module, scan engine, preservation, background analysis jobs, inference gateway, exporter | Model endpoints only (per bound task) | Yes |
 | `towpath-connect` | Source connectors: mail provider, mail archive, calendar files, document and media metadata, destination indexes; fulfills content requests | Source and destination read credentials only | Yes, if any external source is used |
-| `towpath-act` | Action runner: mailbox actions and deliveries to [destinations](scans-and-destinations.md) | One write credential per allowlisted mailbox or destination | No. Not in the first releases; scope is an [open decision](decisions.md#d1-mailbox-and-destination-execution) |
+| `towpath-act` | Action runner: mailbox actions and deliveries to [destinations](scans-and-destinations.md) | One write credential per allowlisted mailbox or destination | No. Arrives in milestone 7 for folder deliveries and tier 1 mailbox changes ([D1](decisions.md#d1-mailbox-and-destination-execution)) |
 
 External to Towpath: mail providers, destinations such as a document system or media archive, the mail archive and the tool that maintains it, model endpoints (Poundlock or any other), and the personal Gmail evacuation project.
 
@@ -74,7 +74,7 @@ Two cross-module reads are deliberately absent. The mail module cannot read life
 | Mode | Units | Stores | Credentials | Notes |
 | --- | --- | --- | --- | --- |
 | Mail management, mail stays at provider | app (mail), connect | source, mail | provider read; model optional | Proposals are reviewed and can be exported for manual execution |
-| Mail management with execution | adds `towpath-act` | adds action ledger | adds provider write | Only after the [mailbox action decision](decisions.md#d1-mailbox-and-destination-execution) |
+| Mail management with execution | adds `towpath-act` | adds action ledger | adds provider write | Tier 1 changes only ([D1](decisions.md#d1-mailbox-and-destination-execution)); requires enforcement level 3 |
 | Mail management over an archive | app (mail), connect (archive) | source, mail | none beyond file read access | Analysis and search only; there is no account to act on |
 | Life summary only | app (life), connect (calendar, files) or none | source, life | source-specific or none | Recollections alone are a valid starting point |
 | Both | all of the above | all | union | Mail reaches life summary only through an explicit grant with a scope (accounts, labels, dates) |
@@ -87,4 +87,4 @@ Two cross-module reads are deliberately absent. The mail module cannot read life
 2. The mail module classifies it with deterministic rules; if a task is bound to a model endpoint and the data class is granted, the gateway sends a minimal prompt and validates the result.
 3. The mail module may create a proposal (for example, add label "Newsletters") that freezes the target occurrence, its native ID, and the state observed at run N.
 4. If the source has a life grant covering this message, the life module may propose a claim that cites a span of it. Accepting the claim captures the excerpt and hash, and the person may also preserve the full message or an attachment.
-5. If a person approves the mail proposal and an executor exists, the executor rechecks provider state, acts, and writes a receipt. The next sync observes the new state. The life claim keeps its captured citation either way.
+5. If a person approves the mail proposal and `towpath-act` is deployed, it rechecks provider state, acts, and writes a receipt. The next sync observes the new state. The life claim keeps its captured citation either way.

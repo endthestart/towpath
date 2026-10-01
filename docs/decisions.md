@@ -12,7 +12,7 @@ These are built into the current documents. The owner can accept or overturn eac
 | R2 | One connector tier and source store shared by mail and life, with explicit per-consumer grants | [components](components.md#stores-and-ownership), [interfaces](interfaces.md#2-source-read-api-app-reads-the-source-store) | First slice |
 | R3 | Occurrences per source with dated observations and match strengths; no merging | [interfaces](interfaces.md#occurrence) | First slice |
 | R4 | Accepted claims capture cited excerpts; a person can also preserve the full item or attachment as a content-addressed artifact (owner request, 2026-10-01) | [preserved artifacts](scans-and-destinations.md#preserved-artifacts) | Life slice; future archive package |
-| R5 | No mailbox write credential until D1 is decided; ship proposal review, checklist export, and generated filters first | [mailbox actions](mail-boundaries.md#recommendation) | Nothing now |
+| R5 | No mailbox write credential before milestone 7; ship proposal review, checklist export, and generated filters first | [mailbox actions](mail-boundaries.md#recommendation) | Nothing now |
 | R6 | Permanent deletion is never a Towpath action | [mailbox actions](mail-boundaries.md#action-tiers) | Nothing now |
 | R7 | Endpoint profiles with destination class, data-class ceiling, ledger grants, capability probes, same-endpoint fallbacks only | [model providers](model-providers.md) | Slice 1b |
 | R8 | Archive adapter reads standard mail files with an optional manifest (accepted as D4) | [archive adapter](archive-adapter.md#input-options) | Archive connector |
@@ -23,16 +23,16 @@ These are built into the current documents. The owner can accept or overturn eac
 
 ### D1. Mailbox and destination execution
 
-How much execution belongs in Towpath? Since destinations were added, this splits in two:
+**Accepted 2026-10-01.** `towpath-act`, the separate action runner, executes two kinds of approved actions:
 
-- **Deliveries to destinations** (add a file to a folder, document system, or media archive). Additive; they never change the mailbox. A folder destination needs no credential.
-- **Mailbox changes** (labels, archive, filters, later trash). They change the account, and provider permissions for them are broad ([provider realities](mail-boundaries.md#provider-permission-realities)).
+- **Deliveries** to destinations, starting with folder destinations.
+- **Tier 1 mailbox changes:** add or remove labels, archive, mark read or unread ([action tiers](mail-boundaries.md#action-tiers)).
 
-Options for mailbox changes are compared in [mailbox actions](mail-boundaries.md#options-for-mailbox-execution).
+Conditions that come with this choice: mailbox writes run only at enforcement level 3; the action allowlist is configured at the runner, not in the app; only digest-frozen, human-approved proposals are executed; each target's state is rechecked first; every batch gets receipts and an inverse proposal for undo; there is a per-batch cap and a dry-run mode. Filters (tier 2) remain generated files the person installs. Trash (tier 4) needs a separate decision. Unsubscribes stay with [D8](#d8-unsubscribe-handling). Permanent deletion is never a Towpath action.
 
-- **Recommended:** build `towpath-act` first for folder deliveries only, which exercises approvals, receipts, and the separate process without any write credential. Keep mailbox changes to review, checklist export, and generated filters (options A and E) until private use shows whether in-Towpath execution (C) or an external tool (D) is worth it.
-- **Status:** owner unsure; to be asked separately with this context.
-- **Blocks:** roadmap milestone 7 only.
+The Gmail credential this requires is broader than the actions allowed (see [facts to verify](#facts-to-verify-before-implementation)). That is accepted; the runner's process separation and allowlist are the control.
+
+- **Blocks:** nothing before roadmap milestone 7.
 
 ### D2. Implementation language and storage
 
@@ -63,7 +63,7 @@ Options for mailbox changes are compared in [mailbox actions](mail-boundaries.md
 ### D8. Unsubscribe handling
 
 - **Options:** display only; Towpath performs one-click POST unsubscribes after per-sender approval; never.
-- **Recommended:** display only until D1 is settled; one-click POST would be a tier 3 executor action.
+- **Recommended:** display only; one-click POST would be a tier 3 action and is outside D1's accepted scope.
 - **Blocks:** nothing before milestone 7.
 
 ### D9. First non-email life source
@@ -82,7 +82,7 @@ These affect the design but could not be confirmed from primary documentation wh
 | Claim used in the design | Affects |
 | --- | --- |
 | Gmail's narrowest scope that can change labels or archive also permits reading and sending | Mailbox execution analysis |
-| Creating Gmail filters needs a separate settings scope | Option E and executor tier 2 |
+| Creating Gmail filters needs a separate settings scope | Generated filter files (tier 2) |
 | A read-only Gmail scope exists that allows full message reads, and a metadata-only scope restricts search | First Gmail connector |
 | Gmail can list a message's part structure, with attachment sizes and IDs, without downloading attachment bytes | Index-all, fetch-on-demand (D5) |
 | OAuth clients in testing status issue refresh tokens with short lifetimes, and restricted scopes require verification for public distribution | Self-hosted setup guide |
@@ -97,7 +97,8 @@ These affect the design but could not be confirmed from primary documentation wh
 | --- | --- | --- |
 | 2026 (first public design) | Three distinct concerns; evacuation is independent of Towpath | Agreed |
 | 2026 (first public design) | Configurable OpenAI-compatible endpoints; Poundlock optional; no implicit destination | Agreed |
-| 2026 (first public design) | Towpath proposes mailbox changes; a separately permissioned component executes approved actions | Tentative; see D1 |
+| 2026 (first public design) | Towpath proposes mailbox changes; a separately permissioned component executes approved actions | Confirmed by D1 |
+| 2026-10-01 | D1: action runner executes folder deliveries and tier 1 mailbox changes, with safeguards | Accepted |
 | 2026-10-01 | D2: Python and SQLite | Accepted |
 | 2026-10-01 | D10: real read-only mail connector before life summary without email | Accepted |
 | 2026-10-01 | D3: Gmail API, read-only scope, for the first real connector | Accepted |
