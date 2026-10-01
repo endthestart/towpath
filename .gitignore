@@ -1,0 +1,29 @@
+# Local deployments and secrets
+.env
+.env.*
+!.env.example
+config.local.*
+secrets/
+private/
+data/
+exports/
+backups/
+*.sqlite
+*.sqlite3
+*.db
+*.db-wal
+*.db-shm
+*.mbox
+*.eml
+*.pst
+*.ost
+*.takeout
+*.key
+*.pem
+
+# Tool output
+__pycache__/
+.pytest_cache/
+.venv/
+dist/
+build/
