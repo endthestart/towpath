@@ -23,6 +23,7 @@ item_app = typer.Typer(no_args_is_help=True, help="Record decisions about items.
 fixtures_app = typer.Typer(no_args_is_help=True, help="Generate and change synthetic fixtures.")
 model_app = typer.Typer(no_args_is_help=True, help="Model endpoints: probe, grant, and run queued work.")
 provider_app = typer.Typer(no_args_is_help=True, help="Mail-management provider (Inbox Zero), read-only.")
+config_app = typer.Typer(no_args_is_help=True, help="Check configuration without contacting any service.")
 app.add_typer(connect_app, name="connect")
 app.add_typer(scan_app, name="scan")
 app.add_typer(proposals_app, name="proposals")
@@ -30,6 +31,7 @@ app.add_typer(item_app, name="item")
 app.add_typer(fixtures_app, name="fixtures")
 app.add_typer(model_app, name="model")
 app.add_typer(provider_app, name="provider")
+app.add_typer(config_app, name="config")
 
 ConfigOpt = typer.Option(Path("towpath.toml"), "--config", "-c", help="Configuration file.")
 
@@ -273,3 +275,53 @@ def provider_rules(provider: str = typer.Argument(None), config: Path = ConfigOp
 def provider_links(provider: str = typer.Argument(None), config: Path = ConfigOpt):
     """Links to the provider's own screens for features without a public API."""
     _emit(_provider(config, provider).links(), False)
+
+
+@config_app.command("check")
+def config_check(config: Path = ConfigOpt):
+    """Validate the config and report which secrets are present. Never prints a secret or calls a service."""
+    from towpath import credentials
+    from towpath.models.profiles import ProfileError, check_destination
+
+    cfg = _load(config)
+    problems = 0
+
+    def secret(ref):
+        nonlocal problems
+        try:
+            credentials.resolve(ref)
+            return "present"
+        except credentials.CredentialError as exc:
+            problems += 1
+            return f"MISSING ({exc})"
+
+    typer.echo(f"stores: {cfg.store_dir}")
+    for s in cfg.sources.values():
+        if s.adapter == "gmail":
+            state = []
+            for label, path in (("client secrets", s.client_secrets), ("token", s.token)):
+                ok = path is not None and path.is_file()
+                problems += not ok and label == "client secrets"
+                state.append(f"{label} {'present' if ok else 'missing'}")
+            detail = ", ".join(state)
+        elif s.credential:
+            detail = f"{s.base_url}, credential {secret(s.credential)}"
+        else:
+            detail = str(s.path)
+        typer.echo(f"source {s.id}: {s.adapter} ({s.kind}) - {detail}")
+    for e in cfg.endpoints.values():
+        try:
+            check_destination(e, cfg.bundled_hosts)
+            dest = e.destination
+        except ProfileError as exc:
+            problems += 1
+            dest = f"REJECTED ({exc})"
+        cred = "none" if e.credential == "none" else secret(e.credential)
+        typer.echo(f"endpoint {e.id}: {e.kind} {e.model} at {e.base_url} - {dest}; credential {cred}; "
+                   f"allows {', '.join(e.allow_data)}")
+    for task, eid in cfg.tasks.items():
+        typer.echo(f"task {task} -> {eid}")
+    for p in cfg.providers.values():
+        typer.echo(f"provider {p.id}: {p.adapter} at {p.base_url}; api key {secret(p.api_key)}")
+    typer.echo("ok" if not problems else f"{problems} problem(s)")
+    raise typer.Exit(1 if problems else 0)

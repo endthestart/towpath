@@ -345,3 +345,11 @@ def test_fieldmask_excludes_nested_data():
     masked = fieldmask.apply(message, fieldmask.parse(fieldmask.message_mask(3)))
     assert "data" not in json.dumps(masked)
     assert masked["payload"]["parts"][0]["body"] == {"size": 3}
+
+
+def test_example_config_is_valid_and_placeholder_only():
+    cfg = config_mod.load(REPO / "examples" / "towpath.example.toml")
+    assert {s.adapter for s in cfg.sources.values()} == {"gmail", "paperless", "immich"}
+    assert cfg.endpoints["local"].destination == "this-machine"
+    text = (REPO / "examples" / "towpath.example.toml").read_text()
+    assert violations(text) == [] and "env:" not in text.split("[[sources]]")[0]

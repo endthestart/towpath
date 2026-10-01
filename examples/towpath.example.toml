@@ -1,0 +1,70 @@
+# Example Towpath configuration. Copy it to a private folder OUTSIDE this
+# repository (for example ~/towpath-private/towpath.toml) and edit there.
+# Paths are relative to the copied file. Secrets are never written here:
+# credentials are references (env:NAME, file:PATH, or none).
+
+[stores]
+dir = "state"
+
+# Gmail, read-only, with your own Google OAuth client (docs/setup/local-quickstart.md).
+[[sources]]
+id = "gmail_test"
+kind = "mail-provider"
+adapter = "gmail"
+client_secrets = "secrets/google-oauth-client.json"
+token = "secrets/gmail-token.json"
+
+# Paperless-ngx, read through a view-only user's API token.
+[[sources]]
+id = "paperless"
+kind = "document-system"
+adapter = "paperless"
+base_url = "http://localhost:8000"
+token = "file:secrets/paperless-token"
+
+# Immich, read through an API key limited to asset read permissions.
+[[sources]]
+id = "immich"
+kind = "photo-library"
+adapter = "immich"
+base_url = "http://localhost:2283"
+token = "file:secrets/immich-api-key"
+
+[[selectors]]
+id = "pdf-to-paperless"
+media_types = ["application/pdf"]
+disposition = "attachment"
+min_bytes = 1
+destination = "paperless"
+exclude_labels = ["SPAM", "TRASH"]
+classifier = "doc.is_statement"
+
+[[selectors]]
+id = "photos-to-immich"
+media_types = ["image/jpeg", "image/png", "image/heic"]
+disposition = "attachment"
+min_bytes = 20000
+destination = "immich"
+exclude_labels = ["SPAM", "TRASH"]
+
+# A model server on this machine (Ollama shown; llama.cpp server uses port 8080).
+[endpoints.local]
+base_url = "http://127.0.0.1:11434/v1"
+credential = "none"
+model = "replace-with-a-local-model"
+kind = "chat"
+destination = "this-machine"
+allow_data = ["synthetic", "metadata"]
+timeout_seconds = 120
+
+[tasks]
+"doc.is_statement" = "local"
+
+# Inbox Zero, read-only, after its evaluation (docs/evaluations/inbox-zero-plan.md).
+# [[providers]]
+# id = "inbox_zero"
+# kind = "mail-management"
+# adapter = "inbox-zero"
+# base_url = "http://localhost:3000"
+# api_key = "file:secrets/inbox-zero-api-key"
+# links = { account_id = "replace-with-the-id-in-inbox-zero-urls" }
