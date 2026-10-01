@@ -1,6 +1,6 @@
-# Recommendations and open decisions
+# Recommendations and decisions
 
-Status: **mixed.** Items marked *Accepted* were agreed by the owner; everything else is a recommendation pending review. Each item says what it blocks so decisions can be made one at a time.
+Status: **mixed.** Items marked *Accepted* were agreed by the owner. *Withdrawn* items no longer apply. Everything else is a recommendation or open question. Each item says what it blocks so decisions can be made one at a time.
 
 ## Recommendations in this design
 
@@ -8,101 +8,114 @@ These are built into the current documents. The owner can accept or overturn eac
 
 | ID | Recommendation | Where | Blocks if overturned |
 | --- | --- | --- | --- |
-| R1 | One codebase, three process roles (`towpath` app, `towpath-connect`, optional `towpath-act`); modules enabled per deployment | [components](components.md#deployable-units) | First slice structure |
-| R2 | One connector tier and source store shared by mail and life, with explicit per-consumer grants | [components](components.md#stores-and-ownership), [interfaces](interfaces.md#2-source-read-api-app-reads-the-source-store) | First slice |
-| R3 | Occurrences per source with dated observations and match strengths; no merging | [interfaces](interfaces.md#occurrence) | First slice |
-| R4 | Accepted claims capture cited excerpts; a person can also preserve the full item or attachment as a content-addressed artifact (owner request, 2026-10-01) | [preserved artifacts](scans-and-destinations.md#preserved-artifacts) | Life slice; future archive package |
-| R5 | No mailbox write credential before milestone 7; ship proposal review, checklist export, and generated filters first | [mailbox actions](mail-boundaries.md#decision) | Nothing now |
-| R6 | Permanent deletion is never a Towpath action | [mailbox actions](mail-boundaries.md#action-tiers) | Nothing now |
-| R7 | Endpoint profiles with destination class, data-class ceiling, ledger grants, capability probes, same-endpoint fallbacks only | [model providers](model-providers.md) | Slice 1b |
-| R8 | Archive adapter reads standard mail files with an optional manifest (accepted as D4) | [archive adapter](archive-adapter.md#input-options) | Archive connector |
-| R9 | First slice is synthetic, read-only, no models, no network | [first slice](first-slice.md) | Starting implementation |
-| R10 | Generic scans (selectors), destination connectors with a read half in `towpath-connect` and a write half in `towpath-act`, and delivery as an approved action | [scans and destinations](scans-and-destinations.md) | Find-and-route features |
+| R1 | One Python codebase run as four Compose services (`towpath-web`, `towpath-worker`, `towpath-connect`, optional `towpath-act`), with bundled tools as optional profiles | [components](components.md#services) | First slice structure |
+| R2 | Integrate first: connect to existing deployments, bundle existing tools, use libraries; write code only for what remains. Every integration stays a candidate until verified | [architecture](architecture.md#integrate-first), [integrations](integrations.md) | Everything |
+| R3 | Connection setup runs in the service that will hold the credential; the web UI never sees tokens | [components](components.md#services) | First real connector |
+| R4 | One connection per source, used by features through explicit grants | [components](components.md#permission-matrix) | First slice |
+| R5 | Items recorded per source with dated observations; duplicates linked, never merged | [interfaces](interfaces.md#occurrence) | First slice |
+| R6 | Human decisions kept in their own store, apart from rebuildable derived data | [components](components.md#stores-and-ownership) | First slice |
+| R7 | Visibility classes (`private`, `personal`, `shareable`) from the first release; private items never reach models or exports | [life stream](life-stream.md#visibility-and-authorship) | First slice schema |
+| R8 | Accepted claims capture cited excerpts; a person can also preserve a full item or attachment (owner request) | [preserved artifacts](scans-and-destinations.md#preserved-artifacts) | Life stream |
+| R9 | Scans with selectors; destinations as existing tools with a read half in `towpath-connect` and a write half in `towpath-act` | [scans and destinations](scans-and-destinations.md) | Attachment routing |
+| R10 | Model endpoints with destination class, data-class grants, capability probes, and same-endpoint fallbacks only | [model providers](model-providers.md) | Slice 1b |
+| R11 | No write credential before roadmap milestone 5; permanent deletion is never a Towpath action | [mail management](mail-management.md#action-tiers) | Nothing now |
+| R12 | First slice is synthetic, read-only, no models, no network | [first slice](first-slice.md) | Starting implementation |
 
-## Open owner decisions
+## Decisions
 
 ### D1. Mailbox and destination execution
 
-**Accepted 2026-10-01.** `towpath-act`, the separate action runner, executes two kinds of approved actions:
-
-- **Deliveries** to destinations, starting with folder destinations.
-- **Tier 1 mailbox changes:** add or remove labels, archive, mark read or unread ([action tiers](mail-boundaries.md#action-tiers)).
-
-Conditions that come with this choice: mailbox writes run only at enforcement level 3; the action allowlist is configured at the runner, not in the app; only digest-frozen, human-approved proposals are executed; each target's state is rechecked first; every batch gets receipts and an inverse proposal for undo; there is a per-batch cap and a dry-run mode. Filters (tier 2) remain generated files the person installs. Trash (tier 4) needs a separate decision. Unsubscribes stay with [D8](#d8-unsubscribe-handling). Permanent deletion is never a Towpath action.
-
-The Gmail credential this requires is broader than the actions allowed (see [facts to verify](#facts-to-verify-before-implementation)). That is accepted; the runner's process separation and allowlist are the control.
-
-- **Blocks:** nothing before roadmap milestone 7.
+**Accepted 2026-10-01.** `towpath-act`, the separate action runner, executes approved deliveries to destinations and tier 1 mailbox changes: add or remove labels, archive, mark read or unread ([action tiers](mail-management.md#action-tiers)). Its allowlist is configured at the runner; it executes only frozen, human-approved proposals, rechecks each target, writes receipts and an inverse proposal, and has a per-batch cap and dry-run mode. Drafts are [D11](#d11-draft-replies), rules are [D12](#d12-smart-rules), unsubscribes are [D8](#d8-unsubscribe-handling), and trash needs its own decision. The Gmail credential this requires is broader than the allowed actions; that is accepted, with the runner's separation and allowlist as the control.
 
 ### D2. Implementation language and storage
 
-**Accepted 2026-10-01.** Python with SQLite, one file per store. The standard library handles RFC 5322 parsing, Maildir, and mbox; SQLite full-text search covers lexical search without a server.
+**Accepted 2026-10-01.** Python, with SQLite files (one per store) for Towpath's own data. The web framework is [D13](#d13-web-framework).
 
 ### D3. First real mail source
 
-**Accepted 2026-10-01.** The first real read-only connector uses the Gmail API with a read-only scope. It fits the owner's account and the index-then-fetch design: stable native IDs, real labels, and part structure without downloading attachments. The connector interface stays protocol-neutral so IMAP or JMAP can follow. Self-hosters must register their own OAuth client; the setup guide must cover that after the related [facts are verified](#facts-to-verify-before-implementation).
+**Accepted 2026-10-01.** The Gmail API, through Google's official client libraries, with a read-only scope for `towpath-connect`. Rechecked under integrate-first: local Gmail sync and indexing tools were considered, but they keep a full local copy of the mailbox, which conflicts with fetching content only when needed and drifts toward mail migration, which is not Towpath's purpose. The connector interface stays protocol-neutral so IMAP or JMAP can follow.
 
 ### D4. Archive input
 
-**Accepted 2026-10-01.** Towpath reads the archive as standard mail files (Maildir or mbox) plus the optional [manifest](archive-adapter.md#draft-manifest-row), whatever archive tool the evacuation chooses. The evacuation can add a manifest writer if its tool does not produce one. A tool-specific plugin is not planned.
+**Withdrawn 2026-10-01.** It existed only to serve the owner's separate Gmail migration. A local mail archive is an ordinary optional source with no special design ([integrations](integrations.md#sources)).
 
 ### D5. Content retention
 
-**Accepted 2026-10-01.** Towpath gets read access to the whole account. It indexes every message's metadata and part structure, fetches bodies and attachments one item at a time when a rule, scan, or person needs them, and evicts cached content later. Durable copies exist only when a person preserves an item or part. Specific uses such as "find all photos" or "find PDFs not already in my document system" are built as generic [scans and destinations](scans-and-destinations.md), not as one-off features.
+**Accepted 2026-10-01.** Towpath gets read access to the whole mailbox. It indexes every message's metadata and part structure, fetches bodies and attachments one item at a time when a feature or person needs them, and evicts cached content later. Durable copies exist only when a person preserves an item. Specific uses such as "find PDFs not already in my document system" are built as generic [scans and destinations](scans-and-destinations.md).
 
 ### D6. Remote model use
 
-- **Question:** whether any remote endpoint (`self-hosted` other than this machine, or `third-party`) may receive `content` or `derived-personal` data in the owner's deployment, and whether the public default UI should even offer third-party grants for those classes.
-- **Recommended:** allow `self-hosted` grants per endpoint; require a second confirmation for `third-party` content grants.
-- **Blocks:** slice 1b UI wording; not the gateway design.
+- **Question:** may a remote endpoint (`self-hosted` elsewhere, or `third-party`) receive message content or life-stream data in the owner's deployment, and should the public UI offer third-party grants for those classes at all?
+- **Recommended:** allow `self-hosted` grants per endpoint; require a second confirmation for `third-party` content grants. `private` items never go anywhere.
+- **Blocks:** slice 1b wording; not the gateway design.
 
 ### D7. Coverage report home
 
-**Accepted 2026-10-01.** Towpath produces the provider-versus-archive coverage report as an advisory, read-only report with match strengths, because it already indexes both sides. The report carries no authority. The evacuation may use it as one input but keeps its own per-message verification before any deletion. First-slice check 7 stays.
+**Withdrawn 2026-10-01.** A "Gmail versus archive" coverage report would serve only the separate migration. Towpath's coverage reports describe sync completeness for each source.
 
 ### D8. Unsubscribe handling
 
-- **Options:** display only; Towpath performs one-click POST unsubscribes after per-sender approval; never.
-- **Recommended:** display only; one-click POST would be a tier 3 action and is outside D1's accepted scope.
-- **Blocks:** nothing before milestone 7.
+- **Options:** show the sender's unsubscribe link and let the person act; Towpath performs one-click unsubscribes after per-sender approval; never.
+- **Recommended:** show the link. One-click execution sends a request to the sender and confirms the address is live, which is outside D1's scope.
+- **Blocks:** roadmap milestone 4 wording only.
 
-### D9. First non-email life source
+### D9. Life-stream sources after mail
 
-- **Recommended:** typed recollections plus an iCalendar file import, so life summary is proven without any mail.
-- **Blocks:** the life-summary slice (milestone 5).
+- **Recommended:** contacts first (people are the backbone), then read connections to the person's photo library and document system as evidence sources, with recollections available from the start of the life stream.
+- **Blocks:** roadmap milestone 7 ordering.
 
-### D10. Order after the first slice
+### D10. Order
 
-**Accepted 2026-10-01.** A real read-only mail connector comes next, before life summary without email.
+**Accepted 2026-10-01.** Mail management first, starting with a real read-only Gmail connector. The life stream follows, starting from mail, then contacts, photos, and documents. Its design still does not depend on mail.
+
+### D11. Draft replies
+
+- **Options:** (a) Towpath generates draft text that the person edits and copies; (b) after approval, `towpath-act` creates a draft in Gmail, never sending it.
+- **Tradeoff:** (b) is smoother, but the Gmail permission for creating drafts appears also to allow sending (to verify), so the runner would hold a send-capable credential with sending excluded only by its allowlist.
+- **Recommended:** (a) first; decide (b) after verifying the scope.
+- **Blocks:** roadmap milestone 5 scope.
+
+### D12. Smart rules
+
+For mail that is important but does not need reading every day.
+
+- **Options:** (a) generate a Gmail filter file the person imports; (b) `towpath-act` creates filters after approval, which needs a settings permission; (c) a Towpath digest page that summarizes that mail on a schedule and flags anything needing attention, with no mailbox change.
+- **Recommended:** (c) plus (a) first; (b) later if importing filters proves tedious.
+- **Blocks:** roadmap milestone 4 scope.
+
+### D13. Web framework
+
+- **Options:** Django (built-in authentication, admin, migrations, SQLite support); FastAPI with server-rendered pages (lighter, more assembly).
+- **Recommended:** Django, because login, configuration screens, and review lists are most of the first UI, and Django supplies them.
+- **Blocks:** first slice, if it includes the web UI; otherwise milestone 3.
 
 ## Facts to verify before implementation
 
-These affect the design but could not be confirmed from primary documentation while writing it. Verify against current provider documentation and record the date checked.
-
 | Claim used in the design | Affects |
 | --- | --- |
-| Gmail's narrowest scope that can change labels or archive also permits reading and sending | Mailbox execution analysis |
-| Creating Gmail filters needs a separate settings scope | Generated filter files (tier 2) |
-| A read-only Gmail scope exists that allows full message reads, and a metadata-only scope restricts search | First Gmail connector |
-| Gmail can list a message's part structure, with attachment sizes and IDs, without downloading attachment bytes | Index-all, fetch-on-demand (D5) |
-| OAuth clients in testing status issue refresh tokens with short lifetimes, and restricted scopes require verification for public distribution | Self-hosted setup guide |
+| Gmail's narrowest scope that can change labels or archive also permits reading and sending | D1 analysis |
+| Creating Gmail drafts needs a scope that also permits sending | D11 |
+| Creating Gmail filters needs a separate settings scope; Gmail imports filters from a file | D12 |
+| A read-only Gmail scope allows full message reads; a metadata-only scope restricts search | First Gmail connector |
+| Gmail lists a message's part structure, with attachment sizes and IDs, without downloading attachment bytes | D5 |
+| OAuth clients in testing status issue short-lived refresh tokens; restricted scopes require verification for public distribution | Self-hosted setup guide |
 | Gmail incremental-sync cursors can expire, requiring a full sync | Connector cursor handling |
-| Some JMAP providers issue read-only API tokens | D3 |
-| Provider exports may include labels in a message header | Archive adapter |
-| One-click unsubscribe uses a `List-Unsubscribe-Post` header (RFC 8058) | Unsubscribe display and D8 |
+| One-click unsubscribe uses a `List-Unsubscribe-Post` header (RFC 8058) | D8 |
+| SQLite write-ahead logging works across containers with read-only mounts on one host | Store layout ([components](components.md#stores-and-ownership)) |
+| Each candidate in [integrations](integrations.md) meets the evaluation checklist | Any adoption |
 
 ## Decision log
 
 | Date | Decision | Status |
 | --- | --- | --- |
-| 2026 (first public design) | Three distinct concerns; evacuation is independent of Towpath | Agreed |
 | 2026 (first public design) | Configurable OpenAI-compatible endpoints; Poundlock optional; no implicit destination | Agreed |
-| 2026 (first public design) | Towpath proposes mailbox changes; a separately permissioned component executes approved actions | Confirmed by D1 |
-| 2026-10-01 | D1: action runner executes folder deliveries and tier 1 mailbox changes, with safeguards | Accepted |
+| 2026 (first public design) | Towpath proposes changes; a separately permissioned component executes approved actions | Confirmed by D1 |
+| 2026-10-01 | D1: action runner executes deliveries and tier 1 mailbox changes, with safeguards | Accepted |
 | 2026-10-01 | D2: Python and SQLite | Accepted |
-| 2026-10-01 | D10: real read-only mail connector before life summary without email | Accepted |
-| 2026-10-01 | D3: Gmail API, read-only scope, for the first real connector | Accepted |
-| 2026-10-01 | D4: archive read as Maildir or mbox plus optional manifest, independent of archive tool | Accepted |
-| 2026-10-01 | D7: Towpath produces an advisory coverage report; deletion verification stays in the evacuation | Accepted |
-| 2026-10-01 | D5: read access to all mail, index everything, fetch per item on demand; generic scans and destinations | Accepted |
-| 2026-10-01 | Preservation of the full item or attachment, not only excerpts, as a foundation for a later archive package | Accepted as a requirement; design in R4 |
+| 2026-10-01 | D3: Gmail API, read-only, for the first connector | Accepted; rechecked under integrate-first |
+| 2026-10-01 | D5: read access to all mail; index everything, fetch on demand; generic scans and destinations | Accepted |
+| 2026-10-01 | D10: mail management first; life stream follows from mail | Accepted |
+| 2026-10-01 | Preserve full items or attachments, not only excerpts | Accepted as a requirement (R8) |
+| 2026-10-01 | Towpath is a self-hosted front end that integrates existing tools, deployed with Docker Compose, able to bundle tools or point at existing ones | Accepted direction (R1, R2) |
+| 2026-10-01 | Moving mail out of Gmail is a separate personal project, outside Towpath | Accepted |
+| 2026-10-01 | D4 and D7 | Withdrawn; they served only that separate project |

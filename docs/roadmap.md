@@ -2,19 +2,18 @@
 
 This is a dependency map, not a calendar or a claim of completed capabilities.
 
-**Built:** documentation only. **Designed:** everything below. No code, connector, model integration, or mailbox access exists in this repository.
+**Built:** documentation only. **Designed:** everything below. No code, connector, model integration, Compose file, or mailbox access exists in this repository.
 
 | Milestone | Deliverable | Depends on | Required evidence |
 | --- | --- | --- | --- |
-| 1. Public foundation | MIT repository, three-concern boundaries, [components](components.md), [interfaces](interfaces.md), [provider contract](model-providers.md), [scans and destinations](scans-and-destinations.md), [decisions](decisions.md) | — | Public tree and history contain no private account or infrastructure data |
-| 2. Synthetic read-only mail slice | [First slice](first-slice.md): fixture provider and Maildir connectors, source store with part index, content requests, coverage, deterministic triage, frozen proposals, a read-only scan against a folder destination index, CLI | D2 (accepted) | All first-slice acceptance checks pass; no write path or network access exists |
-| 2b. Model endpoint contract | Inference gateway, probes, fallbacks, grants, tested against a loopback stub | 2, D6 wording | Checks 1b-1 to 1b-7 pass |
-| 3. First real read-only mail connector | Gmail API with a read-only scope, whole-account read access, index everything and fetch on demand, enforcement level 2 | 2, D3 and D5 (accepted) | Private acceptance on the owner's account; public tests remain synthetic |
-| 4. Scans and preservation on real mail | Saved selectors, folder destination index, presence reports, preserved artifacts with provenance; no deliveries yet | 3 | Preserved bytes verify against connector hashes; rerunning a scan proposes nothing new |
-| 5. Life summary without email | Recollections and an iCalendar import, claims with citations and approximate dates, review, small timeline | 2 (store patterns), D9 | Claims open their evidence; corrections survive reprocessing; no mail source configured |
-| 6. Mail as life evidence | Scoped life grant on a mail source; excerpt capture and optional item or attachment preservation; citation re-resolution through an archive match | 4, 5 | A citation survives removal of its provider copy in a synthetic test |
-| 7. Action runner | `towpath-act` for approved folder deliveries and tier 1 mailbox changes (labels, archive, read state); generated filters | 4, D1 (accepted) | Frozen digests, allowlist, precondition recheck, receipts; mailbox writes additionally need inverse proposals and enforcement level 3 |
-| 8. Archive connector for real archives | Maildir and mbox with manifest support | 2, D4 (accepted) | Coverage counts reconcile against the archive tool's own counts |
-| 9. More sources and curation | Messages, documents, media metadata, narratives, family export, destination API plugins, and later an archive package built from preserved artifacts | 5, 6 | Per-source grants, release review, portable export and restore |
+| 1. Public foundation | Architecture, [services](components.md), [interfaces](interfaces.md), [integration candidates](integrations.md), [decisions](decisions.md) | — | Public tree and history contain no private data or infrastructure details |
+| 2. Synthetic read-only mail slice | [First slice](first-slice.md): Gmail-like fixture adapter, source index, content requests, deterministic triage, frozen proposals, a read-only scan against a folder destination, CLI | D2 | All first-slice checks pass; no write path or network access exists |
+| 2b. Model endpoint contract | Inference gateway, probes, fallbacks, grants, visibility filtering, against a loopback stub | 2 | Slice 1b checks pass |
+| 3. Real Gmail connection, read-only | Compose default profile, login, Gmail connection setup in `towpath-connect`, whole-mailbox index with fetch on demand | 2, D3, D13 | Private acceptance on the owner's account; public tests stay synthetic |
+| 4. Mail management review | Categories with corrections, important-and-unanswered list, unsubscribe review, draft text to copy, digest and generated filter files, search; read connections to a document system and photo library for presence checks | 3, D8, D12, verified [candidates](integrations.md) | Corrections survive reprocessing; rerunning produces no duplicate proposals |
+| 5. Action runner | `towpath-act` for tier 1 mailbox changes and deliveries to a folder, document system, or photo library; Gmail drafts only if D11 allows | 4, D1, D11 | Frozen approvals, allowlist, rechecks, receipts, inverse proposals, dry run |
+| 6. Life stream from mail | Mail life grant, people and event candidates, claims with citations and date precision, review, timeline, excerpt capture and optional preservation, recollections, questions with cited answers when a model is bound | 3 (4 helpful), 2b for answers | Claims open their evidence; contradictions shown; corrections survive model changes |
+| 7. More life sources | Contacts, then photo library and document system as evidence sources (references, not copies) | 6, D9 | Each source works with mail disconnected |
+| 8. Later | Calendars, other mail providers (IMAP, JMAP), more sources, curated family edition, export packages | 7 | Per-source grants, visibility enforced in exports, portable export and restore |
 
-The owner chose a real mail connector (milestone 3) before life summary without email (milestone 5); milestone 5 depends only on milestone 2, so it can start any time. The personal Gmail evacuation proceeds on its own schedule with its own tools. Towpath's archive connector does not wait for Gmail deletion, and Gmail deletion does not wait for Towpath.
+Mail management can be used on its own from milestone 3 or 4. The life stream starts from mail in milestone 6 but must work with any single source. Moving mail out of a provider is not on this roadmap; it is a separate project outside Towpath.

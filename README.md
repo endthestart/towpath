@@ -1,39 +1,41 @@
 # Towpath
 
-Towpath is an open-source project building tools to manage your digital life, starting with email, and using that information to create an evidence-linked life summary.
+Towpath is an open-source, self-hosted web application for managing your digital life, starting with email, and for building an evidence-linked life story from the sources you connect.
 
-**Status: designed, not built.** This repository contains architecture documents only. There is no runnable application, mailbox connector, model integration, or archive. Nothing here accesses or changes a live mailbox.
+**Status: designed, not built.** This repository contains design documents only. There is no runnable application, Compose file, connector, or model integration yet, and nothing here accesses or changes a mailbox.
 
-## Three separate concerns
+## What it will do
 
-1. **Mail management (Towpath):** help people understand and manage mail that may stay at Gmail or another provider. Towpath reads, classifies, finds items such as attachments, and proposes changes or deliveries to other tools for review. A separate action runner will execute approved, reversible mailbox changes and file deliveries ([decision D1](docs/decisions.md#d1-mailbox-and-destination-execution)); permanent deletion is never a Towpath action.
-2. **Life summary (Towpath):** connect selected sources into reviewable claims about people, events, places, and time, with citations and uncertainty. It works without email.
-3. **Personal Gmail evacuation (not Towpath):** one person's project to preserve historical Gmail in a local living archive and possibly remove provider copies. Towpath may read such an archive through an optional [adapter](docs/archive-adapter.md); it never requires the migration.
+- **Mail management:** connect a mailbox (Gmail first) and review suggestions: unsubscribe candidates, important mail still waiting for your reply, draft replies, categories, smart rules for mail that matters but doesn't need daily reading, and attachments that belong in your document system or photo library. Approved, reversible changes run through a separately permissioned action runner; permanent deletion is never a Towpath action.
+- **Life stream:** find people, events, places, photos, and documents across connected sources and turn them into reviewable claims with citations, uncertain dates, and visible contradictions. Ask questions and get cited answers. In the long term, curate a story to share with family. It starts from mail but works with any source.
 
-Each Towpath capability can be deployed alone or together. See [usage modes](docs/components.md#usage-modes).
+## How it is built
+
+Towpath is the front end and coordinator. It connects to tools people already run (for example a document system or photo library) or bundles open-source tools in its Docker Compose file, and writes code only where nothing suitable exists. See [integrate first](docs/architecture.md#integrate-first).
+
+Model features use explicitly configured OpenAI-compatible endpoints: base URL, credential, model, and destination. Poundlock is one optional endpoint; a bundled local model server or any compatible API works the same way. Nothing is sent to a remote model by default, and items marked private are never sent at all. See [model providers](docs/model-providers.md).
+
+Moving mail out of a provider is not part of Towpath.
 
 ## Design documents
 
 | Document | Covers |
 | --- | --- |
-| [Architecture](docs/architecture.md) | Overview, design rules, refinements to the first design |
-| [Components](docs/components.md) | Deployable units, store ownership, permission matrix, usage modes |
-| [Interfaces](docs/interfaces.md) | Connector, occurrence, grant, proposal, approval, receipt, claim, gateway records |
-| [Mailbox actions](docs/mail-boundaries.md) | Action tiers, provider permission limits, execution options compared |
-| [Scans and destinations](docs/scans-and-destinations.md) | Generic find-and-route over mail, destination connectors, preserved artifacts |
-| [Archive adapter](docs/archive-adapter.md) | Where an optional archive connector fits and which formats it reads |
-| [Model providers](docs/model-providers.md) | Endpoint profiles, destinations, data-class grants, capability probes, fallbacks |
-| [First slice](docs/first-slice.md) | Smallest read-only synthetic email build and its acceptance checks |
-| [Decisions](docs/decisions.md) | Recommendations, open owner decisions, facts to verify |
+| [Architecture](docs/architecture.md) | What Towpath is, integrate-first, design rules, what is out of scope |
+| [Services](docs/components.md) | Compose services and profiles, stores, credentials, permission matrix |
+| [Mail management](docs/mail-management.md) | Features, action tiers, provider permissions, execution options |
+| [Life stream](docs/life-stream.md) | Evidence rule, sources, claims, review, visibility, cited answers |
+| [Scans and destinations](docs/scans-and-destinations.md) | Finding items in mail, routing them to other tools, preserving evidence |
+| [Integrations](docs/integrations.md) | Candidate existing tools and libraries per need, with an evaluation checklist |
+| [Interfaces](docs/interfaces.md) | Records that cross service boundaries |
+| [Model providers](docs/model-providers.md) | Endpoint profiles, destinations, grants, capability probes, fallbacks |
+| [First slice](docs/first-slice.md) | Smallest read-only synthetic email build and its checks |
+| [Decisions](docs/decisions.md) | Accepted, withdrawn, and open decisions; facts to verify |
 | [Roadmap](docs/roadmap.md) | Dependency map of milestones |
 | [Publication](docs/publication.md) | What belongs in this public repository and what stays private |
 
-## Model providers
-
-Towpath uses explicitly configured OpenAI-compatible endpoints: base URL, credential reference, model, and destination class. Poundlock is one optional endpoint; any compatible local server, gateway, or hosted API can be configured the same way. Towpath probes each endpoint's capabilities with synthetic prompts and falls back only to other methods on the same endpoint or to non-model features. No endpoint is selected automatically, and personal content is never sent to a remote endpoint without an explicit grant. See [model providers](docs/model-providers.md).
-
 ## Public project boundary
 
-The public repository holds portable application code, schemas, generic documentation, synthetic fixtures, and release assets. Accounts, mail, photos, credentials, hostnames, network layouts, machine benchmarks, deployment secrets, and personal research stay in each user's private deployment. [Publication rules](docs/publication.md) describe the boundary.
+The public repository holds portable application code, schemas, generic documentation, synthetic fixtures, and release assets. Accounts, mail, photos, credentials, hostnames, network layouts, and personal research stay in each user's private deployment. [Publication rules](docs/publication.md) describe the boundary.
 
 This project is not affiliated with OpenAI, Google, or the authors of the tools it may integrate with. License: [MIT](LICENSE).

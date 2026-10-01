@@ -1,90 +1,81 @@
-# Components, data ownership, and permissions
+# Services, stores, and permissions
 
-Status: **designed, not built.** Names such as `towpath-connect` are working names for process roles, not published commands.
+Status: **designed, not built.** Service names are working names.
 
-## Deployable units
+## Services
 
-Towpath is one codebase with three process roles. A small deployment can run all of them on one machine; the separation is about which secrets each process can read, not about running many services.
+Towpath is one Python codebase ([D2](decisions.md#d2-implementation-language-and-storage)) run as four services in Docker Compose. Separate containers let each service hold only the credentials it needs.
 
-| Unit | Contains | Holds credentials for | Required? |
+| Service | Does | Holds credentials for | Required? |
 | --- | --- | --- | --- |
-| `towpath` app | CLI and later web UI, review workflows, mail module, life module, scan engine, preservation, background analysis jobs, inference gateway, exporter | Model endpoints only (per bound task) | Yes |
-| `towpath-connect` | Source connectors: mail provider, mail archive, calendar files, document and media metadata, destination indexes; fulfills content requests | Source and destination read credentials only | Yes, if any external source is used |
-| `towpath-act` | Action runner: mailbox actions and deliveries to [destinations](scans-and-destinations.md) | One write credential per allowlisted mailbox or destination | No. Arrives in milestone 7 for folder deliveries and tier 1 mailbox changes ([D1](decisions.md#d1-mailbox-and-destination-execution)) |
+| `towpath-web` | Login, UI, review and approval screens, configuration; links to each service's connection setup | None for external accounts | Yes |
+| `towpath-worker` | Analysis jobs, scans, classification, draft generation, claim proposals, question answering; the only service that calls models | Model endpoints only | Yes |
+| `towpath-connect` | Read adapters for mail, contacts, document systems, photo libraries, calendars; fetches content on request; runs read-only connection setup | Read access to connected accounts and tools | Yes, once anything is connected |
+| `towpath-act` | Executes approved, frozen proposals: mailbox changes, drafts if allowed, deliveries to document or photo systems; runs write-access connection setup | Write access, per allowlisted action | No; added in [roadmap](roadmap.md) milestone 5 |
 
-External to Towpath: mail providers, destinations such as a document system or media archive, the mail archive and the tool that maintains it, model endpoints (Poundlock or any other), and the personal Gmail evacuation project.
+**Why web and worker hold no account credentials.** Worker parses untrusted mail and sends it to models; web renders it. If injected content or a bug subverts either, it should find nothing that can read more of an account or change one.
 
-**Why the connector runner is separate from the app.** The app parses untrusted content and sends it to models. If a malformed message, prompt injection, or bug compromises app logic, it should find no credential that can read more mail or change a mailbox. The connector runner does no analysis and calls no model.
+**Why connection setup runs in the credential-holding service.** When a person clicks "Connect Gmail" in the UI, the request goes to `towpath-connect`'s setup endpoint, which runs the provider's OAuth flow and stores the resulting token in its own secret volume. Granting write access is a separate consent flow run by `towpath-act`, producing a separate token. The web UI shows status and scopes but never sees a token.
 
-**Why the action runner is separate from both.** It is the only code that can change a mailbox or write to another system. It reads approved proposals and its own receipts, nothing else, and can be absent from a deployment entirely.
+## Docker Compose layout
 
-### Enforcement levels
-
-The design states plainly how strong each boundary is in a given deployment:
-
-| Level | How units are separated | What it protects against |
+| Compose profile | Services | Purpose |
 | --- | --- | --- |
-| 1. Module | One process; credentials for disabled roles not loaded | Accidental coupling in code |
-| 2. Process and secret | Separate processes; each reads only its own secret file or environment | App-level bugs and injected content reaching credentials |
-| 3. OS user or container | Separate users or containers; store files permissioned per owner | A compromised app process reading other units' secrets or writing their stores |
+| default | `towpath-web`, `towpath-worker`, `towpath-connect` | Mail management review and life stream, read-only |
+| `actions` | `towpath-act` | Approved mailbox changes and deliveries |
+| `models` | A bundled OpenAI-compatible model server ([candidates](integrations.md#models)) | For people without an existing endpoint |
+| `documents` | A bundled document system ([candidates](integrations.md#documents)) | For people without an existing one |
+| `photos` | A bundled photo library ([candidates](integrations.md#photos)) | For people without an existing one |
 
-The first slice runs at level 1 with no credentials at all. Any release that holds a real provider credential should support level 2. Mailbox write support should require level 3. Delivery to a folder destination needs no credential and can run at level 2.
+Every bundled tool is optional and interchangeable with an existing deployment: the person enters its URL and credential in Towpath instead of enabling the profile. Towpath's own services never require a bundled tool.
+
+Volumes: one data volume per store (below), mounted read-write only in the writing service and read-only elsewhere, and one secret volume per credential-holding service. The Compose file and an `.env.example` in the repository will contain placeholders only ([publication rules](publication.md)).
 
 ## Stores and ownership
 
-Every store has exactly one writer. Other units read through the interfaces in [interfaces](interfaces.md). The first implementation can use one SQLite file per store so file permissions can enforce level 3; a shared database server with per-role grants is a later option.
+Human decisions are kept apart from everything rebuildable, so backups can focus on what cannot be regenerated. Every store has one writing service.
 
-| Store | Sole writer | Readers | Contents | Rebuildable? |
+| Store | Writer | Readers | Contents | Rebuildable? |
 | --- | --- | --- | --- | --- |
-| Source store | `towpath-connect` | App (through grants), `towpath-act` (account and native IDs only) | Source descriptors, sync runs, cursors, occurrences with metadata and MIME part structure, observed state, content cache, destination indexes, coverage reports, cross-source matches | Partly: re-sync can rebuild it while the source still holds the items |
-| Work queue | App | `towpath-connect` | Content requests: which occurrence or part to fetch, for which scan or person, with priority | Yes |
-| Mail store | App, mail module | App, `towpath-act` (approved proposals only) | Classifications, sender and list profiles, triage results, mailbox proposals, approvals | Classifications yes; proposals and approvals no |
-| Scan store | App, scan engine | App, `towpath-act` (approved deliveries only) | Selectors, scan runs and coverage, matches, delivery proposals, approvals | Matches yes; proposals and approvals no |
-| Preserved artifacts | App, preservation | App, exporter | Content-addressed bytes kept by a person's choice, with provenance per occurrence ([preserved artifacts](scans-and-destinations.md#preserved-artifacts)) | No; this is the durable copy |
-| Life store | App, life module | App, exporter | Recollections (authored evidence), entities, claims, captured excerpts and links to preserved artifacts, review history, narratives, release decisions | Claims proposed by rules or models yes; reviews, recollections, and captured citations no |
-| Model ledger | App, inference gateway | App | Endpoint profiles in use, capability reports, data-class grants, call records (endpoint fingerprint, model, prompt version, input fingerprint, outcome) | No; it is an audit record |
-| Action ledger | `towpath-act` | App | Execution attempts and per-item receipts for mailbox actions and deliveries | No |
-| Configuration and secrets | Person deploying | Each unit reads its own section | Endpoint profiles, source definitions, grants, secret references | Not stored in the repository |
+| Source index | `towpath-connect` | worker, web, act (IDs only) | Connections, sync runs, cursors, item metadata and part structure, dated observations (labels, folders), content cache, external references (document and photo IDs) | Mostly, by resyncing |
+| Work queue | web and worker (append only) | `towpath-connect` | Content requests: which item or part to fetch, for which feature | Yes |
+| Derived store | worker | web | Classifications, sender and list profiles, triage results, proposals, scans and matches, people and event candidates, proposed claims, embeddings | Yes |
+| Decisions store | web | worker, act | Approvals with frozen proposal copies, rejections, corrections, accepted claims, recollections, visibility settings, source grants, model endpoint grants, preservation choices | **No.** Back this up |
+| Preserved artifacts | worker, on a recorded preservation choice | web | Exact bytes a person chose to keep, content-addressed, with provenance ([preserved artifacts](scans-and-destinations.md#preserved-artifacts)) | **No.** Back this up |
+| Model ledger | worker | web | Endpoint profiles in use, capability reports, call records | No; audit record |
+| Action ledger | `towpath-act` | web | Execution attempts and per-item receipts | No; audit record |
+| Secrets | Each credential-holding service, its own volume | That service only | OAuth tokens, API keys | Not in any store above |
 
-The app cannot fetch from a provider. When it needs content that is not cached, it writes a content request; `towpath-connect` fetches that one item or part, records its hash, and caches it. Preservation copies bytes from the cache only after checking them against that hash.
-
-Recollections are written by the life module, not by a connector, because a person types them into Towpath. They are still evidence: the original wording is immutable and edits are new versions.
+SQLite files, one per store, are the first implementation. Two points need verification before relying on them: SQLite's write-ahead log across containers with read-only mounts, and concurrent appends to the work queue. If either fails, readers go through a small read API on the owning service instead.
 
 ## Permission matrix
 
-R = read, W = write, — = no access.
+R = read, W = write, — = none.
 
-| Unit | Read credentials | Write credentials | Model credential | Source store | Work queue | Mail store | Scan store | Life store | Preserved artifacts | Model ledger | Action ledger |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `towpath-connect` | R | — | — | W | R | — | — | — | — | — | — |
-| App: mail module | — | — | via gateway | R (mail grant) | W | W | — | — | — | via gateway | R |
-| App: scan engine | — | — | via gateway | R (per grant) | W | — | W | — | — | via gateway | R |
-| App: life module | — | — | via gateway | R (life grant) | W | — | — | W | R | via gateway | — |
-| App: preservation | — | — | — | R (hashes, cache) | W | — | — | — | W | — | — |
-| App: inference gateway | — | — | R | — | — | — | — | — | — | W | — |
-| App: exporter | — | — | — | — | — | — | — | R (released items) | R (released items) | — | — |
-| `towpath-act` | — | R | — | R (IDs only) | — | R (approved) | R (approved) | — | R (items to deliver) | — | W |
+| Service | Read credentials | Write credentials | Model credentials | Source index | Work queue | Derived | Decisions | Preserved | Model ledger | Action ledger |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `towpath-web` | — | — | — | R | W | R | W | R | R | R |
+| `towpath-worker` | — | — | R | R | W | W | R | W | W | R |
+| `towpath-connect` | R | — | — | W | R | — | R (grants only) | — | — | — |
+| `towpath-act` | — | R | — | R (IDs only) | — | — | R (approvals) | R (to deliver) | — | W |
 
-Grants between the mail and life modules are checked in the app's read layer, inside one process. That is a level 1 boundary: it prevents accidental use of mail as life evidence, not misuse by a compromised app. The credential boundaries above are the stronger ones.
-
-Two cross-module reads are deliberately absent. The mail module cannot read life claims, and the life module cannot read proposals or approvals. One narrow exception is optional: when both modules are enabled, the life module may publish a list of occurrence IDs cited by accepted claims, so the mail review screen can warn "cited in your life summary" before a person approves archiving or trashing it. That list carries no claim content.
+Source grants decide which features may use which source: a mailbox connected for mail management is not life-stream evidence until a person grants it. Grants are enforced in worker's and web's read layer. That is a code-level boundary inside one service, weaker than the credential boundaries above, and documented as such.
 
 ## Usage modes
 
-| Mode | Units | Stores | Credentials | Notes |
-| --- | --- | --- | --- | --- |
-| Mail management, mail stays at provider | app (mail), connect | source, mail | provider read; model optional | Proposals are reviewed and can be exported for manual execution |
-| Mail management with execution | adds `towpath-act` | adds action ledger | adds provider write | Tier 1 changes only ([D1](decisions.md#d1-mailbox-and-destination-execution)); requires enforcement level 3 |
-| Mail management over an archive | app (mail), connect (archive) | source, mail | none beyond file read access | Analysis and search only; there is no account to act on |
-| Life summary only | app (life), connect (calendar, files) or none | source, life | source-specific or none | Recollections alone are a valid starting point |
-| Both | all of the above | all | union | Mail reaches life summary only through an explicit grant with a scope (accounts, labels, dates) |
-| Find and route | app (scan engine), connect, optionally `towpath-act` | source, scan, preserved artifacts | source read; destination read; destination write only if delivering | Without the action runner, approved deliveries can still be exported as files for manual import |
-| Gmail evacuation | not Towpath | its own archive | its own | Towpath can read the resulting archive like any other source |
+| Mode | Services | Notes |
+| --- | --- | --- |
+| Mail management, review only | default profile | Approved items export as checklists or generated filter files |
+| Mail management with actions | adds `actions` | Tier 1 mailbox changes and deliveries per [D1](decisions.md#d1-mailbox-and-destination-execution) |
+| Life stream from mail | default profile | Needs a life grant on the mail connection |
+| Life stream without mail | default profile | Contacts, photo library, document system, calendars, recollections |
+| Existing tools | default profile plus connections | Point at existing document or photo systems and model endpoints |
+| Everything bundled | all profiles | For a fresh self-hosted setup |
 
-## Data flow for one message
+## One message, end to end
 
-1. `towpath-connect` indexes a message from a provider: native IDs, observed labels, header and provider dates, and MIME part structure. Bodies and attachments are fetched when a rule, scan, or person requests them, then cached and evictable.
-2. The mail module classifies it with deterministic rules; if a task is bound to a model endpoint and the data class is granted, the gateway sends a minimal prompt and validates the result.
-3. The mail module may create a proposal (for example, add label "Newsletters") that freezes the target occurrence, its native ID, and the state observed at run N.
-4. If the source has a life grant covering this message, the life module may propose a claim that cites a span of it. Accepting the claim captures the excerpt and hash, and the person may also preserve the full message or an attachment.
-5. If a person approves the mail proposal and `towpath-act` is deployed, it rechecks provider state, acts, and writes a receipt. The next sync observes the new state. The life claim keeps its captured citation either way.
+1. `towpath-connect` indexes a message: native IDs, labels observed at this sync, dates, and MIME part structure. No body or attachment is downloaded yet.
+2. Worker's triage rules need the body, so worker enqueues a content request; `towpath-connect` fetches that one message and caches it.
+3. Worker classifies it and, if a model task is bound and the data class is granted, calls the endpoint. It proposes a label and notes a PDF attachment that a scan matches for the document system.
+4. The person approves the label in the web UI and approves sending the PDF to their document system. Web records both approvals with frozen copies.
+5. `towpath-act` rechecks the message's labels, applies the label, uploads the PDF, and writes receipts. The next sync observes the new label; the document system now holds the PDF, and Towpath stores its document ID as a reference.

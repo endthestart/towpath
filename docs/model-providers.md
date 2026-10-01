@@ -14,7 +14,7 @@ base_url = "http://127.0.0.1:8080/v1"
 credential = "env:TOWPATH_LOCAL_CHAT_KEY"   # or "file:<path>", "keyring:<name>", "none"
 model = "example-local-model"
 kind = "chat"                               # "chat" or "embeddings"
-destination = "this-machine"                # "this-machine", "self-hosted", or "third-party"
+destination = "this-machine"                # "this-machine", "bundled", "self-hosted", or "third-party"
 allow_data = ["synthetic", "metadata"]
 timeout_seconds = 120
 
@@ -32,13 +32,14 @@ allow_data = ["synthetic", "metadata", "content"]
 # "life.extract" has no binding, so that feature is disabled.
 ```
 
-The example is inert: placeholder model names, loopback addresses, and an environment-variable reference with no value. Real profiles live in the private deployment ([publication rules](publication.md)).
+Profiles are created after login. API keys are entered on a setup screen served by `towpath-worker`, the service that uses them, following the same pattern as [connection setup](components.md#services); the web UI shows the profile but not the key. The example is inert: placeholder model names, loopback addresses, and an environment-variable reference with no value. Real profiles live in the private deployment ([publication rules](publication.md)).
 
 ### Destination classes
 
 | Destination | Meaning | Check Towpath can make |
 | --- | --- | --- |
 | `this-machine` | Server on the same host | Base URL host must resolve only to loopback; otherwise the profile is rejected |
+| `bundled` | The model server in Towpath's own Compose `models` profile | Base URL host must be that Compose service's name; otherwise the profile is rejected |
 | `self-hosted` | A server the person controls elsewhere, such as a home server or a gateway like Poundlock | Cannot be verified; treated as remote for grants |
 | `third-party` | A hosted API operated by someone else | Treated as remote; the review screen names the operator domain before the first grant |
 
@@ -52,7 +53,7 @@ The example is inert: placeholder model names, loopback addresses, and an enviro
 | `attachments` | Attachment bytes or extracted text |
 | `derived-personal` | Accepted claims, people and place records, timelines |
 
-`allow_data` in the file is a ceiling. For any destination other than `this-machine`, each class above `synthetic` also needs a grant recorded in the model ledger by an explicit command or review action, tied to the endpoint fingerprint (base URL, model, kind, credential reference). Changing any fingerprint field voids the grants for that endpoint. Queued work records the endpoint fingerprint it was approved for and fails rather than running against a changed profile.
+`allow_data` in the file is a ceiling. For any destination other than `this-machine` or `bundled`, each class above `synthetic` also needs a grant recorded in the model ledger by an explicit command or review action, tied to the endpoint fingerprint (base URL, model, kind, credential reference). Changing any fingerprint field voids the grants for that endpoint. Queued work records the endpoint fingerprint it was approved for and fails rather than running against a changed profile.
 
 ## Capability probing
 
@@ -85,10 +86,10 @@ An endpoint that returns an error, times out, or produces invalid output repeate
 
 ## Gateway behavior
 
-The inference gateway is the only app code that makes outbound model calls ([interfaces](interfaces.md#5-inference-gateway-inside-the-app)). For each call it:
+The inference gateway runs in `towpath-worker` and is the only Towpath code that makes outbound model calls ([interfaces](interfaces.md#5-inference-gateway-inside-worker)). For each call it:
 
 1. Resolves the task binding; no binding means `Disabled`.
-2. Checks the data class against the profile ceiling and, for non-local destinations, the ledger grant.
+2. Refuses any input with `private` [visibility](life-stream.md#visibility-and-authorship), then checks the data class against the profile ceiling and, for non-local destinations, the ledger grant.
 3. Selects the structured-output method from the latest capability report.
 4. Sends the minimal input the task needs (for example, metadata only for list detection).
 5. Validates the output and records endpoint fingerprint, model, served model if reported, prompt version, input fingerprint, outcome, and usage if available.

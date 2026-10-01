@@ -1,8 +1,8 @@
-# Interfaces between components
+# Interfaces between services
 
 Status: **designed, not built.** Schemas are version 0 drafts. Field names will change during the [first slice](first-slice.md); the boundaries they encode should not change without a design note. All examples are synthetic and use reserved domains (`example.com`, `.test`).
 
-Each record carries a `schema` field so stores can be migrated and so a record crossing a process boundary can be rejected if its version is unknown.
+Each record carries a `schema` field so stores can be migrated and so a record crossing a service boundary can be rejected if its version is unknown.
 
 ## 1. Source connector (inside `towpath-connect`)
 
@@ -32,7 +32,7 @@ A run that ends early records `complete: false`; the coverage report shows the g
 }
 ```
 
-`kind` is one of `mail-provider`, `mail-archive`, `calendar-file`, `document`, `media-metadata`, `destination-index`. Every item's metadata and part structure is always indexed. `retention` controls content: `on-demand` (the default: fetched when a rule, scan, or person needs it, then evictable), `full-content`, or `metadata-only`. See [decision D5](decisions.md#d5-content-retention). Durable copies are a separate, explicit choice ([preserved artifacts](scans-and-destinations.md#preserved-artifacts)).
+`kind` is one of `mail-provider`, `mail-archive` (an optional local archive, treated like any other source), `contacts`, `calendar`, `document-system`, `photo-library`. Document-system and photo-library connectors also tell scans what those tools already hold ([destinations](scans-and-destinations.md#destination-connectors)). Every item's metadata and part structure is always indexed. `retention` controls content: `on-demand` (the default: fetched when a rule, scan, or person needs it, then evictable), `full-content`, or `metadata-only`. See [decision D5](decisions.md#d5-content-retention). Durable copies are a separate, explicit choice ([preserved artifacts](scans-and-destinations.md#preserved-artifacts)).
 
 ### Occurrence
 
@@ -71,7 +71,7 @@ One record per item per source. Observed state is a dated observation, not a fac
 }
 ```
 
-`parts` comes from the provider's structure listing where available, without downloading attachments; a part's `sha256` is filled when its bytes are first fetched. `raw_sha256` covers the exact bytes the source returned. `normalized_sha256` covers decoded headers that survive export (From, To, Cc, Date, Subject, Message-ID) and decoded body parts, so a provider copy and an archive copy can match even when the archive adds headers. The normalization algorithm is part of the schema version.
+`parts` comes from the provider's structure listing where available, without downloading attachments; a part's `sha256` is filled when its bytes are first fetched. `raw_sha256` covers the exact bytes the source returned. `normalized_sha256` covers decoded headers that survive export (From, To, Cc, Date, Subject, Message-ID) and decoded body parts, so copies of one message in different sources (for example two accounts that both received it) can be recognized even when headers differ. The normalization algorithm is part of the schema version.
 
 ### Cross-source match
 
@@ -99,16 +99,13 @@ Matches also link a candidate attachment to a destination index entry by SHA-256
   "items_seen": 30,
   "items_new": 2,
   "items_absent_since_last_run": 1,
-  "unparseable": [{"native_id": "fx-a-000029", "reason": "invalid date header"}],
-  "compared_with": "src_fixture_archive",
-  "comparison": {"exact-raw": 0, "normalized-content": 24, "message-id-only": 2, "conflict": 1, "missing": 3},
-  "advisory": "Report only. Not an authorization to delete provider mail."
+  "unparseable": [{"native_id": "fx-a-000029", "reason": "invalid date header"}]
 }
 ```
 
 ### Content request
 
-The app cannot fetch from a source. It asks `towpath-connect` through the work queue:
+Web and worker cannot fetch from a source. They ask `towpath-connect` through the work queue:
 
 ```json
 {
@@ -123,7 +120,7 @@ The app cannot fetch from a source. It asks `towpath-connect` through the work q
 
 `towpath-connect` fetches only that occurrence or part, verifies or records its hash, caches it, and marks the request done or failed. Scans process mail one item at a time this way, so read access to a whole account does not mean copying the whole account.
 
-## 2. Source read API (app reads the source store)
+## 2. Source read API (web and worker read the source index)
 
 ```text
 list_occurrences(consumer, filter) -> occurrences inside the consumer's grant
@@ -147,7 +144,7 @@ A mail source added for mail management gets a `mail` grant. It gets no `life` g
 
 ## 3. Mail proposal, approval, and receipt
 
-A proposal is created by the mail module (rules or a model). It describes one action type against an explicit set of occurrences, with the state that justified it.
+A proposal is created by worker (rules or a model). It describes one action type against an explicit set of occurrences, with the state that justified it.
 
 ```json
 {
@@ -166,9 +163,11 @@ A proposal is created by the mail module (rules or a model). It describes one ac
 }
 ```
 
+Action types allowlisted by [D1](decisions.md#d1-mailbox-and-destination-execution): `label.add`, `label.remove`, `archive`, `mark.read`, `mark.unread`, and `deliver` ([scans and destinations](scans-and-destinations.md#delivery-proposal)). `draft.create` and `filter.create` depend on [D11](decisions.md#d11-draft-replies) and [D12](decisions.md#d12-smart-rules).
+
 States: `proposed` → `approved` or `rejected`; `approved` → `executed`, `partially-executed`, `failed`, or `stale`; any open proposal → `expired`. A later sync that changes a target's state makes an unexecuted proposal `stale`.
 
-An approval freezes the proposal by digest. Only a person, through the review UI, creates one.
+An approval freezes the proposal: web stores a copy of it and its digest in the decisions store. Only a person, through the review UI, creates one.
 
 ```json
 {
@@ -197,7 +196,7 @@ The action runner (`towpath-act`), where deployed, recomputes the digest, refuse
 
 `result` is one of `applied`, `skipped-precondition`, `skipped-not-allowlisted`, `failed`. Without the action runner, an approved proposal can be exported as a checklist for manual action.
 
-## 4. Life evidence and claims
+## 4. Life stream claims
 
 ```json
 {
@@ -210,28 +209,31 @@ The action runner (`towpath-act`), where deployed, recomputes the digest, refuse
   "citations": [
     {"occurrence_id": "occ_0055", "part": "text/plain", "span": [120, 188],
      "excerpt_sha256": "77ab…", "captured_excerpt": "Your booking for Example City, 14–17 May, is confirmed.",
-     "preserved": {"level": "item", "artifact_sha256": "a90c…"}}
+     "preserved": {"level": "item", "artifact_sha256": "a90c…"}},
+    {"external": {"source_id": "src_photos", "kind": "photo-library", "native_id": "asset-7f3e"},
+     "observed": "taken 2026-05-15, Example City"}
   ],
+  "visibility": "personal",
   "producer": "rules/travel-confirmation@0",
   "state": "proposed",
   "uncertainty": "A booking confirmation supports a plan, not that travel occurred."
 }
 ```
 
-`modality` distinguishes `plan`, `occurred`, `recollected`, and `inferred`. `captured_excerpt` is filled when the claim is accepted. `preserved` is optional: the person can also keep the whole message (`item`) or one attachment (`part`) as a [preserved artifact](scans-and-destinations.md#preserved-artifacts) when the source itself is valuable. A recollection citation points to a recollection version in the life store instead of an occurrence.
+`modality` distinguishes `plan`, `occurred`, `recollected`, and `inferred`. An `external` citation references an item another system owns, such as a photo or document, by its native ID; Towpath does not copy it. `visibility` is `private`, `personal`, or `shareable` ([life stream](life-stream.md#visibility-and-authorship)). `captured_excerpt` is filled when the claim is accepted. `preserved` is optional: the person can also keep the whole message (`item`) or one attachment (`part`) as a [preserved artifact](scans-and-destinations.md#preserved-artifacts) when the source itself is valuable. A recollection citation points to a recollection version, with its author, in the decisions store.
 
-## 5. Inference gateway (inside the app)
+## 5. Inference gateway (inside worker)
 
 ```text
 infer(task, input_parts, data_class, output_schema | none) -> InferenceResult | Disabled(reason) | Failed(reason)
 ```
 
-The caller names a task (for example `mail.classify`), never an endpoint. The gateway looks up the task binding, checks the endpoint's destination class and data-class grant, picks the structured-output method from the endpoint's capability report, validates the output, and writes a ledger record. See [model providers](model-providers.md). Model output enters the mail, scan, or life store only as a proposal.
+The caller names a task (for example `mail.classify`), never an endpoint. The gateway looks up the task binding, checks the endpoint's destination class and data-class grant, picks the structured-output method from the endpoint's capability report, validates the output, and writes a ledger record. Input parts with `private` visibility are refused whatever the grants. See [model providers](model-providers.md). Model output enters the derived store only as a proposal.
 
 ## 6. Scans, destinations, and preserved artifacts
 
 Selector, delivery proposal, and artifact records are defined in [scans and destinations](scans-and-destinations.md).
 
-## 7. Export for an independent archive or migration
+## 7. Export
 
-Towpath can export proposals, coverage reports, preserved artifacts with provenance, and accepted claims with citations as JSON Lines using the schemas above. An external tool, including the Gmail evacuation project, may consume these files. Nothing in an export grants authority to act.
+Towpath can export approved proposals, preserved artifacts with provenance, and accepted claims with citations as JSON Lines using the schemas above. Exports exclude `private` items, and shared editions include only `shareable` ones. Nothing in an export grants authority to act.
