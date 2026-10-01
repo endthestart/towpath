@@ -1,61 +1,92 @@
 # Towpath architecture
 
-Status: proposed boundaries for public review. This is a design document, not an implementation claim.
+Status: **designed, not built.** This document is the overview. Nothing described here exists as running code yet. Recommendations that still need the owner's agreement are listed in [decisions](decisions.md).
 
-## The three concerns
+## Goal and the three concerns
 
-| Concern | Purpose | Input | Output | Can change a live account? |
-| --- | --- | --- | --- | --- |
-| Mail management | Help people handle today's email | Provider read adapter or a chosen mail archive | Analyses and action proposals | Only through an optional, scoped action executor after review |
-| Life summary | Recover and curate a personal history | Evidence adapters for mail, messages, calendars, photos, documents, memories | Search, timeline, claims, narratives | No |
-| Personal mail evacuation | Preserve one person's historical Gmail independently, then decide whether to remove provider copies | Their accounts and backups | A local living archive and migration records | Yes, in that person's separate migration process |
+Towpath builds tools to manage your digital life, starting with email, and uses that information to create an evidence-linked life summary.
 
-Mail management must be useful while mail remains in Gmail or another provider. Life summary must work without email. People can run either Towpath capability alone, both together, or neither with the personal evacuation process. This preserves the option to keep mail at the provider if Towpath makes it useful there.
+| Concern | Purpose | Input | Output | Can change a live account? | Part of Towpath? |
+| --- | --- | --- | --- | --- | --- |
+| Mail management | Help people understand and handle mail that stays at Gmail or another provider | A mail provider read connector, or a mail archive read connector | Reports, classifications, exact action proposals | Only through an optional, separately permissioned executor, still undecided ([mailbox actions](mail-boundaries.md)) | Yes |
+| Life summary | Turn selected sources into reviewable claims about people, events, places, and time | Any selected sources: recollections, calendars, documents, media metadata, and optionally mail | Claims with citations and uncertainty, timeline, questions, narratives | No | Yes |
+| Personal Gmail evacuation | Preserve one person's historical Gmail in a local living archive and possibly remove provider copies | That person's accounts and backups | An archive and migration records | Yes, under its own process | **No.** Independent project; Towpath may read its archive through an [adapter](archive-adapter.md) |
+
+Each Towpath capability is usable alone. Life summary must produce useful claims with no mail source configured. Mail management must be useful while mail remains at the provider indefinitely. Neither depends on the evacuation, and the evacuation does not depend on Towpath.
+
+## System view
 
 ```mermaid
 flowchart LR
-    Provider[Live mail provider] --> MailRead[Mail read adapter]
-    Archive[Optional independent archive] --> MailRead
-    MailRead --> MailReview[Mail analysis and review]
-    MailReview --> Proposal[Exact action proposal]
-    Proposal --> Executor[Optional action executor]
-    Executor --> Provider
+    subgraph External
+        Provider[Mail provider]
+        ArchiveFiles[Mail archive on disk]
+        Files[Calendar files, documents, media]
+        Endpoint[Configured model endpoints]
+        Evac[Gmail evacuation project]
+    end
 
-    MailRead -. optional evidence .-> Evidence[Evidence adapters and references]
-    Other[Messages, calendars, media, documents, memories] --> Evidence
-    Evidence --> Claims[Proposed claims with citations]
-    Claims --> Curator[Human review]
-    Curator --> Story[Search, timeline, life summary]
+    subgraph Connect[towpath-connect: read credentials only]
+        MailConn[Mail provider connector]
+        ArchConn[Archive connector]
+        OtherConn[Other source connectors]
+    end
 
-    Migration[Personal Gmail evacuation project] --> Archive
+    subgraph App[towpath app: no provider credentials]
+        Mail[Mail module]
+        Life[Life module]
+        Gateway[Inference gateway]
+        Review[Review UI and CLI]
+    end
+
+    Act[towpath-act: optional, write credential]
+
+    Provider --> MailConn
+    ArchiveFiles --> ArchConn
+    Files --> OtherConn
+    MailConn --> SourceStore[(Source store)]
+    ArchConn --> SourceStore
+    OtherConn --> SourceStore
+
+    SourceStore --> Mail
+    SourceStore -. explicit grant only .-> Life
+    Mail --> Gateway
+    Life --> Gateway
+    Gateway --> Endpoint
+    Mail --> Review
+    Life --> Review
+
+    Review -- approved, frozen proposal --> Act
+    Act --> Provider
+    Evac --> ArchiveFiles
 ```
 
-The dashed link is optional. The migration process is outside Towpath's application boundary. An archive integration reads a documented export or supported API and does not acquire authority to delete provider mail.
+[Components](components.md) defines each deployable unit, which store it owns, and its permissions. [Interfaces](interfaces.md) defines the records that cross unit boundaries. [First slice](first-slice.md) defines the smallest build that tests this design with synthetic data.
 
-## Shared infrastructure, separate authority
+## Design rules
 
-Mail management and life summary may share a deployment, a job queue, an evidence reference format, and provider configuration. They keep separate write permissions and user-facing workflows. Shared storage does not imply that a life-history claim can trigger a mailbox action.
+1. **Credentials follow processes.** The process that parses untrusted mail and talks to models (the app) holds no provider credential. Provider read credentials live only in the connector runner. A provider write credential, if one ever exists, lives only in the executor.
+2. **One connector per source, many consumers.** A mailbox is read once into the source store. Mail management and life summary consume it through separate, explicit grants. Connecting mail for management does not make it life-summary evidence.
+3. **Occurrences, not merged messages.** Each copy of an item in each source is its own occurrence. Equal Message-IDs or hashes produce a recorded match with a strength, never a merge.
+4. **Observations are dated.** Mailbox state (labels, folders, read status) is recorded as observed at a sync run. Disappearance is recorded as "absent since run N", never as deletion of history.
+5. **Proposals, not actions.** Analysis and models produce proposals. Only a person produces an approval. Model output can never become an approval.
+6. **Citations survive source changes.** When a life-summary claim is accepted, the cited span is captured (excerpt and hash, subject to the retention policy) so the claim stays reviewable after the provider copy is archived, moved, or deleted.
+7. **No implicit model destination.** Every model call goes through the inference gateway, which requires an explicit endpoint profile, task binding, destination class, and data-class grant. No profile means the feature is off. See [model providers](model-providers.md).
+8. **Rebuildable derivations.** Indexes, vectors, classifications, and model outputs can be regenerated. Human decisions (approvals, claim reviews, corrections) cannot and are stored as originals.
 
-| Component | Responsibility | Authority |
+## Refinements to the first public design
+
+The first public design was tested against the three-concern goal and the following boundaries changed:
+
+| Earlier position | Problem found | Refinement |
 | --- | --- | --- |
-| Source adapters | Read from a provider, archive, or existing application; record source IDs, coverage, and acquisition time | Read credentials only |
-| Evidence store | Preserve immutable input or stable references, source-specific occurrences, and hashes where bytes are held | Writes only its own storage |
-| Analysis workers | Deterministic extraction first; model-backed proposals for ambiguous material | Read scoped evidence; write derived records |
-| Review | Show source citations, uncertainty, conflicting evidence, and action details; record corrections | Changes derived decisions, not originals |
-| Mail executor | Execute an approved, frozen proposal against one account and return a receipt | Narrow provider write credential; no authority over life claims |
-| Narrative exporter | Produce a selected reading edition and its evidence links | Read only items released for that audience |
-| Model provider adapter | Call an explicitly configured endpoint and record model/route metadata | No account or file-system mutation tools |
-
-The [mail boundary](mail-boundaries.md) gives the executor flow. The [provider design](model-providers.md) defines the model contract. The [publication rules](publication.md) separate application code from a user's deployment.
-
-## Evidence and claim contract
-
-An evidence record identifies its source and namespace, original identifier, acquisition time, byte hash if archived, original time fields and timezone assumptions, content location, authorship, access policy, and coverage gaps. Equal Message-IDs or hashes do not collapse distinct account occurrences.
-
-A claim is a statement about a person, event, place, relationship, or period. It stores a date expression and precision, evidence spans, producer and version, and proposed/accepted/rejected/superseded state. A message about an intended trip supports a *plan*; it does not by itself prove travel occurred. A person's recollection is attributed evidence, with its original wording and described period.
-
-Derived indexes, vectors, summaries, and model outputs can be rebuilt. A correction remains attached to its evidence and survives a model change. Narratives cite accepted claims or attributed recollections and require release review before sharing.
+| Separate "mail read adapter" and "evidence adapters" | Two adapters would read the same mailbox with two credentials, and life summary could ingest all mail by default | One connector tier writes a shared source store; consumers need explicit grants |
+| Executor holds a "narrowly scoped provider credential" | Gmail's API scopes that can apply labels or archive also permit reading and sending (to be verified, see [decisions](decisions.md#facts-to-verify-before-implementation)); IMAP passwords grant everything | Narrowness is enforced by process separation, an action allowlist configured at the executor, and frozen proposal digests, not only by provider scopes |
+| Citations point to source items | A mailbox action or the evacuation can remove the cited provider copy | Capture on accept, plus cross-source match so a citation can be re-resolved in an archive |
+| Archive adapter "once the format is known" | Adapter shape was undefined, and the evacuation's tool may change | Read standard formats plus an optional manifest; the archive is read-only to Towpath; see [archive adapter](archive-adapter.md) |
+| Provider/archive verification left vague | A Towpath report could be mistaken for deletion approval | Towpath may produce an advisory coverage report with match strengths; deletion decisions stay in the evacuation project |
+| Mail and life deployability open | Unclear what "use one without the other" requires | One codebase, modules enabled per deployment, three process roles; see [components](components.md#usage-modes) |
 
 ## Public deployment contract
 
-The application must run without Poundlock, a specific NAS, a particular mail archive, or private infrastructure. First installation should configure storage, a mail read adapter only if desired, and a model endpoint only if desired. Capabilities that need an unavailable API route stay disabled with a clear reason. No cloud destination is inferred from a model name.
+The application must run without Poundlock, a specific storage device, a particular mail archive, or private infrastructure. First installation configures storage; mail, other sources, and model endpoints are each optional. Capabilities that need an unavailable source, permission, or API route stay disabled with a stated reason. The [publication rules](publication.md) keep private data and deployment details out of this repository.

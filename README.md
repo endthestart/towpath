@@ -1,23 +1,38 @@
 # Towpath
 
-Towpath is an open-source project for managing your digital life, starting with email, and using that information to create an evidence-linked life summary. It will offer user-controlled tools for handling daily information alongside a reviewable record of people, events, places, and memories.
+Towpath is an open-source project building tools to manage your digital life, starting with email, and using that information to create an evidence-linked life summary.
 
-**Status: architecture and roadmap.** This repository does not yet contain a runnable application, mailbox connector, or archive. The first release is a public design so implementation can happen in the open without publishing anyone's personal data or infrastructure.
+**Status: designed, not built.** This repository contains architecture documents only. There is no runnable application, mailbox connector, model integration, or archive. Nothing here accesses or changes a live mailbox.
 
-The work has three distinct concerns:
+## Three separate concerns
 
-1. **Mail management:** classify, find missed messages, propose organization and unsubscribe actions, and let a person review changes to a live mailbox.
-2. **Life summary:** connect mail, messages, calendars, photos, documents, and first-person recollections into claims about people, events, places, and time. Answers and stories cite evidence and carry uncertainty.
-3. **Personal mail evacuation:** moving a particular person's historical Gmail into a local living archive and eventually removing provider copies. This is an independent migration and preservation project. Towpath may read an archive through a documented adapter, but its mail management and life summary do not require that migration.
+1. **Mail management (Towpath):** help people understand and manage mail that may stay at Gmail or another provider. Towpath reads, classifies, and proposes changes for review. Whether and how Towpath ever executes approved changes is an [open decision](docs/decisions.md#d1-mailbox-execution).
+2. **Life summary (Towpath):** connect selected sources into reviewable claims about people, events, places, and time, with citations and uncertainty. It works without email.
+3. **Personal Gmail evacuation (not Towpath):** one person's project to preserve historical Gmail in a local living archive and possibly remove provider copies. Towpath may read such an archive through an optional [adapter](docs/archive-adapter.md); it never requires the migration.
 
-Read the [architecture](docs/architecture.md) for component boundaries and the [mail boundary](docs/mail-boundaries.md) for exactly what can change a mailbox. The [roadmap](docs/roadmap.md) marks what exists and what is proposed.
+Each Towpath capability can be deployed alone or together. See [usage modes](docs/components.md#usage-modes).
+
+## Design documents
+
+| Document | Covers |
+| --- | --- |
+| [Architecture](docs/architecture.md) | Overview, design rules, refinements to the first design |
+| [Components](docs/components.md) | Deployable units, store ownership, permission matrix, usage modes |
+| [Interfaces](docs/interfaces.md) | Connector, occurrence, grant, proposal, approval, receipt, claim, gateway records |
+| [Mailbox actions](docs/mail-boundaries.md) | Action tiers, provider permission limits, execution options compared |
+| [Archive adapter](docs/archive-adapter.md) | Where an optional archive connector fits and which formats it reads |
+| [Model providers](docs/model-providers.md) | Endpoint profiles, destinations, data-class grants, capability probes, fallbacks |
+| [First slice](docs/first-slice.md) | Smallest read-only synthetic email build and its acceptance checks |
+| [Decisions](docs/decisions.md) | Recommendations, open owner decisions, facts to verify |
+| [Roadmap](docs/roadmap.md) | Dependency map of milestones |
+| [Publication](docs/publication.md) | What belongs in this public repository and what stays private |
 
 ## Model providers
 
-Towpath's first inference contract will use a configurable OpenAI-compatible Chat Completions endpoint: base URL, API key, and model ID. A local server or gateway such as Poundlock can fill that role; Poundlock is optional. OpenAI's API can also be configured explicitly. No model provider or network destination is selected automatically. Later capabilities, such as embeddings and transcription, are negotiated independently. See [provider design](docs/model-providers.md).
+Towpath uses explicitly configured OpenAI-compatible endpoints: base URL, credential reference, model, and destination class. Poundlock is one optional endpoint; any compatible local server, gateway, or hosted API can be configured the same way. Towpath probes each endpoint's capabilities with synthetic prompts and falls back only to other methods on the same endpoint or to non-model features. No endpoint is selected automatically, and personal content is never sent to a remote endpoint without an explicit grant. See [model providers](docs/model-providers.md).
 
 ## Public project boundary
 
 The public repository holds portable application code, schemas, generic documentation, synthetic fixtures, and release assets. Accounts, mail, photos, credentials, hostnames, network layouts, machine benchmarks, deployment secrets, and personal research stay in each user's private deployment. [Publication rules](docs/publication.md) describe the boundary.
 
-This project is not affiliated with OpenAI or the authors of the tools it may integrate with. License: [MIT](LICENSE).
+This project is not affiliated with OpenAI, Google, or the authors of the tools it may integrate with. License: [MIT](LICENSE).
