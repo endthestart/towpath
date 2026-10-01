@@ -352,4 +352,6 @@ def test_example_config_is_valid_and_placeholder_only():
     assert {s.adapter for s in cfg.sources.values()} == {"gmail", "paperless", "immich"}
     assert cfg.endpoints["local"].destination == "this-machine"
     text = (REPO / "examples" / "towpath.example.toml").read_text()
-    assert violations(text) == [] and "env:" not in text.split("[[sources]]")[0]
+    assert violations(text) == []
+    refs = [s.credential for s in cfg.sources.values() if s.credential] + [e.credential for e in cfg.endpoints.values()]
+    assert refs and all(r == "none" or r.startswith(("file:", "env:")) for r in refs)
