@@ -90,7 +90,8 @@ def _update_matches(db, run_id: str) -> None:
                               VALUES (?, ?, 'message-id-only', '["rfc_message_id"]', ?)""", (a, b, run_id))
 
 
-def sync(config, source_id: str, **adapter_options) -> dict:
+def sync(config, source_id: str, max_items: int | None = None, **adapter_options) -> dict:
+    """Index one source. ``max_items`` stops after that many messages; the next run resumes."""
     source = config.sources[source_id]
     connector = build_connector(source, **adapter_options)
     db = open_store(config.store_dir, "source", ROLE)
@@ -133,6 +134,8 @@ def sync(config, source_id: str, **adapter_options) -> dict:
                 db.execute("INSERT OR IGNORE INTO full_sync_seen (source_id, native_id) VALUES (?, ?)",
                            (source_id, rec["native_id"]))
                 db.commit()  # progress survives an interruption
+                if max_items is not None and counts["seen"] >= max_items:
+                    raise Interrupted(f"stopped after {max_items} messages (--max-items); the next run resumes")
             elif kind == "deleted":
                 n = db.execute("UPDATE items SET absent_since_run = ? WHERE source_id = ? AND native_id = ? "
                                "AND absent_since_run IS NULL", (run_id, source_id, event[1])).rowcount

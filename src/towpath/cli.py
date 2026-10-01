@@ -53,6 +53,8 @@ def _emit(data, as_json: bool) -> None:
 @connect_app.command("sync")
 def connect_sync(source: list[str] = typer.Argument(None, help="Source IDs; all sources if omitted."),
                  config: Path = ConfigOpt, as_json: bool = typer.Option(False, "--json"),
+                 max_items: int = typer.Option(None, "--max-items",
+                                               help="Stop after this many messages; the next run resumes."),
                  simulate_interrupt_after: int = typer.Option(None, hidden=True),
                  simulate_ignored_mask: bool = typer.Option(False, hidden=True)):
     """Index sources: full sync first, incremental after."""
@@ -62,8 +64,40 @@ def connect_sync(source: list[str] = typer.Argument(None, help="Source IDs; all 
         options = {}
         if cfg.sources[source_id].adapter == "fixture-gmail":
             options = {"interrupt_after": simulate_interrupt_after, "ignore_mask": simulate_ignored_mask}
-        results.append(connect.sync(cfg, source_id, **options))
+        results.append(connect.sync(cfg, source_id, max_items=max_items, **options))
     _emit(results, as_json)
+
+
+@connect_app.command("auth")
+def connect_auth(source: str, config: Path = ConfigOpt,
+                 no_browser: bool = typer.Option(False, "--no-browser", help="Print the URL instead.")):
+    """Authorize read-only Gmail access with your own Google OAuth client."""
+    from towpath.adapters.google_gmail import ScopeError, authorize
+
+    cfg = _load(config)
+    src = cfg.sources[source]
+    if src.adapter != "gmail":
+        raise typer.BadParameter(f"source {source} does not use the gmail adapter")
+    try:
+        result = authorize(src.client_secrets, src.token, open_browser=not no_browser)
+    except ScopeError as exc:
+        typer.echo(f"refused: {exc}", err=True)
+        raise typer.Exit(2) from exc
+    typer.echo(f"authorized; granted scopes: {', '.join(result['granted_scopes'])}; token saved to {result['token']}")
+
+
+@connect_app.command("verify-structure")
+def connect_verify(source: str, sample: int = typer.Option(25, "--sample"), config: Path = ConfigOpt,
+                   as_json: bool = typer.Option(False, "--json")):
+    """Check that the structural field mask keeps body data out of responses (D16). Stores nothing."""
+    from towpath.adapters import build_connector
+    from towpath.adapters.google_gmail import verify_structure
+
+    cfg = _load(config)
+    connector = build_connector(cfg.sources[source])
+    report = verify_structure(connector.client, connector.mask, sample)
+    _emit(report, as_json)
+    raise typer.Exit(0 if report["passed"] else 1)
 
 
 @connect_app.command("fetch-requests")
