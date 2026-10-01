@@ -22,7 +22,7 @@ An archive source supports three uses, all optional:
 
 1. **Mail management over the archive.** Search, triage reports, and sender analysis on mail that no longer lives at a provider. No actions: there is no account to change.
 2. **Life-summary evidence.** With a life grant, archived mail can support claims. Citations stay valid after provider copies are gone.
-3. **Advisory coverage.** When both a provider source and an archive source exist, Towpath reports which provider occurrences have archive matches and at what strength ([interfaces](interfaces.md#coverage-report)).
+3. **Advisory coverage.** When both a provider source and an archive source exist, Towpath reports ([D7](decisions.md#d7-coverage-report-home), accepted) which provider occurrences have archive matches and at what strength ([interfaces](interfaces.md#coverage-report)).
 
 None of these is required for Towpath to work, and the evacuation does not need Towpath.
 
@@ -58,4 +58,3 @@ The archive changes as new mail is appended. The adapter scans incrementally by 
 ## Remaining questions
 
 - Whether the evacuation's chosen tool writes Maildir or mbox directly, or needs an export step and a manifest writer. That is the evacuation's choice; Towpath's input is fixed by [D4](decisions.md#d4-archive-input).
-- Whether the advisory coverage report belongs in Towpath, in the evacuation tooling, or both ([decision D7](decisions.md#d7-coverage-report-home)).

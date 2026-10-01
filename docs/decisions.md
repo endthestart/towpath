@@ -58,10 +58,7 @@ Options for mailbox changes are compared in [mailbox actions](mail-boundaries.md
 
 ### D7. Coverage report home
 
-- **Question:** should the provider-versus-archive coverage report live in Towpath, in the evacuation tooling, or both?
-- **Recommended:** Towpath produces it as an advisory read-only report because it already has both sources' occurrences; the evacuation keeps its own per-message verification for any deletion.
-- **Status:** to be asked separately with context.
-- **Blocks:** first slice check 7 (can be dropped if the answer is "evacuation only").
+**Accepted 2026-10-01.** Towpath produces the provider-versus-archive coverage report as an advisory, read-only report with match strengths, because it already indexes both sides. The report carries no authority. The evacuation may use it as one input but keeps its own per-message verification before any deletion. First-slice check 7 stays.
 
 ### D8. Unsubscribe handling
 
@@ -105,5 +102,6 @@ These affect the design but could not be confirmed from primary documentation wh
 | 2026-10-01 | D10: real read-only mail connector before life summary without email | Accepted |
 | 2026-10-01 | D3: Gmail API, read-only scope, for the first real connector | Accepted |
 | 2026-10-01 | D4: archive read as Maildir or mbox plus optional manifest, independent of archive tool | Accepted |
+| 2026-10-01 | D7: Towpath produces an advisory coverage report; deletion verification stays in the evacuation | Accepted |
 | 2026-10-01 | D5: read access to all mail, index everything, fetch per item on demand; generic scans and destinations | Accepted |
 | 2026-10-01 | Preservation of the full item or attachment, not only excerpts, as a foundation for a later archive package | Accepted as a requirement; design in R4 |
