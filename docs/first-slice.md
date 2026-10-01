@@ -1,6 +1,6 @@
 # First slice: read-only synthetic mail
 
-Status: **designed, not built.** This is the smallest build that tests the architecture before any real mailbox is connected. It uses only generated synthetic data, makes no network calls, and holds no credentials.
+Status: **built (synthetic) on 2026-10-01; slice 1b not built.** This is the smallest build that tests the architecture before any real mailbox is connected. It uses only generated synthetic data, makes no network calls, and holds no credentials. Code is in `src/towpath/`; each acceptance check below is a test in `tests/test_first_slice.py`, and all pass. See [results](#results).
 
 ## Purpose
 
@@ -94,6 +94,29 @@ Adds the inference gateway against a stub OpenAI-compatible server started by th
 | 1b-6 | An item with model use `excluded` is refused even with every grant in place; a `local-only` item is refused by a `self-hosted` endpoint |
 | 1b-7 | Changing the profile's model voids its grants and fails queued work instead of rerouting |
 | 1b-8 | The prompt-injection fixture produces at most a proposal, never an approval or other record type |
+
+## Results
+
+Run with `python -m pytest` after installing (see the [README](../README.md#running-the-first-slice)). All 19 checks pass, plus tests for parser robustness, mask truncation detection, and field-mask behavior.
+
+| Design claim | Outcome on synthetic data |
+| --- | --- |
+| 1. Gmail-shaped adapter fits the connector interface | Holds. The connector sits on a five-call read-only client interface (`get_profile`, `list_messages`, `get_message`, `get_attachment`, `list_history`) that a real Gmail client can implement |
+| 2. Items, observations, and absence survive resync, interruption, relabeling, deletion | Holds, including resume after interruption and full rescan after an expired cursor |
+| 3. Index everything, fetch on request | Holds in the fixture: no body or attachment data is stored at sync, even when the fixture ignores the field mask; scans fetch only matching parts. Real Gmail behavior is still unproven ([D16](decisions.md#d16-gmail-structure-without-content)) |
+| 4. Scans and presence checks by destination hash | Holds for SHA-256 and base64 SHA-1 destinations |
+| 5. Proposals frozen, stale correctly, no execution path, dismissals respected | Holds; proposal IDs derive from a canonical digest and match across processes |
+| 6. Decisions survive rebuilding derived data | Holds; deleting the derived store reproduces the same proposals |
+| 7. Separate processes, read-only worker access | Holds; the database itself refuses writes from the worker role |
+
+What it taught:
+
+- **The item and observation model is light enough at this scale** (48 messages). Indexing cost on a large real mailbox is unmeasured and belongs to milestone 4.
+- **Separating decisions from derived data paid off immediately:** the rebuild check was trivial to write and to pass.
+- **The proposal record needs one more precondition before an action runner exists:** a fresh presence check at the destination at execution time, since a destination can gain the file after the proposal is made.
+- **Any scan over stored content must be bounded.** The first version of the reserved-domain check used an unbounded pattern that took quadratic time over base64 data; it now uses bounded repetition.
+- **Read-only access works with SQLite's default journal mode** across processes on one host. Write-ahead logging is not used yet; the caveat in [components](components.md#stores-and-ownership) still applies to containers.
+- Not built in this slice: cache eviction, slice 1b (model endpoints), approvals, and any action runner.
 
 ## What the slice should teach
 

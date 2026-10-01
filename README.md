@@ -2,7 +2,7 @@
 
 Towpath is an open-source, self-hosted web application for managing your digital life, starting with email, and for building an evidence-linked life story from the sources you connect.
 
-**Status: designed, not built.** This repository contains design documents only. There is no runnable application, Compose file, connector, or model integration yet, and nothing here accesses or changes a mailbox.
+**Status: first slice built on synthetic data; everything else designed.** The repository contains the design documents and a command-line slice that indexes synthetic Gmail-shaped mail read-only, finds attachments, and checks whether a document or photo destination already holds them. There is no real mail connector, Compose file, web UI, or model integration yet, and nothing here accesses or changes a real mailbox.
 
 ## What it will do
 
@@ -16,6 +16,26 @@ Towpath is the front end and coordinator. It connects to tools people already ru
 Model features use explicitly configured OpenAI-compatible endpoints: base URL, credential, model, and destination. Poundlock is one optional endpoint; a bundled local model server or any compatible API works the same way. Personal data is not sent to any endpoint outside the machine unless the owner grants it, and items can be kept local-only or excluded from models entirely. See [model providers](docs/model-providers.md).
 
 Moving mail out of a provider is not part of Towpath.
+
+## Running the first slice
+
+Requires Python 3.11 or newer. Everything runs on generated synthetic data, with no network access or credentials.
+
+```sh
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+python -m pytest                        # the acceptance checks
+towpath fixtures generate /tmp/towpath-demo
+cd /tmp/towpath-demo
+towpath connect sync                    # index synthetic accounts and destination folders
+towpath scan run                        # find attachments; request the bytes it needs
+towpath connect fetch-requests          # fetch only those parts
+towpath scan run                        # presence checks and delivery proposals
+towpath proposals list
+```
+
+Proposals cannot be executed; this slice has no write path. See [first slice](docs/first-slice.md) for what it tests and what it taught.
 
 ## Design documents
 

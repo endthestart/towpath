@@ -148,3 +148,4 @@ These are built into the current documents. The owner can accept or overturn eac
 | 2026-10-01 | Tooling review completed; recommendations R14 to R20 added; D14 partly settled; D15 opened | Research |
 | 2026-10-01 | D15: Inbox Zero integrated as an optional Compose service for mail management; D1 revised so `towpath-act` handles deliveries; D8, D11, D12 scoped to Towpath-built features | Accepted |
 | 2026-10-01 | Owner review: D14 accepted (Gmail API only; bring-your-own OAuth as the initial approach; separate Cloud projects); R14, R15, R17, R19, R20 accepted with qualifications; D16 opened; Inbox Zero provider contract and evaluation plan added; license class renamed "source available with use restrictions" | Accepted |
+| 2026-10-01 | First slice built on synthetic data; all 19 acceptance checks pass; findings recorded in [first slice results](first-slice.md#results) | Built |

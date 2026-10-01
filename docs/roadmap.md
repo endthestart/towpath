@@ -2,12 +2,12 @@
 
 This is a dependency map, not a calendar or a claim of completed capabilities.
 
-**Built:** documentation only. **Designed:** everything below. No code, connector, model integration, Compose file, or mailbox access exists in this repository.
+**Built:** milestone 2, the synthetic read-only slice ([results](first-slice.md#results)). **Designed:** everything else. No real connector, model integration, Compose file, or mailbox access exists in this repository.
 
 | Milestone | Deliverable | Depends on | Required evidence |
 | --- | --- | --- | --- |
 | 1. Public foundation | Architecture, [services](components.md), [interfaces](interfaces.md), [integration candidates](integrations.md), [tooling review](research/2026-10-tooling-review.md), [decisions](decisions.md) | — | Public tree and history contain no private data or infrastructure details |
-| 2. Synthetic read-only slice | [First slice](first-slice.md): Gmail-shaped fixture adapter, source index, content requests, scans with presence checks against a folder destination, delivery proposals that cannot execute, decisions store, CLI | D2 | All first-slice checks pass; no write path or network access exists |
+| 2. Synthetic read-only slice (**built**) | [First slice](first-slice.md): Gmail-shaped fixture adapter, source index, content requests, scans with presence checks against a folder destination, delivery proposals that cannot execute, decisions store, CLI | D2 | All first-slice checks pass; no write path or network access exists |
 | 2b. Model endpoint contract | Inference gateway, probes, fallbacks, grants, model-use filtering, against a loopback stub | 2 | Slice 1b checks pass |
 | 3. Mail management through Inbox Zero | [Evaluation](evaluations/inbox-zero-plan.md) on a dedicated test mailbox, then the Compose `mail` profile (or an existing instance), setup guide for separate Google Cloud projects, every model role configured, provider adapter for statistics, rules, and links | D14, D15 | Points marked "to verify" in [mail management](mail-management.md#integration-points) are answered; evaluation notes stay private, a generic summary goes public |
 | 4. Towpath's read-only Gmail connector (CLI) | `gmail.readonly` with the person's own OAuth client; incremental, resumable index, newest first; fetch on demand | 2, D3, D14 | Private acceptance on the owner's account; public tests stay synthetic |
