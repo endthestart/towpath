@@ -20,6 +20,7 @@ These are built into the current documents. The owner can accept or overturn eac
 | R10 | Model endpoints with destination class, data-class grants, capability probes, and same-endpoint fallbacks only | [model providers](model-providers.md) | Slice 1b |
 | R11 | No write credential before roadmap milestone 5; permanent deletion is never a Towpath action | [mail management](mail-management.md#action-tiers) | Nothing now |
 | R12 | First slice is synthetic, read-only, no models, no network | [first slice](first-slice.md) | Starting implementation |
+| R13 | FOSS only (accepted 2026-10-01): every included library and bundled tool has an OSI-approved license with no added restrictions; services a person connects are their choice and never required | [integrations](integrations.md) | Every integration choice |
 
 ## Decisions
 
@@ -115,3 +116,4 @@ These are built into the current documents. The owner can accept or overturn eac
 | 2026-10-01 | D6, D8, D9, D11, D12 | Accepted as recommended in owner review |
 | 2026-10-01 | D13: no framework for now; Django leading candidate for the later UI | Accepted direction |
 | 2026-10-01 | Audience and model use split into separate settings | Accepted (owner review) |
+| 2026-10-01 | FOSS only for everything Towpath includes or bundles; Inbox Zero excluded (license adds commercial and enterprise restrictions) | Accepted |

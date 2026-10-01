@@ -11,7 +11,7 @@ Towpath is an open-source, self-hosted web application for managing your digital
 
 ## How it is built
 
-Towpath is the front end and coordinator. It connects to tools people already run (for example a document system or photo library) or bundles open-source tools in its Docker Compose file, and writes code only where nothing suitable exists. See [integrate first](docs/architecture.md#integrate-first).
+Towpath is the front end and coordinator. It connects to tools people already run (for example a document system or photo library) or bundles open-source tools in its Docker Compose file, and writes code only where nothing suitable exists. Everything Towpath includes or bundles is free and open-source software. See [integrate first](docs/architecture.md#integrate-first).
 
 Model features use explicitly configured OpenAI-compatible endpoints: base URL, credential, model, and destination. Poundlock is one optional endpoint; a bundled local model server or any compatible API works the same way. Personal data is not sent to any endpoint outside the machine unless the owner grants it, and items can be kept local-only or excluded from models entirely. See [model providers](docs/model-providers.md).
 

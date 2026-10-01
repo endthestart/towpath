@@ -2,6 +2,8 @@
 
 Status: **candidates only.** Nothing in this document is adopted. Each entry needs its current behavior, API, license, and maintenance checked before Towpath depends on it, and that check should be recorded in [decisions](decisions.md). Projects change quickly; earlier impressions of them are not evidence.
 
+**FOSS only.** Every library Towpath includes and every tool its Compose file bundles must be free and open-source software under an [OSI-approved](https://opensource.org/licenses) license that covers the whole component Towpath uses. "Source-available" licenses, and open licenses with added restrictions on commercial use, number of users, or field of use, do not qualify; neither do proprietary "enterprise" directories inside an otherwise open repository if Towpath would need them. External services a person chooses to connect, such as their mail provider or a hosted model API, are their choice and are never required.
+
 Towpath prefers, in order: an existing deployment the person already runs, a bundled open-source service, an existing library, and only then new code ([integrate first](architecture.md#integrate-first)).
 
 ## Evaluation checklist
@@ -10,7 +12,7 @@ For every candidate, record:
 
 | Question | Why it matters |
 | --- | --- |
-| License, and whether Towpath calls it as a separate service or includes its code | Towpath is MIT. Separate services over an API can have other licenses; included code must be compatible |
+| License: OSI-approved for everything Towpath uses, with no added restrictions; and whether Towpath calls it as a separate service or includes its code | FOSS-only rule. Towpath is MIT: separate services over an API can carry other FOSS licenses (for example AGPL), while included code must be MIT-compatible |
 | Maintained recently, with a documented, versioned API | Towpath's adapter breaks if the API drifts |
 | Can Towpath point at an existing instance, and can Compose bundle one? | Both modes are required for tools people often already run |
 | Least-privilege access (read-only tokens, scoped keys) | Read adapters belong in `towpath-connect`, writes in `towpath-act` |
@@ -25,7 +27,7 @@ For every candidate, record:
 | MIME parsing | Python standard library `email` and `mailbox` | Library | Also reads Maildir and mbox |
 | Other providers | IMAP client libraries; JMAP clients | Library | Later; IMAP grants all-or-nothing access |
 | Local mail sync and indexing | Gmail-to-Maildir sync tools paired with a local mail indexer | Bundled service | Considered, not proposed: they keep a full local copy of the mailbox, which conflicts with [fetching narrowly](architecture.md#design-rules) and is not Towpath's purpose |
-| Rules, unsubscribe review, corrections, classification ideas | Inbox Zero and similar open-source mail assistants | Reference | Useful designs; no single app to adopt wholesale. Check license before reusing any code |
+| Rules, unsubscribe review, reply tracking, classification | No adopted tool yet; FOSS candidates under review | — | Inbox Zero is **excluded**: its license is AGPL-3.0 with added commercial-use and enterprise-user restrictions, so it is not FOSS. Towpath does not use or copy its code |
 | Generated rules | Gmail's filter import file format; Sieve for other providers | Format | Verify Gmail's current import format |
 | Unsubscribe metadata | `List-Unsubscribe` (RFC 2369) and one-click (RFC 8058) headers | Standard | No tool needed |
 
