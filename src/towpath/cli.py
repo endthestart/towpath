@@ -1,4 +1,4 @@
-"""Command line for the first slice.
+"""Towpath command line (read-only).
 
 Command groups map to roles: ``connect`` is towpath-connect, ``scan`` and
 ``proposals`` are towpath-worker, and ``item`` and ``scan dismiss`` are the
@@ -15,7 +15,8 @@ from towpath import connect, decisions, scan
 from towpath.fixtures import generator
 from towpath.fixtures.domains import check_paths
 
-app = typer.Typer(no_args_is_help=True, add_completion=False, help="Towpath first slice (synthetic, read-only).")
+app = typer.Typer(no_args_is_help=True, add_completion=False,
+                  help="Towpath: read-only tools for mail, documents, photos, and model endpoints.")
 connect_app = typer.Typer(no_args_is_help=True, help="towpath-connect: read sources, fetch requested content.")
 scan_app = typer.Typer(no_args_is_help=True, help="towpath-worker: scans and presence checks.")
 proposals_app = typer.Typer(no_args_is_help=True, help="Inspect and export proposals.")
