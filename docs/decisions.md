@@ -40,11 +40,7 @@ Options for mailbox changes are compared in [mailbox actions](mail-boundaries.md
 
 ### D3. First real mail source
 
-The next milestone after the synthetic slice is a real read-only mail connector (D10). Which protocol it uses is still open.
-
-- **Options:** Gmail API with a read-only scope (matches the owner's account; native IDs, labels, part structure without downloading attachments; each self-hoster registers an OAuth client); IMAP (works with most providers; app-password access is all-or-nothing; labels are only approximated); JMAP (clean API, read-only tokens on some providers; fewer providers).
-- **Recommended:** Gmail API read-only, with the connector interface kept protocol-neutral so IMAP can follow.
-- **Blocks:** roadmap milestone 3.
+**Accepted 2026-10-01.** The first real read-only connector uses the Gmail API with a read-only scope. It fits the owner's account and the index-then-fetch design: stable native IDs, real labels, and part structure without downloading attachments. The connector interface stays protocol-neutral so IMAP or JMAP can follow. Self-hosters must register their own OAuth client; the setup guide must cover that after the related [facts are verified](#facts-to-verify-before-implementation).
 
 ### D4. Archive input
 
@@ -110,5 +106,6 @@ These affect the design but could not be confirmed from primary documentation wh
 | 2026 (first public design) | Towpath proposes mailbox changes; a separately permissioned component executes approved actions | Tentative; see D1 |
 | 2026-10-01 | D2: Python and SQLite | Accepted |
 | 2026-10-01 | D10: real read-only mail connector before life summary without email | Accepted |
+| 2026-10-01 | D3: Gmail API, read-only scope, for the first real connector | Accepted |
 | 2026-10-01 | D5: read access to all mail, index everything, fetch per item on demand; generic scans and destinations | Accepted |
 | 2026-10-01 | Preservation of the full item or attachment, not only excerpts, as a foundation for a later archive package | Accepted as a requirement; design in R4 |

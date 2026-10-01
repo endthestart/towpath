@@ -103,4 +103,4 @@ Adds the inference gateway against a stub OpenAI-compatible server started by th
 - Whether three process roles are worth their complexity before any credential exists.
 - What the proposal record needs before choosing an [execution option](mail-boundaries.md#options-for-mailbox-execution).
 
-After the slice, the next step is a real read-only mail connector ([decision D10](decisions.md#d10-order-after-the-first-slice)); its protocol is [decision D3](decisions.md#d3-first-real-mail-source).
+After the slice, the next step is a real read-only mail connector ([decision D10](decisions.md#d10-order-after-the-first-slice)); using the Gmail API read-only ([decision D3](decisions.md#d3-first-real-mail-source)).
