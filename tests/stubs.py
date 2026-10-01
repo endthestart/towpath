@@ -100,3 +100,66 @@ class OpenAIStub(Stub):
                                       "message": {"role": "assistant", "content": content}}],
                          "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}}, None
         return 404, {"error": {"message": "unknown path"}}, None
+
+
+class PaperlessStub(Stub):
+    def __init__(self, held: dict[str, int], version="3.2.1", token="paperless-secret"):
+        self.held, self.version, self.token = held, version, token
+        super().__init__(self.route)
+
+    def route(self, req):
+        if req["headers"].get("authorization") != f"Token {self.token}":
+            return 401, {"detail": "Invalid token."}, None
+        if req["path"] == "/api/":
+            return 200, {"documents": "/api/documents/"}, {"X-Version": self.version, "X-Api-Version": "9"}
+        if req["path"] == "/api/documents/":
+            checksum = (req["query"].get("checksum__iexact") or [None])[0]
+            if checksum is None:
+                return 200, {"count": len(self.held), "results": []}, None
+            doc = self.held.get(checksum.lower())
+            return 200, {"count": int(doc is not None), "results": [{"id": doc}] if doc else []}, None
+        return 404, {"detail": "Not found."}, None
+
+
+class ImmichStub(Stub):
+    def __init__(self, held: dict[str, str], key="immich-secret"):
+        self.held, self.key = held, key
+        super().__init__(self.route)
+
+    def route(self, req):
+        if req["headers"].get("x-api-key") != self.key:
+            return 401, {"message": "Invalid API key"}, None
+        if req["path"] == "/api/server/version":
+            return 200, {"major": 3, "minor": 2, "patch": 4}, None
+        if req["path"] == "/api/search/metadata" and req["method"] == "POST":
+            checksum = (req["body"] or {}).get("checksum")
+            asset = self.held.get(checksum) if checksum else None
+            items = [{"id": asset, "checksum": checksum}] if asset else []
+            total = len(self.held) if checksum is None else len(items)
+            return 200, {"assets": {"total": total, "count": len(items), "items": items, "nextPage": None}}, None
+        return 404, {"message": "Not found"}, None
+
+
+class InboxZeroStub(Stub):
+    def __init__(self, keys: dict[str, set[str]]):
+        self.keys = keys  # API key -> scopes
+        super().__init__(self.route)
+
+    def route(self, req):
+        scopes = self.keys.get(req["headers"].get("api-key"))
+        if scopes is None:
+            return 401, {"error": "Invalid API key"}, None
+        if req["method"] != "GET":
+            return 405, {"error": "Method not allowed"}, None
+        need = {"/api/v1/stats/by-period": "STATS_READ", "/api/v1/stats/response-time": "STATS_READ",
+                "/api/v1/rules": "RULES_READ"}.get(req["path"])
+        if need is None:
+            return 404, {"error": "Not found"}, None
+        if need not in scopes:
+            return 403, {"error": "Insufficient permissions"}, None
+        if req["path"] == "/api/v1/rules":
+            return 200, {"rules": [{"id": "r1", "name": "Newsletters", "actions": [{"type": "LABEL"}]}]}, None
+        if req["path"].endswith("by-period"):
+            return 200, {"result": [{"startOfPeriod": "2026-09-28", "All": 42}],
+                         "period": req["query"].get("period", ["week"])[0]}, None
+        return 200, {"summary": {"medianResponseTime": 60, "averageResponseTime": 90, "within1Hour": 0.5}}, None

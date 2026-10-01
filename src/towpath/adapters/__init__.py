@@ -10,6 +10,12 @@ def build_connector(source, **options):
     if source.adapter == "gmail":
         from towpath.adapters.google_gmail import GoogleGmailClient
         return GmailConnector(source.id, GoogleGmailClient.from_token(source.token))
+    if source.adapter == "paperless":
+        from towpath.adapters.destinations import PaperlessConnector
+        return PaperlessConnector(source)
+    if source.adapter == "immich":
+        from towpath.adapters.destinations import ImmichConnector
+        return ImmichConnector(source)
     if source.adapter == "folder":
         return FolderConnector(source.id, source.kind, source.path)
     raise ValueError(f"unknown adapter {source.adapter!r}")

@@ -241,12 +241,39 @@ def fetch_requests(config) -> dict:
                    (request_id, req["item_id"], req["part_id"], "fetched", h["sha256"], now()))
         result["fetched"] += 1
         db.commit()
+    result.update(_presence_lookups(config, db, queue, connectors, run_ids))
     for run_id in run_ids.values():
         db.execute("UPDATE runs SET finished_at = ?, complete = 1 WHERE run_id = ?", (now(), run_id))
     db.commit()
     db.close()
     queue.close()
     return result
+
+
+def _presence_lookups(config, db, queue, connectors, run_ids) -> dict:
+    """Ask lookup destinations whether they already hold requested checksums.
+
+    Results are observations at a run, not guarantees: a delivery must check again.
+    """
+    answered = {(r["source_id"], r["algorithm"], r["checksum"]) for r in db.execute(
+        "SELECT source_id, algorithm, checksum FROM destination_lookups")}
+    pending: dict[tuple[str, str], list[str]] = {}
+    for req in queue.execute("SELECT * FROM presence_requests ORDER BY seq"):
+        key = (req["destination_id"], req["algorithm"], req["checksum"])
+        if key not in answered:
+            pending.setdefault((req["destination_id"], req["algorithm"]), []).append(req["checksum"])
+    counts = {"presence_checked": 0}
+    for (dest_id, algorithm), checksums in pending.items():
+        if dest_id not in connectors:
+            connectors[dest_id] = build_connector(config.sources[dest_id])
+            run_ids[dest_id] = _new_run(db, dest_id, "lookup", None)
+        for checksum, (present, remote_id) in connectors[dest_id].lookup(algorithm, checksums).items():
+            db.execute("""INSERT OR REPLACE INTO destination_lookups (source_id, algorithm, checksum, present,
+                          remote_id, checked_run, checked_at) VALUES (?,?,?,?,?,?,?)""",
+                       (dest_id, algorithm, checksum, int(present), remote_id, run_ids[dest_id], now()))
+            counts["presence_checked"] += 1
+        db.commit()
+    return counts
 
 
 def coverage(config, source_id: str) -> list[dict]:

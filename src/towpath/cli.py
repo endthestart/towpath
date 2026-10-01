@@ -22,12 +22,14 @@ proposals_app = typer.Typer(no_args_is_help=True, help="Inspect and export propo
 item_app = typer.Typer(no_args_is_help=True, help="Record decisions about items.")
 fixtures_app = typer.Typer(no_args_is_help=True, help="Generate and change synthetic fixtures.")
 model_app = typer.Typer(no_args_is_help=True, help="Model endpoints: probe, grant, and run queued work.")
+provider_app = typer.Typer(no_args_is_help=True, help="Mail-management provider (Inbox Zero), read-only.")
 app.add_typer(connect_app, name="connect")
 app.add_typer(scan_app, name="scan")
 app.add_typer(proposals_app, name="proposals")
 app.add_typer(item_app, name="item")
 app.add_typer(fixtures_app, name="fixtures")
 app.add_typer(model_app, name="model")
+app.add_typer(provider_app, name="provider")
 
 ConfigOpt = typer.Option(Path("towpath.toml"), "--config", "-c", help="Configuration file.")
 
@@ -234,3 +236,40 @@ def model_check(task: str, data_class: str = typer.Option("metadata", "--data-cl
 
     status, reason, endpoint = gateway.check_policy(_load(config), task, data_class, [])
     typer.echo(f"{status}: {reason or 'allowed'} (endpoint {getattr(endpoint, 'id', None)})")
+
+
+def _provider(config: Path, provider: str | None):
+    from towpath.providers.inbox_zero import InboxZeroProvider
+
+    cfg = _load(config)
+    if not cfg.providers:
+        raise typer.BadParameter("no [[providers]] configured")
+    pid = provider or next(iter(cfg.providers))
+    return InboxZeroProvider(cfg.providers[pid])
+
+
+@provider_app.command("probe")
+def provider_probe(provider: str = typer.Argument(None), config: Path = ConfigOpt,
+                   as_json: bool = typer.Option(False, "--json")):
+    """Check which read-only capabilities the provider key allows."""
+    p = _provider(config, provider)
+    _emit({**p.describe(), "capabilities": p.probe()}, as_json)
+
+
+@provider_app.command("overview")
+def provider_overview(provider: str = typer.Argument(None), period: str = typer.Option("week", "--period"),
+                      config: Path = ConfigOpt):
+    """Statistics from the provider's API."""
+    _emit(_provider(config, provider).overview(period), True)
+
+
+@provider_app.command("rules")
+def provider_rules(provider: str = typer.Argument(None), config: Path = ConfigOpt):
+    """The provider's rules, read-only."""
+    _emit(_provider(config, provider).rules(), True)
+
+
+@provider_app.command("links")
+def provider_links(provider: str = typer.Argument(None), config: Path = ConfigOpt):
+    """Links to the provider's own screens for features without a public API."""
+    _emit(_provider(config, provider).links(), False)

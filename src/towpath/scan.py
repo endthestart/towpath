@@ -59,10 +59,17 @@ def run_scan(config, selector_id: str) -> dict:
     dest = source.execute("SELECT descriptor FROM sources WHERE source_id = ?", (selector.destination,)).fetchone()
     if dest is None:
         raise RuntimeError(f"destination {selector.destination} has not been synced yet")
-    algorithm = json.loads(dest["descriptor"])["algorithm"]
+    descriptor = json.loads(dest["descriptor"])
+    algorithm = descriptor["algorithm"]
+    lookup = "lookup" in descriptor.get("capabilities", [])
     held = {r["checksum"] for r in source.execute(
         "SELECT checksum FROM destination_entries WHERE source_id = ? AND algorithm = ? AND absent_since_run IS NULL",
         (selector.destination, algorithm))}
+    known_absent: set[str] = set()
+    if lookup:
+        for r in source.execute("SELECT checksum, present FROM destination_lookups WHERE source_id = ? "
+                                "AND algorithm = ?", (selector.destination, algorithm)):
+            (held if r["present"] else known_absent).add(r["checksum"])
     dismissed = {r["match_key"] for r in decisions.execute("SELECT match_key FROM dismissals")}
     settings = _settings(decisions)
     counts = {"candidates": 0, "waiting": 0, "present": 0, "proposed": 0, "dismissed": 0, "stale": 0}
@@ -91,6 +98,12 @@ def run_scan(config, selector_id: str) -> dict:
                                  created_at) VALUES (?, ?, ?, 'background', ?)""",
                               (c["item_id"], c["part_id"], f"scan:{selector.id}", now()))
                 status = "waiting"
+                counts["waiting"] += 1
+            elif lookup and checksum not in held and checksum not in known_absent:
+                queue.execute("""INSERT OR IGNORE INTO presence_requests (destination_id, algorithm, checksum,
+                                 requested_by, created_at) VALUES (?, ?, ?, ?, ?)""",
+                              (selector.destination, algorithm, checksum, f"scan:{selector.id}", now()))
+                status = "waiting-presence"
                 counts["waiting"] += 1
             elif checksum in held:
                 status = "present"

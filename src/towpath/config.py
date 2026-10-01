@@ -104,11 +104,14 @@ def _check_keys(table: dict, allowed: set[str], where: str) -> None:
         raise ConfigError(f"unknown key(s) in {where}: {', '.join(sorted(unknown))}")
 
 
-def _cred(ref: str, where: str) -> str:
+def _cred(ref: str, where: str, root: Path | None = None) -> str:
     try:
-        return credentials.validate(ref)
+        credentials.validate(ref)
     except credentials.CredentialError as exc:
         raise ConfigError(f"{where}: {exc}") from exc
+    if ref.startswith("file:") and root is not None and not Path(ref[5:]).is_absolute():
+        return "file:" + str((root / ref[5:]).resolve())
+    return ref
 
 
 def _source(raw: dict, root: Path) -> Source:
@@ -126,12 +129,12 @@ def _source(raw: dict, root: Path) -> Source:
     token = raw.get("token")
     if adapter in {"paperless", "immich"}:
         return Source(sid, raw["kind"], adapter, base_url=raw["base_url"].rstrip("/"),
-                      credential=_cred(token, f"source {sid}"))
+                      credential=_cred(token, f"source {sid}", root))
     return Source(sid, raw["kind"], adapter, path=resolve("path"), client_secrets=resolve("client_secrets"),
                   token=resolve("token"))
 
 
-def _endpoint(eid: str, raw: dict) -> Endpoint:
+def _endpoint(eid: str, raw: dict, root: Path) -> Endpoint:
     _check_keys(raw, ENDPOINT_KEYS, f"endpoint {eid}")
     missing = {"base_url", "credential", "model", "kind", "destination", "allow_data"} - set(raw)
     if missing:
@@ -143,7 +146,7 @@ def _endpoint(eid: str, raw: dict) -> Endpoint:
     bad = set(raw["allow_data"]) - DATA_CLASSES
     if bad:
         raise ConfigError(f"endpoint {eid}: unknown data classes {sorted(bad)}")
-    return Endpoint(eid, raw["base_url"].rstrip("/"), _cred(raw["credential"], f"endpoint {eid}"), raw["model"],
+    return Endpoint(eid, raw["base_url"].rstrip("/"), _cred(raw["credential"], f"endpoint {eid}", root), raw["model"],
                     raw["kind"], raw["destination"], tuple(raw["allow_data"]),
                     float(raw.get("timeout_seconds", 60)))
 
@@ -171,7 +174,7 @@ def load(path: Path) -> Config:
             max_bytes=raw.get("max_bytes"), exclude_labels=tuple(raw.get("exclude_labels", ())),
             classifier=raw.get("classifier"))
 
-    endpoints = {eid: _endpoint(eid, raw) for eid, raw in data.get("endpoints", {}).items()}
+    endpoints = {eid: _endpoint(eid, raw, root) for eid, raw in data.get("endpoints", {}).items()}
     tasks = dict(data.get("tasks", {}))
     for task, eid in tasks.items():
         if eid not in endpoints:
@@ -183,7 +186,8 @@ def load(path: Path) -> Config:
         if raw.get("kind") != "mail-management" or raw.get("adapter") != "inbox-zero":
             raise ConfigError(f"provider {raw.get('id')}: only kind mail-management with adapter inbox-zero")
         providers[raw["id"]] = Provider(raw["id"], raw["kind"], raw["adapter"], raw["base_url"].rstrip("/"),
-                                        _cred(raw["api_key"], f"provider {raw['id']}"), dict(raw.get("links", {})))
+                                        _cred(raw["api_key"], f"provider {raw['id']}", root),
+                                        dict(raw.get("links", {})))
 
     return Config(root=root, store_dir=store_dir, sources=sources, selectors=selectors, endpoints=endpoints,
                   tasks=tasks, providers=providers, bundled_hosts=tuple(data.get("bundled_hosts", ())))
