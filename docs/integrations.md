@@ -2,7 +2,15 @@
 
 Status: **candidates only.** Nothing in this document is adopted. Each entry needs its current behavior, API, license, and maintenance checked before Towpath depends on it, and that check should be recorded in [decisions](decisions.md). Projects change quickly; earlier impressions of them are not evidence.
 
-**FOSS only.** Every library Towpath includes and every tool its Compose file bundles must be free and open-source software under an [OSI-approved](https://opensource.org/licenses) license that covers the whole component Towpath uses. "Source-available" licenses, and open licenses with added restrictions on commercial use, number of users, or field of use, do not qualify; neither do proprietary "enterprise" directories inside an otherwise open repository if Towpath would need them. External services a person chooses to connect, such as their mail provider or a hosted model API, are their choice and are never required.
+**License policy.** Towpath itself is MIT. A component it uses must have its source code published and be free to use for personal self-hosting with Towpath's goals:
+
+| Class | Meaning | How Towpath may use it |
+| --- | --- | --- |
+| Open source | OSI-approved license with no added restrictions (MIT, Apache-2.0, BSD, GPL, AGPL, and similar) | Required dependency, bundled service, or optional integration |
+| Open source, personal-use terms | Source published and free for personal use, but with added limits on commercial use, organization size, or field of use | Optional integration or optional Compose profile only, labeled with its terms; never required by Towpath's core features; its code is never copied into Towpath |
+| Not open source | No published source, or no free personal use | Not bundled. A person may still connect a service they choose, such as their mail provider or a hosted model API |
+
+The middle class keeps Towpath's own code usable by anyone while still letting a personal deployment benefit from tools that are free for that use.
 
 Towpath prefers, in order: an existing deployment the person already runs, a bundled open-source service, an existing library, and only then new code ([integrate first](architecture.md#integrate-first)).
 
@@ -12,7 +20,7 @@ For every candidate, record:
 
 | Question | Why it matters |
 | --- | --- |
-| License: OSI-approved for everything Towpath uses, with no added restrictions; and whether Towpath calls it as a separate service or includes its code | FOSS-only rule. Towpath is MIT: separate services over an API can carry other FOSS licenses (for example AGPL), while included code must be MIT-compatible |
+| License class (above), and whether Towpath calls it as a separate service or includes its code | Decides whether it can be required, bundled, or only optional. Included code must be MIT-compatible; separate services can carry other licenses |
 | Maintained recently, with a documented, versioned API | Towpath's adapter breaks if the API drifts |
 | Can Towpath point at an existing instance, and can Compose bundle one? | Both modes are required for tools people often already run |
 | Least-privilege access (read-only tokens, scoped keys) | Read adapters belong in `towpath-connect`, writes in `towpath-act` |
@@ -27,7 +35,7 @@ For every candidate, record:
 | MIME parsing | Python standard library `email` and `mailbox` | Library | Also reads Maildir and mbox |
 | Other providers | IMAP client libraries; JMAP clients | Library | Later; IMAP grants all-or-nothing access |
 | Local mail sync and indexing | Gmail-to-Maildir sync tools paired with a local mail indexer | Bundled service | Considered, not proposed: they keep a full local copy of the mailbox, which conflicts with [fetching narrowly](architecture.md#design-rules) and is not Towpath's purpose |
-| Rules, unsubscribe review, reply tracking, classification | No adopted tool yet; FOSS candidates under review | — | Inbox Zero is **excluded**: its license is AGPL-3.0 with added commercial-use and enterprise-user restrictions, so it is not FOSS. Towpath does not use or copy its code |
+| Rules, unsubscribe review, reply tracking, classification | Inbox Zero | Possible optional service | License class: open source with personal-use terms (AGPL-3.0 plus added commercial-use and organization-size restrictions; free for personal use). Fit under review: models, permissions, automatic actions |
 | Generated rules | Gmail's filter import file format; Sieve for other providers | Format | Verify Gmail's current import format |
 | Unsubscribe metadata | `List-Unsubscribe` (RFC 2369) and one-click (RFC 8058) headers | Standard | No tool needed |
 
