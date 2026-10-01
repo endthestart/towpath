@@ -355,3 +355,22 @@ def test_example_config_is_valid_and_placeholder_only():
     assert violations(text) == []
     refs = [s.credential for s in cfg.sources.values() if s.credential] + [e.credential for e in cfg.endpoints.values()]
     assert refs and all(r == "none" or r.startswith(("file:", "env:")) for r in refs)
+
+
+def test_ctrl_c_during_full_sync_resumes(ws, monkeypatch):
+    original = FixtureGmailClient.get_message
+    calls = {"n": 0}
+
+    def flaky(self, message_id, fields=None):
+        calls["n"] += 1
+        if calls["n"] == 8:
+            raise KeyboardInterrupt
+        return original(self, message_id, fields)
+
+    monkeypatch.setattr(FixtureGmailClient, "get_message", flaky)
+    with pytest.raises(KeyboardInterrupt):
+        connect.sync(ws.config, "src_a")
+    monkeypatch.setattr(FixtureGmailClient, "get_message", original)
+    resumed = connect.sync(ws.config, "src_a")
+    assert resumed["kind"] == "resumed-full" and resumed["complete"]
+    assert resumed["indexed_total"] == ws.summary["messages_a"] and resumed["seen"] == ws.summary["messages_a"] - 7

@@ -72,6 +72,15 @@ def connect_sync(source: list[str] = typer.Argument(None, help="Source IDs; all 
     _emit(results, as_json)
 
 
+@connect_app.command("probe")
+def connect_probe(source: str, config: Path = ConfigOpt, as_json: bool = typer.Option(False, "--json")):
+    """Show what a source reports about itself, without indexing anything."""
+    from towpath.adapters import build_connector
+
+    connector = build_connector(_load(config).sources[source])
+    _emit({**connector.describe(), "probe": connector.probe()}, as_json)
+
+
 @connect_app.command("auth")
 def connect_auth(source: str, config: Path = ConfigOpt,
                  no_browser: bool = typer.Option(False, "--no-browser", help="Print the URL instead.")):
