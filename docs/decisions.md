@@ -12,7 +12,7 @@ These are built into the current documents. The owner can accept or overturn eac
 | R2 | One connector tier and source store shared by mail and life, with explicit per-consumer grants | [components](components.md#stores-and-ownership), [interfaces](interfaces.md#2-source-read-api-app-reads-the-source-store) | First slice |
 | R3 | Occurrences per source with dated observations and match strengths; no merging | [interfaces](interfaces.md#occurrence) | First slice |
 | R4 | Accepted claims capture cited excerpts; a person can also preserve the full item or attachment as a content-addressed artifact (owner request, 2026-10-01) | [preserved artifacts](scans-and-destinations.md#preserved-artifacts) | Life slice; future archive package |
-| R5 | No mailbox write credential before milestone 7; ship proposal review, checklist export, and generated filters first | [mailbox actions](mail-boundaries.md#recommendation) | Nothing now |
+| R5 | No mailbox write credential before milestone 7; ship proposal review, checklist export, and generated filters first | [mailbox actions](mail-boundaries.md#decision) | Nothing now |
 | R6 | Permanent deletion is never a Towpath action | [mailbox actions](mail-boundaries.md#action-tiers) | Nothing now |
 | R7 | Endpoint profiles with destination class, data-class ceiling, ledger grants, capability probes, same-endpoint fallbacks only | [model providers](model-providers.md) | Slice 1b |
 | R8 | Archive adapter reads standard mail files with an optional manifest (accepted as D4) | [archive adapter](archive-adapter.md#input-options) | Archive connector |
