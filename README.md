@@ -2,7 +2,7 @@
 
 Towpath is an open-source, self-hosted web application for managing your digital life, starting with email, and for building an evidence-linked life story from the sources you connect.
 
-**Status: first slice built on synthetic data; everything else designed.** The repository contains the design documents and a command-line slice that indexes synthetic Gmail-shaped mail read-only, finds attachments, and checks whether a document or photo destination already holds them. There is no real mail connector, Compose file, web UI, or model integration yet, and nothing here accesses or changes a real mailbox.
+**Status: read-only command-line tools built and tested on synthetic data and stubs; not yet run against real accounts.** The repository has the design documents and a CLI that can index Gmail read-only (with your own OAuth client), find attachments, check whether Paperless-ngx or Immich already holds them, call explicitly configured model endpoints under policy, and read Inbox Zero statistics. Nothing here can change a mailbox or library. There is no web UI, Compose file, or action runner yet. To try it on your own accounts, follow the [local quickstart](docs/setup/local-quickstart.md).
 
 ## What it will do
 
@@ -25,7 +25,7 @@ Requires Python 3.11 or newer. Everything runs on generated synthetic data, with
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-python -m pytest                        # the acceptance checks
+python -m pytest                        # 48 tests: acceptance checks, slice 1b, adapters
 towpath fixtures generate /tmp/towpath-demo
 cd /tmp/towpath-demo
 towpath connect sync                    # index synthetic accounts and destination folders
@@ -35,7 +35,7 @@ towpath scan run                        # presence checks and delivery proposals
 towpath proposals list
 ```
 
-Proposals cannot be executed; this slice has no write path. See [first slice](docs/first-slice.md) for what it tests and what it taught.
+Proposals cannot be executed; there is no write path. See [first slice](docs/first-slice.md) for what it tests and what it taught, and `towpath --help` for every command.
 
 ## Design documents
 
@@ -50,6 +50,8 @@ Proposals cannot be executed; this slice has no write path. See [first slice](do
 | [Interfaces](docs/interfaces.md) | Records that cross service boundaries |
 | [Model providers](docs/model-providers.md) | Endpoint profiles, destinations, grants, capability probes, fallbacks |
 | [First slice](docs/first-slice.md) | Smallest read-only synthetic email build and its checks |
+| [Local quickstart](docs/setup/local-quickstart.md) | Exact steps to test against your own Gmail, Paperless, Immich, and a local model |
+| [Local agent handoff](docs/setup/local-agent-handoff.md) | A prompt for a coding agent on your machine to continue the verification |
 | [Tooling review, October 2026](docs/research/2026-10-tooling-review.md) | Research on existing tools, licenses, Gmail access rules, and model servers, with sources |
 | [Inbox Zero evaluation plan](docs/evaluations/inbox-zero-plan.md) | Checks to run on a dedicated test mailbox before relying on the integration |
 | [Decisions](docs/decisions.md) | Accepted, withdrawn, and open decisions; facts to verify |

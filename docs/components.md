@@ -1,6 +1,6 @@
 # Services, stores, and permissions
 
-Status: **designed, not built.** Service names are working names.
+Status: **design, partly built.** Service names are working names. The connect and worker roles exist as CLI command groups sharing SQLite stores (source index, work queue, derived, decisions, ledger); `towpath-web` and `towpath-act` do not exist yet. Built pieces are listed in the [roadmap](roadmap.md); everything else here is design.
 
 ## Services
 
@@ -38,8 +38,8 @@ Human decisions are kept apart from everything rebuildable, so backups can focus
 
 | Store | Writer | Readers | Contents | Rebuildable? |
 | --- | --- | --- | --- | --- |
-| Source index | `towpath-connect` | worker, web, act (IDs only) | Connections, sync runs, cursors, item metadata and part structure, dated observations (labels, folders), content cache, external references (document and photo IDs) | Mostly, by resyncing |
-| Work queue | web and worker (append only) | `towpath-connect` | Content requests: which item or part to fetch, for which feature | Yes |
+| Source index | `towpath-connect` | worker, web, act (IDs only) | Connections, sync runs, cursors, item metadata and part structure, dated observations (labels, folders), content cache, destination entries and dated lookup results, external references (document and photo IDs) | Mostly, by resyncing |
+| Work queue | web and worker (append only) | `towpath-connect` | Content requests (which item or part to fetch) and presence requests (which checksum to look up at a destination) | Yes |
 | Derived store | worker | web | Classifications, proposals, scans and matches, people and event candidates, proposed claims, embeddings | Yes |
 | Decisions store | web | worker, act | Approvals with frozen proposal copies, rejections, corrections, accepted claims, recollections, audience and model-use settings, source grants, model endpoint grants, preservation choices | **No.** Back this up |
 | Preserved artifacts | worker, on a recorded preservation choice | web | Exact bytes a person chose to keep, content-addressed, with provenance ([preserved artifacts](scans-and-destinations.md#preserved-artifacts)) | **No.** Back this up |

@@ -1,6 +1,6 @@
 # Model provider contract
 
-Status: **designed, not built.** Provider support will be claimed only after synthetic compatibility tests against each named endpoint.
+Status: **built and tested against a loopback stub (slice 1b); not yet run against a real server.** Code: `src/towpath/models/`. Provider support will be claimed only after compatibility tests against each named endpoint. The client never uses the OpenAI SDK's environment defaults: base URL and key come only from the profile, and organization, project, and admin values read from `OPENAI_*` variables are cleared before any request.
 
 Towpath targets configurable [OpenAI-compatible](https://developers.openai.com/api/reference/overview) HTTP endpoints. Every endpoint is explicit: base URL, credential reference, model ID, and destination class. Poundlock is one optional endpoint. No endpoint is built in, auto-detected, or used as a fallback, and personal content is never sent to a remote endpoint without a recorded, per-endpoint grant.
 

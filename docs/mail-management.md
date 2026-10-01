@@ -1,6 +1,6 @@
 # Mail management
 
-Status: **designed, not built.** Nothing in this repository accesses or changes a live mailbox.
+Status: **design; read-only pieces built.** Towpath's read-only Gmail connector and the read-only Inbox Zero adapter exist and are tested against fakes and stubs only. Nothing in this repository can change a mailbox.
 
 ## Approach
 

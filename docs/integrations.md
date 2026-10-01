@@ -1,6 +1,6 @@
 # Integrations
 
-Status: **candidates, researched 2026-10-01, not yet adopted.** Findings and sources are in the [October 2026 tooling review](research/2026-10-tooling-review.md). Each entry still needs a hands-on check of the exact API calls Towpath will use before it becomes a dependency; record that in [decisions](decisions.md).
+Status: **candidates, researched 2026-10-01.** Adapters now exist for Gmail (Google's API client), Paperless-ngx and Immich (read-only lookups), Inbox Zero (read-only), and OpenAI-compatible endpoints; all are tested against stubs or fakes only, and none is adopted until checked against a running instance ([local quickstart](setup/local-quickstart.md)). Findings and sources are in the [October 2026 tooling review](research/2026-10-tooling-review.md). Each entry still needs a hands-on check of the exact API calls Towpath will use before it becomes a dependency; record that in [decisions](decisions.md).
 
 **License policy.** Towpath itself is MIT. A component it uses must have its source code published and be free to use for personal self-hosting with Towpath's goals:
 

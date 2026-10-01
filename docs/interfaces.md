@@ -1,6 +1,6 @@
 # Interfaces between services
 
-Status: **designed, not built.** Schemas are version 0 drafts. Field names will change during the [first slice](first-slice.md); the boundaries they encode should not change without a design note. All examples are synthetic and use reserved domains (`example.com`, `.test`).
+Status: **version 0, partly implemented.** The connector, occurrence, content request, coverage, proposal, and gateway shapes exist in code (`src/towpath/`); approvals, receipts, and claims do not. Schemas are version 0 drafts. Field names will change during the [first slice](first-slice.md); the boundaries they encode should not change without a design note. All examples are synthetic and use reserved domains (`example.com`, `.test`).
 
 Each record carries a `schema` field so stores can be migrated and so a record crossing a service boundary can be rejected if its version is unknown.
 

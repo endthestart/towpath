@@ -1,6 +1,6 @@
 # Scans, destinations, and preserved artifacts
 
-Status: **designed, not built.** This generalizes requests such as "find every photo in my mail and add it to my photo library" or "find every PDF that is not already in my document system and add it there" into one connector pattern. Destinations are existing tools, such as a document system or photo library the person already runs or one bundled in Compose ([integrations](integrations.md)). Each is an adapter; the scan engine never knows about a particular product.
+Status: **scans, presence checks, and proposals built (read-only); deliveries and preserved artifacts not built.** This generalizes requests such as "find every photo in my mail and add it to my photo library" or "find every PDF that is not already in my document system and add it there" into one connector pattern. Destinations are existing tools, such as a document system or photo library the person already runs or one bundled in Compose ([integrations](integrations.md)). Each is an adapter; the scan engine never knows about a particular product.
 
 ## The pattern
 
@@ -59,8 +59,10 @@ A destination has two halves, so neither web nor worker holds its credential:
 | Destination kind | Read half | Write half | First? |
 | --- | --- | --- | --- |
 | Folder | Hash the directory's files | Write the file plus a JSON sidecar into a directory another tool watches or imports | First, because it needs no third-party API and suits synthetic tests |
-| Document system API | List documents with checksums, using a view-only identity | Upload with metadata, using a separate add-only identity | Next; candidate in [integrations](integrations.md#documents) |
-| Photo library API | List assets with checksums, using a read-only key | Upload, using a separate upload key | Next; candidate in [integrations](integrations.md#photos) |
+| Document system API | Look up a checksum, using a view-only identity (Paperless-ngx: checksum filter; SHA-256 in version 3, MD5 in version 2) | Upload with metadata, using a separate add-only identity | Read half built against the documented API; unverified locally |
+| Photo library API | Look up a checksum, using a read-only key (Immich: metadata search by base64 SHA-1) | Upload, using a separate upload key | Read half built against the documented API; unverified locally |
+
+**Enumerate or look up.** A folder can be listed in full. A large document system or photo library is better asked about specific checksums: the scan queues a presence request, `towpath-connect` answers it with a read-only call, and the dated answer is stored in the source index. Either way, presence is an observation at a time; an action runner must check again just before delivering.
 
 The same connection serves the life stream: a document system or photo library connected as a destination is also an evidence source, read through its own grant. Towpath stores the destination's IDs as references and never takes over its originals.
 

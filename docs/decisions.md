@@ -28,6 +28,7 @@ These are built into the current documents. The owner can accept or overturn eac
 | R18 | If Towpath builds rules itself, it writes Gmail filter XML using gmailctl as the format reference | [integrations](integrations.md#mail) | Only if Towpath builds rules |
 | R19 | **Accepted 2026-10-01.** Document and photo systems use separate permission-limited users or keys, as each tool supports; presence checks use each destination's checksum, and Towpath keeps its own SHA-256 alongside | [scans and destinations](scans-and-destinations.md#destination-connectors) | Milestone 5 |
 | R20 | **Accepted 2026-10-01.** Dates as EDTF with computed bounds, keeping the original date wording and its provenance; people matched by deterministic keys, then splink, as proposals only | [life stream](life-stream.md#the-evidence-rule), [integrations](integrations.md#life-stream) | Milestone 6 |
+| R21 | An action runner must re-check presence at the destination immediately before delivering; a presence result is an observation at a time, not a guarantee (finding from the first slice) | [scans and destinations](scans-and-destinations.md#destination-connectors) | Milestone 5 action runner |
 
 ## Decisions
 
@@ -107,7 +108,8 @@ These are built into the current documents. The owner can accept or overturn eac
 
 - **Finding:** `format=full` returns parsed body content, and a MIME part can carry its bytes inline instead of an attachment ID ([formats](https://developers.google.com/workspace/gmail/api/reference/rest/v1/Format), [message part bodies](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages.attachments)). "Index broadly, fetch narrowly" is therefore not automatic.
 - **Approach:** request a [partial response](https://developers.google.com/workspace/gmail/api/guides/performance) whose field mask names part IDs, types, file names, headers, sizes, and attachment IDs at each nesting level, and never body data. Tests with nested and inline-content fixtures must show that no body data is returned at any depth. If Gmail cannot exclude it reliably, inline data that arrives is discarded without caching, and the bandwidth cost is documented.
-- **Blocks:** milestone 4 (the first-slice fixtures already include these cases).
+- **Status:** tooling built (`towpath connect verify-structure`); awaiting a run against real Gmail ([local quickstart](setup/local-quickstart.md#part-c-authorize-and-prove-the-read-only-boundary)).
+- **Blocks:** relying on milestone 4 with a primary account.
 
 ## Facts to verify before implementation
 
@@ -149,3 +151,4 @@ These are built into the current documents. The owner can accept or overturn eac
 | 2026-10-01 | D15: Inbox Zero integrated as an optional Compose service for mail management; D1 revised so `towpath-act` handles deliveries; D8, D11, D12 scoped to Towpath-built features | Accepted |
 | 2026-10-01 | Owner review: D14 accepted (Gmail API only; bring-your-own OAuth as the initial approach; separate Cloud projects); R14, R15, R17, R19, R20 accepted with qualifications; D16 opened; Inbox Zero provider contract and evaluation plan added; license class renamed "source available with use restrictions" | Accepted |
 | 2026-10-01 | First slice built on synthetic data; all 19 acceptance checks pass; findings recorded in [first slice results](first-slice.md#results) | Built |
+| 2026-10-01 | Built and tested on stubs: slice 1b model gateway; real Gmail client with read-only OAuth and scope refusal; D16 verification command; Paperless and Immich lookups; read-only Inbox Zero adapter; example config, config check, CI. Local verification handed to the owner | Built |

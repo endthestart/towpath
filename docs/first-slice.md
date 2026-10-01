@@ -1,6 +1,6 @@
 # First slice: read-only synthetic mail
 
-Status: **built (synthetic) on 2026-10-01; slice 1b not built.** This is the smallest build that tests the architecture before any real mailbox is connected. It uses only generated synthetic data, makes no network calls, and holds no credentials. Code is in `src/towpath/`; each acceptance check below is a test in `tests/test_first_slice.py`, and all pass. See [results](#results).
+Status: **built (synthetic) on 2026-10-01, including slice 1b.** This is the smallest build that tests the architecture before any real mailbox is connected. It uses only generated synthetic data, makes no network calls, and holds no credentials. Code is in `src/towpath/`; each acceptance check below is a test in `tests/test_first_slice.py`, and all pass. See [results](#results).
 
 ## Purpose
 
@@ -116,7 +116,11 @@ What it taught:
 - **The proposal record needs one more precondition before an action runner exists:** a fresh presence check at the destination at execution time, since a destination can gain the file after the proposal is made.
 - **Any scan over stored content must be bounded.** The first version of the reserved-domain check used an unbounded pattern that took quadratic time over base64 data; it now uses bounded repetition.
 - **Read-only access works with SQLite's default journal mode** across processes on one host. Write-ahead logging is not used yet; the caveat in [components](components.md#stores-and-ownership) still applies to containers.
-- Not built in this slice: cache eviction, slice 1b (model endpoints), approvals, and any action runner.
+- Not built in this slice: cache eviction, approvals, and any action runner.
+
+**Slice 1b** (`tests/test_models.py`): checks 1b-1 to 1b-8 pass against a loopback stub, plus a test that `OPENAI_*` environment variables (base URL, key, organization, project, admin key) never reach an endpoint. The OpenAI Python library reads those variables by default; Towpath clears them after building each client. The fallback ladder tries `json_schema`, then `json_object`, then a plain prompt with repair, then one re-ask, then manual review, and the ledger records which rung succeeded. Behavior with real model servers is unverified.
+
+**Beyond the slice, built against fakes and stubs only:** the real Gmail client and read-only OAuth (`tests/test_gmail_client.py`), Paperless and Immich lookups and the Inbox Zero adapter (`tests/test_destinations_providers.py`). Their local verification steps are in the [local quickstart](setup/local-quickstart.md).
 
 ## What the slice should teach
 

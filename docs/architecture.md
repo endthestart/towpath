@@ -1,6 +1,6 @@
 # Towpath architecture
 
-Status: **designed, not built.** This is the overview. Nothing here exists as running code yet. Decisions and open questions are in [decisions](decisions.md).
+Status: **design, partly built.** This is the overview. A read-only command-line implementation of the connect and worker roles exists and has been tested on synthetic data and stubs only; the web UI, action runner, life stream, and Compose file do not exist yet. Built pieces are listed in the [roadmap](roadmap.md); everything else here is design. Decisions and open questions are in [decisions](decisions.md).
 
 ## What Towpath is
 
