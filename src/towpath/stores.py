@@ -7,6 +7,7 @@
 | derived   | worker  | web            |
 | decisions | web     | worker, connect |
 | ledger    | worker  | web            |
+| quota     | connect | connect        |
 
 Readers open with ``mode=ro`` so the database itself refuses writes.
 """
@@ -20,6 +21,17 @@ WRITERS = {
     "derived": {"worker"},
     "decisions": {"web"},
     "ledger": {"worker"},
+    "quota": {"connect"},
+}
+
+# Columns and tables added after a store was first released. Applied on every
+# writer open, idempotently, so existing local databases upgrade in place.
+ADDED_COLUMNS = {
+    "source": {
+        "runs": {"termination": "TEXT", "reason": "TEXT", "items_processed": "INTEGER"},
+        "coverage": {"termination": "TEXT", "reason": "TEXT"},
+        "sync_state": {"full_sync_phase": "TEXT", "full_sync_page_token": "TEXT"},
+    },
 }
 
 SCHEMAS = {
@@ -33,6 +45,8 @@ CREATE TABLE IF NOT EXISTS runs (
 CREATE TABLE IF NOT EXISTS sync_state (
   source_id TEXT PRIMARY KEY, cursor TEXT, full_sync_history_id TEXT, full_sync_run TEXT);
 CREATE TABLE IF NOT EXISTS full_sync_seen (
+  source_id TEXT NOT NULL, native_id TEXT NOT NULL, PRIMARY KEY (source_id, native_id));
+CREATE TABLE IF NOT EXISTS full_sync_listed (
   source_id TEXT NOT NULL, native_id TEXT NOT NULL, PRIMARY KEY (source_id, native_id));
 CREATE TABLE IF NOT EXISTS items (
   item_id TEXT PRIMARY KEY, source_id TEXT NOT NULL, native_id TEXT NOT NULL, thread_id TEXT,
@@ -107,6 +121,13 @@ CREATE TABLE IF NOT EXISTS decision_log (
   seq INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, target_id TEXT NOT NULL, detail TEXT NOT NULL,
   author TEXT NOT NULL, at TEXT NOT NULL);
 """,
+    "quota": """
+CREATE TABLE IF NOT EXISTS attempts (
+  seq INTEGER PRIMARY KEY AUTOINCREMENT, at REAL NOT NULL, budget_id TEXT NOT NULL, account TEXT NOT NULL,
+  method TEXT NOT NULL, units INTEGER NOT NULL, day TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS attempts_budget_at ON attempts (budget_id, at);
+CREATE INDEX IF NOT EXISTS attempts_budget_day ON attempts (budget_id, day);
+""",
     "ledger": """
 CREATE TABLE IF NOT EXISTS capability_reports (
   endpoint_id TEXT NOT NULL, fingerprint TEXT NOT NULL, at TEXT NOT NULL, report TEXT NOT NULL,
@@ -140,14 +161,25 @@ def open_store(store_dir: Path, store: str, role: str) -> sqlite3.Connection:
         path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(path)
         conn.executescript(SCHEMAS[store])
+        _add_columns(conn, store)
     elif path.exists():
         conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     else:
         conn = sqlite3.connect(":memory:")
         conn.executescript(SCHEMAS[store])
+        _add_columns(conn, store)
         conn.execute("PRAGMA query_only = ON")
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def _add_columns(conn: sqlite3.Connection, store: str) -> None:
+    for table, columns in ADDED_COLUMNS.get(store, {}).items():
+        present = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        for name, kind in columns.items():
+            if name not in present:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {kind}")
+    conn.commit()
 
 
 def require_writer(store: str, role: str) -> None:

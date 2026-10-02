@@ -266,8 +266,15 @@ def test_full_sync_does_not_hide_server_errors(gmail_ws, monkeypatch):
         return Call(fail)
 
     monkeypatch.setattr(gmail_ws.service, "get", server_error)
-    with pytest.raises(HttpError):
-        connect.sync(gmail_ws.config, "src_a")
+    # Server errors are retried, then end the run as a recorded, resumable stop; never as "message missing".
+    result = connect.sync(gmail_ws.config, "src_a")
+    assert result["termination"] == "server-stop" and result["complete"] is False
+    assert "://" not in result["reason"] and "googleapis" not in result["reason"]
+    db = gmail_ws.db("source")
+    assert db.execute("SELECT COUNT(*) FROM items").fetchone()[0] == 0
+    run = db.execute("SELECT termination, complete FROM runs WHERE run_id = ?", (result["run_id"],)).fetchone()
+    db.close()
+    assert tuple(run) == ("server-stop", 0)
 
 
 def test_scope_checks():
@@ -280,7 +287,8 @@ def test_scope_checks():
 
 def test_real_client_has_no_write_calls():
     public = {n for n in dir(GoogleGmailClient) if not n.startswith("_")}
-    assert public == {"from_token", "get_profile", "list_messages", "get_message", "get_attachment", "list_history"}
+    assert public == {"from_token", "get_profile", "list_messages", "get_message", "get_attachment", "list_history",
+                      "close"}  # close releases the quota budget lock
 
 
 @pytest.mark.parametrize("existing_mode", [None, 0o644, 0o666])

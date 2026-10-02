@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from towpath import credentials
+from towpath.quota import PacingSettings
 
 SOURCE_KINDS = {"mail-provider", "document-system", "photo-library"}
 ADAPTER_KEYS = {
@@ -30,7 +31,7 @@ SELECTOR_KEYS = {"id", "media_types", "disposition", "min_bytes", "max_bytes", "
                  "exclude_labels", "classifier"}
 ENDPOINT_KEYS = {"base_url", "credential", "model", "kind", "destination", "allow_data", "timeout_seconds"}
 PROVIDER_KEYS = {"id", "kind", "adapter", "base_url", "api_key", "links"}
-TOP_KEYS = {"stores", "sources", "selectors", "endpoints", "tasks", "providers", "bundled_hosts"}
+TOP_KEYS = {"stores", "sources", "selectors", "endpoints", "tasks", "providers", "bundled_hosts", "gmail_pacing"}
 STORE_KEYS = {"dir"}
 DESTINATIONS = {"this-machine", "bundled", "self-hosted", "third-party"}
 DATA_CLASSES = {"synthetic", "metadata", "content", "attachments", "derived-personal"}
@@ -96,6 +97,7 @@ class Config:
     tasks: dict[str, str] = field(default_factory=dict)
     providers: dict[str, Provider] = field(default_factory=dict)
     bundled_hosts: tuple[str, ...] = ()
+    gmail_pacing: PacingSettings = field(default_factory=PacingSettings)
 
 
 def _check_keys(table: dict, allowed: set[str], where: str) -> None:
@@ -189,5 +191,10 @@ def load(path: Path) -> Config:
                                         _cred(raw["api_key"], f"provider {raw['id']}", root),
                                         dict(raw.get("links", {})))
 
+    try:
+        pacing = PacingSettings.from_table(dict(data.get("gmail_pacing", {})))
+    except (TypeError, ValueError) as exc:
+        raise ConfigError(f"[gmail_pacing]: {exc}") from exc
     return Config(root=root, store_dir=store_dir, sources=sources, selectors=selectors, endpoints=endpoints,
-                  tasks=tasks, providers=providers, bundled_hosts=tuple(data.get("bundled_hosts", ())))
+                  tasks=tasks, providers=providers, bundled_hosts=tuple(data.get("bundled_hosts", ())),
+                  gmail_pacing=pacing)

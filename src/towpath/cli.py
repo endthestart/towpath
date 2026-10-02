@@ -55,31 +55,95 @@ def _emit(data, as_json: bool) -> None:
             typer.echo(f"{key}: {value}")
 
 
+def _print_progress(snapshot: dict) -> None:
+    from towpath.progress import describe
+
+    typer.echo(describe(snapshot), err=True)
+
+
+def _stop_exit(exc) -> None:
+    """Print a clean stop's sanitized reason and exit with its code."""
+    typer.echo(f"stopped ({exc.code}): {exc.reason}", err=True)
+    raise typer.Exit(exc.exit_code)
+
+
+def _run_guarded(fn):
+    """Run a Gmail-touching command: clean stops and Ctrl-C exit nonzero without tracebacks or URLs."""
+    from towpath.adapters.errors import SyncStop
+
+    try:
+        return fn()
+    except SyncStop as exc:
+        _stop_exit(exc)
+    except KeyboardInterrupt:
+        typer.echo("cancelled; progress is saved and the next run resumes", err=True)
+        raise typer.Exit(130) from None
+
+
 @connect_app.command("sync")
 def connect_sync(source: list[str] = typer.Argument(None, help="Source IDs; all sources if omitted."),
                  config: Path = ConfigOpt, as_json: bool = typer.Option(False, "--json"),
-                 max_items: int = typer.Option(None, "--max-items",
-                                               help="Stop after this many messages; the next run resumes."),
+                 max_items: int = typer.Option(None, "--max-items", min=1,
+                                               help="Stop after this many message reads; the next run resumes."),
+                 quiet: bool = typer.Option(False, "--quiet", help="No progress lines on stderr."),
+                 debug: bool = typer.Option(False, "--debug", help="Show tracebacks for unexpected errors."),
                  simulate_interrupt_after: int = typer.Option(None, hidden=True),
                  simulate_ignored_mask: bool = typer.Option(False, hidden=True)):
-    """Index sources: full sync first, incremental after."""
+    """Index sources: full sync first, incremental after. Gmail requests are paced by [gmail_pacing].
+
+    Exit codes: 0 complete or capped; 3 quota or daily budget stop; 4 authorization;
+    5 permission; 6 rejected request; 7 server or network; 8 another command holds
+    the budget lock; 130 cancelled; 1 unexpected error. Every stop keeps progress.
+    """
+    from towpath.progress import Progress
+
     cfg = _load(config)
-    results = []
+    results, exit_code = [], 0
     for source_id in source or list(cfg.sources):
         options = {}
         if cfg.sources[source_id].adapter == "fixture-gmail":
             options = {"interrupt_after": simulate_interrupt_after, "ignore_mask": simulate_ignored_mask}
-        results.append(connect.sync(cfg, source_id, max_items=max_items, **options))
+        tracker = Progress(source_id, None if quiet else _print_progress)
+        try:
+            result = _run_guarded(lambda sid=source_id, opts=options, tr=tracker: connect.sync(
+                cfg, sid, max_items=max_items, progress=tr, **opts))
+        except typer.Exit:
+            raise
+        except Exception as exc:  # noqa: BLE001 - recorded by sync; keep URLs and data off the terminal
+            if debug:
+                raise
+            typer.echo(f"error: unexpected {exc.__class__.__name__}; progress is saved; "
+                       f"see `towpath connect status {source_id}` (rerun with --debug for details)", err=True)
+            raise typer.Exit(1) from None
+        results.append(result)
+        exit_code = max(exit_code, result.get("exit_code", 0))
     _emit(results, as_json)
+    raise typer.Exit(exit_code)
+
+
+@connect_app.command("status")
+def connect_status(source: str, config: Path = ConfigOpt, runs: int = typer.Option(5, "--runs", min=1),
+                   as_json: bool = typer.Option(False, "--json")):
+    """Recent runs, resume state, and quota budget use. Shows no message data, IDs, or tokens."""
+    _emit(connect.status(_load(config), source, runs), as_json)
 
 
 @connect_app.command("probe")
 def connect_probe(source: str, config: Path = ConfigOpt, as_json: bool = typer.Option(False, "--json")):
-    """Show what a source reports about itself, without indexing anything."""
+    """Show what a source reports about itself, without indexing anything (paced for Gmail)."""
     from towpath.adapters import build_connector
 
-    connector = build_connector(_load(config).sources[source])
-    _emit({**connector.describe(), "probe": connector.probe()}, as_json)
+    cfg = _load(config)
+
+    def run():
+        connector = build_connector(cfg.sources[source], cfg)
+        try:
+            return {**connector.describe(), "probe": connector.probe()}
+        finally:
+            if hasattr(connector, "close"):
+                connector.close()
+
+    _emit(_run_guarded(run), as_json)
 
 
 @connect_app.command("auth")
@@ -108,16 +172,25 @@ def connect_verify(source: str, sample: int = typer.Option(25, "--sample", min=1
     from towpath.adapters.google_gmail import verify_structure
 
     cfg = _load(config)
-    connector = build_connector(cfg.sources[source])
-    report = verify_structure(connector.client, connector.mask, sample)
+
+    def run():
+        connector = build_connector(cfg.sources[source], cfg)
+        try:
+            return verify_structure(connector.client, connector.mask, sample)
+        finally:
+            connector.close()
+
+    report = _run_guarded(run)
     _emit(report, as_json)
     raise typer.Exit(0 if report["passed"] else 1)
 
 
 @connect_app.command("fetch-requests")
 def connect_fetch(config: Path = ConfigOpt, as_json: bool = typer.Option(False, "--json")):
-    """Fetch the parts that scans asked for, one at a time."""
-    _emit(connect.fetch_requests(_load(config)), as_json)
+    """Fetch the parts that scans asked for, one at a time (paced for Gmail). Never runs automatically."""
+    result = _run_guarded(lambda: connect.fetch_requests(_load(config)))
+    _emit(result, as_json)
+    raise typer.Exit(result.get("exit_code", 0))
 
 
 @connect_app.command("coverage")

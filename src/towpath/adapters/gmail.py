@@ -14,7 +14,7 @@ from email.utils import parseaddr, parsedate_to_datetime
 from pathlib import Path
 
 from towpath import fieldmask
-from towpath.adapters.errors import CursorExpired, Interrupted, NotFound
+from towpath.adapters.errors import CursorExpired, Interrupted, InvalidPageToken, NotFound, RequestStop
 
 READ_CALLS = ("get_profile", "list_messages", "get_message", "get_attachment", "list_history")
 
@@ -31,11 +31,13 @@ class FixtureGmailClient:
     message reads, to test resumable syncs.
     """
 
-    def __init__(self, path: Path, ignore_mask: bool = False, interrupt_after: int | None = None):
+    def __init__(self, path: Path, ignore_mask: bool = False, interrupt_after: int | None = None,
+                 invalid_page_tokens: set[str] | None = None):
         self.path = Path(path)
         self.data = json.loads(self.path.read_text())
         self.ignore_mask = ignore_mask
         self.interrupt_after = interrupt_after
+        self.invalid_page_tokens = set(invalid_page_tokens or ())
         self.message_reads = 0
         self.calls: list[tuple] = []
 
@@ -45,6 +47,8 @@ class FixtureGmailClient:
 
     def list_messages(self, page_token: str | None = None, max_results: int = 10) -> dict:
         self.calls.append(("list_messages", page_token))
+        if page_token in self.invalid_page_tokens:
+            raise InvalidPageToken("synthetic invalid page token")
         ids = sorted(self.data["messages"], reverse=True)  # newest first, as Gmail lists them
         start = int(page_token or 0)
         page = ids[start:start + max_results]
@@ -72,12 +76,16 @@ class FixtureGmailClient:
         data = self.data["attachments"][attachment_id]
         return {"size": len(b64url_decode(data)), "data": data}
 
-    def list_history(self, start_history_id: str) -> dict:
-        self.calls.append(("list_history", start_history_id))
+    def list_history(self, start_history_id: str, page_token: str | None = None, max_results: int = 100) -> dict:
+        self.calls.append(("list_history", start_history_id, page_token))
         if int(start_history_id) < int(self.data["historyFloor"]):
             raise CursorExpired(start_history_id)
         records = [h for h in self.data["history"] if int(h["id"]) > int(start_history_id)]
-        return {"history": records, "historyId": self.data["historyId"]}
+        start = int(page_token or 0)
+        page = {"history": records[start:start + max_results], "historyId": self.data["historyId"]}
+        if start + max_results < len(records):
+            page["nextPageToken"] = str(start + max_results)
+        return page
 
 
 def _header(headers: list[dict], name: str) -> str | None:
@@ -187,57 +195,131 @@ class GmailConnector:
             "problems": problems,
         }
 
-    def enumerate(self, cursor: str | None, full_sync_history_id: str | None = None,
-                  already_seen: set[str] | None = None):
-        """Yield index events. Incremental when a cursor is usable, full otherwise.
+    def close(self) -> None:
+        for owner in (self.client, getattr(self, "limiter", None)):
+            if owner is not None and hasattr(owner, "close"):
+                owner.close()
 
-        Events: ("full_start", history_id), ("item", record), ("deleted", native_id),
-        ("labels_added"/"labels_removed", native_id, changed_labels),
-        ("done", {"kind", "cursor", "complete"}).
+    def _incremental(self, cursor: str):
+        """History since ``cursor``, one page at a time, with a checkpoint after each record.
+
+        Yields ("cursor_expired", cursor) if Gmail no longer accepts the cursor.
         """
-        if cursor and not full_sync_history_id:
+        token, restarted, latest = None, False, cursor
+        while True:
             try:
-                response = self.client.list_history(cursor)
+                page = self.client.list_history(cursor, page_token=token)
             except CursorExpired:
                 yield ("cursor_expired", cursor)
-            else:
-                for record in response.get("history", []):
-                    for added in record.get("messagesAdded", []):
-                        try:
-                            msg = self.client.get_message(added["message"]["id"], fields=self.mask)
-                        except NotFound:
-                            continue
-                        yield ("item", self._record(msg))
-                    for deleted in record.get("messagesDeleted", []):
-                        yield ("deleted", deleted["message"]["id"])
-                    for key in ("labelsAdded", "labelsRemoved"):
-                        for change in record.get(key, []):
-                            event = "labels_added" if key == "labelsAdded" else "labels_removed"
-                            yield (event, change["message"]["id"], sorted(change["labelIds"]))
-                yield ("done", {"kind": "incremental", "cursor": response["historyId"], "complete": True})
                 return
-
-        history_id = full_sync_history_id or self.client.get_profile()["historyId"]
-        yield ("full_start", history_id)
-        seen = set(already_seen or ())
-        token = None
-        while True:
-            page = self.client.list_messages(page_token=token)
-            for ref in page.get("messages", []):
-                if ref["id"] in seen:
-                    continue
-                try:
-                    msg = self.client.get_message(ref["id"], fields=self.mask)
-                except NotFound:
-                    # A listed message can disappear before it is read. Leave it
-                    # unseen so the completed rescan records an indexed copy absent.
-                    continue
-                seen.add(ref["id"])
-                yield ("item", self._record(msg))
+            except InvalidPageToken:
+                if token is None or restarted:
+                    raise RequestStop("Gmail rejected the history page token twice") from None
+                token, restarted = None, True  # replaying records is safe: every event is idempotent
+                continue
+            for record in page.get("history", []):
+                for added in record.get("messagesAdded", []):
+                    try:
+                        msg = self.client.get_message(added["message"]["id"], fields=self.mask)
+                    except NotFound:
+                        continue
+                    yield ("item", self._record(msg))
+                for deleted in record.get("messagesDeleted", []):
+                    yield ("deleted", deleted["message"]["id"])
+                for key in ("labelsAdded", "labelsRemoved"):
+                    for change in record.get(key, []):
+                        event = "labels_added" if key == "labelsAdded" else "labels_removed"
+                        yield (event, change["message"]["id"], sorted(change["labelIds"]))
+                yield ("checkpoint", record["id"])
+            latest = page.get("historyId", latest)
             token = page.get("nextPageToken")
             if not token:
-                break
-        yield ("done", {"kind": "full", "cursor": history_id, "complete": True})
+                yield ("done", {"kind": "incremental", "cursor": latest, "complete": True})
+                return
+
+    def _listing(self, phase: str, token: str | None, seen: set[str]):
+        """List message IDs from ``token`` (None is the first page), reading any not yet seen.
+
+        Before each page it yields ("page", phase, token) so a stop can resume at
+        that page. An invalid saved token restarts the listing from the first
+        page; already-seen IDs are skipped, so nothing is read twice.
+        """
+        restarted = False
+        while True:
+            yield ("page", phase, token)
+            try:
+                page = self.client.list_messages(page_token=token)
+            except InvalidPageToken:
+                if token is None or restarted:
+                    raise RequestStop("Gmail rejected the message listing page token twice") from None
+                token, restarted = None, True
+                continue
+            present = []
+            for ref in page.get("messages", []):
+                message_id = ref["id"]
+                if message_id in seen:
+                    present.append(message_id)
+                    continue
+                try:
+                    msg = self.client.get_message(message_id, fields=self.mask)
+                except NotFound:
+                    continue  # listed, then deleted before it was read
+                seen.add(message_id)
+                present.append(message_id)
+                yield ("item", self._record(msg))
+            yield ("listed", phase, present)
+            token = page.get("nextPageToken")
+            if not token:
+                return
+
+    def enumerate(self, cursor: str | None, full_state: dict | None = None, already_seen: set[str] | None = None,
+                  **_):
+        """Yield index events. Incremental when a cursor is usable, full otherwise.
+
+        Full syncs have three phases, each resumable:
+
+        - scan: list every message and read those not yet indexed in this sync;
+        - reconcile: list again, reading anything the scan missed because the
+          mailbox changed underneath it (page tokens can shift);
+        - confirm: the caller re-reads each indexed message the reconcile
+          listing did not show, and marks it absent only if Gmail says it is gone.
+
+        Events: ("full_start", history_id), ("page", phase, token), ("item", record),
+        ("listed", phase, ids), ("phase", name), ("confirm", None), ("deleted", id),
+        ("labels_added"/"labels_removed", id, labels), ("checkpoint", history_record_id),
+        ("cursor_expired", cursor), ("done", {"kind", "cursor", "complete"}).
+        """
+        if cursor and not full_state:
+            expired = False
+            for event in self._incremental(cursor):
+                if event[0] == "cursor_expired":
+                    expired = True
+                yield event
+            if not expired:
+                return
+
+        state = dict(full_state or {})
+        if not state.get("history_id"):
+            state = {"history_id": self.client.get_profile()["historyId"], "phase": "scan", "page_token": None}
+            yield ("full_start", state["history_id"])
+        seen = set(already_seen or ())
+        phase, token = state.get("phase") or "scan", state.get("page_token")
+        if phase == "scan":
+            yield from self._listing("scan", token, seen)
+            yield ("phase", "reconcile")
+            phase, token = "reconcile", None
+        if phase == "reconcile":
+            yield from self._listing("reconcile", token, seen)
+            yield ("phase", "confirm")
+        yield ("confirm", None)
+        yield ("done", {"kind": "full", "cursor": state["history_id"], "complete": True})
+
+    def confirm(self, native_id: str) -> dict | None:
+        """Re-read one message. None means Gmail says it no longer exists."""
+        try:
+            return self._record(self.client.get_message(native_id, fields=self.mask))
+        except NotFound:
+            return None
 
     # -- content ---------------------------------------------------------------
 
