@@ -6,6 +6,15 @@
 [stores]
 dir = "state"
 
+# Gmail pacing. These are Towpath's defaults and also its maximum rates;
+# lower them if your Google Cloud project's quotas require. One budget per project.
+[gmail_pacing]
+budget_id = "default"
+min_interval_seconds = 1.0
+units_per_minute = 1200
+daily_units = 1800000
+checkpoint_every = 25
+
 # Gmail, read-only, with your own Google OAuth client (docs/setup/local-quickstart.md).
 [[sources]]
 id = "gmail_test"

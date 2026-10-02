@@ -1,6 +1,6 @@
 # Gmail sync hardening: implementation handoff
 
-Status: implementation requested; live full-mailbox and incremental validation pending.
+Status: **implemented and tested on synthetic data only** (2026-10-02). Live full-mailbox, incremental, and D16 validation remain pending with the local agent; see [local validation](#local-validation). The specification below is unchanged from the owner's handoff.
 
 ## Goal and boundaries
 
@@ -125,3 +125,66 @@ Sources: [message listing](https://developers.google.com/workspace/gmail/api/ref
 Before implementation, confirm that the owner's local preflight and label fixes
 are present in the branch. If they are not yet published, ask for those commits
 or the patch rather than independently changing the same code.
+
+## Implementation
+
+Every item below is tested on synthetic data with a fake clock and Google-shaped fake responses (`tests/test_sync_hardening.py`). None of it has run against Gmail.
+
+| Requirement | Where | How |
+| --- | --- | --- |
+| 1. Pacing settings | `src/towpath/quota.py` (`PacingSettings`), `[gmail_pacing]` in config | Defaults are 1 s, 1,200 units per minute, and 1,800,000 units per day. They are also the maximums: config may only lower them. Values are validated, unknown keys are rejected, and `budget_id` names one budget per Cloud project |
+| 2. Every attempt accounted | `QuotaLimiter.acquire`, `GoogleGmailClient._execute` | Each attempt books its method's published cost before sending. This covers retries, listing, history, profile probes, `verify-structure`, and attachment reads. The API client's own retries are disabled (`num_retries=0`). `build_connector` always attaches the limiter, so the ordinary CLI is paced |
+| 3. Shared, persistent budget | `quota.db` `attempts` table; `BudgetLock` | Daily units are counted per budget (the whole project). Per-minute units are counted per account. The minimum interval is counted per budget. All of it persists across restarts. An exclusive `flock` per budget admits one Gmail command at a time; another exits with code 8 |
+| 4. Retries and error classes | `classify`, `error_details`, `_execute` | Waits honor `Retry-After`. Otherwise equal-jitter exponential backoff is used (base 2 s, cap 300 s, at most 6 attempts). A requested wait longer than the cap stops instead of sleeping. Waits are cancellable with Ctrl-C. Stops are distinct and exit nonzero: quota (3), daily budget (3), auth (4), permission (5), request (6), server or network (7), lock (8). Reasons carry the status and the API reason code only, never URLs or messages |
+| 5. Recorded termination | `connect.sync` | Every run records `termination`, `reason`, and items processed, with a coverage row. This covers complete, capped, every stop, cancelled (Ctrl-C, re-raised), and error (re-raised, with only the exception type recorded). Stores and the lock are always closed. Cursors move only with processed events; incomplete runs are never marked complete |
+| 6. Efficient, correct resume | `GmailConnector.enumerate`, `_listing`, `confirm` | Full syncs save the token of the page being processed and resume there. An invalid token restarts listing from the first page, skipping already-read IDs. Then a reconcile listing pass reads anything the scan missed, and a confirm phase re-reads indexed messages the reconcile listing did not show. Only a confirmed 404 marks absence. Incremental syncs page history and checkpoint after each record |
+| 7. Bounded, private progress | `src/towpath/progress.py`, `connect status` | Progress shows phase, counts, waits, and a measured rate with its per-minute spread. `status` shows runs, phase, budget use, and lock state. Neither shows subjects, addresses, message IDs, cursors, page tokens, or URLs |
+
+Also added:
+
+- **Checkpoints:** commits are batched every `checkpoint_every` messages (default 25). A crash loses at most one batch, which the next run re-reads. Ctrl-C and clean stops commit everything.
+- **Database upgrade:** existing `source.db` files gain their new columns in place on first use.
+
+### Correctness tradeoff for resume
+
+Gmail page tokens are opaque, and nothing guarantees they stay stable while the mailbox changes. Resuming from a saved token is efficient: it re-lists at most one page instead of every earlier page. But if earlier messages were deleted meanwhile, it can skip some messages.
+
+Towpath therefore pays for one extra listing pass per full sync. It costs 5 units per page of up to 500 IDs, about 200 requests for 100,000 messages. That pass reads anything not yet indexed. Absence then needs a confirming read, 20 units per candidate.
+
+The result:
+
+- A full sync completes only after a whole listing and confirmation.
+- A partial scan is never treated as evidence of absence.
+- A message moved to Trash or Spam stays indexed with its new labels.
+
+The cost: an extra listing pass, plus one read per previously indexed message that is no longer listed.
+
+## Local validation
+
+Run on the dedicated test account first, after part C of the [local quickstart](../setup/local-quickstart.md). Keep outputs private and publish only generic findings.
+
+1. **Tests:** `python -m pytest -q` reports 94 passed. `ruff check src tests` and the fixture-domain check pass.
+2. **Budgets:** confirm the project's quotas in Cloud console. Set `[gmail_pacing]` at or below them; the defaults are fine if the console shows the published new-project values.
+3. **Accounting:**
+   - Run `towpath connect sync gmail_test --max-items 50`, then `towpath connect status gmail_test`.
+   - The `budget.day_used` value should match `sqlite3 state/quota.db "select sum(units) from attempts"`.
+   - Request times should be at least 1 s apart: `select max(at) - min(at), count(*) from attempts`.
+4. **No burst on restart:** run the same capped command twice back to back. The second run's first request should wait about 1 s.
+5. **Lock:** start a sync in one terminal and run `towpath connect probe gmail_test` in another. Expect exit 8 and no traceback.
+6. **Ctrl-C:**
+   - Interrupt a running sync. Expect exit 130, and `status` shows `cancelled` with the items processed.
+   - Note `select max(seq) from attempts` in `state/quota.db`.
+   - Run again: the kind is `resumed-full`. Then `select method, count(*) from attempts where seq > <noted value> group by method` should show only one or two `users.messages.list` requests before new reads, not one per page already read.
+7. **Quota stops:** if a real quota error occurs, record the exit code (3), the reason (an API reason code with no URL), and the waits seen. Do not deliberately exhaust quota.
+8. **Full completion:** let a background run finish, and record the following privately:
+   - wall time;
+   - the measured rates from the progress lines;
+   - total units;
+   - the reconcile and confirm phases seen in the progress lines.
+
+   A second run should be `incremental`.
+9. **Incremental changes:** on the test account, add a label, archive one message, and delete another. Then run `connect sync`, and check the observations and absence in `source.db`.
+10. **Expired authorization:** if the app is still in Testing after 7 days, expect exit 4 with a reauthorization message, then `connect auth` and a resumed run.
+11. **D16:** `connect verify-structure --sample 50` still passes, and `select count(*) from cache` stays 0 until a scan requests content.
+
+Record pass or fail for each step in the first-slice results, keeping counts generic. Leave D16 open until steps 8 and 11 pass on the test account.

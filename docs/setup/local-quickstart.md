@@ -19,7 +19,7 @@ git checkout claude/happy-gauss-ugprmu
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-python -m pytest -q          # expect: 59 passed
+python -m pytest -q          # expect: 94 passed
 ruff check src tests         # expect: All checks passed!
 ```
 
@@ -96,28 +96,68 @@ This is the D16 check ([decision](../decisions.md#d16-gmail-structure-without-co
 
 A pass applies to the messages sampled. Before using a primary account, also verify the granted scopes, capped and incremental syncs, interruption recovery, and handling of messages deleted during a sync on the test account.
 
-## Part D: index, measure, and resume
+## Part D: index slowly, measure, and resume
+
+Every Gmail request Towpath makes is paced by a persistent budget in `state/quota.db`:
+
+- **Minimum interval:** at least 1 second between request attempts.
+- **Per minute:** at most 1,200 quota units, counted per account.
+- **Per day:** at most 1,800,000 units for the whole Google project. The budget day follows Google's Pacific-time quota day.
+- **What counts:** every attempt, including retries, listing, history, probes, `verify-structure`, and attachment fetches. Each is charged at its published unit cost: a message read is 20 units, so about one message per second at most.
+- **One command at a time:** a lock admits one Gmail command per budget. A second one exits with code 8 instead of doubling the rate.
+
+These are Towpath's own conservative budgets, not Google's limits. Confirm your project's actual quotas in Cloud console (**APIs & Services → Gmail API → Quotas**). You may lower the budgets, never raise them, in `towpath.toml`:
+
+```toml
+[gmail_pacing]
+budget_id = "default"          # one budget per Google Cloud project
+min_interval_seconds = 1.0     # 1.0 or more
+units_per_minute = 1200        # 20 to 1200
+daily_units = 1800000          # 100 to 1800000
+checkpoint_every = 25          # messages per committed checkpoint
+```
+
+Start with a capped run and look at its status:
 
 ```sh
 time towpath connect sync gmail_test --max-items 200
-towpath connect coverage gmail_test
+towpath connect status gmail_test
 ```
 
-The first command indexes the 200 newest messages, then stops. Record the elapsed time; at that rate, estimate the full mailbox. New Cloud projects have lower quotas, so a large mailbox can take hours ([R17](../decisions.md#recommendations-in-this-design)).
+`status` shows the following, but no message data, IDs, cursors, or page tokens:
 
-The run reports `complete: False`, which is expected with `--max-items`. Running the same command again continues where it stopped. Ctrl-C is also safe at any point; the next run resumes.
+- the last runs, and how each ended;
+- whether a full sync is in progress, and its phase;
+- how much of the per-minute and daily budget is used;
+- whether another command holds the lock.
 
-**Current limitation:** the ordinary CLI has no quota-aware pacing. A new project
-can exhaust the SDK's retries and stop with a quota error. Checkpoints survive,
-but do not start an unattended full sync until the
-[sync-hardening work](../evaluations/gmail-sync-hardening.md) is implemented and
-locally verified. A manually paced local check is not a shipped rate limiter.
+Progress lines on stderr show the phase, the count processed, any waits, and a *measured* rate with its spread. That rate is not a completion estimate.
 
-When ready, run without the cap until a run reports `complete: True`:
+Then let it run in the background until a run reports `complete`. For example:
 
 ```sh
-towpath connect sync gmail_test
+nohup towpath connect sync gmail_test > ~/towpath-private/sync.log 2>&1 &
 ```
+
+Every way a run can end is recorded, and the next run continues from where it stopped:
+
+| Exit | Meaning | What to do |
+| --- | --- | --- |
+| 0 | complete, or capped by `--max-items` | Run again to continue a capped run |
+| 3 | quota stop, or the local daily budget is used | Run again later; after a daily stop, run again the next budget day |
+| 4 | authorization expired or revoked (an app in Testing expires after 7 days) | `towpath connect auth gmail_test`, then run again |
+| 5 | permission refused | Check that only `gmail.readonly` is granted and the Gmail API is enabled |
+| 6 | Gmail rejected a request | Record the reason privately and report it |
+| 7 | server or network errors persisted through retries | Run again later |
+| 8 | another Towpath command holds the budget | Wait for it to finish |
+| 130 | Ctrl-C | Run again |
+
+How resuming works:
+
+1. A full sync first **scans** the mailbox, then makes a cheap **reconcile** listing pass that catches anything the mailbox shifted underneath it.
+2. Last, it **confirms** each previously indexed message the listing did not show. A message is marked absent only when Gmail says it is gone.
+3. A resumed run starts at the page where the last one stopped. If Gmail rejects that saved page token, the run lists from the start again, skipping messages already read.
+4. Incremental runs save their position after each history record. They never skip events, and a stop never claims completion.
 
 Later runs are incremental and take seconds. Labels changed by you or by another tool are recorded as dated observations; deleted messages are marked absent, not erased.
 
@@ -126,6 +166,7 @@ Check the index directly, if you like:
 ```sh
 sqlite3 state/source.db "select count(*), sum(absent_since_run is not null) from items;"
 sqlite3 state/source.db "select count(*) from cache;"   # 0 until a scan fetches attachments
+sqlite3 state/quota.db "select method, count(*), sum(units) from attempts group by method;"
 ```
 
 ## Part E: Paperless and Immich (read-only lookups)

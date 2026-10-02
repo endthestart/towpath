@@ -133,6 +133,8 @@ and fixtures match Google's documented history shape. Production pacing, run
 error summaries, and efficient resume are specified in the
 [Gmail sync hardening handoff](evaluations/gmail-sync-hardening.md).
 
+**Sync hardening, 2026-10-02 (synthetic only):** this adds paced, budgeted Gmail requests with a persistent shared quota store and a per-budget lock; classified retries; recorded termination for every run; page-level full-sync resume with a reconcile pass and confirmed absence; per-record incremental checkpoints; and private progress and status output. There are 94 tests, all synthetic. See the [implementation notes](evaluations/gmail-sync-hardening.md#implementation). Live full completion, incremental behavior, and D16 remain pending local validation.
+
 ## What the slice should teach
 
 - Whether the item and observation model is too heavy for indexing a large mailbox.

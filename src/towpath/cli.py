@@ -89,7 +89,7 @@ def connect_sync(source: list[str] = typer.Argument(None, help="Source IDs; all 
                  debug: bool = typer.Option(False, "--debug", help="Show tracebacks for unexpected errors."),
                  simulate_interrupt_after: int = typer.Option(None, hidden=True),
                  simulate_ignored_mask: bool = typer.Option(False, hidden=True)):
-    """Index sources: full sync first, incremental after. Gmail requests are paced by [gmail_pacing].
+    """Index sources: full sync first, incremental after. Gmail requests are paced by the gmail_pacing settings.
 
     Exit codes: 0 complete or capped; 3 quota or daily budget stop; 4 authorization;
     5 permission; 6 rejected request; 7 server or network; 8 another command holds
@@ -379,6 +379,10 @@ def config_check(config: Path = ConfigOpt):
             return f"MISSING ({exc})"
 
     typer.echo(f"stores: {cfg.store_dir}")
+    pacing = cfg.gmail_pacing
+    typer.echo(f"gmail pacing: budget '{pacing.budget_id}', at least {pacing.min_interval_seconds} s between "
+               f"requests, {pacing.units_per_minute} units/min, {pacing.daily_units} units/day "
+               f"({pacing.day_timezone} day)")
     for s in cfg.sources.values():
         if s.adapter == "gmail":
             state = []

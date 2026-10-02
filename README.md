@@ -25,7 +25,7 @@ Requires Python 3.11 or newer. Everything runs on generated synthetic data, with
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-python -m pytest                        # 59 tests: acceptance checks, slice 1b, adapters
+python -m pytest                        # 94 tests: acceptance checks, slice 1b, adapters, sync hardening
 towpath fixtures generate /tmp/towpath-demo
 cd /tmp/towpath-demo
 towpath connect sync                    # index synthetic accounts and destination folders

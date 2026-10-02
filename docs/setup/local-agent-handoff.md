@@ -32,7 +32,7 @@ You are continuing work on Towpath, an MIT-licensed, self-hosted project in this
 2. Parts B and C: the Google project, `connect auth`, `connect probe`, and `connect verify-structure --sample 50`. **This gathers live evidence for D16.**
    - A pass establishes the result for the messages actually checked, not every possible MIME structure. An empty mailbox fails. Record the count and MIME cases covered; primary-account readiness also requires the scope and sync checks in part D.
    - If it fails, investigate the field mask in `src/towpath/fieldmask.py` and `GmailConnector`, propose a fix, and add a synthetic fixture case reproducing what Gmail did.
-3. Part D: a capped sync of 200 messages, then resume to completion on the test account. Record the messages-per-minute rate. Confirm that a second sync is incremental.
+3. Part D: the paced sync. Follow [local validation](../evaluations/gmail-sync-hardening.md#local-validation) steps 1 to 11 on the test account: accounting, no burst, lock, Ctrl-C, background completion, incremental changes. Record the measured rates (as measurements, not promises) and each step's pass or fail.
 4. Part E: Paperless and Immich probes and scans. Confirm that known files are reported present.
    - If either API differs from what `src/towpath/adapters/destinations.py` expects, fix the adapter. Update `tests/stubs.py` to match the real response shapes, without real data.
 5. Part F: probe a local model and run the queue. Record which structured-output methods it supports.
