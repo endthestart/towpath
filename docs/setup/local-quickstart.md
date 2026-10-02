@@ -19,7 +19,7 @@ git checkout claude/happy-gauss-ugprmu
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-python -m pytest -q          # expect: 48 passed
+python -m pytest -q          # expect: 59 passed
 ruff check src tests         # expect: All checks passed!
 ```
 
@@ -90,8 +90,11 @@ towpath connect verify-structure gmail_test --sample 50
 This is the D16 check ([decision](../decisions.md#d16-gmail-structure-without-content)). It reads 50 recent messages with Towpath's structural field mask and stores nothing.
 
 - **Pass:** `passed: True`, `messages_with_body_data: 0`, and `truncated: 0`.
+- An empty mailbox cannot establish this: the check fails when no messages were read. Add harmless test messages with PDF and image attachments first, and record how many messages and which MIME cases were actually checked.
 - **Also note:** `attachments_inline`, which counts attachments Gmail sends inline instead of by attachment ID, and `max_depth`.
 - **If it fails:** stop and record the output privately. Do not continue to the sync until the result is understood.
+
+A pass applies to the messages sampled. Before using a primary account, also verify the granted scopes, capped and incremental syncs, interruption recovery, and handling of messages deleted during a sync on the test account.
 
 ## Part D: index, measure, and resume
 
@@ -103,6 +106,12 @@ towpath connect coverage gmail_test
 The first command indexes the 200 newest messages, then stops. Record the elapsed time; at that rate, estimate the full mailbox. New Cloud projects have lower quotas, so a large mailbox can take hours ([R17](../decisions.md#recommendations-in-this-design)).
 
 The run reports `complete: False`, which is expected with `--max-items`. Running the same command again continues where it stopped. Ctrl-C is also safe at any point; the next run resumes.
+
+**Current limitation:** the ordinary CLI has no quota-aware pacing. A new project
+can exhaust the SDK's retries and stop with a quota error. Checkpoints survive,
+but do not start an unattended full sync until the
+[sync-hardening work](../evaluations/gmail-sync-hardening.md) is implemented and
+locally verified. A manually paced local check is not a shipped rate limiter.
 
 When ready, run without the cap until a run reports `complete: True`:
 

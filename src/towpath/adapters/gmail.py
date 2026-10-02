@@ -192,7 +192,8 @@ class GmailConnector:
         """Yield index events. Incremental when a cursor is usable, full otherwise.
 
         Events: ("full_start", history_id), ("item", record), ("deleted", native_id),
-        ("labels", native_id, labels), ("done", {"kind", "cursor", "complete"}).
+        ("labels_added"/"labels_removed", native_id, changed_labels),
+        ("done", {"kind", "cursor", "complete"}).
         """
         if cursor and not full_sync_history_id:
             try:
@@ -211,7 +212,8 @@ class GmailConnector:
                         yield ("deleted", deleted["message"]["id"])
                     for key in ("labelsAdded", "labelsRemoved"):
                         for change in record.get(key, []):
-                            yield ("labels", change["message"]["id"], sorted(change["message"]["labelIds"]))
+                            event = "labels_added" if key == "labelsAdded" else "labels_removed"
+                            yield (event, change["message"]["id"], sorted(change["labelIds"]))
                 yield ("done", {"kind": "incremental", "cursor": response["historyId"], "complete": True})
                 return
 
@@ -224,7 +226,12 @@ class GmailConnector:
             for ref in page.get("messages", []):
                 if ref["id"] in seen:
                     continue
-                msg = self.client.get_message(ref["id"], fields=self.mask)
+                try:
+                    msg = self.client.get_message(ref["id"], fields=self.mask)
+                except NotFound:
+                    # A listed message can disappear before it is read. Leave it
+                    # unseen so the completed rescan records an indexed copy absent.
+                    continue
                 seen.add(ref["id"])
                 yield ("item", self._record(msg))
             token = page.get("nextPageToken")

@@ -140,10 +140,13 @@ def sync(config, source_id: str, max_items: int | None = None, **adapter_options
                 n = db.execute("UPDATE items SET absent_since_run = ? WHERE source_id = ? AND native_id = ? "
                                "AND absent_since_run IS NULL", (run_id, source_id, event[1])).rowcount
                 counts["absent"] += n
-            elif kind == "labels":
+            elif kind in {"labels_added", "labels_removed"}:
                 iid = item_id(source_id, event[1])
                 if db.execute("SELECT 1 FROM items WHERE item_id = ?", (iid,)).fetchone():
-                    _observe(db, iid, run_id, event[2])
+                    labels = set(_latest_labels(db, iid) or [])
+                    changed = set(event[2])
+                    labels = labels | changed if kind == "labels_added" else labels - changed
+                    _observe(db, iid, run_id, sorted(labels))
             elif kind == "destination_entry":
                 e = event[1]
                 counts["seen"] += 1

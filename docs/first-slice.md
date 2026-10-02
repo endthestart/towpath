@@ -122,6 +122,17 @@ What it taught:
 
 **Beyond the slice, built against fakes and stubs only:** the real Gmail client and read-only OAuth (`tests/test_gmail_client.py`), Paperless and Immich lookups and the Inbox Zero adapter (`tests/test_destinations_providers.py`). Their local verification steps are in the [local quickstart](setup/local-quickstart.md).
 
+**Local preflight, 2026-10-02:** all 57 tests pass on Python 3.14, with lint and fixture-domain checks passing. Regression tests cover empty structure-verification samples, invalid sample sizes, messages disappearing between listing and fetching during initial sync and rescan, and token replacement with owner-only permissions. Token replacement is atomic and preserves the previous file if replacement fails. Server errors still stop a sync rather than being mistaken for missing messages. No real accounts or services were contacted; D16 remains pending live evidence.
+
+**Follow-up validation, 2026-10-02:** a capped read-only Gmail sync encountered
+a per-minute quota error and retained its committed checkpoint. A manually paced
+resume reached the cap; this does not validate full completion or incremental
+sync. A separate synthetic regression reproduced missing `message.labelIds` in
+Google-shaped label history. The connector now applies top-level label deltas,
+and fixtures match Google's documented history shape. Production pacing, run
+error summaries, and efficient resume are specified in the
+[Gmail sync hardening handoff](evaluations/gmail-sync-hardening.md).
+
 ## What the slice should teach
 
 - Whether the item and observation model is too heavy for indexing a large mailbox.

@@ -101,7 +101,7 @@ def connect_auth(source: str, config: Path = ConfigOpt,
 
 
 @connect_app.command("verify-structure")
-def connect_verify(source: str, sample: int = typer.Option(25, "--sample"), config: Path = ConfigOpt,
+def connect_verify(source: str, sample: int = typer.Option(25, "--sample", min=1), config: Path = ConfigOpt,
                    as_json: bool = typer.Option(False, "--json")):
     """Check that the structural field mask keeps body data out of responses (D16). Stores nothing."""
     from towpath.adapters import build_connector

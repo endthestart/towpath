@@ -7,6 +7,7 @@ authorization, and refuses any token that carries a broader grant.
 
 import json
 import os
+import tempfile
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -41,10 +42,17 @@ def tokeninfo_scopes(access_token: str) -> set[str]:
 
 
 def _write_private(path: Path, text: str) -> None:
+    """Replace a token atomically with an owner-only file, including on refresh."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w") as f:
-        f.write(text)
+    fd, temporary = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temporary, path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
 
 
 def authorize(client_secrets: Path, token_path: Path, open_browser: bool = True) -> dict:
@@ -142,6 +150,8 @@ def verify_structure(client, mask: str, sample: int = 25) -> dict:
     Reads ``sample`` recent messages with the structural mask and reports any
     body data, truncation, and inline attachments. Stores nothing.
     """
+    if sample < 1:
+        raise ValueError("sample must be at least 1")
     ids: list[str] = []
     token = None
     while len(ids) < sample:
@@ -172,5 +182,8 @@ def verify_structure(client, mask: str, sample: int = 25) -> dict:
         report["messages_checked"] += 1
         report["body_data_chars"] += chars
         report["messages_with_body_data"] += bool(chars)
-    report["passed"] = report["messages_with_body_data"] == 0 and report["truncated"] == 0
+    report["passed"] = (report["messages_checked"] > 0
+                        and report["messages_with_body_data"] == 0 and report["truncated"] == 0)
+    if not report["messages_checked"]:
+        report["reason"] = "no messages were checked; structure verification needs a non-empty mailbox"
     return report

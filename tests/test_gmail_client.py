@@ -156,6 +156,30 @@ def test_incremental_paging_and_expired_cursor(gmail_ws):
     assert again["kind"] == "full-after-expired-cursor" and again["complete"]
 
 
+@pytest.mark.parametrize("change_type", ["labelsAdded", "labelsRemoved"])
+def test_incremental_labels_use_history_deltas(gmail_ws, change_type):
+    connect.sync(gmail_ws.config, "src_a")
+    message_id = gmail_ws.summary["newsletters"][0]
+    message = gmail_ws.service.data["messages"][message_id]
+    original_labels = set(message["labelIds"])
+    changed_label = "Label_Checked" if change_type == "labelsAdded" else "UNREAD"
+    expected = (original_labels | {changed_label} if change_type == "labelsAdded"
+                else original_labels - {changed_label})
+    history_id = str(int(gmail_ws.service.data["historyId"]) + 1)
+    gmail_ws.service.data["historyId"] = history_id
+    gmail_ws.service.data["history"].append({"id": history_id, change_type: [{
+        "message": {"id": message_id, "threadId": message["threadId"]},
+        "labelIds": [changed_label],
+    }]})
+    result = connect.sync(gmail_ws.config, "src_a")
+    assert result["complete"] and result["kind"] == "incremental"
+    db = gmail_ws.db("source")
+    row = db.execute("SELECT labels FROM observations WHERE item_id = ? AND run_id = ?",
+                     (gmail_ws.item(message_id), result["run_id"])).fetchone()
+    db.close()
+    assert set(json.loads(row["labels"])) == expected
+
+
 def test_fetch_and_scan_through_real_client(gmail_ws):
     gmail_ws.full_pipeline()
     att = [kw for name, kw in gmail_ws.service.calls if name == "attachments.get"]
@@ -191,6 +215,61 @@ def test_verify_structure_reports(gmail_ws):
     assert not shallow["passed"] and shallow["truncated"] > 0
 
 
+def test_verify_structure_requires_messages(gmail_ws):
+    gmail_ws.service.data["messages"] = {}
+    report = verify_structure(GoogleGmailClient(gmail_ws.service), fieldmask.message_mask(), sample=50)
+    assert report["messages_checked"] == 0
+    assert not report["passed"]
+    assert report["reason"] == "no messages were checked; structure verification needs a non-empty mailbox"
+
+
+@pytest.mark.parametrize("sample", [0, -1])
+def test_verify_structure_rejects_nonpositive_samples(gmail_ws, sample):
+    with pytest.raises(ValueError, match="sample must be at least 1"):
+        verify_structure(GoogleGmailClient(gmail_ws.service), fieldmask.message_mask(), sample=sample)
+    assert gmail_ws.service.calls == []
+
+
+@pytest.mark.parametrize("rescan", [False, True])
+def test_full_sync_handles_message_deleted_after_listing(gmail_ws, monkeypatch, rescan):
+    if rescan:
+        from towpath.fixtures import generator
+
+        connect.sync(gmail_ws.config, "src_a")
+        generator.expire_cursor(gmail_ws.root)
+        gmail_ws.service.data = json.loads((gmail_ws.root / "account_a.json").read_text())
+    missing_id = sorted(gmail_ws.service.data["messages"], reverse=True)[0]
+    original = gmail_ws.service.get
+
+    def deleted_after_listing(**kw):
+        if kw["id"] == missing_id:
+            return Call(gmail_ws.service._404)
+        return original(**kw)
+
+    monkeypatch.setattr(gmail_ws.service, "get", deleted_after_listing)
+    result = connect.sync(gmail_ws.config, "src_a")
+    assert result["complete"]
+    assert result["indexed_total"] == gmail_ws.summary["messages_a"] - 1
+    db = gmail_ws.db("source")
+    row = db.execute("SELECT absent_since_run FROM items WHERE native_id = ?", (missing_id,)).fetchone()
+    db.close()
+    if rescan:
+        assert row["absent_since_run"] == result["run_id"]
+    else:
+        assert row is None
+
+
+def test_full_sync_does_not_hide_server_errors(gmail_ws, monkeypatch):
+    def server_error(**kw):
+        def fail():
+            raise HttpError(httplib2.Response({"status": 500}), b'{"error": {"code": 500}}')
+        return Call(fail)
+
+    monkeypatch.setattr(gmail_ws.service, "get", server_error)
+    with pytest.raises(HttpError):
+        connect.sync(gmail_ws.config, "src_a")
+
+
 def test_scope_checks():
     check_scopes({READONLY})
     with pytest.raises(ScopeError):
@@ -204,7 +283,28 @@ def test_real_client_has_no_write_calls():
     assert public == {"from_token", "get_profile", "list_messages", "get_message", "get_attachment", "list_history"}
 
 
-def test_token_file_is_private(tmp_path):
+@pytest.mark.parametrize("existing_mode", [None, 0o644, 0o666])
+def test_token_file_is_private(tmp_path, existing_mode):
     path = tmp_path / "secrets" / "token.json"
+    if existing_mode is not None:
+        path.parent.mkdir()
+        path.write_text('{"old":"synthetic"}')
+        path.chmod(existing_mode)
     google_gmail._write_private(path, "{}")
     assert (path.stat().st_mode & 0o777) == 0o600
+    assert path.read_text() == "{}"
+
+
+def test_failed_token_replacement_preserves_previous_file(tmp_path, monkeypatch):
+    path = tmp_path / "token.json"
+    path.write_text('{"old":"synthetic"}')
+    path.chmod(0o600)
+
+    def fail_replace(*args):
+        raise OSError("synthetic replacement failure")
+
+    monkeypatch.setattr(google_gmail.os, "replace", fail_replace)
+    with pytest.raises(OSError, match="synthetic replacement failure"):
+        google_gmail._write_private(path, '{"new":"synthetic"}')
+    assert path.read_text() == '{"old":"synthetic"}'
+    assert list(tmp_path.iterdir()) == [path]

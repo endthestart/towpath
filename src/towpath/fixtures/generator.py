@@ -392,10 +392,10 @@ def advance(out: Path, seed: int = 11) -> dict:
         msg["labelIds"] = sorted((set(msg["labelIds"]) - {"INBOX", "UNREAD"}) | {"Label_Newsletters"})
         history_id += 1
         data["history"].append({"id": str(history_id), "labelsRemoved": [
-            {"message": {"id": msg_id, "labelIds": msg["labelIds"]}, "labelIds": ["INBOX", "UNREAD"]}]})
+            {"message": {"id": msg_id, "threadId": msg["threadId"]}, "labelIds": ["INBOX", "UNREAD"]}]})
         history_id += 1
         data["history"].append({"id": str(history_id), "labelsAdded": [
-            {"message": {"id": msg_id, "labelIds": msg["labelIds"]}, "labelIds": ["Label_Newsletters"]}]})
+            {"message": {"id": msg_id, "threadId": msg["threadId"]}, "labelIds": ["Label_Newsletters"]}]})
 
     deleted = summary["statement_jan"]
     del data["messages"][deleted]
