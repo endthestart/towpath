@@ -31,7 +31,8 @@ SELECTOR_KEYS = {"id", "media_types", "disposition", "min_bytes", "max_bytes", "
                  "exclude_labels", "classifier"}
 ENDPOINT_KEYS = {"base_url", "credential", "model", "kind", "destination", "allow_data", "timeout_seconds"}
 PROVIDER_KEYS = {"id", "kind", "adapter", "base_url", "api_key", "links"}
-TOP_KEYS = {"stores", "sources", "selectors", "endpoints", "tasks", "providers", "bundled_hosts", "gmail_pacing"}
+TOP_KEYS = {"stores", "sources", "selectors", "endpoints", "tasks", "providers", "bundled_hosts", "gmail_pacing",
+            "files"}
 STORE_KEYS = {"dir"}
 DESTINATIONS = {"this-machine", "bundled", "self-hosted", "third-party"}
 DATA_CLASSES = {"synthetic", "metadata", "content", "attachments", "derived-personal"}
@@ -98,6 +99,8 @@ class Config:
     providers: dict[str, Provider] = field(default_factory=dict)
     bundled_hosts: tuple[str, ...] = ()
     gmail_pacing: PacingSettings = field(default_factory=PacingSettings)
+    # Optional file discovery (towpath.discovery.config.FilesConfig); None when [files] is absent.
+    files: object = None
 
 
 def _check_keys(table: dict, allowed: set[str], where: str) -> None:
@@ -195,6 +198,16 @@ def load(path: Path) -> Config:
         pacing = PacingSettings.from_table(dict(data.get("gmail_pacing", {})))
     except (TypeError, ValueError) as exc:
         raise ConfigError(f"[gmail_pacing]: {exc}") from exc
+
+    files = None
+    if "files" in data:
+        # The only edge from core into discovery: pure validation, imported only when configured.
+        from towpath.discovery.config import FilesConfigError, parse
+
+        try:
+            files = parse(data["files"], root, store_dir)
+        except FilesConfigError as exc:
+            raise ConfigError(str(exc)) from exc
     return Config(root=root, store_dir=store_dir, sources=sources, selectors=selectors, endpoints=endpoints,
                   tasks=tasks, providers=providers, bundled_hosts=tuple(data.get("bundled_hosts", ())),
-                  gmail_pacing=pacing)
+                  gmail_pacing=pacing, files=files)

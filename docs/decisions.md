@@ -111,6 +111,25 @@ These are built into the current documents. The owner can accept or overturn eac
 - **Status:** tooling built (`towpath connect verify-structure`); awaiting a run against real Gmail ([local quickstart](setup/local-quickstart.md#part-c-authorize-and-prove-the-read-only-boundary)).
 - **Blocks:** relying on milestone 4 with a primary account.
 
+### D17. File discovery boundary
+
+**Accepted 2026-10-03 as the foundation's boundary; no provider adopted.** [File discovery](file-discovery.md) is an optional module (`towpath.discovery`, `towpath files ...`). It is useful without mail, models, or the life stream.
+- **Ownership:**
+  - An existing search tool owns crawling, parsing, unpacking, and the text index.
+  - Towpath keeps only references, versions, coverage, citations, and recoveries, in a separate rebuildable `files.db` written by the connect role.
+  - Grants per root and feature stay in the decisions store.
+- **Separation:**
+  - File discovery shares canonical IDs, credential references, store roles, and the evidence-reference shape.
+  - It shares no code path with mail sync: no mail fields, no imports in either direction, and no change to `connect.sync`.
+  - Disabling it leaves mail unchanged.
+- **Providers:**
+  - Recoll and sist2 are swappable candidates behind one contract. Each is GPL and runs as a separate program; Towpath copies none of its code.
+  - Recoll gets the first adapter because its Python binding documents search, excerpt, and nested recovery, all verified natively on synthetic files ([evidence](evaluations/file-discovery-providers.md)).
+  - sist2 has a capability slot until a stable excerpt and recovery interface is verified. Its raw index schema is documented as unstable.
+  - AnythingLLM is out of scope for now.
+- **Limits:** no source writes, moves, deletes, or deduplication; no model calls; no automatic claim acceptance.
+- **Pending:** live evaluation of both tools on the owner's archives, and the choice between them. Both are local work.
+
 ## Facts to verify before implementation
 
 | Claim used in the design | Affects |
@@ -153,3 +172,4 @@ These are built into the current documents. The owner can accept or overturn eac
 | 2026-10-01 | First slice built on synthetic data; all 19 acceptance checks pass; findings recorded in [first slice results](first-slice.md#results) | Built |
 | 2026-10-01 | Built and tested on stubs: slice 1b model gateway; real Gmail client with read-only OAuth and scope refusal; D16 verification command; Paperless and Immich lookups; read-only Inbox Zero adapter; example config, config check, CI. Local verification handed to the owner | Built |
 | 2026-10-02 | Owner's local fixes applied; Gmail sync hardening implemented on synthetic tests (pacing defaults 1 s, 1,200 units/min, 1,800,000 units/day as maximums; shared persistent budget and lock; recorded stops; page-level resume with reconcile and confirmed absence). Live validation and D16 pending | Built (synthetic) |
+| 2026-10-03 | D17: optional file discovery foundation on a separate branch; providers are existing tools (Recoll adapter, sist2 slot); separate `files.db`; grants per root and feature in the decisions store. Built on synthetic files only | Accepted (boundary); providers pending |

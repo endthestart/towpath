@@ -8,6 +8,7 @@
 | decisions | web     | worker, connect |
 | ledger    | worker  | web            |
 | quota     | connect | connect        |
+| files     | connect | worker, web    |
 
 Readers open with ``mode=ro`` so the database itself refuses writes.
 """
@@ -22,6 +23,7 @@ WRITERS = {
     "decisions": {"web"},
     "ledger": {"worker"},
     "quota": {"connect"},
+    "files": {"connect"},
 }
 
 # Columns and tables added after a store was first released. Applied on every
@@ -117,6 +119,9 @@ CREATE TABLE IF NOT EXISTS settings (
 CREATE TABLE IF NOT EXISTS model_grants (
   endpoint_id TEXT NOT NULL, fingerprint TEXT NOT NULL, data_class TEXT NOT NULL, author TEXT NOT NULL,
   at TEXT NOT NULL, PRIMARY KEY (endpoint_id, fingerprint, data_class));
+CREATE TABLE IF NOT EXISTS file_grants (
+  root_alias TEXT NOT NULL, feature TEXT NOT NULL, author TEXT NOT NULL, at TEXT NOT NULL,
+  PRIMARY KEY (root_alias, feature));
 CREATE TABLE IF NOT EXISTS decision_log (
   seq INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, target_id TEXT NOT NULL, detail TEXT NOT NULL,
   author TEXT NOT NULL, at TEXT NOT NULL);
@@ -127,6 +132,30 @@ CREATE TABLE IF NOT EXISTS attempts (
   method TEXT NOT NULL, units INTEGER NOT NULL, day TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS attempts_budget_at ON attempts (budget_id, at);
 CREATE INDEX IF NOT EXISTS attempts_budget_day ON attempts (budget_id, day);
+""",
+    # Optional file discovery (towpath.discovery): rebuildable references, never file text.
+    "files": """
+CREATE TABLE IF NOT EXISTS runs (
+  run_id TEXT PRIMARY KEY, provider_id TEXT NOT NULL, kind TEXT NOT NULL, started_at TEXT NOT NULL,
+  finished_at TEXT, termination TEXT, reason TEXT, items_seen INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS coverage (
+  run_id TEXT PRIMARY KEY, provider_id TEXT NOT NULL, root_alias TEXT, complete INTEGER NOT NULL,
+  scanned INTEGER NOT NULL, by_status TEXT NOT NULL, reason TEXT);
+CREATE TABLE IF NOT EXISTS occurrences (
+  occurrence_id TEXT PRIMARY KEY, provider_id TEXT NOT NULL, native_id TEXT NOT NULL, root_alias TEXT NOT NULL,
+  rel_path TEXT NOT NULL, members TEXT NOT NULL, media_type TEXT, size INTEGER, dates TEXT NOT NULL,
+  hashes TEXT NOT NULL, extraction TEXT NOT NULL, version TEXT, first_seen_run TEXT NOT NULL,
+  last_seen_run TEXT NOT NULL, missing_since_run TEXT, updated_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS occurrences_root ON occurrences (provider_id, root_alias);
+CREATE TABLE IF NOT EXISTS occurrence_versions (
+  occurrence_id TEXT NOT NULL, version TEXT NOT NULL, first_seen_run TEXT NOT NULL,
+  PRIMARY KEY (occurrence_id, version));
+CREATE TABLE IF NOT EXISTS citations (
+  citation_id TEXT PRIMARY KEY, occurrence_id TEXT NOT NULL, version TEXT, location TEXT NOT NULL,
+  excerpt_sha256 TEXT, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS recoveries (
+  recovery_id TEXT PRIMARY KEY, occurrence_id TEXT NOT NULL, version TEXT, path TEXT NOT NULL,
+  sha256 TEXT NOT NULL, size INTEGER NOT NULL, created_at TEXT NOT NULL);
 """,
     "ledger": """
 CREATE TABLE IF NOT EXISTS capability_reports (
