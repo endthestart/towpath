@@ -46,8 +46,20 @@ def _plain(text: str, mimetype: str) -> str:
     return "".join(parser.parts).strip()
 
 
-def _row(doc) -> dict:
-    return {name: doc.get(name) for name in FIELDS}
+def _row(doc, db) -> dict:
+    """The fields Towpath uses, plus the media type of each enclosing ipath prefix (None when Recoll
+    holds no record for it, as for an mbox inside a ZIP). The prefix lookup relies on the observed
+    ``rcludi`` form ``<path>|<ipath>`` (Recoll 1.36.1)."""
+    row = {name: doc.get(name) for name in FIELDS}
+    ipath, udi = row.get("ipath") or "", row.get("rcludi") or ""
+    ancestors = []
+    if ipath and udi.endswith("|" + ipath):
+        base, parts = udi[: -len(ipath)], ipath.split(":")
+        for n in range(1, len(parts)):
+            parent = _doc(db, base + ":".join(parts[:n]))
+            ancestors.append(parent.get("mtype") if parent is not None else None)
+    row["ancestors"] = ancestors
+    return row
 
 
 def _db(req):
@@ -64,7 +76,7 @@ def _query(db, text: str, max_rows: int) -> list[dict]:
         doc = q.fetchone()
         if doc is None:
             break
-        rows.append(_row(doc))
+        rows.append(_row(doc, db))
     return rows
 
 
@@ -96,7 +108,7 @@ def handle(req: dict) -> dict:
     if doc is None:
         return {"error": "missing", "detail": "no such document in the index"}
     if op == "describe":
-        return {"row": _row(doc)}
+        return {"row": _row(doc, db)}
     from recoll import rclextract
 
     extractor = rclextract.Extractor(doc)

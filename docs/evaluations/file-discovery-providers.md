@@ -56,4 +56,6 @@ What was checked, against which version, and how. Everything here was run in a c
 
 ## Decision for stage 4
 
-Recoll's binding documents search, excerpt, and nested recovery. All three were verified natively, so it gets the first adapter. sist2 gets a capability slot: probe and version only, with search reported as not implemented.
+Recoll's binding documents search, excerpt, and nested recovery. All three were verified natively, so it gets the first adapter (built: `providers/recoll.py`). sist2 gets a capability slot (`providers/sist2.py`): probe and version only, with search reported as not implemented.
+
+One more detail, observed rather than documented: `rcludi` has the form `<path>|<ipath>`, and `Db.getDoc(udi)` returns the record. The adapter uses this to read the media types of enclosing items, which determine member kinds.

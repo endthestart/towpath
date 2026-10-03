@@ -24,7 +24,7 @@ from towpath.discovery import corpus
 from towpath.discovery.run import ToolError, run
 
 SIST2_IMAGE = "sist2app/sist2:4.2.3"
-BRIDGE = Path(__file__).parent / "providers" / "recoll_bridge.py"
+BRIDGE = Path(__file__).parent / "bridges" / "recoll_bridge.py"
 PYTHON_CANDIDATES = ("python3", "/usr/bin/python3", "/usr/bin/python3.12", "/usr/bin/python3.11")
 
 # (case, query, what an ideal result would contain, what the case tests)

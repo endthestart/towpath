@@ -4,7 +4,7 @@ File discovery finds documents in folders, archives, and old mail backups by ask
 
 It is optional and separate from mail. It works without Gmail, model endpoints, or the life stream. Later, permitted results can become agent context or life-stream evidence. That needs separate grants, and the [context packet](#context-packet) is the only route.
 
-Status: **synthetic slice built** (fixture provider). Nothing here has run on personal data. Neither provider is adopted ([D17](decisions.md#d17-file-discovery-boundary)).
+Status: **synthetic slice and Recoll adapter built**, tested on synthetic files. Nothing here has run on personal data. Neither provider is adopted ([D17](decisions.md#d17-file-discovery-boundary)).
 
 ## Boundary
 
@@ -39,6 +39,8 @@ Mail sync, scans, adapters, quota pacing, and the model gateway never import `to
 | `discovery/store.py` | `files.db`: runs, coverage, occurrences, versions, citations, recoveries |
 | `discovery/service.py` | Probe, status, bounded search, describe, excerpt, recover, import |
 | `discovery/providers/` | `base` contract; `fixture` (test aid); `recoll`; `sist2` (capability slot) |
+| `discovery/bridges/recoll_bridge.py` | Standalone script run by the interpreter that has Recoll's binding; JSON over stdin/stdout |
+| `discovery/run.py` | Runs external tools: argument lists only, time limit, output cap, kill |
 | `discovery/evaluate.py` | Native evaluation harness over a generated corpus |
 | `discovery/context.py` | Versioned, bounded context packet |
 | `discovery/corpus.py` | Generated synthetic corpus and its expected catalog |
@@ -172,7 +174,23 @@ Evidence, versions, and commits are in the [provider evaluation](evaluations/fil
 | Recover nested original | Verified: `Extractor.idoctofile`, bytes identical | Not documented for the CLI (web UI serves files; unverified) |
 | Root scoping in queries | Verified: `dir:` clause; Towpath also filters every result | Not evaluated |
 | Hashes | None (`sig` is a change token) | `--checksums` option (not evaluated) |
-| Status here | Adapter built (stage 4) | Slot: probe and capability report only |
+| Status here | Adapter built; stub tests plus an optional native test (runs when Recoll is installed) | Slot: probe and capability report; search and the rest answer "not implemented" |
+
+### Recoll adapter
+
+- The owner installs Recoll and runs `recollindex` with their own configuration. Towpath only queries the index.
+- Recoll's Python binding is compiled for one Python version, so Towpath runs [`recoll_bridge.py`](../src/towpath/discovery/bridges/recoll_bridge.py) with the interpreter named in `python`. It passes a minimal environment and enforces the time and output limits.
+- How Recoll fields map to Towpath's:
+
+  | Towpath | Recoll |
+  | --- | --- |
+  | `native_id` | `rcludi` |
+  | Version | `sig` |
+  | Members | `ipath` components; kinds come from Recoll's own records of the enclosing items |
+  | Dates | `fmtime` (outer file) and `dmtime` (message date when inside a message) |
+
+- Recoll reports no hashes, extraction errors, or truncation through the binding. Those fields stay empty or `null` rather than guessed.
+- Every Recoll query is scoped with `dir:` to the granted roots, and every row is still re-checked. Tests simulate a query that escapes its `dir:` clause.
 
 ## Context packet
 
