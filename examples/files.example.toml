@@ -1,0 +1,26 @@
+# Example configuration for optional file discovery (docs/file-discovery.md).
+# It works on its own: no mail source, model endpoint, or life-stream feature is needed.
+# Copy it OUTSIDE this repository and edit there. Paths are relative to the copied file.
+# To try it on synthetic files instead: towpath fixtures files /tmp/towpath-files
+
+[stores]
+dir = "state"
+
+[files]
+enabled = true
+recover_dir = "state/recovered"   # derived copies; never inside or around a root
+
+[files.limits]
+max_results = 20
+max_scan = 500
+max_excerpt_bytes = 2000
+max_recover_bytes = 50000000
+timeout_seconds = 30
+max_output_bytes = 4000000
+
+# A folder an existing search tool already indexes. Nothing is shown from it until
+# you grant a feature on it: towpath files grant old-backups search
+[[files.roots]]
+alias = "old-backups"
+path = "/srv/archive/old-backups"
+exclude = ["private/*"]

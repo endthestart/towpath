@@ -177,3 +177,9 @@ def test_files_store_is_written_only_by_connect(tmp_path):
     assert (tmp_path / "files.db").exists()
     decisions = open_store(tmp_path, "decisions", "web")
     assert decisions.execute("SELECT count(*) FROM file_grants").fetchone()[0] == 0
+
+
+def test_example_files_config_loads_without_touching_anything():
+    cfg = config_mod.load(REPO / "examples" / "files.example.toml")
+    assert cfg.files.roots["old-backups"].exclude == ("private/*",)
+    assert not cfg.sources and not cfg.endpoints

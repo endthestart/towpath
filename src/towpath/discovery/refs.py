@@ -1,0 +1,91 @@
+"""Path safety: every provider reference must land inside a configured root.
+
+Provider output is untrusted. A reference is accepted only when it is a
+``file:`` URL or a root-relative path, it resolves (after following symlinks)
+inside a configured root, and it is not excluded there. Member names inside
+containers are labels only and are never used as filesystem paths.
+"""
+
+import fnmatch
+import os
+import re
+from pathlib import Path, PurePosixPath
+from urllib.parse import unquote, urlsplit
+
+ALLOWED_SCHEMES = {"file"}
+SAFE_NAME = re.compile(r"[^A-Za-z0-9._ -]")
+
+
+class BadReference(ValueError):
+    """A reference that escapes its roots or uses a refused scheme."""
+
+
+def _real(path: Path) -> Path:
+    return Path(os.path.realpath(path))
+
+
+def _within(child: Path, parent: Path) -> bool:
+    return child == parent or parent in child.parents
+
+
+def excluded(root, rel_path: str) -> bool:
+    """fnmatch semantics: ``*`` also crosses folders, so ``private/*`` covers everything under private/."""
+    return any(fnmatch.fnmatchcase(rel_path, pattern) or fnmatch.fnmatchcase(rel_path + "/", pattern)
+               for pattern in root.exclude)
+
+
+def check_relative(rel_path: str) -> str:
+    if not rel_path or "\x00" in rel_path:
+        raise BadReference("empty or NUL-containing path")
+    pure = PurePosixPath(rel_path)
+    if pure.is_absolute() or ".." in pure.parts or "\\" in rel_path:
+        raise BadReference("path must be relative to its root, without '..'")
+    return str(pure)
+
+
+def resolve_in_root(root, rel_path: str) -> Path:
+    """The real filesystem path of ``rel_path`` under ``root``, refusing anything that escapes it."""
+    rel_path = check_relative(rel_path)
+    base = _real(root.path)
+    target = _real(base / rel_path)
+    if not _within(target, base):
+        raise BadReference("reference escapes its root")
+    return target
+
+
+def locate(reference: str, roots: dict) -> tuple[str, str]:
+    """Map a provider's ``file:`` URL (or absolute path) to ``(root alias, relative path)``.
+
+    The lexical path picks the root; the real path (symlinks followed) must stay inside it.
+    """
+    if "://" in reference or reference.startswith("file:"):
+        parts = urlsplit(reference)
+        if parts.scheme not in ALLOWED_SCHEMES:
+            raise BadReference(f"scheme {parts.scheme!r} is not allowed")
+        if parts.netloc not in {"", "localhost"}:
+            raise BadReference("file URLs must not name a host")
+        path = unquote(parts.path)
+    else:
+        path = reference
+    if "\x00" in path or not os.path.isabs(path):
+        raise BadReference("reference must be an absolute file path")
+    lexical = Path(os.path.normpath(path))
+    for alias, root in roots.items():
+        base = Path(os.path.normpath(root.path))
+        if _within(lexical, base) and lexical != base:
+            rel = lexical.relative_to(base).as_posix()
+            resolve_in_root(root, rel)
+            return alias, rel
+        real_base = _real(root.path)
+        if _within(lexical, real_base) and lexical != real_base:
+            rel = lexical.relative_to(real_base).as_posix()
+            resolve_in_root(root, rel)
+            return alias, rel
+    raise BadReference("reference is outside every configured root")
+
+
+def safe_filename(name: str | None, fallback: str = "recovered") -> str:
+    """A single path component built from an untrusted name."""
+    base = PurePosixPath((name or "").replace("\\", "/")).name
+    base = SAFE_NAME.sub("_", base).strip(" .")
+    return base[:120] or fallback

@@ -4,7 +4,7 @@ File discovery finds documents in folders, archives, and old mail backups by ask
 
 It is optional and separate from mail. It works without Gmail, model endpoints, or the life stream. Later, permitted results can become agent context or life-stream evidence. That needs separate grants, and the [context packet](#context-packet) is the only route.
 
-Status: **design and synthetic slice**. Nothing here has run on personal data. Neither provider is adopted ([D17](decisions.md#d17-file-discovery-boundary)).
+Status: **synthetic slice built** (fixture provider). Nothing here has run on personal data. Neither provider is adopted ([D17](decisions.md#d17-file-discovery-boundary)).
 
 ## Boundary
 
@@ -72,6 +72,23 @@ python = "/usr/bin/python3"       # interpreter that has Recoll's Python binding
 ```
 
 Unknown keys are rejected. Roots may not nest. `command` (for sist2) is an argument list; there is no shell. Loading the config does not stat, list, or open anything.
+
+## Commands
+
+All print JSON. Errors print `error (<code>): <reason>` and exit 2. The codes are `disabled`, `denied`, `not-found`, `stale`, `unavailable`, `invalid-reference`, and `limit`.
+
+| Command | Does | Needs |
+| --- | --- | --- |
+| `towpath files status` | Config, grants, catalog counts, recent imports and coverage. Calls no provider | — |
+| `towpath files probe [PROVIDER]` | Tool, version, capabilities | — |
+| `towpath files grant ROOT FEATURE` / `revoke` | Record or withdraw a grant (web role) | — |
+| `towpath files search QUERY [--limit] [--offset]` | Bounded results with lineage, dates, extraction, version, passage offset; no text | `search` |
+| `towpath files describe OCCURRENCE` | Stored record and current state: `current`, `changed`, `unavailable`, or `unverifiable` | `search` |
+| `towpath files excerpt OCCURRENCE [--at N] [--max-bytes N]` | Bounded text, marked untrusted, plus a citation pinned to the version | `excerpt` |
+| `towpath files cite CITATION` | Re-check a citation; with `excerpt`, also compare the cited text | `search` |
+| `towpath files recover OCCURRENCE` | Derived copy plus provenance in `recover_dir` | `recover` |
+| `towpath files import [--root] [--max-items]` | References and coverage for granted roots; only a complete run marks anything missing | `search` |
+| `towpath fixtures files OUT` | Generate the synthetic corpus, its fixture catalog, and a config | — |
 
 ## Records
 

@@ -25,6 +25,8 @@ fixtures_app = typer.Typer(no_args_is_help=True, help="Generate and change synth
 model_app = typer.Typer(no_args_is_help=True, help="Model endpoints: probe, grant, and run queued work.")
 provider_app = typer.Typer(no_args_is_help=True, help="Mail-management provider (Inbox Zero), read-only.")
 config_app = typer.Typer(no_args_is_help=True, help="Check configuration without contacting any service.")
+files_app = typer.Typer(no_args_is_help=True,
+                        help="Optional file discovery through an existing search tool (towpath-connect; read-only).")
 app.add_typer(connect_app, name="connect")
 app.add_typer(scan_app, name="scan")
 app.add_typer(proposals_app, name="proposals")
@@ -33,6 +35,7 @@ app.add_typer(fixtures_app, name="fixtures")
 app.add_typer(model_app, name="model")
 app.add_typer(provider_app, name="provider")
 app.add_typer(config_app, name="config")
+app.add_typer(files_app, name="files")
 
 ConfigOpt = typer.Option(Path("towpath.toml"), "--config", "-c", help="Configuration file.")
 
@@ -283,6 +286,16 @@ def fixtures_check(paths: list[Path]):
     raise typer.Exit(1 if found else 0)
 
 
+@fixtures_app.command("files")
+def fixtures_files(out: Path):
+    """Generate the synthetic file discovery corpus, its fixture catalog, and an example config."""
+    from towpath.discovery import corpus
+
+    summary = corpus.generate(out)
+    summary["config"] = str(corpus.write_example_config(out))
+    _emit(summary, False)
+
+
 @model_app.command("probe")
 def model_probe(endpoint: str, config: Path = ConfigOpt, as_json: bool = typer.Option(False, "--json")):
     """Probe an endpoint with synthetic prompts and record its capabilities (worker)."""
@@ -412,3 +425,98 @@ def config_check(config: Path = ConfigOpt):
         typer.echo(f"provider {p.id}: {p.adapter} at {p.base_url}; api key {secret(p.api_key)}")
     typer.echo("ok" if not problems else f"{problems} problem(s)")
     raise typer.Exit(1 if problems else 0)
+
+
+def _files(fn):
+    """Run a files command: JSON out; clean, sanitized errors; Ctrl-C records the run as interrupted."""
+    from towpath.discovery import service
+
+    try:
+        typer.echo(json.dumps(fn(service), indent=2, sort_keys=True))
+    except KeyboardInterrupt:
+        typer.echo("cancelled; the run is recorded as interrupted", err=True)
+        raise typer.Exit(130) from None
+    except Exception as exc:
+        code = service.error_code(exc)
+        if code == "error" and not isinstance(exc, (service.DiscoveryError, ValueError)):
+            raise
+        typer.echo(f"error ({code}): {exc}", err=True)
+        raise typer.Exit(2) from None
+
+
+@files_app.command("status")
+def files_status(config: Path = ConfigOpt):
+    """Configuration, grants, and catalog state. Calls no provider."""
+    cfg = _load(config)
+    _files(lambda s: s.status(cfg))
+
+
+@files_app.command("probe")
+def files_probe(provider: str = typer.Argument(None), config: Path = ConfigOpt):
+    """Ask each configured provider for its tool and version, and list its capabilities."""
+    cfg = _load(config)
+    _files(lambda s: s.probe(cfg, provider))
+
+
+@files_app.command("search")
+def files_search(query: str, provider: str = typer.Option(None, "--provider"),
+                 limit: int = typer.Option(None, "--limit", help="Results per page (capped by max_results)."),
+                 offset: int = typer.Option(0, "--offset"), config: Path = ConfigOpt):
+    """Bounded search of roots with a search grant. Results carry locations, never file text."""
+    cfg = _load(config)
+    _files(lambda s: s.search(cfg, query, provider, limit, offset))
+
+
+@files_app.command("describe")
+def files_describe(occurrence: str, config: Path = ConfigOpt):
+    """One result's full record, and whether it is current, changed, or unavailable now."""
+    cfg = _load(config)
+    _files(lambda s: s.describe(cfg, occurrence))
+
+
+@files_app.command("excerpt")
+def files_excerpt(occurrence: str, at: int = typer.Option(0, "--at", help="Start offset in the extracted text."),
+                  max_bytes: int = typer.Option(None, "--max-bytes"), config: Path = ConfigOpt):
+    """A bounded text read of one result (needs an excerpt grant). Records a citation."""
+    cfg = _load(config)
+    _files(lambda s: s.excerpt(cfg, occurrence, at, max_bytes))
+
+
+@files_app.command("cite")
+def files_cite(citation: str, config: Path = ConfigOpt):
+    """Check a citation: current, stale, unavailable, or unverifiable. Never serves changed content."""
+    cfg = _load(config)
+    _files(lambda s: s.resolve_citation(cfg, citation))
+
+
+@files_app.command("recover")
+def files_recover(occurrence: str, config: Path = ConfigOpt):
+    """Write a derived copy of one result to recover_dir, with provenance (needs a recover grant)."""
+    cfg = _load(config)
+    _files(lambda s: s.recover(cfg, occurrence))
+
+
+@files_app.command("import")
+def files_import(provider: str = typer.Option(None, "--provider"), root: str = typer.Option(None, "--root"),
+                 max_items: int = typer.Option(10000, "--max-items"), config: Path = ConfigOpt):
+    """Record references (never text) for granted roots in files.db, with honest coverage."""
+    cfg = _load(config)
+    _files(lambda s: s.import_catalog(cfg, provider, root, max_items))
+
+
+@files_app.command("grant")
+def files_grant(root: str, feature: str, config: Path = ConfigOpt):
+    """Grant one feature on one root: search, excerpt, recover, agent-context, or life-evidence (web role)."""
+    from towpath.discovery import policy
+
+    cfg = _load(config)
+    _files(lambda s: (policy.grant(cfg, root, feature), {"root": root, "granted": feature})[1])
+
+
+@files_app.command("revoke")
+def files_revoke(root: str, feature: str, config: Path = ConfigOpt):
+    """Withdraw one feature grant on one root (web role)."""
+    from towpath.discovery import policy
+
+    cfg = _load(config)
+    _files(lambda s: {"root": root, "revoked": feature, "was_granted": policy.revoke(cfg, root, feature)})
