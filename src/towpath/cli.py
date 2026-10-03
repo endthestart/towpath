@@ -520,3 +520,24 @@ def files_revoke(root: str, feature: str, config: Path = ConfigOpt):
 
     cfg = _load(config)
     _files(lambda s: {"root": root, "revoked": feature, "was_granted": policy.revoke(cfg, root, feature)})
+
+
+@files_app.command("evaluate")
+def files_evaluate(out: Path, tool: list[str] = typer.Option(["recoll", "sist2"], "--tool"),
+                   timeout: float = typer.Option(120, "--timeout", help="Seconds per tool call."),
+                   recoll_python: str = typer.Option(None, "--recoll-python",
+                                                     help="Interpreter with Recoll's Python binding."),
+                   sist2_binary: str = typer.Option(None, "--sist2-binary"),
+                   sist2_image: str = typer.Option(None, "--sist2-image", help="A local sist2 image."),
+                   keep: bool = typer.Option(False, "--keep", help="Keep the temporary corpus and indexes.")):
+    """Run installed providers over a generated synthetic corpus; write OUT/report.json. Needs no config."""
+    from towpath.discovery.evaluate import evaluate
+
+    bad = set(tool) - {"recoll", "sist2"}
+    if bad:
+        raise typer.BadParameter(f"unknown tool(s): {', '.join(sorted(bad))}")
+    report = evaluate(out, tuple(tool), timeout, recoll_python, sist2_binary, sist2_image, keep)
+    for name, result in report["tools"].items():
+        state = result.get("version", "available") if result["available"] else f"unavailable ({result['reason']})"
+        typer.echo(f"{name}: {state}")
+    typer.echo(f"report: {out / 'report.json'}")

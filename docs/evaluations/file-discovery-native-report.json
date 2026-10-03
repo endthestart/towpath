@@ -1,0 +1,279 @@
+{
+  "cases": [
+    {
+      "case": "nested-attachment",
+      "ideal": "archive/2003/old-mail.zip > message > paper.docx (twice)",
+      "query": "zebrafinch economy",
+      "tests": "ZIP > mbox > message > attachment lineage; duplicates"
+    },
+    {
+      "case": "message-body",
+      "ideal": "archive/2003/old-mail.zip > message 3",
+      "query": "canal cafe",
+      "tests": "mail body text inside a ZIP"
+    },
+    {
+      "case": "beyond-text-limit",
+      "ideal": "archive/long/thesis-notes.txt (line after 54 KB)",
+      "query": "kingfisher",
+      "tests": "text extraction limits"
+    },
+    {
+      "case": "encrypted-member",
+      "ideal": "nothing without the passphrase",
+      "query": "encrypted archive",
+      "tests": "encrypted archives"
+    },
+    {
+      "case": "traversal-names",
+      "ideal": "archive/tricky/traversal.zip members",
+      "query": "traversal member",
+      "tests": "hostile member names"
+    },
+    {
+      "case": "symlink-escape",
+      "ideal": "nothing (Towpath refuses it anyway)",
+      "query": "outside the root",
+      "tests": "symlinks leaving the root"
+    },
+    {
+      "case": "excluded-path",
+      "ideal": "indexed by the tool; Towpath must filter it",
+      "query": "Private diary",
+      "tests": "exclusions are Towpath's"
+    },
+    {
+      "case": "prompt-injection",
+      "ideal": "archive/notes/injection.md, as plain text",
+      "query": "admin mode",
+      "tests": "injection text is data"
+    }
+  ],
+  "corpus": {
+    "files": [
+      "archive/2003/old-mail.zip",
+      "archive/broken/corrupt.zip",
+      "archive/escape-link",
+      "archive/locked/secret.zip",
+      "archive/long/thesis-notes.txt",
+      "archive/notes/injection.md",
+      "archive/outlook/old.pst",
+      "archive/private/diary.txt",
+      "archive/tricky/traversal.zip",
+      "shared/copy-of-paper.docx"
+    ],
+    "paper_sha256": "7d8499888bd721b4832fb92993bccf17e5f2588ccbd95cfe0e87ca72611c1ab6",
+    "synthetic": true
+  },
+  "format": "towpath.files.native-eval/1",
+  "generated_at": "2026-10-03T02:34:20+00:00",
+  "timeout_seconds": 180.0,
+  "tools": {
+    "recoll": {
+      "available": true,
+      "binding": {
+        "available": true,
+        "interpreter": "python3.12"
+      },
+      "cases": {
+        "beyond-text-limit": {
+          "hits": [
+            "archive/long/thesis-notes.txt"
+          ],
+          "query": "kingfisher",
+          "seconds": 0.034
+        },
+        "encrypted-member": {
+          "hits": [],
+          "query": "encrypted archive",
+          "seconds": 0.059
+        },
+        "excluded-path": {
+          "hits": [
+            "archive/private/diary.txt"
+          ],
+          "query": "Private diary",
+          "seconds": 0.033
+        },
+        "message-body": {
+          "hits": [
+            "archive/2003/old-mail.zip | mail/backup.mbox:3"
+          ],
+          "query": "canal cafe",
+          "seconds": 0.034
+        },
+        "nested-attachment": {
+          "hits": [
+            "archive/2003/old-mail.zip | mail/backup.mbox:1:0",
+            "archive/2003/old-mail.zip | mail/backup.mbox:2:0",
+            "shared/copy-of-paper.docx"
+          ],
+          "query": "zebrafinch economy",
+          "seconds": 0.042
+        },
+        "prompt-injection": {
+          "hits": [
+            "archive/notes/injection.md"
+          ],
+          "query": "admin mode",
+          "seconds": 0.04
+        },
+        "symlink-escape": {
+          "hits": [],
+          "query": "outside the root",
+          "seconds": 0.059
+        },
+        "traversal-names": {
+          "hits": [
+            "archive/tricky/traversal.zip | ../../evil.txt"
+          ],
+          "query": "traversal member",
+          "seconds": 0.034
+        }
+      },
+      "config": "topdirs only; every other setting at Recoll's default",
+      "documents": [
+        "archive [inode/directory]",
+        "archive/2003 [inode/directory]",
+        "archive/2003/old-mail.zip [application/zip]",
+        "archive/2003/old-mail.zip | mail/backup.mbox:1 [message/rfc822]",
+        "archive/2003/old-mail.zip | mail/backup.mbox:1:0 [application/vnd.openxmlformats-officedocument.wordprocessingml.document]",
+        "archive/2003/old-mail.zip | mail/backup.mbox:2 [message/rfc822]",
+        "archive/2003/old-mail.zip | mail/backup.mbox:2:0 [application/vnd.openxmlformats-officedocument.wordprocessingml.document]",
+        "archive/2003/old-mail.zip | mail/backup.mbox:3 [message/rfc822]",
+        "archive/broken [inode/directory]",
+        "archive/broken/corrupt.zip [application/zip]",
+        "archive/escape-link [inode/symlink]",
+        "archive/locked [inode/directory]",
+        "archive/locked/secret.zip [application/zip]",
+        "archive/long [inode/directory]",
+        "archive/long/thesis-notes.txt [text/plain]",
+        "archive/notes [inode/directory]",
+        "archive/notes/injection.md [text/plain]",
+        "archive/outlook [inode/directory]",
+        "archive/outlook/old.pst [application/vnd.ms-outlook]",
+        "archive/private [inode/directory]",
+        "archive/private/diary.txt [text/plain]",
+        "archive/tricky [inode/directory]",
+        "archive/tricky/traversal.zip [application/zip]",
+        "archive/tricky/traversal.zip | ../../evil.txt [text/plain]",
+        "archive/tricky/traversal.zip | /abs.txt [text/plain]",
+        "shared [inode/directory]",
+        "shared/copy-of-paper.docx [application/vnd.openxmlformats-officedocument.wordprocessingml.document]"
+      ],
+      "index": {
+        "index_bytes": 155760,
+        "peak_child_rss_kb": 25224,
+        "returncode": 0,
+        "rss_note": "largest child process of this harness so far (ru_maxrss)",
+        "seconds": 0.13
+      },
+      "interface": "recollindex CLI + Python binding via recoll_bridge.py",
+      "missing_helpers": [
+        "pffexport (application/vnd.ms-outlook)"
+      ],
+      "nested": {
+        "dbytes": "131",
+        "dmtime": "01052128800",
+        "dmtime_is_message_date": true,
+        "excerpt_contains_paper_text": true,
+        "excerpt_total_bytes": 129,
+        "fbytes": "1298",
+        "fmtime": "01073001600",
+        "found": true,
+        "ipath": "mail/backup.mbox:1:0",
+        "recovered": true,
+        "recovered_matches_sha256": true,
+        "sig": "53591790994860"
+      },
+      "version": "Recoll 1.36.1 + Xapian 1.4.22"
+    },
+    "sist2": {
+      "available": true,
+      "cases": {
+        "beyond-text-limit": {
+          "hits": [],
+          "query": "kingfisher"
+        },
+        "encrypted-member": {
+          "hits": [],
+          "query": "encrypted archive"
+        },
+        "excluded-path": {
+          "hits": [
+            "archive/private/diary.txt"
+          ],
+          "query": "Private diary"
+        },
+        "message-body": {
+          "hits": [
+            "archive/2003/old-mail.zip#/mail/backup.mbox#/message-2.eml"
+          ],
+          "query": "canal cafe"
+        },
+        "nested-attachment": {
+          "hits": [
+            "shared/copy-of-paper.docx",
+            "archive/2003/old-mail.zip#/mail/backup.mbox#/message-0.eml#/paper.docx",
+            "archive/2003/old-mail.zip#/mail/backup.mbox#/message-1.eml#/paper.docx"
+          ],
+          "query": "zebrafinch economy"
+        },
+        "prompt-injection": {
+          "hits": [
+            "archive/notes/injection.md"
+          ],
+          "query": "admin mode"
+        },
+        "symlink-escape": {
+          "hits": [],
+          "query": "outside the root"
+        },
+        "traversal-names": {
+          "hits": [
+            "archive/tricky/traversal.zip#/../../evil.txt",
+            "archive/tricky/traversal.zip#//abs.txt"
+          ],
+          "query": "traversal member"
+        }
+      },
+      "documents": [
+        "archive/2003/old-mail.zip [application/zip]",
+        "archive/2003/old-mail.zip#/mail/backup.mbox [application/mbox]",
+        "archive/2003/old-mail.zip#/mail/backup.mbox#/message-0.eml [message/rfc822]",
+        "archive/2003/old-mail.zip#/mail/backup.mbox#/message-0.eml#/paper.docx [application/vnd.openxmlformats-officedocument.wordprocessingml.document]",
+        "archive/2003/old-mail.zip#/mail/backup.mbox#/message-1.eml [message/rfc822]",
+        "archive/2003/old-mail.zip#/mail/backup.mbox#/message-1.eml#/paper.docx [application/vnd.openxmlformats-officedocument.wordprocessingml.document]",
+        "archive/2003/old-mail.zip#/mail/backup.mbox#/message-2.eml [message/rfc822]",
+        "archive/broken/corrupt.zip [application/zip]",
+        "archive/broken/corrupt.zip#/mail/backup.mbox [application/mbox]",
+        "archive/locked/secret.zip [application/zip]",
+        "archive/long/thesis-notes.txt [text/plain]",
+        "archive/notes/injection.md [text/plain]",
+        "archive/outlook/old.pst [application/vnd.ms-outlook-pst]",
+        "archive/private/diary.txt [text/plain]",
+        "archive/tricky/traversal.zip [application/zip]",
+        "archive/tricky/traversal.zip#/../../evil.txt [text/plain]",
+        "archive/tricky/traversal.zip#//abs.txt [text/plain]",
+        "shared/copy-of-paper.docx [application/vnd.openxmlformats-officedocument.wordprocessingml.document]"
+      ],
+      "index": {
+        "index_bytes": 176128,
+        "options": "defaults (content-size 32768, archive recurse)",
+        "peak_child_rss_kb": null,
+        "returncode": 0,
+        "seconds": 0.22
+      },
+      "interface": "sist2 scan + index --print (NDJSON); matching below is the harness's own substring test over extracted text, not sist2's search",
+      "long_document_content_bytes": 32768,
+      "nested": {
+        "found": true,
+        "mtime": 1072958400,
+        "path": "archive/2003/old-mail.zip#/mail/backup.mbox#/message-0.eml#",
+        "recovery": "not evaluated: no documented CLI to extract a nested original"
+      },
+      "runs_as": "docker image sist2app/sist2:4.2.3",
+      "version": "4.2.3"
+    }
+  }
+}

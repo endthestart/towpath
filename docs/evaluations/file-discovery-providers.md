@@ -28,7 +28,7 @@ What was checked, against which version, and how. Everything here was run in a c
 
 - The mbox inside the ZIP is not a result row of its own; the message (`ipath` `mail/backup.mbox:1`) and the attachment are.
 - The Python binding is compiled for one Python version (here 3.12, while the project venv is 3.11). Towpath therefore runs it in a separate interpreter (`python` in the provider config).
-- `mimeconf` routes ZIP to `rclzip.py` and PST to `rclpst.py` (helper programs). Upstream notes that TAR handling is off by default. Missing helpers should appear as skipped or unsupported; the native evaluation (stage 3) records what actually happens.
+- `mimeconf` routes ZIP to `rclzip.py` and PST to `rclpst.py` (helper programs). Upstream notes that TAR handling is off by default. Missing helpers are listed in its `missing` file; the [native evaluation](file-discovery-native.md) records what happened.
 
 ## sist2
 
