@@ -145,7 +145,8 @@ def _result(occ: Occurrence, passage: dict | None) -> dict:
 
 
 def search(config, query: str, provider_id: str | None = None, limit: int | None = None,
-           offset: int = 0) -> dict:
+           offset: int = 0, require: tuple[str, ...] = ()) -> dict:
+    """Bounded search over roots with a search grant (and every feature in ``require``)."""
     fc = files_config(config)
     if not query.strip():
         raise DiscoveryError("empty query")
@@ -154,9 +155,10 @@ def search(config, query: str, provider_id: str | None = None, limit: int | None
     prov = provider(config, provider_id)
     limit = _limit(fc, "max_results", limit)
     grants = policy.granted(config)
-    roots = {a for a in prov.roots if "search" in grants.get(a, set())}
+    needed = {"search", *require}
+    roots = {a for a in prov.roots if needed <= grants.get(a, set())}
     if not roots:
-        raise policy.Denied(f"no search grant for any root of provider {prov.id}")
+        raise policy.Denied(f"no root of provider {prov.id} has grants for {', '.join(sorted(needed))}")
     timeout = fc.limits["timeout_seconds"]
     deadline = time.monotonic() + timeout
     db = fstore.connect_rw(config)
@@ -197,7 +199,7 @@ def search(config, query: str, provider_id: str | None = None, limit: int | None
             "note": "results carry no file text; use 'files excerpt' (needs an excerpt grant)"}
 
 
-def _stored(config, occurrence_id: str, feature: str):
+def stored_record(config, occurrence_id: str, feature: str):
     """The stored occurrence, if its root still exists, is not excluded, and has ``feature`` granted."""
     fc = files_config(config)
     db = fstore.connect_ro(config)
@@ -213,7 +215,7 @@ def _stored(config, occurrence_id: str, feature: str):
     return fstore.row_to_dict(row)
 
 
-def _current(config, row: dict):
+def current_state(config, row: dict):
     """Ask the provider for the occurrence now. Returns (state, occurrence or None, reason)."""
     fc = config.files
     prov = provider(config, row["provider_id"])
@@ -234,8 +236,8 @@ def _current(config, row: dict):
 
 
 def describe(config, occurrence_id: str) -> dict:
-    row = _stored(config, occurrence_id, "search")
-    state, occ, reason = _current(config, row)
+    row = stored_record(config, occurrence_id, "search")
+    state, occ, reason = current_state(config, row)
     return {"occurrence": row, "state": state, "reason": reason,
             "current": occ.to_dict() if occ is not None else None}
 
@@ -249,8 +251,8 @@ def _cut_utf8(text: str, max_bytes: int) -> tuple[str, bool]:
 
 def excerpt(config, occurrence_id: str, start: int = 0, max_bytes: int | None = None) -> dict:
     fc = files_config(config)
-    row = _stored(config, occurrence_id, "excerpt")
-    state, _, reason = _current(config, row)
+    row = stored_record(config, occurrence_id, "excerpt")
+    state, _, reason = current_state(config, row)
     if state == "changed":
         raise Stale(f"{occurrence_id} {reason}; search again")
     if state == "unavailable":
@@ -287,10 +289,10 @@ def resolve_citation(config, citation) -> dict:
             raise NotFound(f"no citation {citation}")
         citation = found
     try:
-        row = _stored(config, citation["occurrence_id"], "search")
+        row = stored_record(config, citation["occurrence_id"], "search")
     except NotFound:
         return {"citation": citation, "state": "unavailable", "reason": "occurrence not in the catalog"}
-    state, _, reason = _current(config, row)
+    state, _, reason = current_state(config, row)
     if state == "current" and row["version"] != citation["version"]:
         state, reason = "stale", "the occurrence has changed since this citation was made"
     elif state == "changed":
@@ -311,8 +313,8 @@ def resolve_citation(config, citation) -> dict:
 def recover(config, occurrence_id: str) -> dict:
     """Write a derived copy of one occurrence to ``recover_dir``, with a provenance record."""
     fc = files_config(config)
-    row = _stored(config, occurrence_id, "recover")
-    state, _, reason = _current(config, row)
+    row = stored_record(config, occurrence_id, "recover")
+    state, _, reason = current_state(config, row)
     if state == "changed":
         raise Stale(f"{occurrence_id} {reason}; search again")
     if state == "unavailable":

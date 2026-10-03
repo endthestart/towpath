@@ -541,3 +541,27 @@ def files_evaluate(out: Path, tool: list[str] = typer.Option(["recoll", "sist2"]
         state = result.get("version", "available") if result["available"] else f"unavailable ({result['reason']})"
         typer.echo(f"{name}: {state}")
     typer.echo(f"report: {out / 'report.json'}")
+
+
+@files_app.command("context")
+def files_context(purpose: str = typer.Option(..., "--purpose", help="agent-context or life-evidence."),
+                  query: str = typer.Option(None, "--query"),
+                  occurrence: list[str] = typer.Option([], "--occurrence", help="Repeat for several."),
+                  max_items: int = typer.Option(None, "--max-items"),
+                  excerpt_bytes: int = typer.Option(None, "--excerpt-bytes"),
+                  provider: str = typer.Option(None, "--provider"),
+                  out: Path = typer.Option(None, "--out", help="Write the packet here instead of stdout."),
+                  config: Path = ConfigOpt):
+    """Build a versioned, bounded context packet (towpath.files.context/1). Calls no model."""
+    from towpath.discovery import context
+
+    cfg = _load(config)
+
+    def build(_service):
+        packet = context.build(cfg, purpose, query, tuple(occurrence), max_items, excerpt_bytes, provider)
+        if out is None:
+            return packet
+        out.write_text(json.dumps(packet, indent=2, sort_keys=True))
+        return {"written": str(out), "items": len(packet["items"]), "omitted": len(packet["omitted"])}
+
+    _files(build)

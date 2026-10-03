@@ -46,7 +46,10 @@ def _sist2_ready() -> bool:
         return True
     if not shutil.which("docker"):
         return False
-    probe = subprocess.run(["docker", "image", "inspect", ev.SIST2_IMAGE], capture_output=True)
+    try:
+        probe = subprocess.run(["docker", "image", "inspect", ev.SIST2_IMAGE], capture_output=True, timeout=20)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
     return probe.returncode == 0
 
 

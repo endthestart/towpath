@@ -275,3 +275,8 @@ Selector, delivery proposal, and artifact records are defined in [scans and dest
 ## 8. Export
 
 Towpath can export approved proposals, preserved artifacts with provenance, and accepted claims with citations as JSON Lines using the schemas above. The owner's own exports include everything; shared editions include only items and claims with `shareable` audience. Nothing in an export grants authority to act.
+
+## 9. File discovery (optional)
+
+Records for discovered files (locator, occurrence, extraction, dates, coverage), the provider contract, and the `towpath.files.context/1` packet are defined in [file discovery](file-discovery.md). File records share canonical IDs and the evidence-reference shape with the rest of Towpath. They never reuse mail fields.
+

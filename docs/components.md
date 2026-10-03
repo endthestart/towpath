@@ -45,6 +45,7 @@ Human decisions are kept apart from everything rebuildable, so backups can focus
 | Preserved artifacts | worker, on a recorded preservation choice | web | Exact bytes a person chose to keep, content-addressed, with provenance ([preserved artifacts](scans-and-destinations.md#preserved-artifacts)) | **No.** Back this up |
 | Model ledger | worker | web | Endpoint profiles in use, capability reports, call records | No; audit record |
 | Action ledger | `towpath-act` | web | Execution attempts and per-item receipts | No; audit record |
+| File discovery index (optional) | `towpath-connect` | worker, web | References, versions, coverage, citations, and recoveries for [file discovery](file-discovery.md); never file text (the provider's own index holds that) | Yes, by re-importing; grants live in the decisions store |
 | Secrets | Each credential-holding service, its own volume | That service only | OAuth tokens, API keys | Not in any store above |
 
 SQLite files, one per store, are the first implementation. All services must share one host and a local filesystem. A reader whose volume is mounted read-only may fail to open a database in write-ahead-log mode unless its side files already exist ([tooling review](research/2026-10-tooling-review.md#light-python-foundation)); options are to mount read-write and open read-only in code (weaker), or to give readers a small read API on the owning service (stronger). Decide when building the Compose file; the CLI slices run as separate processes on one host and open read-only in code.
@@ -59,6 +60,8 @@ R = read, W = write, — = none.
 | `towpath-worker` | — | — | R | R | W | W | R | W | W | R |
 | `towpath-connect` | R | — | — | W | R | — | R (grants only) | — | — | — |
 | `towpath-act` | — | R | — | R (IDs only) | — | — | R (approvals) | R (to deliver) | — | W |
+
+Optional [file discovery](file-discovery.md) runs in `towpath-connect`. It queries an existing search tool that the owner installs, writes `files.db`, reads file grants from the decisions store, and writes recovered copies only to its own `recover_dir`.
 
 Source grants decide which features may use which source: a mailbox connected for mail management is not life-stream evidence until a person grants it. Grants are enforced in worker's and web's read layer. That is a code-level boundary inside one service, weaker than the credential boundaries above, and documented as such.
 

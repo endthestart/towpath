@@ -2,7 +2,7 @@
 
 Towpath is an open-source, self-hosted web application for managing your digital life, starting with email, and for building an evidence-linked life story from the sources you connect.
 
-**Status: read-only command-line tools built and tested on synthetic data and stubs; not yet run against real accounts.** The repository has the design documents and a CLI that can index Gmail read-only (with your own OAuth client), find attachments, check whether Paperless-ngx or Immich already holds them, call explicitly configured model endpoints under policy, and read Inbox Zero statistics. Nothing here can change a mailbox or library. There is no web UI, Compose file, or action runner yet. To try it on your own accounts, follow the [local quickstart](docs/setup/local-quickstart.md).
+**Status: read-only command-line tools built and tested on synthetic data and stubs; not yet run against real accounts.** The repository has the design documents and a CLI that can index Gmail read-only (with your own OAuth client), find attachments, check whether Paperless-ngx or Immich already holds them, call explicitly configured model endpoints under policy, read Inbox Zero statistics, and (optionally) search folders, archives, and old mail backups through Recoll. Nothing here can change a mailbox or library. There is no web UI, Compose file, or action runner yet. To try it on your own accounts, follow the [local quickstart](docs/setup/local-quickstart.md).
 
 ## What it will do
 
@@ -49,8 +49,11 @@ Proposals cannot be executed; there is no write path. See [first slice](docs/fir
 | [Integrations](docs/integrations.md) | Candidate existing tools and libraries per need, with an evaluation checklist |
 | [Interfaces](docs/interfaces.md) | Records that cross service boundaries |
 | [Model providers](docs/model-providers.md) | Endpoint profiles, destinations, grants, capability probes, fallbacks |
+| [File discovery](docs/file-discovery.md) | Optional search of folders, archives, and old mail backups through an existing tool (Recoll), with lineage, grants, recovery, and context packets |
+| [File discovery providers](docs/evaluations/file-discovery-providers.md) and [native evaluation](docs/evaluations/file-discovery-native.md) | Interface evidence for Recoll and sist2, and their results on synthetic files |
 | [First slice](docs/first-slice.md) | Smallest read-only synthetic email build and its checks |
 | [Local quickstart](docs/setup/local-quickstart.md) | Exact steps to test against your own Gmail, Paperless, Immich, and a local model |
+| [File discovery handoff](docs/setup/file-discovery-handoff.md) | Numbered steps for a local agent to validate file discovery on real archives |
 | [Local agent handoff](docs/setup/local-agent-handoff.md) | A prompt for a coding agent on your machine to continue the verification |
 | [Tooling review, October 2026](docs/research/2026-10-tooling-review.md) | Research on existing tools, licenses, Gmail access rules, and model servers, with sources |
 | [Inbox Zero evaluation plan](docs/evaluations/inbox-zero-plan.md) | Checks to run on a dedicated test mailbox before relying on the integration |

@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.conftest import Files
 from towpath import config as config_mod
 from towpath.discovery import corpus, policy, refs, service
 from towpath.discovery.providers.base import Hit, Unavailable
@@ -17,47 +18,6 @@ from towpath.stores import open_store
 
 REPO = Path(__file__).resolve().parents[1]
 PAPER_SHA = hashlib.sha256(corpus.docx(corpus.PAPER_TEXT)).hexdigest()
-
-
-class Files:
-    def __init__(self, root: Path):
-        self.root = root
-        self.summary = corpus.generate(root)
-        self.path = corpus.write_example_config(root)
-        self.config = config_mod.load(self.path)
-
-    def reload(self, old: str | None = None, new: str | None = None):
-        if old is not None:
-            self.path.write_text(self.path.read_text().replace(old, new))
-        self.config = config_mod.load(self.path)
-        return self.config
-
-    def grant(self, root: str, *features: str):
-        for feature in features:
-            policy.grant(self.config, root, feature)
-
-    def search(self, query: str, **kw):
-        return service.search(self.config, query, **kw)
-
-    def find(self, query: str, location_suffix: str) -> dict:
-        for result in self.search(query)["results"]:
-            if result["location"].endswith(location_suffix):
-                return result
-        raise AssertionError(f"no result ending {location_suffix!r}")
-
-    def cli(self, *args: str, check: bool = True) -> subprocess.CompletedProcess:
-        env = dict(os.environ, PYTHONPATH=str(REPO / "src"))
-        return subprocess.run([sys.executable, "-m", "towpath", *args, "--config", str(self.path)],
-                              capture_output=True, text=True, env=env, cwd=self.root, check=check)
-
-    def decision_log(self) -> list:
-        db = open_store(self.config.store_dir, "decisions", "connect")
-        return [tuple(r) for r in db.execute("SELECT kind, target_id, detail FROM decision_log")]
-
-
-@pytest.fixture
-def fx(tmp_path):
-    return Files(tmp_path)
 
 
 def test_file_commands_need_no_mail_models_or_life(fx):

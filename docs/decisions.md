@@ -128,7 +128,7 @@ These are built into the current documents. The owner can accept or overturn eac
   - sist2 has a capability slot until a stable excerpt and recovery interface is verified. Its raw index schema is documented as unstable.
   - AnythingLLM is out of scope for now.
 - **Limits:** no source writes, moves, deletes, or deduplication; no model calls; no automatic claim acceptance.
-- **Pending:** live evaluation of both tools on the owner's archives, and the choice between them. Both are local work.
+- **Pending:** live evaluation of both tools on the owner's archives, and the choice between them. Both are local work ([handoff](setup/file-discovery-handoff.md)).
 
 ## Facts to verify before implementation
 
