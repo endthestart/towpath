@@ -54,7 +54,7 @@ The core image removes CPython's `readline`, `_gdbm`, and `_dbm` modules. They l
   - `manifest.json` (packages, sources with checksums, license inventory, linkage of non-distribution binaries);
   - `SHA256SUMS`;
   - a README.
-- **Size.** Measured for the Recoll image on 2026-10-04: 125 source packages, 396 files, about 575 MB. Blobs already in the registry are reused, so later releases upload only changed sources.
+- **Size**, measured 2026-10-04: core, 61 source packages and about 313 MB (CI's availability check); Recoll, 125 source packages and about 575 MB in 396 files, collected and verified in a local run. Blobs already in the registry are reused, so later releases upload only changed sources.
 
 To download the source of an image you have:
 
