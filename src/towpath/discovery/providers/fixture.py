@@ -12,7 +12,7 @@ import json
 import os
 from pathlib import Path
 
-from towpath.discovery.providers.base import BaseProvider, Excerpt, Hit, LimitExceeded, Unavailable
+from towpath.discovery.providers.base import BaseProvider, Excerpt, Hit, LimitExceeded, Listing, Unavailable
 from towpath.discovery.records import DateFact, Extraction, Member
 
 
@@ -68,30 +68,32 @@ class Provider(BaseProvider):
     def probe(self, timeout: float) -> dict:
         return {"tool": "fixture", "version": "1", "entries": len(self._catalog()), "test_aid": True}
 
-    def search(self, query: str, roots: list, max_rows: int, timeout: float):
+    @staticmethod
+    def _bounded(rows: list, max_rows: int) -> tuple[list, bool]:
+        return rows[:max_rows], len(rows) <= max_rows
+
+    def search(self, query: str, roots: list, max_rows: int, timeout: float) -> Listing:
         words = [w.lower() for w in query.split() if w]
-        if not words:
-            return
         wanted = {r.alias for r in roots}
-        rows = 0
-        for entry in self._catalog():
+        matches = []
+        for entry in self._catalog() if words else []:
             if entry["root"] not in wanted:
                 continue
             names = " ".join(str(m[1] or "") for m in entry["members"]) + " " + entry["path"]
-            haystack = ((entry["text"] or "") + "\n" + names).lower()
-            if all(w in haystack for w in words):
-                text = (entry["text"] or "").lower()
-                start = text.find(words[0])
-                yield self._hit(entry, {"kind": "text-offset", "start": start} if start >= 0 else None)
-                rows += 1
-                if rows >= max_rows:
-                    return
+            if all(w in ((entry["text"] or "") + "\n" + names).lower() for w in words):
+                matches.append(entry)
+                if len(matches) > max_rows:
+                    break
+        rows, exhausted = self._bounded(matches, max_rows)
+        hits = []
+        for entry in rows:
+            start = (entry["text"] or "").lower().find(words[0])
+            hits.append(self._hit(entry, {"kind": "text-offset", "start": start} if start >= 0 else None))
+        return Listing(hits, exhausted, len(rows))
 
-    def enumerate(self, root, max_rows: int, timeout: float):
-        for n, entry in enumerate(e for e in self._catalog() if e["root"] == root.alias):
-            if n >= max_rows:
-                return
-            yield self._hit(entry)
+    def enumerate(self, root, max_rows: int, timeout: float) -> Listing:
+        rows, exhausted = self._bounded([e for e in self._catalog() if e["root"] == root.alias], max_rows)
+        return Listing([self._hit(e) for e in rows], exhausted, len(rows))
 
     def describe(self, native_id: str, timeout: float) -> Hit:
         return self._hit(self._entry(native_id))

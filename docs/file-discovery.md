@@ -89,7 +89,7 @@ All print JSON. Errors print `error (<code>): <reason>` and exit 2. The codes ar
 | `towpath files excerpt OCCURRENCE [--at N] [--max-bytes N]` | Bounded text, marked untrusted, plus a citation pinned to the version and the source stamp. Only when `current` | `excerpt` |
 | `towpath files cite CITATION` | Re-check a citation; with `excerpt`, also compare the cited text | `search` |
 | `towpath files recover OCCURRENCE` | Derived copy plus provenance in `recover_dir` | `recover` |
-| `towpath files import [--root] [--max-items]` | References and coverage for granted roots; only a complete run marks anything missing | `search` |
+| `towpath files import [--root] [--max-items]` | References and coverage for granted roots; only a run whose provider listing was exhausted marks anything missing | `search` |
 | `towpath fixtures files OUT` | Generate the synthetic corpus, its fixture catalog, and a config | — |
 
 ## Records
@@ -111,7 +111,7 @@ Dates carry their meaning, one of `file-modified`, `member-modified`, `message-d
 | Table | Holds |
 | --- | --- |
 | `runs` | Each import or search: provider, times, termination (`complete`, `partial`, `failed`, `interrupted`), reason |
-| `coverage` | What a run examined and the count per extraction status. Only a complete run can mark anything missing |
+| `coverage` | What a run examined and the count per extraction status. Only a complete run (provider listing exhausted, no time limit, no failure) can mark anything missing |
 | `occurrences` | One row per occurrence: locator, media type, size, dates, hashes, extraction, current version, first and last seen, `missing_since_run` |
 | `occurrence_versions` | Every version token seen per occurrence |
 | `citations` | A cited location pinned to the provider's version and the source file's stamp at citation time |
@@ -176,13 +176,26 @@ A `search` grant does not grant excerpts, recovery, agent context, or life-evide
 
 ## Providers
 
-The provider contract (`providers/base.py`) has five operations. Each one may answer "unavailable" with a reason:
+The provider contract (`providers/base.py`) has six operations. Each one may answer "unavailable" with a reason:
 
 - `probe`: tool and version;
-- `search`: bounded, root-scoped hits with native references;
-- `describe`: the record for one native reference;
+- `search`: bounded, root-scoped hits with native references, as a listing;
+- `enumerate`: every item under one root, as a listing;
+- `describe`: the record for one native reference, with its version and source stamp;
 - `excerpt`: bounded text;
 - `recover`: native-format bytes to a given path.
+
+**Listing completeness.**
+
+- **Two separate parts:** a listing (`Listing`) carries the hits that survived the provider's own filtering, and an `exhausted` flag about the provider's raw rows.
+- **How exhaustion is established:** the provider asks for one row more than the cap and does not return it.
+  - `exhausted` is `true` only when that extra row did not exist.
+  - It is `false` when the cap was reached.
+  - It is `null` when the provider cannot say.
+- **Why it matters:** filtering (Recoll lists folders as rows, and unusable rows are dropped) shortens the hits, but never turns a capped listing into a complete one.
+- **Effect on imports:** an import is complete, and marks unseen records missing, only when the listing is exhausted, the time limit was not hit, and the provider did not fail.
+- **Effect on search:** `more_may_exist` is true unless the provider confirmed exhaustion.
+- **No unbounded reads:** neither path raises a ceiling or reads past the cap.
 
 ### Capability matrix
 
@@ -289,7 +302,7 @@ The generated corpus (`discovery/corpus.py`) contains:
   - How Recoll's query language ranks user `OR` terms against the `dir:` clause is unverified, because the manual was unavailable. Containment relies on Towpath's own re-check of every row, which is tested.
 - **Recoll limits:**
   - Recovery size is checked after Recoll writes the member.
-  - Enumeration returns all rows in one bridge call, so a large root can exceed `max_output_bytes`. The import is then recorded as failed; enumeration is not chunked yet.
+  - Enumeration returns up to `max_items` rows in one bridge call, so a large root can exceed `max_output_bytes`. The import is then recorded as failed; enumeration is not chunked yet. A root with more raw rows than `max_items` (folders count) is imported as `partial` and establishes no absence.
 - **Paging:** pages use an offset and re-run the provider query. There is no stable cursor, so order can shift between pages.
 - **Citation offsets:** offsets refer to the provider's extracted text. A provider upgrade may shift them, and `cite` then reports stale rather than serving different text.
 - **Grants and roles:**

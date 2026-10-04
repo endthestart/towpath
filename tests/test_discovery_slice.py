@@ -12,7 +12,7 @@ import pytest
 from tests.conftest import Files
 from towpath import config as config_mod
 from towpath.discovery import corpus, policy, refs, service
-from towpath.discovery.providers.base import Hit, Unavailable
+from towpath.discovery.providers.base import Hit, Listing, Unavailable
 from towpath.discovery.records import Extraction
 from towpath.stores import open_store
 
@@ -219,8 +219,7 @@ def test_hostile_provider_rows_are_dropped(fx, monkeypatch):
             f"file://{base}/escape-link", f"{fx.root}/roots/shared/copy-of-paper.docx", f"{base}/notes/injection.md"]
 
     def hostile(self, query, roots, max_rows, timeout):
-        for n, url in enumerate(rows):
-            yield Hit(f"h{n}", url, (), Extraction("indexed"))
+        return Listing([Hit(f"h{n}", url, (), Extraction("indexed")) for n, url in enumerate(rows)], True, len(rows))
 
     from towpath.discovery.providers import fixture
     monkeypatch.setattr(fixture.Provider, "search", hostile)
@@ -261,10 +260,15 @@ def test_imports_are_repeatable_and_honest_about_absence(fx, monkeypatch):
     original = fixture.Provider.enumerate
 
     def interrupted(self, root, max_rows, timeout):
-        for n, hit in enumerate(original(self, root, max_rows, timeout)):
-            if n == 3:
-                raise KeyboardInterrupt
-            yield hit
+        listing = original(self, root, max_rows, timeout)
+
+        def hits():
+            for n, hit in enumerate(listing.hits):
+                if n == 3:
+                    raise KeyboardInterrupt
+                yield hit
+
+        return Listing(hits(), listing.exhausted, listing.raw_rows)
 
     monkeypatch.setattr(fixture.Provider, "enumerate", interrupted)
     with pytest.raises(KeyboardInterrupt):
@@ -369,3 +373,15 @@ def test_fixture_index_goes_stale_until_reindexed(fx):
     path.unlink()
     assert corpus.reindex(fx.root)["dropped"] == 1
     assert service.describe(fx.config, note["occurrence_id"])["state"] == "unavailable"
+
+
+def test_fixture_listing_boundaries(fx):
+    fx.grant("archive", "search")
+    raw = sum(1 for e in json.loads((fx.root / "catalog.json").read_text())["entries"] if e["root"] == "archive")
+    exact, = service.import_catalog(fx.config, max_items=raw)
+    assert exact["complete"] and exact["absence_established"]
+    short, = service.import_catalog(fx.config, max_items=raw - 1)
+    assert short["complete"] is False and short["marked_missing"] == 0
+    page = fx.search("zebrafinch", limit=200)
+    assert page["more_may_exist"] is False
+

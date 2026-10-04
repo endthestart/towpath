@@ -68,16 +68,19 @@ def _db(req):
     return recoll.connect(confdir=req["confdir"])
 
 
-def _query(db, text: str, max_rows: int) -> list[dict]:
+def _query(db, text: str, max_rows: int) -> tuple[list[dict], bool]:
+    """Up to ``max_rows`` rows, and whether the query is exhausted: one more row is fetched (and
+    not returned) to tell a listing that ended from one that reached the cap."""
     q = db.query()
     q.execute(text)
     rows = []
-    while len(rows) < max_rows:
+    while True:
         doc = q.fetchone()
         if doc is None:
-            break
+            return rows, True
+        if len(rows) >= max_rows:
+            return rows, False
         rows.append(_row(doc, db))
-    return rows
 
 
 def _doc(db, udi: str):
@@ -96,14 +99,19 @@ def handle(req: dict) -> dict:
         return {"binding": True, "members": sorted(n for n in dir(recoll) if not n.startswith("_"))}
     db = _db(req)
     if op == "search":
-        rows = []
+        rows, exhausted = [], True
         for folder in req["dirs"]:
-            rows += _query(db, f'{req["query"]} dir:"{folder}"', req["max_rows"] - len(rows))
-            if len(rows) >= req["max_rows"]:
+            remaining = req["max_rows"] - len(rows)
+            if remaining <= 0:
+                exhausted = False  # folders left unqueried
                 break
-        return {"rows": rows}
+            found, done = _query(db, f'{req["query"]} dir:"{folder}"', remaining)
+            rows += found
+            exhausted = exhausted and done
+        return {"rows": rows, "exhausted": exhausted}
     if op == "enumerate":
-        return {"rows": _query(db, f'dir:"{req["dir"]}"', req["max_rows"])}
+        rows, exhausted = _query(db, f'dir:"{req["dir"]}"', req["max_rows"])
+        return {"rows": rows, "exhausted": exhausted}
     doc = _doc(db, req["udi"])
     if doc is None:
         return {"error": "missing", "detail": "no such document in the index"}

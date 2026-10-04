@@ -168,10 +168,10 @@ def search(config, query: str, provider_id: str | None = None, limit: int | None
     deadline = time.monotonic() + timeout
     db = fstore.connect_rw(config)
     run = fstore.begin_run(db, prov.id, "search")
-    results, rows, permitted, more, stopped = [], 0, 0, False, None
+    results, permitted, more, stopped = [], 0, False, None
     try:
-        for hit in prov.search(query, [prov.roots[a] for a in sorted(roots)], fc.limits["max_scan"], timeout):
-            rows += 1
+        listing = prov.search(query, [prov.roots[a] for a in sorted(roots)], fc.limits["max_scan"], timeout)
+        for hit in listing.hits:
             occ = _accept(hit, prov, roots)
             if occ is None:
                 continue
@@ -191,8 +191,9 @@ def search(config, query: str, provider_id: str | None = None, limit: int | None
             if time.monotonic() > deadline:
                 stopped, more = "time limit reached", True
                 break
-        # A provider that returned max_scan rows may hold more permitted results beyond them.
-        more = more or rows >= fc.limits["max_scan"]
+        # Unless the provider confirmed its raw rows ran out, permitted results may lie beyond them.
+        # (Counting filtered hits instead would mistake a capped listing for a complete one.)
+        more = more or listing.exhausted is not True
         db.commit()
         fstore.finish_run(db, run, "complete" if stopped is None else "partial", len(results), stopped)
     except KeyboardInterrupt:
@@ -463,10 +464,13 @@ def import_catalog(config, provider_id: str | None = None, root: str | None = No
         complete, reason, termination = True, None, "complete"
         deadline = time.monotonic() + fc.limits["timeout_seconds"]
         try:
-            for n, hit in enumerate(prov.enumerate(prov.roots[alias], max_items + 1, fc.limits["timeout_seconds"])):
-                if n >= max_items:
-                    complete, reason = False, f"stopped at max_items={max_items}"
-                    break
+            # Completeness comes from the provider's raw rows, never from how many hits survive filtering.
+            listing = prov.enumerate(prov.roots[alias], max_items, fc.limits["timeout_seconds"])
+            if listing.exhausted is False:
+                complete, reason = False, f"the provider holds more than max_items={max_items} rows"
+            elif listing.exhausted is None:
+                complete, reason = False, "the provider did not confirm that the listing was exhaustive"
+            for hit in listing.hits:
                 if time.monotonic() > deadline:
                     complete, reason = False, "time limit reached"
                     break

@@ -293,6 +293,87 @@ def test_source_change_without_reindex_is_not_current(rw):
         service.recover(rw.config, paper["occurrence_id"])
 
 
+def test_raw_row_cap_with_directory_does_not_mark_missing(rw):
+    rw.grant("archive", "search")
+    initial = service.import_catalog(rw.config, root="archive")[0]
+    assert initial["complete"] and initial["occurrences_seen"] == 7
+    folder = rw.root / "roots/archive/2003"
+    rw.index.insert(0, {
+        "url": f"file://{folder}", "ipath": "", "mtype": "inode/directory",
+        "rcludi": f"{folder}|", "text": "",
+    })
+    rw.save()
+    capped = service.import_catalog(rw.config, root="archive", max_items=1)[0]
+    assert capped["complete"] is False
+    assert capped["absence_established"] is False
+    assert capped["marked_missing"] == 0
+
+
+def _raw_rows(rw, root: str = "archive") -> int:
+    base = f"file://{rw.root / 'roots' / root}/"
+    return sum(1 for row in rw.index if row.get("url", "").startswith(base))
+
+
+def test_listing_boundary_is_exact_even_with_filtered_rows(rw):
+    rw.grant("archive", "search")
+    folder = rw.root / "roots/archive/2003"
+    rw.index.append({"url": f"file://{folder}", "ipath": "", "mtype": "inode/directory", "rcludi": f"{folder}|",
+                     "text": ""})  # filtered by the adapter, but still a raw row
+    rw.save()
+    raw = _raw_rows(rw)
+    exact = service.import_catalog(rw.config, root="archive", max_items=raw)[0]
+    assert exact["complete"] and exact["absence_established"] and exact["occurrences_seen"] == 7
+    short = service.import_catalog(rw.config, root="archive", max_items=raw - 1)[0]
+    assert (short["complete"], short["termination"], short["marked_missing"]) == (False, "partial", 0)
+    assert "max_items" in short["reason"]
+    one = service.import_catalog(rw.config, root="archive", max_items=1)[0]
+    assert one["occurrences_seen"] <= 1 and one["marked_missing"] == 0
+
+
+def test_exhausted_listing_after_a_deletion_marks_only_that_record(rw):
+    rw.grant("archive", "search")
+    service.import_catalog(rw.config, root="archive")
+    rw.index = [row for row in rw.index if not row.get("url", "").endswith("notes/injection.md")]
+    rw.save()  # as if recollindex ran after the file was deleted
+    report = service.import_catalog(rw.config, root="archive", max_items=_raw_rows(rw))[0]
+    assert report["complete"] and report["marked_missing"] == 1
+
+
+def test_unconfirmed_listing_establishes_no_absence(rw, monkeypatch):
+    rw.grant("archive", "search")
+    service.import_catalog(rw.config, root="archive")
+    original = recoll_provider.Provider._call
+
+    def no_signal(self, request, timeout):
+        data = original(self, request, timeout)
+        data.pop("exhausted", None)  # e.g. an older bridge that does not report exhaustion
+        return data
+
+    monkeypatch.setattr(recoll_provider.Provider, "_call", no_signal)
+    rw.index = [row for row in rw.index if not row.get("url", "").endswith("notes/injection.md")]
+    rw.save()
+    report = service.import_catalog(rw.config, root="archive")[0]
+    assert report["complete"] is False and report["marked_missing"] == 0
+    assert "did not confirm" in report["reason"]
+    assert service.search(rw.config, "zebrafinch")["more_may_exist"] is True
+
+
+def test_search_capped_by_filtered_rows_still_says_more(rw):
+    rw.grant("archive", "search")
+    for n in range(3):
+        folder = rw.root / f"roots/archive/dir{n}"
+        rw.index.insert(0, {"url": f"file://{folder}", "ipath": "", "mtype": "inode/directory",
+                            "rcludi": f"{folder}|", "text": "zebrafinch"})
+    rw.save()
+    rw.reload("[files.limits]\nmax_scan = 3")
+    capped = service.search(rw.config, "zebrafinch")
+    assert capped["results"] == [] and capped["more_may_exist"] is True
+    rw.path.write_text(rw.path.read_text().replace("max_scan = 3", "max_scan = 500"))
+    rw.config = config_mod.load(rw.path)
+    full = service.search(rw.config, "zebrafinch economy")
+    assert full["results"] and full["more_may_exist"] is False
+
+
 def _paper(rw):
     return next(r for r in service.search(rw.config, "zebrafinch economy")["results"]
                 if r["location"].endswith("message 1 > paper.docx"))
@@ -565,4 +646,31 @@ def test_native_stale_index_then_reindex(tmp_path, monkeypatch):
     assert service.resolve_citation(cfg, fresh["citation"])["state"] == "current"
     recovered = service.recover(cfg, second["occurrence_id"])
     assert recovered["sha256"] == hashlib.sha256(corpus.docx(changed_text)).hexdigest()
+
+
+@pytest.mark.skipif(_native_recoll() is None, reason="Recoll and its Python binding are not installed")
+def test_native_listing_exhaustion(tmp_path, monkeypatch):
+    """Real Recoll lists folders as rows (filtered by the adapter); completeness follows raw rows."""
+    monkeypatch.delenv("PYTHONPATH", raising=False)
+    python = _native_recoll()
+    corpus.generate(tmp_path)
+    conf = tmp_path / "recoll-conf"
+    conf.mkdir()
+    (conf / "recoll.conf").write_text(f"topdirs = {tmp_path / 'roots'}\n")
+    subprocess.run(["recollindex", "-c", str(conf)], check=True, capture_output=True, timeout=120)
+    (tmp_path / "towpath.toml").write_text(corpus.EXAMPLE_CONFIG.split("[[files.providers]]")[0] + (
+        f'[[files.providers]]\nid = "recoll"\nadapter = "recoll"\nroots = ["archive"]\n'
+        f'confdir = "{conf}"\npython = "{python}"\n'))
+    cfg = config_mod.load(tmp_path / "towpath.toml")
+    policy.grant(cfg, "archive", "search")
+    prov = service.provider(cfg)
+    full = prov.enumerate(prov.roots["archive"], 1000, 60)
+    assert full.exhausted is True and full.raw_rows > len(full.hits)  # folder rows were filtered
+    exact = prov.enumerate(prov.roots["archive"], full.raw_rows, 60)
+    assert exact.exhausted is True
+    assert prov.enumerate(prov.roots["archive"], full.raw_rows - 1, 60).exhausted is False
+    complete = service.import_catalog(cfg, root="archive", max_items=full.raw_rows)[0]
+    assert complete["complete"] and complete["marked_missing"] == 0
+    capped = service.import_catalog(cfg, root="archive", max_items=1)[0]
+    assert (capped["complete"], capped["absence_established"], capped["marked_missing"]) == (False, False, 0)
 

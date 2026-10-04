@@ -39,6 +39,21 @@ class Hit:
 
 
 @dataclass(frozen=True)
+class Listing:
+    """Rows from one bounded provider query, after the provider's own filtering.
+
+    ``exhausted`` describes the provider's raw rows, not ``hits``: True only when the provider
+    confirmed nothing lay beyond the rows it examined (it asked for one more than the cap and got
+    none); False when the cap was reached; None when the provider cannot say. Filtering (folders,
+    unusable rows) shortens ``hits`` but never makes a capped listing look exhausted.
+    """
+
+    hits: list
+    exhausted: bool | None
+    raw_rows: int = 0
+
+
+@dataclass(frozen=True)
 class Excerpt:
     text: str
     start: int                    # offset in the extracted text, in characters
@@ -64,11 +79,12 @@ class BaseProvider:
     def probe(self, timeout: float) -> dict:
         raise Unavailable("probe is not implemented")
 
-    def search(self, query: str, roots: list, max_rows: int, timeout: float):
-        """Yield ``Hit`` rows in the provider's rank order, at most ``max_rows``."""
+    def search(self, query: str, roots: list, max_rows: int, timeout: float) -> Listing:
+        """``Hit`` rows in the provider's rank order from at most ``max_rows`` raw rows."""
         raise Unavailable("search is not implemented")
 
-    def enumerate(self, root, max_rows: int, timeout: float):
+    def enumerate(self, root, max_rows: int, timeout: float) -> Listing:
+        """Every item under ``root``, from at most ``max_rows`` raw rows."""
         raise Unavailable("enumerate is not implemented")
 
     def describe(self, native_id: str, timeout: float) -> Hit:

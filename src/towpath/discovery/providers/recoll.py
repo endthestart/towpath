@@ -29,7 +29,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from towpath.discovery import refs
-from towpath.discovery.providers.base import BaseProvider, Excerpt, Hit, LimitExceeded, Unavailable
+from towpath.discovery.providers.base import BaseProvider, Excerpt, Hit, LimitExceeded, Listing, Unavailable
 from towpath.discovery.records import DateFact, Extraction, Member, RecordError
 from towpath.discovery.run import ToolError, run
 
@@ -169,20 +169,21 @@ class Provider(BaseProvider):
         info["binding"] = self._call({"op": "probe"}, timeout).get("binding", False)
         return info
 
-    def search(self, query: str, roots: list, max_rows: int, timeout: float):
-        dirs = [os.path.realpath(r.path) for r in roots]
-        for row in self._call({"op": "search", "query": query, "dirs": dirs, "max_rows": max_rows}, timeout)["rows"]:
-            hit = self._hit(row)
-            if hit is not None:
-                yield hit
+    def _listing(self, data: dict) -> Listing:
+        """Directory and unusable rows are dropped here; exhaustion is the bridge's raw-row answer."""
+        rows = data["rows"]
+        exhausted = data.get("exhausted")
+        hits = [hit for hit in (self._hit(row) for row in rows) if hit is not None]
+        return Listing(hits, exhausted if isinstance(exhausted, bool) else None, len(rows))
 
-    def enumerate(self, root, max_rows: int, timeout: float):
-        rows = self._call({"op": "enumerate", "dir": os.path.realpath(root.path), "max_rows": max_rows},
-                          timeout)["rows"]
-        for row in rows:
-            hit = self._hit(row)
-            if hit is not None:
-                yield hit
+    def search(self, query: str, roots: list, max_rows: int, timeout: float) -> Listing:
+        dirs = [os.path.realpath(r.path) for r in roots]
+        return self._listing(self._call({"op": "search", "query": query, "dirs": dirs, "max_rows": max_rows},
+                                        timeout))
+
+    def enumerate(self, root, max_rows: int, timeout: float) -> Listing:
+        return self._listing(self._call({"op": "enumerate", "dir": os.path.realpath(root.path),
+                                         "max_rows": max_rows}, timeout))
 
     def describe(self, native_id: str, timeout: float) -> Hit:
         hit = self._hit(self._call({"op": "describe", "udi": native_id}, timeout)["row"])
