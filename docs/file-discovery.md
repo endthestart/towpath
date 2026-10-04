@@ -77,16 +77,16 @@ Unknown keys are rejected. Roots may not nest. `command` (for sist2) is an argum
 
 ## Commands
 
-All print JSON. Errors print `error (<code>): <reason>` and exit 2. The codes are `disabled`, `denied`, `not-found`, `stale`, `unavailable`, `invalid-reference`, and `limit`.
+All print JSON. Errors print `error (<code>): <reason>` and exit 2. The codes are `disabled`, `denied`, `not-found`, `stale`, `unavailable`, `unverifiable`, `invalid-reference`, and `limit`.
 
 | Command | Does | Needs |
 | --- | --- | --- |
 | `towpath files status` | Config, grants, catalog counts, recent imports and coverage. Calls no provider | — |
 | `towpath files probe [PROVIDER]` | Tool, version, capabilities | — |
 | `towpath files grant ROOT FEATURE` / `revoke` | Record or withdraw a grant (web role) | — |
-| `towpath files search QUERY [--limit] [--offset]` | Bounded results with lineage, dates, extraction, version, passage offset; no text | `search` |
-| `towpath files describe OCCURRENCE` | Stored record and current state: `current`, `changed`, `unavailable`, or `unverifiable` | `search` |
-| `towpath files excerpt OCCURRENCE [--at N] [--max-bytes N]` | Bounded text, marked untrusted, plus a citation pinned to the version | `excerpt` |
+| `towpath files search QUERY [--limit] [--offset]` | Bounded results with lineage, dates, extraction, version, passage offset, and source freshness; no text | `search` |
+| `towpath files describe OCCURRENCE` | Stored record and current state (`current`, `changed`, `unavailable`, `unverifiable`), with provider version and source freshness shown separately | `search` |
+| `towpath files excerpt OCCURRENCE [--at N] [--max-bytes N]` | Bounded text, marked untrusted, plus a citation pinned to the version and the source stamp. Only when `current` | `excerpt` |
 | `towpath files cite CITATION` | Re-check a citation; with `excerpt`, also compare the cited text | `search` |
 | `towpath files recover OCCURRENCE` | Derived copy plus provenance in `recover_dir` | `recover` |
 | `towpath files import [--root] [--max-items]` | References and coverage for granted roots; only a complete run marks anything missing | `search` |
@@ -114,10 +114,35 @@ Dates carry their meaning, one of `file-modified`, `member-modified`, `message-d
 | `coverage` | What a run examined and the count per extraction status. Only a complete run can mark anything missing |
 | `occurrences` | One row per occurrence: locator, media type, size, dates, hashes, extraction, current version, first and last seen, `missing_since_run` |
 | `occurrence_versions` | Every version token seen per occurrence |
-| `citations` | A cited location pinned to the occurrence's version at citation time |
+| `citations` | A cited location pinned to the provider's version and the source file's stamp at citation time |
 | `recoveries` | Each recovered copy: path, SHA-256, size, version |
 
 `files.db` is rebuildable. Deleting it loses no decision: grants live in the decisions store, and a rebuilt catalog derives the same occurrence IDs from the same locations. A citation whose occurrence has changed version, or disappeared, resolves to **stale** or **unavailable**, never to the new content.
+
+### Provider version and source freshness
+
+These are two separate questions, and both must pass before any content is returned:
+
+| Question | Values | Evidence |
+| --- | --- | --- |
+| **Provider version:** does the provider's index still hold the version recorded in `files.db`? | `same`, `changed`, `none` | The provider's version token (Recoll `sig`) |
+| **Source freshness:** does the outer file on disk still match what the index recorded about it? | `fresh`, `changed`, `missing`, `unverifiable` | The provider's *source stamp* (outer size, mtime, ctime) against one `stat` of the contained outer file |
+
+- **Why the second question exists:** an index can be stale. Recoll keeps its old `sig` until `recollindex` runs again, while its extractor reads the file as it is now (verified natively). Without the freshness check, an excerpt or recovery under the old version could return new bytes.
+- **Resulting state:**
+  - `current` only when the provider version is `same` and the source is `fresh`.
+  - `changed` when either side changed.
+  - `unavailable` when the source is missing.
+  - `unverifiable` when there is no version or no stamp.
+- **What needs `current`:** excerpts, recoveries, and context-packet excerpts. Otherwise they are refused with `stale`, `unavailable`, or `unverifiable`.
+- **Search** marks each returned result's source freshness, so a stale index is visible before anything is read.
+- **Changes during a read:** the source is stat'ed again after each excerpt or recovery. A change during the read is refused, and the partial copy is removed.
+- **Citations** record the provider version and the source stamp at citation time. `cite` reports `stale` if either differs now. With an excerpt grant, it also compares a hash of the re-read text.
+- **Limits:**
+  - The check is one `stat` per item: no hashing and no writes.
+  - It sees changes of size, whole-second mtime, or whole-second ctime. Because ctime moves on any rewrite, a rewrite that keeps size and restores mtime (as `rsync -t` or `touch -r` would) is still caught.
+  - A rewrite inside the same ctime second with the same size is not caught. Only the citation text hash, when re-read, can catch that.
+  - Metadata-only changes (for example `chmod`) also move ctime. They are reported as `changed` until the provider re-indexes, which is the conservative direction.
 
 ## Grants
 
@@ -186,6 +211,7 @@ Evidence, versions, and commits are in the [provider evaluation](evaluations/fil
   | --- | --- |
   | `native_id` | `rcludi` |
   | Version | `sig` |
+  | Source stamp | `pcbytes` (outer size; `fbytes` for a top-level file), `fmtime` (outer mtime), and the ctime that follows the size in `sig` |
   | Members | `ipath` components; kinds come from Recoll's own records of the enclosing items |
   | Dates | `fmtime` (outer file) and `dmtime` (message date when inside a message) |
 
@@ -246,7 +272,7 @@ The generated corpus (`discovery/corpus.py`) contains:
 | Truncation and coverage shown honestly | fixture and native harness |
 | Missing helper, encrypted, corrupt, denied grant, excluded root, absent provider: honest statuses | slice tests |
 | Duplicates stay distinct occurrences | slice tests |
-| A stale citation cannot serve different content | slice tests |
+| A stale citation cannot serve different content; a stale index cannot serve changed source bytes | slice, Recoll stub, and native Recoll tests |
 | Malicious references and prompt injection expose nothing and cause no action | slice tests |
 | Repeated imports, interrupted runs, changed records, rebuilds preserve references and grants | slice tests |
 | No private data in Git or CI | `towpath fixtures check-domains`; corpus generated at test time |
@@ -259,6 +285,7 @@ The generated corpus (`discovery/corpus.py`) contains:
 - **Recoll interfaces observed, not documented:**
   - Member kinds are verified only for ZIP > mbox > message > attachment. TAR, nested archives, PST (through `pffexport`), and embedded office parts are unverified.
   - The `rcludi` form `<path>|<ipath>` is observed, not documented.
+  - The source stamp relies on two more observed fields: `pcbytes` as the outer file's size, and `sig` as size followed by whole-second ctime. The docstrings call `sig` "app-defined" and do not list `pcbytes`. The ctime is used only when `sig` starts with the recorded size. If a Recoll version lays `sig` out differently, the check falls back to size and mtime and says so.
   - How Recoll's query language ranks user `OR` terms against the `dir:` clause is unverified, because the manual was unavailable. Containment relies on Towpath's own re-check of every row, which is tested.
 - **Recoll limits:**
   - Recovery size is checked after Recoll writes the member.

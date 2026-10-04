@@ -94,18 +94,21 @@ def row_to_dict(row) -> dict:
     return data
 
 
-def citation_id(occurrence_id: str, version: str | None, location: dict) -> str:
-    return short_id("cit", occurrence_id, version or "", canonical_json(location))
+def citation_id(occurrence_id: str, version: str | None, source: dict | None, location: dict) -> str:
+    return short_id("cit", occurrence_id, version or "", canonical_json(source), canonical_json(location))
 
 
-def add_citation(db, occurrence_id: str, version: str | None, location: dict, excerpt_sha256: str) -> dict:
-    cid = citation_id(occurrence_id, version, location)
-    db.execute("INSERT OR IGNORE INTO citations (citation_id, occurrence_id, version, location, excerpt_sha256, "
-               "created_at) VALUES (?,?,?,?,?,?)",
-               (cid, occurrence_id, version, canonical_json(location), excerpt_sha256, now()))
+def add_citation(db, occurrence_id: str, version: str | None, source: dict | None, location: dict,
+                 excerpt_sha256: str) -> dict:
+    """Pin a cited location to the provider's version *and* the source file's stamp at citation time."""
+    cid = citation_id(occurrence_id, version, source, location)
+    db.execute("INSERT OR IGNORE INTO citations (citation_id, occurrence_id, version, source_stamp, location, "
+               "excerpt_sha256, created_at) VALUES (?,?,?,?,?,?,?)",
+               (cid, occurrence_id, version, canonical_json(source), canonical_json(location), excerpt_sha256,
+                now()))
     db.commit()
-    return {"citation_id": cid, "occurrence_id": occurrence_id, "version": version, "location": location,
-            "excerpt_sha256": excerpt_sha256}
+    return {"citation_id": cid, "occurrence_id": occurrence_id, "version": version, "source": source,
+            "location": location, "excerpt_sha256": excerpt_sha256}
 
 
 def get_citation(db, cid: str) -> dict | None:
@@ -114,6 +117,7 @@ def get_citation(db, cid: str) -> dict | None:
         return None
     data = dict(row)
     data["location"] = json.loads(data["location"])
+    data["source"] = json.loads(data.pop("source_stamp") or "null")
     return data
 
 

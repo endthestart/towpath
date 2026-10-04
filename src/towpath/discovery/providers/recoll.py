@@ -15,6 +15,12 @@ How Recoll rows become Towpath records:
   inside a message (verified), otherwise the document date Recoll records.
 - Size is known only for top-level files (``fbytes``). Recoll reports no hashes, no extraction
   errors, and no truncation through the binding, so those stay empty or unknown.
+- The source stamp (what the index recorded about the outer file) is ``pcbytes`` (or ``fbytes`` for
+  a top-level file) as size, ``fmtime`` as mtime, and the ctime that follows the size in ``sig``.
+  Observed natively on 1.36.1: ``sig`` is the outer file's size followed by its whole-second ctime,
+  ``pcbytes`` the outer file's size, and all three stay unchanged until ``recollindex`` runs again,
+  while the extractor reads the file as it is now. ``pcbytes`` and the ``sig`` layout are not
+  documented, so a ctime is used only when ``sig`` starts with the recorded size.
 """
 
 import os
@@ -50,6 +56,21 @@ def _int(value) -> int | None:
         return int(str(value))
     except (TypeError, ValueError):
         return None
+
+
+def source_stamp(row: dict) -> dict | None:
+    size = _int(row.get("pcbytes"))
+    if size is None and not row.get("ipath"):
+        size = _int(row.get("fbytes"))
+    mtime = _int(row.get("fmtime"))
+    sig = str(row.get("sig") or "")
+    ctime = None
+    if size is not None and sig.startswith(str(size)) and sig[len(str(size)):].isdigit():
+        ctime = int(sig[len(str(size)):])
+    if size is None and mtime is None:
+        return None
+    basis = "Recoll pcbytes/fbytes, fmtime" + (", ctime from sig" if ctime is not None else "")
+    return {"size": size, "mtime": mtime, "ctime": ctime, "basis": basis}
 
 
 def members_from(row: dict) -> tuple[Member, ...]:
@@ -133,7 +154,7 @@ class Provider(BaseProvider):
                                   "Recoll holds a record; it does not report extraction errors or truncation"),
             media_type=row.get("mtype"), size=None if members else _int(row.get("fbytes")),
             dates=tuple(dates), hashes={},
-            version=f"recoll-sig={row['sig']}" if row.get("sig") else None)
+            version=f"recoll-sig={row['sig']}" if row.get("sig") else None, source_stamp=source_stamp(row))
 
     def probe(self, timeout: float) -> dict:
         info = {"tool": "recoll", "interpreter": os.path.basename(self.python)}

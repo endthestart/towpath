@@ -34,6 +34,9 @@ ADDED_COLUMNS = {
         "coverage": {"termination": "TEXT", "reason": "TEXT"},
         "sync_state": {"full_sync_phase": "TEXT", "full_sync_page_token": "TEXT"},
     },
+    "files": {
+        "citations": {"source_stamp": "TEXT"},
+    },
 }
 
 SCHEMAS = {

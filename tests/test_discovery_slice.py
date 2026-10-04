@@ -350,3 +350,22 @@ def test_discovery_config_leaves_email_pipeline_working(ws):
     ws.replace_config("enabled = false", "enabled = true")
     assert ws.full_pipeline().keys() == first.keys()
     assert not (ws.config.store_dir / "files.db").exists()
+
+
+def test_fixture_index_goes_stale_until_reindexed(fx):
+    fx.grant("archive", "search", "excerpt")
+    note = fx.find("zebrafinch", "notes/injection.md")
+    path = fx.root / "roots" / "archive" / "notes" / "injection.md"
+    path.write_text(path.read_text() + "appended later\n")
+    described = service.describe(fx.config, note["occurrence_id"])
+    assert (described["state"], described["provider_version"], described["source"]) == ("changed", "same", "changed")
+    with pytest.raises(service.Stale):
+        service.excerpt(fx.config, note["occurrence_id"])
+    assert corpus.reindex(fx.root)["dropped"] == 0
+    assert service.describe(fx.config, note["occurrence_id"])["provider_version"] == "changed"
+    again = fx.find("zebrafinch", "notes/injection.md")
+    assert again["source"]["state"] == "fresh" and again["version"] != note["version"]
+    assert service.excerpt(fx.config, note["occurrence_id"])["state"] == "current"
+    path.unlink()
+    assert corpus.reindex(fx.root)["dropped"] == 1
+    assert service.describe(fx.config, note["occurrence_id"])["state"] == "unavailable"

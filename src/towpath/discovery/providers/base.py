@@ -31,8 +31,11 @@ class Hit:
     size: int | None = None
     dates: tuple[DateFact, ...] = ()
     hashes: dict = field(default_factory=dict)
-    version: str | None = None
+    version: str | None = None    # which state of this occurrence the provider's index holds
     passage: dict | None = None   # where the match is, e.g. {"kind": "text-offset", "start": 120}
+    # The outer file as the index recorded it: {"size", "mtime", "ctime", "basis"}, each field optional.
+    # Compared with the file on disk before any content is returned (see towpath.discovery.freshness).
+    source_stamp: dict | None = None
 
 
 @dataclass(frozen=True)

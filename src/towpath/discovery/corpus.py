@@ -185,9 +185,39 @@ def generate(out: Path) -> dict:
         link.symlink_to(Path("..") / ".." / "outside" / "secret.txt")
 
     catalog = _catalog(files, paper)
+    for entry in catalog["entries"]:
+        entry["source"] = _stamp(out / "roots" / entry["root"] / entry["path"])
     (out / "catalog.json").write_text(json.dumps(catalog, indent=1, sort_keys=True))
     return {"out": str(out), "files": len(files) + 2, "catalog_entries": len(catalog["entries"]),
             "paper_sha256": _sha256(paper)}
+
+
+def _stamp(path: Path) -> dict | None:
+    """The outer file as the fixture "index" records it, like a real provider at indexing time."""
+    try:
+        st = os.stat(path)
+    except FileNotFoundError:
+        return None
+    return {"size": st.st_size, "mtime": int(st.st_mtime), "ctime": int(st.st_ctime), "basis": "fixture catalog"}
+
+
+def reindex(out: Path) -> dict:
+    """Simulate re-running the provider: re-stamp catalog entries and drop those whose file is gone.
+
+    Extracted text in the catalog is not refreshed; tests that need re-extraction use Recoll.
+    """
+    path = Path(out) / "catalog.json"
+    catalog = json.loads(path.read_text())
+    kept = []
+    for entry in catalog["entries"]:
+        stamp = _stamp(Path(out) / "roots" / entry["root"] / entry["path"])
+        if stamp is not None:
+            entry["source"] = stamp
+            kept.append(entry)
+    dropped = len(catalog["entries"]) - len(kept)
+    catalog["entries"] = kept
+    path.write_text(json.dumps(catalog, indent=1, sort_keys=True))
+    return {"entries": len(kept), "dropped": dropped}
 
 
 def _file_dates() -> list[dict]:

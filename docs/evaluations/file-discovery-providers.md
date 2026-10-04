@@ -24,6 +24,20 @@ What was checked, against which version, and how. Everything here was run in a c
 - `Extractor(doc).idoctofile(ipath, mimetype, ofilename=...)` wrote the nested `.docx`; its SHA-256 matched the attachment's.
 - Query language: `dir:"<path>"` restricts results to a folder, and works alone to list it; `filename:` matches the attachment's name.
 
+**Source freshness (native runs, synthetic corpus).** These tests ran on the corpus, then again after changing a ZIP without and with re-indexing:
+
+| Field | Docstring | Observed |
+| --- | --- | --- |
+| `sig` | "app-defined file modification signature" | The outer file's size followed by its whole-second **ctime**. The corpus sets mtime with `utime`, yet `sig` ended in the indexing-time ctime |
+| `fmtime` | "file modification date" | The outer file's mtime, also for nested items |
+| `fbytes` | "file size in bytes" | The outer size for a top-level file; the member's own size for a nested item |
+| `pcbytes` | not documented | The outer (parent container) file's size |
+
+- **Before re-indexing:** after the ZIP was rewritten, `getDoc` still returned the old `sig`, `fmtime`, and `pcbytes`. `Extractor.textextract` already returned the **new** text.
+- **After re-indexing:** `recollindex` updated all three.
+
+Towpath therefore compares these recorded values with a `stat` of the outer file before returning content (see [provider version and source freshness](../file-discovery.md#provider-version-and-source-freshness)).
+
 **Observed details that matter to Towpath:**
 
 - The mbox inside the ZIP is not a result row of its own; the message (`ipath` `mail/backup.mbox:1`) and the attachment are.

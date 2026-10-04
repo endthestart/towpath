@@ -2,8 +2,9 @@
 
 A test aid only. Its matching (every query word as a case-insensitive
 substring) is not a search engine and proves nothing about real providers.
-Versions are read live from the files on disk, so changing or deleting a
-corpus file behaves as it would with a real provider.
+Like a real index, it reports the version and source stamp recorded when the
+catalog was generated (or re-stamped by ``corpus.reindex``), not the file's
+current state, so changing a corpus file without re-indexing leaves it stale.
 """
 
 import base64
@@ -40,13 +41,12 @@ class Provider(BaseProvider):
         # Lexical, unresolved: the service decides whether it stays inside the root.
         return "file://" + os.path.normpath(os.path.join(self.roots[entry["root"]].path, entry["path"]))
 
-    def _version(self, entry: dict) -> str | None:
-        path = os.path.join(self.roots[entry["root"]].path, entry["path"])
-        try:
-            st = os.stat(path)
-        except OSError:
+    @staticmethod
+    def _version(entry: dict) -> str | None:
+        stamp = entry.get("source")
+        if not stamp:
             return None
-        return f"size={st.st_size};mtime_ns={st.st_mtime_ns}"
+        return f"size={stamp['size']};mtime={stamp['mtime']};ctime={stamp['ctime']}"
 
     def _hit(self, entry: dict, passage: dict | None = None) -> Hit:
         ex = entry["extraction"]
@@ -57,7 +57,7 @@ class Provider(BaseProvider):
                                   ex["limit_bytes"], ex["detail"]),
             media_type=entry["media_type"], size=entry["size"],
             dates=tuple(DateFact(**d) for d in entry["dates"]), hashes=dict(entry["hashes"]),
-            version=self._version(entry), passage=passage)
+            version=self._version(entry), passage=passage, source_stamp=entry.get("source"))
 
     def _entry(self, native_id: str) -> dict:
         for entry in self._catalog():

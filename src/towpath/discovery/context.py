@@ -30,7 +30,7 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def _uncertainty(record: dict, state: str) -> list[str]:
+def _uncertainty(record: dict, st) -> list[str]:
     notes = []
     ex = record["extraction"]
     if ex.get("truncated") is True:
@@ -41,8 +41,13 @@ def _uncertainty(record: dict, state: str) -> list[str]:
         notes.append(f"not indexed ({ex['status']}); a search miss here proves nothing")
     if not record["hashes"]:
         notes.append("no content hash: identity rests on location and version only")
-    if state == "unverifiable":
+    if st.provider_version == "none":
         notes.append("no version token: later reads cannot prove the content is unchanged")
+    if st.source == "unverifiable":
+        notes.append("the provider records no size or time for the source file; freshness cannot be checked, "
+                     "so no excerpt is included")
+    elif st.source == "fresh" and "ctime" not in st.checked:
+        notes.append(f"source freshness checked on {', '.join(st.checked)} only")
     meanings = {d["meaning"] for d in record["dates"]}
     if not meanings & {"message-date", "document-modified"}:
         notes.append("only file or container dates are known; they are not authorship dates")
@@ -90,10 +95,11 @@ def build(config, purpose: str, query: str | None = None, occurrences: tuple[str
         except (service.NotFound, policy.Denied) as exc:
             omitted.append({"occurrence_id": occ, "reason": service.error_code(exc)})
             continue
-        state, _, reason = service.current_state(config, record)
+        st = service.current_state(config, record)
+        state = st.state
         if state in {"changed", "unavailable"}:
             omitted.append({"occurrence_id": occ, "reason": "stale" if state == "changed" else "unavailable",
-                            "detail": reason})
+                            "detail": st.reason, "provider_version": st.provider_version, "source": st.source})
             continue
         item = {
             "ref": {"occurrence_id": occ, "provider": record["provider_id"], "native_id": record["native_id"],
@@ -103,9 +109,10 @@ def build(config, purpose: str, query: str | None = None, occurrences: tuple[str
                              "observed_at": _observed_at(config, record["last_seen_run"])},
             "media_type": record["media_type"], "size": record["size"], "dates": record["dates"],
             "hashes": record["hashes"], "extraction": record["extraction"], "state": state,
-            "uncertainty": _uncertainty(record, state),
+            "uncertainty": _uncertainty(record, st),
             "freshness": {"last_seen_run": record["last_seen_run"], "missing_since_run": record["missing_since_run"],
-                          "checked_at": _now()},
+                          "checked_at": _now(), "provider_version": st.provider_version, "source": st.source,
+                          "source_fields_checked": st.checked},
             "excerpt": None, "excerpt_omitted_reason": None,
         }
         if "excerpt" not in grants.get(record["root_alias"], set()):
@@ -115,7 +122,7 @@ def build(config, purpose: str, query: str | None = None, occurrences: tuple[str
         else:
             try:
                 ex = service.excerpt(config, occ, start=max(start, 0), max_bytes=min(excerpt_bytes, budget - used))
-            except (Unavailable, service.Stale, LimitExceeded) as exc:
+            except (Unavailable, service.Stale, service.Unverifiable, LimitExceeded) as exc:
                 item["excerpt_omitted_reason"] = f"{service.error_code(exc)}: {exc}"
             else:
                 used += len(ex["text"].encode("utf-8"))
