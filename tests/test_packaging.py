@@ -27,11 +27,12 @@ def test_only_the_publish_job_can_write_packages():
     assert re.search(r"^permissions:\n  contents: read\n", WORKFLOW, re.M)
     assert WORKFLOW.count("packages: write") == 1
     publish = _job("publish")
-    assert "packages: write" in publish
-    assert "actions/checkout" not in publish  # it runs no repository code
-    assert not re.search(r"docker build(?!x)", publish)  # it never rebuilds
-    assert "secrets.GITHUB_TOKEN" in publish
-    assert re.findall(r"secrets\.(\w+)", WORKFLOW) == ["GITHUB_TOKEN"]
+    assert "packages: write" in publish and "actions: read" in publish and "contents: write" not in WORKFLOW
+    # It runs only the standard-library release scripts from this commit, and builds nothing.
+    assert "sparse-checkout: packaging/release" in publish and "persist-credentials: false" in publish
+    assert not re.search(r"docker build(?!x)", publish) and "pip install" not in publish
+    assert set(re.findall(r"secrets\.(\w+)", WORKFLOW)) == {"GITHUB_TOKEN"}
+    assert "secrets." not in _job("image") and "secrets." not in _job("test")
 
 
 def test_publishing_is_limited_to_trusted_refs_and_tested_images():
@@ -41,15 +42,36 @@ def test_publishing_is_limited_to_trusted_refs_and_tested_images():
     assert "needs: image" in _job("publish") and "needs: test" in _job("image")
     image = _job("image")
     assert image.index("Test the candidate image") < image.index("Save the tested image")
+    assert image.index("Save the tested image") < image.index("Collect and verify the corresponding source")
     publish = _job("publish")
-    assert 'test "$tested" = "$loaded"' in publish
-    assert "never overwritten" in publish
-    assert "sha-$GITHUB_SHA" in publish and "latest" not in publish
+    assert 'test "$tested" = "$loaded"' in publish and 'test "$tested_config" = "$saved_config"' in publish
+    assert "packaging/release/publish.py" in publish and "--bundle" in publish
+    assert "latest" not in publish
+
+
+def test_image_contents_do_not_depend_on_the_triggering_ref():
+    build = _job("image").split("- name: Build the candidate image", 1)[1].split("- name:", 1)[0]
+    assert "GITHUB_REF" not in build and "github.ref" not in build
+    assert 'REVISION="$GITHUB_SHA"' in build and "pyproject.toml" in build and "git log -1 --format=%cI" in build
+
+
+def test_source_availability_is_checked_on_every_build():
+    image = _job("image")
+    assert "sources.py check" in image and "sources.py collect" in image
+    assert "if: env.PUBLISH != 'true'" in image  # publishing builds run the stricter collect instead
 
 
 def test_container_tests_use_disk_scratch():
     assert '--basetemp "$RUNNER_TEMP/container-tests"' in _job("image")
     assert "tmpfs" not in WORKFLOW
+
+
+def test_images_record_licenses_and_drop_source_obliging_cpython_modules():
+    assert DOCKERFILE.count("collect-licenses.sh") == 2
+    assert "NOTICE-core.md" in DOCKERFILE and "NOTICE-recoll.md" in DOCKERFILE
+    assert DOCKERFILE.count("apt-get upgrade") == 2
+    assert "readline.*.so" in DOCKERFILE and "_gdbm.*.so" in DOCKERFILE and "_dbm.*.so" in DOCKERFILE
+    assert "DISTRO_UPGRADE" not in WORKFLOW  # the offline-development switch is never used by CI
 
 
 def test_images_are_pinned_unprivileged_clis():

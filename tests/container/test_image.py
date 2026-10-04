@@ -250,6 +250,45 @@ def test_fixture_search_excerpt_and_recovery(box):
     assert "shared:" not in denied.stdout and "private/" not in denied.stdout
 
 
+def test_license_records_cover_every_package(box):
+    script = textwrap.dedent("""
+        set -e
+        dpkg-query -W -f='${Package}\\t${Version}\\t${source:Package}\\t${source:Version}\\n' | sort > /tmp/now.tsv
+        cmp /tmp/now.tsv /usr/share/licenses/bundled/packages.tsv && echo "package list current"
+        missing=0
+        for p in $(cut -f1 /tmp/now.tsv); do
+          [ -s /usr/share/licenses/bundled/$p/copyright ] || missing=$((missing+1))
+        done
+        echo "missing copyright: $missing"
+        ls /usr/share/common-licenses/GPL-2 /usr/share/common-licenses/GPL-3 /usr/share/common-licenses/LGPL-2.1
+        head -1 /usr/share/licenses/python/packages.tsv
+        grep -c . /usr/share/licenses/python/packages.tsv
+        grep -i "^typer" /usr/share/licenses/python/packages.tsv
+        echo "notice separates: $(grep -c "Towpath's MIT license does not apply" /usr/share/licenses/NOTICE.md)"
+        echo "towpath license: $(head -1 /usr/share/licenses/towpath/LICENSE)"
+    """)
+    out = box.run("-c", script, entrypoint="sh").stdout
+    assert "package list current" in out and "missing copyright: 0" in out
+    assert "name\tversion\tlicense" in out and "\ntyper\t" in out
+    assert "notice separates: 1" in out and "towpath license: MIT License" in out
+
+
+@pytest.mark.skipif(KIND != "core", reason="CPython from source exists only in the core image")
+def test_core_cpython_links_no_source_obliging_library(box):
+    script = textwrap.dedent("""
+        import importlib.util, pathlib, subprocess
+        print("modules", [m for m in ("readline", "_gdbm", "_dbm") if importlib.util.find_spec(m)])
+        links = []
+        for so in pathlib.Path("/usr/local/lib").rglob("*.so*"):
+            out = subprocess.run(["ldd", str(so)], capture_output=True, text=True).stdout
+            links += [line for line in out.splitlines() if any(x in line for x in ("libreadline", "libgdbm", "libdb-"))]
+        print("links", links)
+        print("cpython license", pathlib.Path("/usr/share/licenses/python/CPython-LICENSE.txt").is_file())
+    """)
+    out = box.run("-c", script, entrypoint="python3").stdout
+    assert "modules []" in out and "links []" in out and "cpython license True" in out
+
+
 @recoll_only
 def test_recoll_binding_helpers_and_license_notices(box):
     out = box.run("-c", "for c in recollindex antiword pdftotext unrtf pffexport; do command -v $c; done; "
@@ -258,10 +297,10 @@ def test_recoll_binding_helpers_and_license_notices(box):
     for tool in ("recollindex", "antiword", "pdftotext", "unrtf", "pffexport", "imports ok"):
         assert tool in out
     listing = box.run("-c", "cat /usr/share/licenses/bundled/packages.tsv; ls /usr/share/licenses/bundled; "
-                      "cat /usr/share/licenses/bundled/NOTICE.md", entrypoint="sh").stdout
+                      "cat /usr/share/licenses/NOTICE.md", entrypoint="sh").stdout
     for pkg in ("recollcmd", "python3-recoll", "antiword", "poppler-utils", "unrtf", "pff-tools", "python3-lxml"):
         assert f"\n{pkg}\t" in "\n" + listing
-    assert "GPL-2.0-or-later" in listing and "apt-get source" in listing
+    assert "GPL-2.0-or-later" in listing and "towpath-sources:sha256-" in listing
     for pkg in ("recollcmd", "antiword", "pff-tools"):
         assert box.run(f"/usr/share/licenses/bundled/{pkg}/copyright", entrypoint="cat").stdout
 

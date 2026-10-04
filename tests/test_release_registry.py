@@ -1,0 +1,195 @@
+"""The release workflow's OCI registry client against a small in-process registry (bearer auth, redirects)."""
+
+import hashlib
+import json
+import socket
+import sys
+import threading
+import uuid
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import parse_qs, urlparse
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "packaging" / "release"))
+
+from registry import HttpRegistry, RegistryError, image_config, platform_manifest, sha256_digest  # noqa: E402
+
+
+class State:
+    def __init__(self):
+        self.manifests, self.blobs, self.uploads = {}, {}, {}
+        self.mode = "ok"
+        self.redirect_saw_auth = []
+
+
+def handler_for(state: State, port_holder: list):
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def _send(self, status, body=b"", headers=None):
+            self.send_response(status)
+            for key, value in (headers or {}).items():
+                self.send_header(key, value)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(body)
+
+        def _error(self, status, code):
+            self._send(status, json.dumps({"errors": [{"code": code}]}).encode(), {"Content-Type": "application/json"})
+
+        def _authorized(self, name):
+            if self.headers.get("Authorization", "").startswith("Bearer t-"):
+                return True
+            realm = f"http://127.0.0.1:{port_holder[0]}/token"
+            self._send(401, b"", {"WWW-Authenticate": f'Bearer realm="{realm}",service="test",'
+                                                      f'scope="repository:{name}:pull,push"'})
+            return False
+
+        def _route(self):
+            url = urlparse(self.path)
+            if url.path == "/token":
+                if self.headers.get("Authorization") != "Basic dXNlcjpzZWNyZXQ=":  # user:secret
+                    return self._send(401)
+                scope = parse_qs(url.query).get("scope", [""])[0]
+                return self._send(200, json.dumps({"token": f"t-{scope}"}).encode())
+            if url.path.startswith("/storage/"):
+                state.redirect_saw_auth.append(self.headers.get("Authorization"))
+                if self.headers.get("Authorization"):
+                    return self._send(400, b"credentials sent to storage")
+                return self._send(200, state.blobs[url.path.split("/")[-1]])
+            parts = url.path.split("/")
+            if parts[1] != "v2":
+                return self._send(404)
+            kind_index = next(i for i, p in enumerate(parts) if p in ("manifests", "blobs"))
+            name, kind, rest = "/".join(parts[2:kind_index]), parts[kind_index], parts[kind_index + 1:]
+            if not self._authorized(name):
+                return None
+            if state.mode == "deny":
+                return self._error(403, "DENIED")
+            if state.mode == "broken":
+                return self._error(500, "UNKNOWN")
+            length = int(self.headers.get("Content-Length") or 0)
+            body = self.rfile.read(length) if length else b""
+            if kind == "manifests":
+                key = (name, rest[0])
+                if self.command == "GET":
+                    found = state.manifests.get(key)
+                    if found is None:
+                        return self._error(404, "MANIFEST_UNKNOWN")
+                    return self._send(200, found[1], {"Content-Type": found[0],
+                                                      "Docker-Content-Digest": sha256_digest(found[1])})
+                if self.command == "PUT":
+                    digest = sha256_digest(body)
+                    state.manifests[key] = state.manifests[(name, digest)] = (self.headers["Content-Type"], body)
+                    return self._send(201, b"", {"Docker-Content-Digest": digest})
+            if kind == "blobs" and rest[0] == "uploads":
+                if self.command == "POST":
+                    upload = str(uuid.uuid4())
+                    state.uploads[upload] = b""
+                    return self._send(202, b"", {"Location": f"/v2/{name}/blobs/uploads/{upload}"})
+                upload = rest[1]
+                if self.command == "PATCH":
+                    state.uploads[upload] += body
+                    return self._send(202, b"", {"Location": f"/v2/{name}/blobs/uploads/{upload}?state=x"})
+                if self.command == "PUT":
+                    digest = parse_qs(url.query)["digest"][0]
+                    data = state.uploads.pop(upload) + body
+                    if sha256_digest(data) != digest:
+                        return self._error(400, "DIGEST_INVALID")
+                    state.blobs[digest] = data
+                    return self._send(201, b"", {"Docker-Content-Digest": digest})
+            if kind == "blobs":
+                digest = rest[0]
+                if digest not in state.blobs:
+                    return self._error(404, "BLOB_UNKNOWN")
+                if self.command == "HEAD":
+                    return self._send(200, b"", {"Content-Length": str(len(state.blobs[digest]))})
+                return self._send(307, b"", {"Location": f"http://127.0.0.1:{port_holder[0]}/storage/{digest}"})
+            return self._send(405)
+
+        do_GET = do_PUT = do_POST = do_PATCH = do_HEAD = _route
+
+    return Handler
+
+
+@pytest.fixture
+def server():
+    state, port = State(), []
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), handler_for(state, port))
+    port.append(httpd.server_address[1])
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    yield state, f"127.0.0.1:{port[0]}/owner/towpath"
+    httpd.shutdown()
+
+
+def test_manifest_round_trip_with_bearer_auth(server):
+    state, repo = server
+    client = HttpRegistry("user", "secret")
+    assert client.get_manifest(repo, "sha-abc") is None
+    raw = json.dumps({"schemaVersion": 2, "config": {"digest": "sha256:" + "0" * 64}, "layers": []}).encode()
+    digest = client.put_manifest(repo, "sha-abc", raw, "application/vnd.oci.image.manifest.v1+json")
+    found = client.get_manifest(repo, "sha-abc")
+    assert found.digest == digest == sha256_digest(raw) and found.raw == raw
+    assert client.get_manifest(repo, digest).digest == digest
+
+
+def test_bad_credentials_permission_and_server_errors_are_errors_not_absence(server):
+    state, repo = server
+    with pytest.raises(RegistryError, match="authentication failed"):
+        HttpRegistry("user", "wrong").get_manifest(repo, "sha-abc")
+    with pytest.raises(RegistryError):
+        HttpRegistry(None, None).get_manifest(repo, "sha-abc")
+    state.mode = "deny"
+    with pytest.raises(RegistryError, match="403 DENIED"):
+        HttpRegistry("user", "secret").get_manifest(repo, "sha-abc")
+    state.mode = "broken"
+    with pytest.raises(RegistryError, match="500"):
+        HttpRegistry("user", "secret").get_manifest(repo, "sha-abc")
+
+
+def test_network_failure_is_an_error():
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    with pytest.raises(RegistryError):
+        HttpRegistry("user", "secret", timeout=5).get_manifest(f"127.0.0.1:{port}/owner/towpath", "sha-abc")
+
+
+def test_streamed_blob_upload_and_redirected_download(server, tmp_path):
+    state, repo = server
+    client = HttpRegistry("user", "secret")
+    payload = tmp_path / "source.tar.xz"
+    payload.write_bytes(b"x" * 300_000)
+    digest = "sha256:" + hashlib.sha256(payload.read_bytes()).hexdigest()
+    assert not client.blob_exists(repo, digest)
+    client.upload_blob(repo, payload, digest, payload.stat().st_size)
+    assert client.blob_exists(repo, digest)
+    assert client.get_blob(repo, digest) == payload.read_bytes()
+    assert state.redirect_saw_auth == [None]  # storage redirects are followed without registry credentials
+    uploads_before = len(state.blobs)
+    client.upload_blob(repo, payload, digest, payload.stat().st_size)  # already present: skipped
+    assert len(state.blobs) == uploads_before
+
+
+def test_index_resolves_to_the_linux_amd64_image(server):
+    state, repo = server
+    client = HttpRegistry("user", "secret")
+    config = json.dumps({"config": {"Labels": {"org.opencontainers.image.revision": "r"}}}).encode()
+    config_digest = sha256_digest(config)
+    client.upload_blob(repo, config, config_digest, len(config))
+    image = json.dumps({"schemaVersion": 2, "mediaType": "application/vnd.oci.image.manifest.v1+json",
+                        "config": {"digest": config_digest, "size": len(config)}, "layers": []}).encode()
+    image_digest = client.put_manifest(repo, "img", image,
+                                       "application/vnd.oci.image.manifest.v1+json")
+    index = json.dumps({"schemaVersion": 2, "mediaType": "application/vnd.oci.image.index.v1+json", "manifests": [
+        {"digest": image_digest, "platform": {"os": "linux", "architecture": "amd64"}},
+        {"digest": "sha256:" + "f" * 64, "platform": {"os": "unknown", "architecture": "unknown"}}]}).encode()
+    client.put_manifest(repo, "sha-r", index, "application/vnd.oci.image.index.v1+json")
+    found = client.get_manifest(repo, "sha-r")
+    assert found.is_index and platform_manifest(client, repo, found).digest == image_digest
+    assert image_config(client, repo, found) == (config_digest, json.loads(config))

@@ -143,6 +143,11 @@ These are built into the current documents. The owner can accept or overturn eac
 
   Both run unprivileged and start no service, mail sync, or scan.
 - **Deployment stays manual and local.** Pull, deploy, verify, and roll back are steps the owner runs.
+- **Revised 2026-10-04 after release review:**
+  - **Canonical image:** one per revision and target, `sha-<commit>`, built with ref-independent arguments.
+  - **Release tags:** aliases of the canonical manifest (same digest). An existing canonical image is promoted only after its labels, its source artifact, and the GitHub run that built and tested it are verified.
+  - **Corresponding source:** the exact source of every distribution package in each image is fetched, verified against `.dsc` checksums and the image's package list, and published to GHCR (`towpath-sources:sha256-<image config>`) before the image. Missing or mismatched source stops publication.
+  - **Core image:** drops CPython's readline, gdbm, and Berkeley DB modules.
 
 ## Facts to verify before implementation
 
@@ -188,3 +193,4 @@ These are built into the current documents. The owner can accept or overturn eac
 | 2026-10-02 | Owner's local fixes applied; Gmail sync hardening implemented on synthetic tests (pacing defaults 1 s, 1,200 units/min, 1,800,000 units/day as maximums; shared persistent budget and lock; recorded stops; page-level resume with reconcile and confirmed absence). Live validation and D16 pending | Built (synthetic) |
 | 2026-10-03 | D17: optional file discovery foundation on a separate branch; providers are existing tools (Recoll adapter, sist2 slot); separate `files.db`; grants per root and feature in the decisions store. Built on synthetic files only | Accepted (boundary); providers pending |
 | 2026-10-04 | D18: container images (`towpath`, `towpath-recoll`) built and tested in GitHub Actions, published to GHCR from trusted refs only, deployed by digest with pull-only Compose | Accepted (owner requirement); first publish pending owner action |
+| 2026-10-04 | D18 revised after release review: canonical image per revision with release tags as digest aliases; verified promotion; corresponding source for every bundled distribution package published before binaries; core image drops CPython modules linking GPL or Sleepycat libraries | Accepted; first publish pending owner action |
