@@ -231,6 +231,15 @@ Evidence, versions, and commits are in the [provider evaluation](evaluations/fil
 - Recoll reports no hashes, extraction errors, or truncation through the binding. Those fields stay empty or `null` rather than guessed.
 - Every Recoll query is scoped with `dir:` to the granted roots, and every row is still re-checked. Tests simulate a query that escapes its `dir:` clause.
 
+## Running in a container
+
+The `towpath-recoll` image holds Towpath, Recoll 1.36.1 with its binding, and the document helpers. The `towpath` image holds the CLI alone, which is enough for the fixture provider. Both are built and tested in CI and pulled by digest ([containers](setup/containers.md)).
+
+- **Mounts:** sources and the config are mounted read-only. State, the Recoll index, recovered copies, and scratch space are separate writable folders.
+- **Runtime:** containers run with no network, as an unprivileged user. Indexing and every search are manual commands.
+- **Config:** `python = "python3"` names the image's interpreter. A bare command name is looked up on `PATH`; a value containing `/` is a path, resolved against the config folder.
+- **Providers:** Recoll's adapter works. sist2 offers probe and version only. Configuring both is possible, but combined search and a full sist2 adapter are future work, and neither provider has been adopted.
+
 ## Context packet
 
 `towpath files context --purpose agent-context|life-evidence (--query Q | --occurrence ID ...)` builds a packet ([`context.py`](../src/towpath/discovery/context.py)). It calls no model, agent, or MCP server, and sends nothing anywhere.

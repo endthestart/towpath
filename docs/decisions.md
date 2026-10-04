@@ -130,6 +130,20 @@ These are built into the current documents. The owner can accept or overturn eac
 - **Limits:** no source writes, moves, deletes, or deduplication; no model calls; no automatic claim acceptance.
 - **Pending:** live evaluation of both tools on the owner's archives, and the choice between them. Both are local work ([handoff](setup/file-discovery-handoff.md)).
 
+### D18. Container build and release path
+
+**Accepted 2026-10-04 (owner requirement).** GitHub Actions tests the code, builds the container images, tests the built images, and publishes the tested images to GHCR. Arcane, or any deployment, only pulls an image by digest and runs it ([containers](setup/containers.md)).
+- **No building on the server.** Deployment Compose files have no `build:`. There is no self-hosted runner on the owner's network, and CI holds no Arcane secret.
+- **What publishes:** only pushes to `main`, `v*` tags, or a manual run with "publish" selected. It uses `GITHUB_TOKEN` with `packages: write` in that one job, and Actions are pinned by commit.
+- **Same image:** the published image is the tested one, loaded from the test job and checked by ID, never rebuilt.
+- **Tags:** revision tags are `sha-<commit>`, plus `vX.Y.Z` for releases. Existing tags are never overwritten, and there is no `latest`.
+- **Images:**
+  - `towpath`: the CLI, no Gmail or model extras.
+  - `towpath-recoll`: adds Recoll 1.36.1, its binding, and document helpers, with license notices.
+
+  Both run unprivileged and start no service, mail sync, or scan.
+- **Deployment stays manual and local.** Pull, deploy, verify, and roll back are steps the owner runs.
+
 ## Facts to verify before implementation
 
 | Claim used in the design | Affects |
@@ -173,3 +187,4 @@ These are built into the current documents. The owner can accept or overturn eac
 | 2026-10-01 | Built and tested on stubs: slice 1b model gateway; real Gmail client with read-only OAuth and scope refusal; D16 verification command; Paperless and Immich lookups; read-only Inbox Zero adapter; example config, config check, CI. Local verification handed to the owner | Built |
 | 2026-10-02 | Owner's local fixes applied; Gmail sync hardening implemented on synthetic tests (pacing defaults 1 s, 1,200 units/min, 1,800,000 units/day as maximums; shared persistent budget and lock; recorded stops; page-level resume with reconcile and confirmed absence). Live validation and D16 pending | Built (synthetic) |
 | 2026-10-03 | D17: optional file discovery foundation on a separate branch; providers are existing tools (Recoll adapter, sist2 slot); separate `files.db`; grants per root and feature in the decisions store. Built on synthetic files only | Accepted (boundary); providers pending |
+| 2026-10-04 | D18: container images (`towpath`, `towpath-recoll`) built and tested in GitHub Actions, published to GHCR from trusted refs only, deployed by digest with pull-only Compose | Accepted (owner requirement); first publish pending owner action |

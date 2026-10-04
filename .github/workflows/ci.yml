@@ -1,24 +1,210 @@
 name: ci
 
+# Tests every push and pull request, builds and tests the container images, and publishes the
+# tested images to GHCR only from trusted refs: pushes to main, tags v*, or a manual run with
+# "publish" selected. The published image is the one that passed the tests, loaded from the
+# test job's artifact and checked by ID; it is never rebuilt. Deployments only pull images.
+
 on:
   push:
   pull_request:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish the tested images for the selected ref to GHCR"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     strategy:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[dev]"
       - run: ruff check src tests
-      - run: towpath fixtures check-domains src tests docs examples README.md CONTRIBUTING.md
+      - run: towpath fixtures check-domains src tests docs examples deploy packaging README.md CONTRIBUTING.md
       - run: python -m pytest -q
+
+  image:
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [core, recoll]
+    env:
+      TARGET: ${{ matrix.target }}
+      PUBLISH: ${{ (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))) || (github.event_name == 'workflow_dispatch' && inputs.publish) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - name: Build the candidate image
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then version="$GITHUB_REF_NAME"; else version="sha-$GITHUB_SHA"; fi
+          docker build --target "$TARGET" \
+            --build-arg REVISION="$GITHUB_SHA" \
+            --build-arg VERSION="$version" \
+            --build-arg CREATED="$(git log -1 --format=%cI)" \
+            --build-arg SOURCE="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            -t "towpath-candidate:$TARGET" .
+          docker image inspect --format '{{.Id}}' "towpath-candidate:$TARGET" | tee "$RUNNER_TEMP/image-id"
+      - name: Test the candidate image
+        env:
+          TOWPATH_IMAGE: towpath-candidate:${{ matrix.target }}
+          TOWPATH_IMAGE_KIND: ${{ matrix.target }}
+          TOWPATH_REVISION: ${{ github.sha }}
+        # Scratch space is on the runner's disk ($RUNNER_TEMP), not a RAM filesystem.
+        run: python -m pytest -q -rs tests/container --basetemp "$RUNNER_TEMP/container-tests" -p no:cacheprovider
+      - name: Save the tested image
+        if: env.PUBLISH == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/tested"
+          docker save "towpath-candidate:$TARGET" | gzip -1 > "$RUNNER_TEMP/tested/image.tar.gz"
+          cp "$RUNNER_TEMP/image-id" "$RUNNER_TEMP/tested/image-id"
+      - if: env.PUBLISH == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tested-image-${{ matrix.target }}
+          path: ${{ runner.temp }}/tested
+          retention-days: 1
+          if-no-files-found: error
+
+  publish:
+    needs: image
+    if: (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))) || (github.event_name == 'workflow_dispatch' && inputs.publish)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [core, recoll]
+    concurrency:
+      group: publish-${{ github.sha }}-${{ matrix.target }}
+      cancel-in-progress: false
+    env:
+      TARGET: ${{ matrix.target }}
+    # No checkout: this job runs no repository code, only Docker and the tested artifact.
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: tested-image-${{ matrix.target }}
+          path: ${{ runner.temp }}/tested
+      - name: Load the tested image and confirm it is the same image
+        run: |
+          set -euo pipefail
+          gunzip -c "$RUNNER_TEMP/tested/image.tar.gz" | docker load
+          tested="$(cat "$RUNNER_TEMP/tested/image-id")"
+          loaded="$(docker image inspect --format '{{.Id}}' "towpath-candidate:$TARGET")"
+          echo "tested $tested"; echo "loaded $loaded"
+          test "$tested" = "$loaded"
+      - name: Push immutable revision tags
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          name=towpath; if [ "$TARGET" = recoll ]; then name=towpath-recoll; fi
+          repo="ghcr.io/$owner/$name"
+          echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          tags=("sha-$GITHUB_SHA")
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then tags+=("$GITHUB_REF_NAME"); fi
+          # Refuse to overwrite: a tag must be absent ("not found"); any other lookup error stops here.
+          for tag in "${tags[@]}"; do
+            if err="$(docker buildx imagetools inspect "$repo:$tag" 2>&1 > /dev/null)"; then
+              echo "::error::$repo:$tag already exists. Published tags are never overwritten."
+              exit 1
+            elif ! grep -qiE "not found|name_unknown|manifest_unknown" <<< "$err"; then
+              echo "::error::could not check whether $repo:$tag exists: $err"
+              exit 1
+            fi
+          done
+          for tag in "${tags[@]}"; do
+            docker tag "towpath-candidate:$TARGET" "$repo:$tag"
+            docker push "$repo:$tag"
+          done
+          digest="$(docker buildx imagetools inspect "$repo:${tags[0]}" --format '{{json .Manifest}}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["digest"])')"
+          {
+            echo "REPO=$repo"
+            echo "DIGEST=$digest"
+            echo "TAGS=${tags[*]}"
+          } >> "$GITHUB_ENV"
+      - name: Confirm the registry holds the tested image
+        run: |
+          set -euo pipefail
+          tested="$(cat "$RUNNER_TEMP/tested/image-id")"
+          docker buildx imagetools inspect --raw "$REPO@$DIGEST" > "$RUNNER_TEMP/manifest.json"
+          python3 - "$REPO" "$DIGEST" "$tested" "$RUNNER_TEMP/manifest.json" <<'PY'
+          import json, subprocess, sys
+          repo, digest, tested, path = sys.argv[1:]
+          manifest = json.load(open(path))
+          # A local image ID is either the pushed index/manifest digest (containerd image store) or
+          # the image config digest (classic store). Accept exactly those, nothing looser.
+          if digest == tested:
+              sys.exit(0)
+          manifests = manifest.get("manifests")
+          if manifests is None:
+              configs = [manifest["config"]["digest"]]
+          else:
+              configs = []
+              for entry in manifests:
+                  if entry.get("platform", {}).get("os") == "unknown":
+                      continue  # attestation manifests
+                  raw = subprocess.run(["docker", "buildx", "imagetools", "inspect", "--raw",
+                                        f"{repo}@{entry['digest']}"], capture_output=True, text=True, check=True)
+                  configs.append(json.loads(raw.stdout)["config"]["digest"])
+          if tested not in configs:
+              sys.exit(f"registry digest {digest} does not hold tested image {tested} (configs: {configs})")
+          PY
+      - name: Record the release
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/record"
+          python3 - > "$RUNNER_TEMP/record/release-$TARGET.json" <<'PY'
+          import json, os
+          print(json.dumps({
+              "image": os.environ["REPO"], "digest": os.environ["DIGEST"],
+              "reference": f"{os.environ['REPO']}@{os.environ['DIGEST']}",
+              "tags": os.environ["TAGS"].split(), "tested_image_id": open(os.environ["RUNNER_TEMP"] + "/tested/image-id").read().strip(),
+              "revision": os.environ["GITHUB_SHA"], "ref": os.environ["GITHUB_REF"],
+              "run": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+          }, indent=2))
+          PY
+          {
+            echo "### $TARGET image published"
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/record/release-$TARGET.json"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-${{ matrix.target }}
+          path: ${{ runner.temp }}/record
+          retention-days: 90

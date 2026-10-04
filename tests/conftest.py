@@ -14,6 +14,9 @@ from towpath.stores import open_store
 
 REPO = Path(__file__).resolve().parents[1]
 
+# Image tests run only against a built candidate image: TOWPATH_IMAGE=<image> pytest tests/container
+collect_ignore_glob = [] if os.environ.get("TOWPATH_IMAGE") else ["container/*"]
+
 
 class Files:
     """A synthetic file discovery corpus with the fixture provider and its example config."""
