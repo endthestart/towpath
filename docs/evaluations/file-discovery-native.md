@@ -41,6 +41,15 @@ The run recorded below happened in a cloud session on **synthetic files only** (
 - Both index everything under their roots. Towpath's own root, exclusion, and grant checks are required, and are applied to every row (tested with hostile provider rows).
 - Recoll's binding covers search, excerpt, and recovery, so it gets the first adapter. sist2 stays a capability slot until an excerpt and recovery interface is verified.
 
+## Re-run after the freshness and listing fixes (2026-10-04)
+
+Recoll 1.36.1 gave the same documents, case hits, nested recovery (SHA-256 identical), message date, and excerpt as the recorded report. Two more native checks now run as tests:
+
+- **Stale index:** a ZIP was changed without re-indexing. Recoll still reported the old `sig`, `fmtime`, and `pcbytes`, while its extractor read the new text. Towpath reported `changed` and refused excerpt and recovery. After `recollindex`, the result was `current` with the new text, and the old citation stayed `stale`.
+- **Listing exhaustion:** with folder rows in the listing, a cap one row short of the raw count gave `exhausted: false` and marked nothing missing. The exact raw count gave `exhausted: true`.
+
+sist2 was not re-run; nothing in its slot changed.
+
 ## Not done here (local work)
 
 - Runs on the owner's real archives: coverage, time, memory, and index size at scale.

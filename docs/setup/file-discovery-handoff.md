@@ -55,6 +55,7 @@ All of it was tested on synthetic files. None of it has met the owner's archives
    - Run `towpath files probe`, then `towpath files grant <root> search`, then `towpath files import`.
    - Record `by_status`, `refused_references`, `complete`, and the run time.
    - If the import fails with `output-limit`, record that (a known gap: enumeration is not chunked yet). Do not raise limits past their ceilings.
+   - Run `towpath files import --max-items 1` and confirm `complete: false`, `absence_established: false`, and `marked_missing: 0`. Recoll lists folders as rows, so the cap is reached even though they are filtered.
 7. **The defining example.**
    - `towpath files search "<words from the paper>"`: confirm the result names the ZIP, the mailbox, the message, and the attachment, with the message date.
    - Grant `excerpt`, run `files excerpt`, then `files cite`.
@@ -69,7 +70,17 @@ All of it was tested on synthetic files. None of it has met the owner's archives
    - Run `towpath files context --purpose agent-context --query ...` without an excerpt grant, then with one. Check that `omitted`, the uncertainty notes, and the limits are sensible.
    - Confirm a `life-evidence` packet is refused until that grant is given.
 10. **Staleness and rebuild, on a scratch copy only.**
-    - Copy one ZIP into a scratch root. Cite a passage from it, then modify the copy. `cite` must say `stale`, and `excerpt` must refuse.
+    - Copy one ZIP into a scratch root and index it. Cite a passage from it, then modify the copy **without** re-running `recollindex`. Then check:
+      - `describe` shows `provider_version: same` and `source: changed`;
+      - `cite` says `stale`;
+      - `excerpt` and `recover` refuse with `stale`.
+    - Run `recollindex` again, search again: the result is `current`, and the old citation stays `stale`.
+    - On the real Recoll version, confirm the stamp fields still behave as observed:
+      - `sig` is the outer size followed by the whole-second ctime;
+      - `pcbytes` is the outer size;
+      - `fmtime` is the outer mtime.
+
+      If they do not, `describe` shows which fields were compared (`source_fields_checked`). Record that.
     - Delete `files.db` and re-import: occurrence IDs and grants must survive.
 11. **Measurements.** For the real root, record:
     - index time, size, and memory;
