@@ -128,7 +128,11 @@ def _provider(raw: dict, roots: dict[str, Root], root: Path) -> ProviderConfig:
         if key in raw:
             options[key] = _path(raw[key], root, f"files provider {pid} {key}")
     if "python" in raw:
-        options["python"] = str(_path(raw["python"], root, f"files provider {pid} python"))
+        value = raw["python"]
+        if isinstance(value, str) and value and "/" not in value and "\x00" not in value:
+            options["python"] = value  # a command name, looked up on PATH (for example "python3")
+        else:
+            options["python"] = str(_path(value, root, f"files provider {pid} python"))
     if "command" in raw:
         command = raw["command"]
         if not isinstance(command, list) or not command or not all(isinstance(c, str) and c for c in command):

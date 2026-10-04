@@ -183,3 +183,14 @@ def test_example_files_config_loads_without_touching_anything():
     cfg = config_mod.load(REPO / "examples" / "files.example.toml")
     assert cfg.files.roots["old-backups"].exclude == ("private/*",)
     assert not cfg.sources and not cfg.endpoints
+
+
+def test_recoll_python_is_a_command_name_or_a_path(tmp_path):
+    base = FILES + '\n[[files.providers]]\nid = "rc"\nadapter = "recoll"\nroots = ["archive"]\nconfdir = "/srv/rc"\n'
+    cfg = write(tmp_path, base + 'python = "python3"\n')
+    assert cfg.files.providers["rc"].options["python"] == "python3"
+    cfg = write(tmp_path, base + 'python = "bin/python3"\n')
+    assert cfg.files.providers["rc"].options["python"] == str(tmp_path / "bin" / "python3")
+    cfg = write(tmp_path, base + 'python = "/usr/bin/python3"\n')
+    assert cfg.files.providers["rc"].options["python"] == "/usr/bin/python3"
+
