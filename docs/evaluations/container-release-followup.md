@@ -67,11 +67,11 @@ published canonical image rather than relying on later builds being identical.
 
 ## Remaining first-release gates
 
-- Review and integrate this follow-up into the cloud working branch, with CI.
-- Resolve the owner's source-retention policy before publication; the current
-  NOTICE promises availability while matching images are published and at
-  least three years after their last publication. No retention decision was
-  made by this local fix.
+- Follow-up integrated into the cloud working branch at `ea969d1`; merged-result
+  [CI passed](https://github.com/endthestart/towpath/actions/runs/37248970575).
+- Source retention accepted by the owner on 2026-10-04: published source
+  artifacts are retained indefinitely, including after matching images are
+  retired. Both image notices and D18 record the policy.
 - The actual first publishing workflow must complete Debian source collection
   and GHCR upload/download checks. Availability checks and registry rehearsals
   do not establish those results in advance.

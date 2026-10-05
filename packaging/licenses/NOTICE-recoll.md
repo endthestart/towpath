@@ -41,4 +41,4 @@ Each artifact holds:
 - a `manifest.json` tying each installed package to its source;
 - `SHA256SUMS`.
 
-Each image's release record names the artifact and its digest. To download it, run `oras pull <registry>/<owner>/towpath-sources:sha256-<config hex>`, or use any OCI client. The source stays published for as long as the image is, and at least three years after the image was last published.
+Each image's release record names the artifact and its digest. To download it, run `oras pull <registry>/<owner>/towpath-sources:sha256-<config hex>`, or use any OCI client. Published source artifacts are retained indefinitely, including after the matching image is retired.

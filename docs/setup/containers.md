@@ -144,7 +144,7 @@ Only the owner can do these, outside this repository:
 1. **Branch protection and release tags (before publishing).** Require the `ci` checks on `main`. Add a tag ruleset so only maintainers can create `v*` tags. A tag push is a trusted publishing ref.
 2. **Actions token.** Settings → Actions → General → Workflow permissions can stay at the read-only default. The `publish` job asks for `packages: write` and `actions: read` itself.
    - If an organization or enterprise policy forbids that, publishing fails at its first registry write.
-3. **Source retention.** Agree that source artifacts in `towpath-sources` are kept as long as the matching images, and for at least three years after an image was last published. The images' NOTICE promises this. Never delete a source artifact while its image is published.
+3. **Source retention (accepted 2026-10-04).** Published source artifacts in `towpath-sources` are retained indefinitely, including after their matching images are retired. The images' NOTICE promises this. Exclude these artifacts from expiry and automated cleanup.
 4. **First publish.** Merge this branch to `main`, or push a `v*` tag after merging; either triggers it. To publish from another branch, GitHub needs the workflow on `main` first, then "Run workflow" with **publish** ticked. In the run, check that:
    - both `publish` jobs succeeded and their summaries show a release record;
    - `created_by_this_run` is true for the first publish of a commit;
