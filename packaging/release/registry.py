@@ -28,6 +28,10 @@ NOT_FOUND_CODES = {"MANIFEST_UNKNOWN", "NAME_UNKNOWN", "BLOB_UNKNOWN", "NOT_FOUN
 class RegistryError(RuntimeError):
     """The registry could not answer (authentication, permission, network, or server error)."""
 
+    def __init__(self, message: str, *, status: int | None = None):
+        super().__init__(message)
+        self.status = status
+
 
 @dataclass(frozen=True)
 class Manifest:
@@ -76,13 +80,15 @@ class HttpRegistry:
         local = host.split(":")[0] in {"localhost", "127.0.0.1"}
         return f"{'http' if local else 'https'}://{host}"
 
-    def _token(self, challenge: str, host: str, scope_hint: str) -> str:
+    def _token(self, challenge: str, host: str, scope_hint: str, *, refresh: bool = False) -> str:
         params = dict(re.findall(r'(\w+)="([^"]*)"', challenge))
         realm = params.pop("realm", None)
         if not realm:
             raise RegistryError(f"{host}: unusable authentication challenge")
         params.setdefault("scope", scope_hint)
         key = (host, params.get("scope", ""))
+        if refresh:
+            self._tokens.pop(key, None)
         if key in self._tokens:
             return self._tokens[key]
         request = urllib.request.Request(f"{realm}?{urllib.parse.urlencode(params)}")
@@ -93,7 +99,7 @@ class HttpRegistry:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
                 data = json.load(response)
         except urllib.error.HTTPError as exc:
-            raise RegistryError(f"{host}: authentication failed ({exc.code})") from None
+            raise RegistryError(f"{host}: authentication failed ({exc.code})", status=exc.code) from None
         except (urllib.error.URLError, OSError) as exc:
             raise RegistryError(f"{host}: authentication service unreachable ({exc})") from None
         token = data.get("token") or data.get("access_token")
@@ -105,7 +111,9 @@ class HttpRegistry:
     def _request(self, method: str, host: str, path: str, *, scope: str, headers: dict | None = None,
                  data=None, url: str | None = None, auth: str | None = None):
         """Return (status, headers, body). Raises RegistryError for transport and auth failures."""
-        for attempt in (1, 2):
+        # Allow the initial challenge, then one refresh if the cached bearer token was refused.
+        # A persistently refused replacement still fails; uploads rewind before either retry.
+        for attempt in (1, 2, 3):
             request = urllib.request.Request(url or self._base(host) + path, method=method, data=data,
                                              headers=dict(headers or {}))
             if auth:
@@ -115,21 +123,21 @@ class HttpRegistry:
                     return response.status, response.headers, response.read()
             except urllib.error.HTTPError as exc:
                 body = exc.read()
-                if exc.code == 401 and attempt == 1:
+                if exc.code == 401 and attempt < 3:
                     challenge = exc.headers.get("WWW-Authenticate", "")
                     if challenge.lower().startswith("bearer"):
-                        auth = f"Bearer {self._token(challenge, host, scope)}"
+                        auth = f"Bearer {self._token(challenge, host, scope, refresh=bool(auth))}"
                     elif challenge.lower().startswith("basic") and self.username and self.password:
                         auth = "Basic " + base64.b64encode(f"{self.username}:{self.password}".encode()).decode()
                     else:
-                        raise RegistryError(f"{host}{path}: authentication required") from None
+                        raise RegistryError(f"{host}{path}: authentication required", status=401) from None
                     if hasattr(data, "seek"):
                         data.seek(0)
                     continue
                 return exc.code, exc.headers, body
             except (urllib.error.URLError, OSError) as exc:
                 raise RegistryError(f"{host}{path}: {getattr(exc, 'reason', exc)}") from None
-        raise RegistryError(f"{host}{path}: authentication was refused")
+        raise RegistryError(f"{host}{path}: authentication was refused", status=401)
 
     @staticmethod
     def _error(host: str, path: str, status: int, body: bytes) -> RegistryError:
@@ -137,7 +145,7 @@ class HttpRegistry:
             codes = [e.get("code") for e in json.loads(body).get("errors", [])]
         except ValueError:
             codes = []
-        return RegistryError(f"{host}{path}: HTTP {status} {' '.join(c for c in codes if c)}".strip())
+        return RegistryError(f"{host}{path}: HTTP {status} {' '.join(c for c in codes if c)}".strip(), status=status)
 
     @staticmethod
     def _not_found(status: int, body: bytes) -> bool:
@@ -229,6 +237,7 @@ class HttpRegistry:
                 raise self._error(host, start, status, body)
             location = urllib.parse.urljoin(location, headers["Location"])
             joiner = "&" if "?" in location else "?"
+            auth = self._auth_for(host, scope)  # PATCH may have refreshed an expired token.
             status, _, body = self._request("PUT", host, start, scope=scope, url=f"{location}{joiner}digest={digest}",
                                             auth=auth, headers={"Content-Length": "0"}, data=b"")
             if status != 201:

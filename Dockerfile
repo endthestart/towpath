@@ -6,8 +6,9 @@
 # Both run as an unprivileged user, start no service, and only run the command given
 # (default: --help). Nothing here syncs mail or scans files on its own.
 #
-# Image contents depend only on the source revision, never on the ref that triggered the build:
+# Build metadata depends only on the source revision, never on the ref that triggered the build:
 # VERSION is the Python package version and CREATED the commit time (both passed by CI).
+# Package archives may change between builds; releases reuse the first tested canonical image.
 # Every distribution package is upgraded to the archive's current version at build time, so CI
 # can fetch and publish the exact corresponding source for each one (packaging/release/sources.py).
 

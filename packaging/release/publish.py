@@ -128,8 +128,9 @@ def build_sources_artifact(bundle: Path, revision: str, source_url: str) -> Sour
                               len(licenses)), licenses))
     for source in meta["sources"]:
         for entry in source["files"]:
-            layers.append((descriptor(entry["name"], "application/octet-stream", "sha256:" + entry["sha256"],
-                                      entry["size"]), bundle / "sources" / entry["name"]))
+            layers.append((descriptor("sources/" + entry["name"], "application/octet-stream",
+                                      "sha256:" + entry["sha256"], entry["size"]),
+                           bundle / "sources" / entry["name"]))
     manifest = {
         "schemaVersion": 2, "mediaType": OCI_MANIFEST, "artifactType": SOURCES_ARTIFACT_TYPE,
         "config": {"mediaType": SOURCES_CONFIG_TYPE, "digest": sha256_digest(config_raw), "size": len(config_raw)},
@@ -181,8 +182,10 @@ def anonymously_readable(anonymous, repository: str, reference: str) -> bool:
     try:
         anonymous.get_manifest(repository, reference)
         return True
-    except RegistryError:
-        return False
+    except RegistryError as exc:
+        if exc.status in (401, 403):
+            return False
+        raise  # A failed probe leaves visibility unknown; it does not establish private access.
 
 
 def check_source_reachable(ctx: Context, anonymous, image_tag: str, sources_tag: str) -> dict:

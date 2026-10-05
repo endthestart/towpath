@@ -22,6 +22,10 @@ class State:
         self.manifests, self.blobs, self.uploads = {}, {}, {}
         self.mode = "ok"
         self.redirect_saw_auth = []
+        self.token_generation = 1
+        self.token_requests = 0
+        self.expire_on_patch = False
+        self.reject_bearer = False
 
 
 def handler_for(state: State, port_holder: list):
@@ -42,8 +46,15 @@ def handler_for(state: State, port_holder: list):
             self._send(status, json.dumps({"errors": [{"code": code}]}).encode(), {"Content-Type": "application/json"})
 
         def _authorized(self, name):
-            if self.headers.get("Authorization", "").startswith("Bearer t-"):
+            if self.command == "PATCH" and state.expire_on_patch:
+                state.token_generation += 1
+                state.expire_on_patch = False
+            if not state.reject_bearer and self.headers.get("Authorization", "").startswith(
+                    f"Bearer t-{state.token_generation}-"):
                 return True
+            # Consume a rejected upload body so the client receives the 401 rather than a reset.
+            if self.command == "PATCH":
+                self.rfile.read(int(self.headers.get("Content-Length") or 0))
             realm = f"http://127.0.0.1:{port_holder[0]}/token"
             self._send(401, b"", {"WWW-Authenticate": f'Bearer realm="{realm}",service="test",'
                                                       f'scope="repository:{name}:pull,push"'})
@@ -55,7 +66,8 @@ def handler_for(state: State, port_holder: list):
                 if self.headers.get("Authorization") != "Basic dXNlcjpzZWNyZXQ=":  # user:secret
                     return self._send(401)
                 scope = parse_qs(url.query).get("scope", [""])[0]
-                return self._send(200, json.dumps({"token": f"t-{scope}"}).encode())
+                state.token_requests += 1
+                return self._send(200, json.dumps({"token": f"t-{state.token_generation}-{scope}"}).encode())
             if url.path.startswith("/storage/"):
                 state.redirect_saw_auth.append(self.headers.get("Authorization"))
                 if self.headers.get("Authorization"):
@@ -138,18 +150,51 @@ def test_manifest_round_trip_with_bearer_auth(server):
     assert client.get_manifest(repo, digest).digest == digest
 
 
+def test_expired_cached_bearer_token_is_refreshed(server):
+    state, repo = server
+    client = HttpRegistry("user", "secret")
+    assert client.get_manifest(repo, "sha-abc") is None
+    assert state.token_requests == 1
+    state.token_generation += 1
+    assert client.get_manifest(repo, "sha-abc") is None
+    assert state.token_requests == 2
+
+
+def test_token_expiry_during_streamed_upload_rewinds_the_payload(server, tmp_path):
+    state, repo = server
+    client = HttpRegistry("user", "secret")
+    payload = tmp_path / "source.tar.xz"
+    payload.write_bytes(b"source package\n" * 20_000)
+    digest = sha256_digest(payload.read_bytes())
+    state.expire_on_patch = True
+    client.upload_blob(repo, payload, digest, payload.stat().st_size)
+    assert state.blobs[digest] == payload.read_bytes()
+    assert state.token_requests == 2
+
+
+def test_bearer_refresh_is_bounded_when_new_tokens_are_also_refused(server):
+    state, repo = server
+    state.reject_bearer = True
+    with pytest.raises(RegistryError, match="HTTP 401"):
+        HttpRegistry("user", "secret").get_manifest(repo, "sha-abc")
+    assert state.token_requests == 2
+
+
 def test_bad_credentials_permission_and_server_errors_are_errors_not_absence(server):
     state, repo = server
-    with pytest.raises(RegistryError, match="authentication failed"):
+    with pytest.raises(RegistryError, match="authentication failed") as denied:
         HttpRegistry("user", "wrong").get_manifest(repo, "sha-abc")
+    assert denied.value.status == 401
     with pytest.raises(RegistryError):
         HttpRegistry(None, None).get_manifest(repo, "sha-abc")
     state.mode = "deny"
-    with pytest.raises(RegistryError, match="403 DENIED"):
+    with pytest.raises(RegistryError, match="403 DENIED") as denied:
         HttpRegistry("user", "secret").get_manifest(repo, "sha-abc")
+    assert denied.value.status == 403
     state.mode = "broken"
-    with pytest.raises(RegistryError, match="500"):
+    with pytest.raises(RegistryError, match="500") as broken:
         HttpRegistry("user", "secret").get_manifest(repo, "sha-abc")
+    assert broken.value.status == 500
 
 
 def test_network_failure_is_an_error():
