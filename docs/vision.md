@@ -27,6 +27,8 @@ See [ADR 0001](adrs/0001-reference-first-digital-life.md). The current UI and co
 
 The source backlog includes Gmail, IMAP accounts, iMessage, file indexes, old mail backups, document/photo libraries, project inventories, Google Takeout, Facebook exports, other messages, contacts and calendars. Their order is open. Named sources are not claims of current support.
 
+The current week's core source priorities are Gmail, IMAP and file-indexing sources; Takeout/Facebook registration or a bounded import is an optional pilot. See [archive source locations](specs/archive-source-locations.md). This source choice does not yet settle whether search covers metadata, full text or semantic retrieval.
+
 A live source and an old export may represent overlapping evidence. Keep occurrences and dates distinct; link possible matches without automatically merging. Unknown format support, unreadable containers and incomplete coverage remain visible.
 
 Use a maintained, suitable existing importer or indexer before writing a new parser. Existing research is dated input: verify the candidate's current API, license, maintenance and behavior before adoption. The public application uses explicitly configured OpenAI-compatible endpoints; Poundlock is an optional provider. Self-hosted AI may classify, connect and summarize permitted evidence while retaining uncertainty, citations and human review.

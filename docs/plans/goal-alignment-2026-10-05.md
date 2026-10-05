@@ -7,6 +7,8 @@ Status: Interview in progress, one question at a time, at most eight. This recor
 1. **Recurring outcomes:** one interface to find a digital life; organize and own its content for reuse in resumes, portfolios, rediscovery and other workflows; build an evidence-linked life timeline and portfolio.
 2. **Ownership sequence:** organize references and collections where sources live first; selected durable local copies with periodic sync next; owner-chosen local source independence later; physical file/folder organization last. The backlog includes messaging, IMAP, files, exports, backups and existing inventories as well as Gmail.
 
+3. **This week's source priorities:** Gmail, IMAP and file-indexing sources are core. A source-location specification or one-time Takeout/Facebook export pilot is optional. Export processing depth is still to decide; existing source locations are the proposed starting point ([archive source specification](../specs/archive-source-locations.md)).
+
 The consolidation handoff is planning input. Towpath should reuse manifests, catalogs, provenance and qualification receipts through its discovery interfaces. Project identity, file content, source occurrences and verification stay distinct. Preserve unknown hashes and coverage gaps; classifications and relationships are reviewable. Physical consolidation and infrastructure operations remain separate.
 
 ## Evidence and documentation reconciliation
@@ -19,6 +21,6 @@ The earlier [weekly schedule](2026-10-05-local-iteration-week.md) is marked unde
 
 ## Next decision
 
-Question 3: Which sources should be searchable together in the first convincing end-of-week demonstration? Existing Gmail metadata, IMAP, iMessage, file/project inventories and exported archives are possible inputs; selection and depth of indexing remain open.
+Question 4: Should the first unified search deliver keyword/full-text results, natural-language questions with source-linked answers, or both? Content indexing depth and model-processing scope remain open.
 
 After source priorities are clear, continue with the expected discovery experience, permitted AI work, reuse/collection workflow, weekly capacity and acceptance criteria as needed. Stop the interview early if the remaining decisions are already clear; do not turn the eight-question maximum into a requirement.
