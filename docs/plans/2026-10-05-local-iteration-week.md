@@ -1,0 +1,27 @@
+# Local iteration week: October 5–9, 2026
+
+By Friday, aim to have a useful local email explorer and a small evidence-linked life-summary prototype. Deliver one usable increment each day. This is a working plan: adapt after the owner tries each increment, and carry unfinished prerequisites forward before adding dependent features.
+
+The starting point is the optional [local email UI](../setup/local-ui.md), with overview, metadata search, Inbox/Sent/attachment filters, and message metadata details. A local full metadata index has completed; account-specific results stay private. Message bodies and attachment contents are not displayed by the UI. The broader [roadmap](../roadmap.md) includes later capabilities and contains older milestone status; this week does not imply those milestones are complete.
+
+| Day | Iteration | End-of-day check |
+| --- | --- | --- |
+| **Monday, October 5** | **Establish the usable baseline.** The local UI is running. Try three searches that matter to the owner, including Sent and an attachment name. Fix the most noticeable browsing problems: dates, navigation, filters, missing context or confusing status. Record the next improvements using synthetic examples. | The owner can find and open saved metadata for a known message. Findings distinguish a missing feature from an indexing defect. |
+| **Tuesday, October 6** | **Keep the index current and the app easy to run.** Verify paced incremental sync, restart behavior and the remaining structure-only validation gates. Add understandable sync freshness, progress and error status to the UI. Provide simple local start/stop instructions. Freeze a GitHub-visible handoff for substantial content-view work if needed. | Newly arrived mail appears after an incremental refresh; failures are visible; restarting preserves progress. D16 stays open until its required live checks pass. No full rescan is started merely to refresh the UI. |
+| **Wednesday, October 7** | **Read a selected message on demand.** Connect an explicit UI request to the existing content queue and credential-owning connector. Display plain text first, with loading, unavailable and error states. Show related indexed messages using existing thread references. Keep bulk content fetching out of this iteration. | Requesting one selected message fetches only the required parts; normal browsing fetches none. Synthetic tests cover MIME/charset cases and unsafe content. Local acceptance uses owner-selected examples. |
+| **Thursday, October 8** | **Find and recover a document.** Improve attachment browsing, show the message it came from, and allow an explicitly selected attachment to be fetched and saved locally through the existing connector. Show size, type and provenance; make unavailable files understandable. If this works early, evaluate one existing document-library presence check. | The owner can search for a filename, identify its source message and recover that selected file. Ordinary browsing downloads nothing; originals and connected libraries are unchanged. |
+| **Friday, October 9** | **Build the first life-summary preview and review the week.** Start with a handful of owner-selected messages, a simple event/story card and links back to evidence. Let the owner enter or correct wording and dates, keeping those decisions separate from regenerated data. Use manual curation first; model assistance is a stretch item under the existing grants. | A small story preview opens its supporting evidence and retains an owner's correction after restart. Review what worked, what remains blocked and the next implementation handoff. If content viewing is unfinished, Friday completes that prerequisite instead. |
+
+## Local and cloud responsibilities
+
+The local agent handles small fixes, running the app, private configuration, account/provider checks, and owner-guided acceptance. It does not browse personal messages to invent test cases; use synthetic fixtures and aggregate live checks, with the owner selecting any content examples.
+
+The cloud agent can take a substantial, bounded implementation such as Wednesday's content-request UI and rendering contract. Supply a branch, public specification, synthetic fixtures, tests and explicit acceptance criteria. It works exclusively from GitHub and receives no account data, credentials, private paths, infrastructure details or access to local services. Review and test its returned changes locally before using them with private data.
+
+Towpath reuses its existing queue, connector, pacing, stores and provider interfaces. It adds coordination and views rather than a new mail sync engine, archive parser or search service. File discovery remains a separate optional connection; a NAS-wide scan is not required to make this email iteration useful.
+
+## Daily completion rule
+
+End each day with a usable demo, the appropriate tests, a short record of what actually passed, and a clear next action. Keep portable code and synthetic findings in GitHub; private validation output stays outside the repository. Preserve existing Gmail read-only access and pacing. The UI holds no provider credentials; content fetches stay with the connector. Back up durable owner decisions when they are introduced.
+
+Container publication, authenticated remote serving and deployment remain a separate lane. Return to those after the local workflow is useful; they are not prerequisites for this week's local iterations.
