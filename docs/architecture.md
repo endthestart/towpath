@@ -1,61 +1,91 @@
 # Towpath architecture
 
-Status: proposed boundaries for public review. This is a design document, not an implementation claim.
+Status: **design, partly built.** This is the overview. A read-only command-line implementation of the connect and worker roles exists and has been tested on synthetic data and stubs only; the web UI, action runner, life stream, and Compose file do not exist yet. Built pieces are listed in the [roadmap](roadmap.md); everything else here is design. Decisions and open questions are in [decisions](decisions.md).
 
-## The three concerns
+## What Towpath is
 
-| Concern | Purpose | Input | Output | Can change a live account? |
-| --- | --- | --- | --- | --- |
-| Mail management | Help people handle today's email | Provider read adapter or a chosen mail archive | Analyses and action proposals | Only through an optional, scoped action executor after review |
-| Life summary | Recover and curate a personal history | Evidence adapters for mail, messages, calendars, photos, documents, memories | Search, timeline, claims, narratives | No |
-| Personal mail evacuation | Preserve one person's historical Gmail independently, then decide whether to remove provider copies | Their accounts and backups | A local living archive and migration records | Yes, in that person's separate migration process |
+Towpath is a self-hosted web application for managing your digital life, starting with email, and for building an evidence-linked life story from the sources you connect. You log in, connect accounts and tools, and work through reviewable suggestions. Towpath is the front end and the coordinator. Wherever a capable open-source tool already exists, Towpath connects to it instead of rebuilding it.
 
-Mail management must be useful while mail remains in Gmail or another provider. Life summary must work without email. People can run either Towpath capability alone, both together, or neither with the personal evacuation process. This preserves the option to keep mail at the provider if Towpath makes it useful there.
+It has two capabilities that share one application:
+
+| Capability | What a person does with it | First source | Changes anything outside Towpath? |
+| --- | --- | --- | --- |
+| [Mail management](mail-management.md) | Unsubscribe, find important unanswered mail, draft replies, categorize, run smart rules and digests (through an integrated mail-management tool, Inbox Zero first); route attachments to the tools that should hold them (Towpath) | A Gmail account (more providers later) | Yes: the integrated tool changes the mailbox under its own settings; Towpath's deliveries go through its action runner after approval |
+| [Life stream](life-stream.md) | Find people, events, places, photos, and documents across connected sources; review claims with citations and uncertain dates; ask questions with cited answers; later, curate a story to share | Mail, then contacts, photo libraries, document systems, calendars, and recollections | No |
+
+Mail management needs write access to the mailbox; the life stream does not. Mail management is useful on its own. The life stream is built after it and starts from mail, but its design does not depend on mail: any connected source can supply evidence.
+
+## Integrate first
+
+Towpath writes code only where no suitable tool or library exists. For each need, the order of preference is:
+
+1. **Connect to a tool the person already runs** (for example, an existing document system or photo library), by URL and credential.
+2. **Bundle an existing open-source tool** in Towpath's Docker Compose file as an optional service.
+3. **Use an existing library** inside Towpath (for example, a provider's official API client or a standard-library mail parser).
+4. **Write Towpath code** for what remains: the user interface, the review and approval workflow, adapters, and the evidence and claim model.
+
+[Integrations](integrations.md) lists candidate tools per need. Every entry is a candidate until its current behavior, license, and fit are verified.
+
+Towpath does not own the originals held by connected tools. A photo stays in the photo library and a document stays in the document system; Towpath stores references to them, plus anything a person explicitly chooses to preserve.
+
+## System view
 
 ```mermaid
 flowchart LR
-    Provider[Live mail provider] --> MailRead[Mail read adapter]
-    Archive[Optional independent archive] --> MailRead
-    MailRead --> MailReview[Mail analysis and review]
-    MailReview --> Proposal[Exact action proposal]
-    Proposal --> Executor[Optional action executor]
-    Executor --> Provider
+    Person((Person)) --> Web
 
-    MailRead -. optional evidence .-> Evidence[Evidence adapters and references]
-    Other[Messages, calendars, media, documents, memories] --> Evidence
-    Evidence --> Claims[Proposed claims with citations]
-    Claims --> Curator[Human review]
-    Curator --> Story[Search, timeline, life summary]
+    subgraph Compose[Towpath Docker Compose]
+        Web[towpath-web: UI, review, approvals, connection setup screens]
+        Worker[towpath-worker: analysis, scans, model calls]
+        Connect[towpath-connect: read adapters, read credentials]
+        Act[towpath-act: action runner, write credentials]
+        DB[(Towpath stores)]
+        Bundled[Optional bundled tools: mail management, model server, document system, photo library]
+    end
 
-    Migration[Personal Gmail evacuation project] --> Archive
+    subgraph External[Already deployed or hosted elsewhere]
+        Mail[Mail provider]
+        Docs[Document system]
+        Photos[Photo library]
+        Other[Contacts, calendars, other sources]
+        Models[OpenAI-compatible model endpoints]
+    end
+
+    Connect --> Mail
+    Connect --> Docs
+    Connect --> Photos
+    Connect --> Other
+    Connect --> Bundled
+    Connect --> DB
+    Worker --> DB
+    Worker --> Models
+    Worker --> Bundled
+    Web --> DB
+    Web -- approved, frozen proposals --> Act
+    Bundled -- mail-management tool, own write access --> Mail
+    Act --> Docs
+    Act --> Photos
 ```
 
-The dashed link is optional. The migration process is outside Towpath's application boundary. An archive integration reads a documented export or supported API and does not acquire authority to delete provider mail.
+Each external tool can be replaced by its bundled equivalent, or left out. [Components](components.md) defines the services, stores, credentials, and Compose layout. [Interfaces](interfaces.md) defines the records that cross service boundaries.
 
-## Shared infrastructure, separate authority
+## Design rules
 
-Mail management and life summary may share a deployment, a job queue, an evidence reference format, and provider configuration. They keep separate write permissions and user-facing workflows. Shared storage does not imply that a life-history claim can trigger a mailbox action.
+1. **AI proposes; evidence establishes.** Rules and models produce proposals. A fact is accepted only by a person, against cited evidence. A booking email supports "a trip was planned", not "the trip happened".
+2. **Proposals, not actions, in Towpath.** Every change Towpath itself makes outside its own stores (for example a document upload) is a proposal until a person approves it, and only the action runner carries it out. Model output can never become an approval. An integrated tool, such as the mail-management provider, acts under its own settings, which the owner configures.
+3. **Credentials follow services.** The service that parses untrusted content and calls models holds no account credential. Read credentials live in `towpath-connect`; Towpath's write credentials live only in `towpath-act`; an integrated tool keeps its own credentials in its own container. Each credential-holding service runs its own connection setup, so the web UI never handles the token.
+4. **Index broadly, fetch narrowly.** With read access to a whole mailbox, Towpath indexes metadata and part structure and fetches content one item at a time when a feature needs it. Read access is not a copy. Providers do not always separate structure from content, so connectors must prove what they receive ([D16](decisions.md#d16-gmail-structure-without-content)).
+5. **Reference what others own.** Photos, documents, and messages stay in their systems. Towpath stores stable references and, only by explicit choice, a preserved copy of evidence that might otherwise disappear.
+6. **Audience and model use from the start.** Every item and claim has an audience (who may see it) and a model-use setting (where it may be processed), set independently. Items excluded from model use never go to a model, whatever endpoint grants exist ([life stream](life-stream.md#audience-and-model-use)).
+7. **Human decisions are originals.** Approvals, corrections, accepted claims, and recollections (in their original wording, with attribution) are durable. Indexes, embeddings, classifications, and model outputs are rebuildable, and are never the only surviving copy of evidence.
+8. **No implicit model destination.** Every model call uses an explicitly configured endpoint and data-class grant. See [model providers](model-providers.md).
 
-| Component | Responsibility | Authority |
-| --- | --- | --- |
-| Source adapters | Read from a provider, archive, or existing application; record source IDs, coverage, and acquisition time | Read credentials only |
-| Evidence store | Preserve immutable input or stable references, source-specific occurrences, and hashes where bytes are held | Writes only its own storage |
-| Analysis workers | Deterministic extraction first; model-backed proposals for ambiguous material | Read scoped evidence; write derived records |
-| Review | Show source citations, uncertainty, conflicting evidence, and action details; record corrections | Changes derived decisions, not originals |
-| Mail executor | Execute an approved, frozen proposal against one account and return a receipt | Narrow provider write credential; no authority over life claims |
-| Narrative exporter | Produce a selected reading edition and its evidence links | Read only items released for that audience |
-| Model provider adapter | Call an explicitly configured endpoint and record model/route metadata | No account or file-system mutation tools |
+## Not part of Towpath
 
-The [mail boundary](mail-boundaries.md) gives the executor flow. The [provider design](model-providers.md) defines the model contract. The [publication rules](publication.md) separate application code from a user's deployment.
+**Moving mail out of a provider.** The owner may someday move historical Gmail into a local archive. That is a separate personal project with its own tools. Towpath never requires it, does not plan around it, and has no features for it. If someone later has a local mail archive, Towpath can read it as an ordinary optional source like any other ([integrations](integrations.md#sources)).
 
-## Evidence and claim contract
-
-An evidence record identifies its source and namespace, original identifier, acquisition time, byte hash if archived, original time fields and timezone assumptions, content location, authorship, access policy, and coverage gaps. Equal Message-IDs or hashes do not collapse distinct account occurrences.
-
-A claim is a statement about a person, event, place, relationship, or period. It stores a date expression and precision, evidence spans, producer and version, and proposed/accepted/rejected/superseded state. A message about an intended trip supports a *plan*; it does not by itself prove travel occurred. A person's recollection is attributed evidence, with its original wording and described period.
-
-Derived indexes, vectors, summaries, and model outputs can be rebuilt. A correction remains attached to its evidence and survives a model change. Narratives cite accepted claims or attributed recollections and require release review before sharing.
+**Replacing existing tools.** Towpath does not aim to be a document manager, photo library, mail server, or archive, and it uses an existing mail-management tool while that tool fits.
 
 ## Public deployment contract
 
-The application must run without Poundlock, a specific NAS, a particular mail archive, or private infrastructure. First installation should configure storage, a mail read adapter only if desired, and a model endpoint only if desired. Capabilities that need an unavailable API route stay disabled with a clear reason. No cloud destination is inferred from a model name.
+Towpath must run without Poundlock, a specific storage device or model host, a mail archive, or any particular private infrastructure. A first installation starts the Towpath services; every connection, bundled tool, and model endpoint is optional and configured after login. Features whose connection or API route is unavailable stay disabled with a stated reason. The [publication rules](publication.md) keep private data and deployment details out of this repository.

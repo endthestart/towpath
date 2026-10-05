@@ -1,0 +1,4 @@
+# Recoll configuration for the container layout in compose.example.yml.
+# Copy to TOWPATH_INDEX_DIR/recoll/recoll.conf. The index is written next to it.
+topdirs = /data/roots/archive
+# Recoll's other settings stay at their defaults; see Recoll's documentation before changing them.

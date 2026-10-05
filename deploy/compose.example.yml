@@ -1,0 +1,45 @@
+# Generic Compose example for Towpath file discovery. It only pulls a published image; it never
+# builds one. Copy this file and env.example (as .env) to a private deployment folder, fill in the
+# values there, and pin TOWPATH_IMAGE to a digest that a CI run tested and published
+# (docs/setup/containers.md).
+#
+# `docker compose up` runs one `towpath files status` check and exits. Nothing runs continuously,
+# nothing syncs mail, and nothing scans files unless you run a command yourself:
+#
+#   docker compose run --rm towpath files probe --config /config/towpath.toml
+#   docker compose --profile index run --rm recoll-index        # build or refresh the Recoll index
+#   docker compose run --rm towpath files search "words" --config /config/towpath.toml
+
+name: towpath-files
+
+x-hardened: &hardened
+  image: ${TOWPATH_IMAGE:?set TOWPATH_IMAGE to ghcr.io/OWNER/towpath-recoll@sha256:DIGEST}
+  user: "10001:10001"
+  read_only: true
+  network_mode: none
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  restart: "no"
+
+services:
+  towpath:
+    <<: *hardened
+    command: ["files", "status", "--config", "/config/towpath.toml"]
+    volumes:
+      - ${TOWPATH_SOURCE_DIR:?set TOWPATH_SOURCE_DIR}:/data/roots/archive:ro
+      - ${TOWPATH_CONFIG_DIR:?set TOWPATH_CONFIG_DIR}:/config:ro
+      - ${TOWPATH_INDEX_DIR:?set TOWPATH_INDEX_DIR}:/index:ro
+      - ${TOWPATH_STATE_DIR:?set TOWPATH_STATE_DIR}:/state
+      - ${TOWPATH_RECOVERED_DIR:?set TOWPATH_RECOVERED_DIR}:/recovered
+      - ${TOWPATH_SCRATCH_DIR:?set TOWPATH_SCRATCH_DIR}:/tmp
+
+  # Manual only (profile "index"): builds or refreshes the Recoll index. Sources stay read-only.
+  recoll-index:
+    <<: *hardened
+    profiles: ["index"]
+    entrypoint: ["recollindex"]
+    command: ["-c", "/index/recoll"]
+    volumes:
+      - ${TOWPATH_SOURCE_DIR:?set TOWPATH_SOURCE_DIR}:/data/roots/archive:ro
+      - ${TOWPATH_INDEX_DIR:?set TOWPATH_INDEX_DIR}:/index
+      - ${TOWPATH_SCRATCH_DIR:?set TOWPATH_SCRATCH_DIR}:/tmp

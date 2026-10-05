@@ -1,0 +1,21 @@
+# Towpath configuration for the container layout in compose.example.yml. Paths are inside the
+# container. Copy to TOWPATH_CONFIG_DIR/towpath.toml. No mail source, model endpoint, or credential
+# is needed for file discovery.
+
+[stores]
+dir = "/state"
+
+[files]
+recover_dir = "/recovered"
+
+[[files.roots]]
+alias = "archive"
+path = "/data/roots/archive"
+exclude = ["private/*"]
+
+[[files.providers]]
+id = "recoll"
+adapter = "recoll"
+roots = ["archive"]
+confdir = "/index/recoll"
+python = "python3"

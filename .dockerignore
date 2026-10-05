@@ -1,0 +1,9 @@
+# Only what the image build needs.
+*
+!pyproject.toml
+!README.md
+!LICENSE
+!src/
+!packaging/
+**/__pycache__
+**/*.pyc

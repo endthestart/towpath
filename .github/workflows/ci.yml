@@ -1,0 +1,190 @@
+name: ci
+
+# Tests every push and pull request, builds and tests the container images, checks that the exact
+# corresponding source of every bundled distribution package is available, and publishes to GHCR
+# only from trusted refs: pushes to main, tags v*, or a manual run with "publish" selected.
+#
+# Publication (packaging/release/publish.py, docs/setup/containers.md):
+# - one canonical image per revision and target, sha-<commit>, never overwritten;
+# - its corresponding source is published first, as towpath-sources:sha256-<image config>;
+# - a release tag vX.Y.Z is an alias of the canonical manifest (same digest), never a rebuild;
+# - an existing canonical image is promoted only after its labels, source, and builder run are verified.
+# The publish job builds nothing; it pushes the image tested in this run, or promotes an earlier one.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish the tested images for the selected ref to GHCR"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e ".[dev]"
+      - run: ruff check src tests packaging
+      - run: towpath fixtures check-domains src tests docs examples deploy packaging README.md CONTRIBUTING.md
+      - run: python -m pytest -q
+
+  image:
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [core, recoll]
+    env:
+      TARGET: ${{ matrix.target }}
+      PUBLISH: ${{ (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))) || (github.event_name == 'workflow_dispatch' && inputs.publish) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - name: Build the candidate image
+        # Build arguments depend on the commit, never on the ref. Package archives can change
+        # between runs; publication reuses the first tested canonical image for this revision.
+        run: |
+          set -euo pipefail
+          version="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          docker build --target "$TARGET" \
+            --build-arg REVISION="$GITHUB_SHA" \
+            --build-arg VERSION="$version" \
+            --build-arg CREATED="$(git log -1 --format=%cI)" \
+            --build-arg SOURCE="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            -t "towpath-candidate:$TARGET" .
+          docker image inspect --format '{{.Id}}' "towpath-candidate:$TARGET" | tee "$RUNNER_TEMP/image-id"
+      - name: Test the candidate image
+        env:
+          TOWPATH_IMAGE: towpath-candidate:${{ matrix.target }}
+          TOWPATH_IMAGE_KIND: ${{ matrix.target }}
+          TOWPATH_REVISION: ${{ github.sha }}
+        # Includes a publication rehearsal against a throwaway local registry. Scratch space is on the
+        # runner's disk ($RUNNER_TEMP), not a RAM filesystem.
+        run: python -m pytest -q -rs tests/container --basetemp "$RUNNER_TEMP/container-tests" -p no:cacheprovider
+      - name: Check that every bundled package's exact source is available
+        if: env.PUBLISH != 'true'
+        run: python packaging/release/sources.py check --image "towpath-candidate:$TARGET" --work "$RUNNER_TEMP/sources-check"
+      - name: Save the tested image
+        if: env.PUBLISH == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/tested"
+          docker save -o "$RUNNER_TEMP/tested/image.tar" "towpath-candidate:$TARGET"
+          python -c 'import sys; sys.path.insert(0, "packaging/release"); import sources, pathlib; print(sources.config_digest_from_save(pathlib.Path(sys.argv[1])))' "$RUNNER_TEMP/tested/image.tar" | tee "$RUNNER_TEMP/tested/config-digest"
+          gzip -1 "$RUNNER_TEMP/tested/image.tar"
+          cp "$RUNNER_TEMP/image-id" "$RUNNER_TEMP/tested/image-id"
+      - name: Collect and verify the corresponding source
+        if: env.PUBLISH == 'true'
+        run: |
+          python packaging/release/sources.py collect --image "towpath-candidate:$TARGET" \
+            --work "$RUNNER_TEMP/sources-work" --bundle "$RUNNER_TEMP/tested/sources" --target "$TARGET" \
+            --revision "$GITHUB_SHA" --config-digest "$(cat "$RUNNER_TEMP/tested/config-digest")" \
+            --source-repository "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT"
+      - if: env.PUBLISH == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tested-image-${{ matrix.target }}
+          path: ${{ runner.temp }}/tested
+          retention-days: 3
+          if-no-files-found: error
+
+  publish:
+    needs: image
+    if: (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))) || (github.event_name == 'workflow_dispatch' && inputs.publish)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+      actions: read # to verify the run that built an already published image
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [core, recoll]
+    concurrency:
+      group: publish-${{ github.sha }}-${{ matrix.target }}
+      cancel-in-progress: false
+    env:
+      TARGET: ${{ matrix.target }}
+    # Builds nothing. Runs only the standard-library release scripts from this commit.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: packaging/release
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: tested-image-${{ matrix.target }}
+          path: ${{ runner.temp }}/tested
+      - name: Load the tested image and confirm it is the same image
+        run: |
+          set -euo pipefail
+          tested_config="$(cat "$RUNNER_TEMP/tested/config-digest")"
+          saved_config="$(python3 -c 'import sys; sys.path.insert(0, "packaging/release"); import sources, pathlib; print(sources.config_digest_from_save(pathlib.Path(sys.argv[1])))' "$RUNNER_TEMP/tested/image.tar.gz")"
+          test "$tested_config" = "$saved_config"
+          gunzip -c "$RUNNER_TEMP/tested/image.tar.gz" | docker load
+          tested="$(cat "$RUNNER_TEMP/tested/image-id")"
+          loaded="$(docker image inspect --format '{{.Id}}' "towpath-candidate:$TARGET")"
+          echo "tested $tested (config $tested_config)"; echo "loaded $loaded"
+          test "$tested" = "$loaded"
+      - name: Publish source, then the image, then release aliases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY_USERNAME: ${{ github.actor }}
+          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          name=towpath; if [ "$TARGET" = recoll ]; then name=towpath-recoll; fi
+          echo "$REGISTRY_PASSWORD" | docker login ghcr.io -u "$REGISTRY_USERNAME" --password-stdin
+          mkdir -p "$RUNNER_TEMP/record"
+          python3 packaging/release/publish.py --target "$TARGET" \
+            --repository "ghcr.io/$owner/$name" --sources-repository "ghcr.io/$owner/towpath-sources" \
+            --local-image "towpath-candidate:$TARGET" --tested-config "$(cat "$RUNNER_TEMP/tested/config-digest")" \
+            --revision "$GITHUB_SHA" --ref "$GITHUB_REF" --source-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --bundle "$RUNNER_TEMP/tested/sources" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --record "$RUNNER_TEMP/record/release-$TARGET.json"
+      - name: Record the release
+        if: always()
+        run: |
+          {
+            echo "### $TARGET release record"
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/record/release-$TARGET.json" 2>/dev/null || echo "no record: publication did not complete"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-${{ matrix.target }}
+          path: ${{ runner.temp }}/record
+          retention-days: 90
+          if-no-files-found: error
