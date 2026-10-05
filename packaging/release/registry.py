@@ -230,18 +230,22 @@ class HttpRegistry:
         handle = open(path_or_bytes, "rb") if not isinstance(path_or_bytes, bytes) else None
         try:
             payload = handle if handle is not None else path_or_bytes
+            chunk_headers = {"Content-Type": "application/octet-stream", "Content-Length": str(size)}
+            if size:
+                chunk_headers["Content-Range"] = f"0-{size - 1}"
             status, headers, body = self._request(
                 "PATCH", host, start, scope=scope, url=location, auth=auth, data=payload,
-                headers={"Content-Type": "application/octet-stream", "Content-Length": str(size)})
+                headers=chunk_headers)
             if status != 202:
-                raise self._error(host, start, status, body)
+                raise RegistryError(f"PATCH upload failed: {self._error(host, start, status, body)}", status=status)
             location = urllib.parse.urljoin(location, headers["Location"])
             joiner = "&" if "?" in location else "?"
             auth = self._auth_for(host, scope)  # PATCH may have refreshed an expired token.
             status, _, body = self._request("PUT", host, start, scope=scope, url=f"{location}{joiner}digest={digest}",
-                                            auth=auth, headers={"Content-Length": "0"}, data=b"")
+                                            auth=auth, headers={"Content-Length": "0",
+                                                               "Content-Type": "application/octet-stream"}, data=b"")
             if status != 201:
-                raise self._error(host, start, status, body)
+                raise RegistryError(f"PUT upload failed: {self._error(host, start, status, body)}", status=status)
         finally:
             if handle is not None:
                 handle.close()
