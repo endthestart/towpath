@@ -1,5 +1,6 @@
 """Behaviour of the release scripts (packaging/release) against in-memory registry, Docker, and runs."""
 
+import io
 import json
 import sys
 import tarfile
@@ -222,7 +223,7 @@ def test_first_publication_through_a_release_tag(world):
     sources_manifest = world.registry.manifests[(SOURCES_REPO, f"sha256-{config[7:]}")]
     assert sources_manifest.body["annotations"]["io.towpath.image.config"] == config
     titles = {layer["annotations"]["org.opencontainers.image.title"] for layer in sources_manifest.body["layers"]}
-    assert {"manifest.json", "SHA256SUMS", "README.md", "licenses.tar", "foo_1.0-1.dsc"} <= titles
+    assert {"manifest.json", "SHA256SUMS", "README.md", "licenses.tar", "sources/foo_1.0-1.dsc"} <= titles
 
 
 def test_repeated_main_publication_is_a_no_op(world):
@@ -399,6 +400,26 @@ def test_sources_artifact_is_reproducible(world):
     assert first.digest == second.digest and first.manifest_raw == second.manifest_raw
 
 
+def test_downloaded_source_artifact_matches_documented_checksum_layout(world):
+    """An OCI client saves layers by title; the documented untar/check steps must work."""
+    config, bundle = world.build("main-build", "101")
+    artifact = publish.build_sources_artifact(bundle, REV, SOURCE_URL)
+    downloaded = world.tmp / "downloaded"
+    downloaded.mkdir()
+    for descriptor, payload in artifact.layers:
+        name = descriptor["annotations"]["org.opencontainers.image.title"]
+        path = downloaded / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(payload if isinstance(payload, bytes) else payload.read_bytes())
+    with tarfile.open(fileobj=io.BytesIO((downloaded / "licenses.tar").read_bytes())) as tar:
+        tar.extractall(downloaded, filter="data")
+    for line in (downloaded / "SHA256SUMS").read_text().splitlines():
+        expected, _, name = line.partition("  ")
+        path = downloaded / name
+        assert path.is_file(), f"documented checksum path is missing after pull: {name}"
+        assert sources.sha256_file(path) == expected
+
+
 # ------------------------------------------------------------------- sources.py checks
 
 
@@ -478,8 +499,24 @@ class FakeAnonymous:
 
     def get_manifest(self, repository, reference):
         if repository not in self.public:
-            raise RegistryError(f"{repository}: HTTP 401 UNAUTHORIZED")
+            raise RegistryError(f"{repository}: HTTP 401 UNAUTHORIZED", status=401)
         return self.registry.get_manifest(repository, reference)
+
+
+@pytest.mark.parametrize("failed_repo", [IMAGE_REPO, SOURCES_REPO])
+def test_unknown_anonymous_visibility_blocks_binary_publication(world, failed_repo):
+    config, bundle = world.build("main-build", "101")
+
+    class UnreachableAnonymous(FakeAnonymous):
+        def get_manifest(self, repository, reference):
+            if repository == failed_repo:
+                raise RegistryError("anonymous registry probe timed out")
+            return super().get_manifest(repository, reference)
+
+    with pytest.raises(RegistryError, match="timed out"):
+        publish.publish(world.ctx("main-build", config, bundle), world.registry, world.docker,
+                        world.runs, UnreachableAnonymous(world.registry, {IMAGE_REPO, SOURCES_REPO}))
+    assert world.docker.pushed == []
 
 
 def test_public_image_with_private_source_is_refused(world):
@@ -502,4 +539,3 @@ def test_public_image_with_private_source_is_refused(world):
                            FakeAnonymous(world.registry, {IMAGE_REPO, SOURCES_REPO}))
     assert both["sources"]["visibility"]["image_public"] and both["sources"]["visibility"]["sources_public"]
     assert_tags_resolve(world, both)
-

@@ -118,7 +118,7 @@ Pull requests and other branch pushes build and test, but never publish.
 
 - **One canonical image per revision and target:** `ghcr.io/<owner>/towpath:sha-<commit>` and `ghcr.io/<owner>/towpath-recoll:sha-<commit>`.
   - The first trusted run to reach publication pushes its tested image there, and that tag is never rewritten.
-  - The image's contents depend only on the commit: revision, package version, commit time, and repository URL. They never depend on the ref that triggered the build.
+  - Build metadata records the revision, package version, commit time, and repository URL; it never depends on the triggering ref. Package archives can change between builds of the same commit, so later runs may build different candidates. Release aliases reuse the first published canonical image.
 - **Release tags are aliases.** For a tag `vX.Y.Z`, the canonical manifest's exact bytes are written under `vX.Y.Z`, so the digest is the same. Nothing is rebuilt or re-pushed. The same commit's main publish and release publish therefore yield one image.
 - **Promoting an existing canonical image** (a release after main, or any retry) requires all of:
   - its labels name this revision, this repository, and this image;
