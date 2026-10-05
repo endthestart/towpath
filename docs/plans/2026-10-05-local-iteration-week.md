@@ -1,5 +1,7 @@
 # Local iteration week: October 5–9, 2026
 
+**Status: under revision after the 2026-10-05 goal-alignment interview.** The owner requested a more substantial plan around cross-source discovery, ownership and reuse. This earlier email-focused schedule is retained as history, not the agreed weekly scope. See [vision](../vision.md).
+
 By Friday, aim to have a useful local email explorer and a small evidence-linked life-summary prototype. Deliver one usable increment each day. This is a working plan: adapt after the owner tries each increment, and carry unfinished prerequisites forward before adding dependent features.
 
 The starting point is the optional [local email UI](../setup/local-ui.md), with overview, metadata search, Inbox/Sent/attachment filters, and message metadata details. A local full metadata index has completed; account-specific results stay private. Message bodies and attachment contents are not displayed by the UI. The broader [roadmap](../roadmap.md) includes later capabilities and contains older milestone status; this week does not imply those milestones are complete.

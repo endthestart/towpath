@@ -1,19 +1,19 @@
 # Towpath architecture
 
-Status: **design, partly built.** This is the overview. A read-only command-line implementation of the connect and worker roles exists and has been tested on synthetic data and stubs only; the web UI, action runner, life stream, and Compose file do not exist yet. Built pieces are listed in the [roadmap](roadmap.md); everything else here is design. Decisions and open questions are in [decisions](decisions.md).
+Status: **design, partly built.** Read-only CLI roles and an optional local email UI exist. A full Gmail metadata index has completed in local acceptance; remaining live validation gates are tracked separately. Other adapters and workflows have synthetic/stub evidence as documented. The action runner, life stream and service Compose layout remain design. See the [vision](vision.md), [roadmap](roadmap.md) and [decisions](decisions.md).
 
 ## What Towpath is
 
-Towpath is a self-hosted web application for managing your digital life, starting with email, and for building an evidence-linked life story from the sources you connect. You log in, connect accounts and tools, and work through reviewable suggestions. Towpath is the front end and the coordinator. Wherever a capable open-source tool already exists, Towpath connects to it instead of rebuilding it.
+Towpath is one self-hosted interface to discover a person's digital life, curate and reuse its contents, and build an evidence-linked timeline and portfolio. Sources include live accounts, local applications, files, exports, backups and recovered collections. Email is the first working source. Towpath connects existing specialist tools and adds the common references, relationships, collections, review and user interface. The [vision](vision.md) records the phased ownership direction.
 
-It has two capabilities that share one application:
+| Capability | What a person does with it | Ownership |
+| --- | --- | --- |
+| Discovery and curation | Search connected sources, trace occurrences, distinguish versions and coverage, curate reference collections | Towpath owns references and owner decisions; source systems retain originals |
+| Evidence-linked reuse | Assemble cited material for another workflow, such as a resume, portfolio or agent context packet | Consumers retain their own review, authorship and publication decisions |
+| [Life stream](life-stream.md) | Connect people, projects, events, places and memories with evidence, uncertain dates and review | Towpath owns reviewed claims and recollections |
+| [Mail management](mail-management.md) | Use an integrated tool for mailbox features and separately approved attachment deliveries | The tool retains its own access; Towpath deliveries use its action runner |
 
-| Capability | What a person does with it | First source | Changes anything outside Towpath? |
-| --- | --- | --- | --- |
-| [Mail management](mail-management.md) | Unsubscribe, find important unanswered mail, draft replies, categorize, run smart rules and digests (through an integrated mail-management tool, Inbox Zero first); route attachments to the tools that should hold them (Towpath) | A Gmail account (more providers later) | Yes: the integrated tool changes the mailbox under its own settings; Towpath's deliveries go through its action runner after approval |
-| [Life stream](life-stream.md) | Find people, events, places, photos, and documents across connected sources; review claims with citations and uncertain dates; ask questions with cited answers; later, curate a story to share | Mail, then contacts, photo libraries, document systems, calendars, and recollections | No |
-
-Mail management needs write access to the mailbox; the life stream does not. Mail management is useful on its own. The life stream is built after it and starts from mail, but its design does not depend on mail: any connected source can supply evidence.
+Discovery and life evidence can use any connected source. They do not require optional mail-management integration to be finished first. References and collections lead development; durable copies, source independence and physical organization are later phases under [ADR 0001](adrs/0001-reference-first-digital-life.md).
 
 ## Integrate first
 
@@ -82,7 +82,7 @@ Each external tool can be replaced by its bundled equivalent, or left out. [Comp
 
 ## Not part of Towpath
 
-**Moving mail out of a provider.** The owner may someday move historical Gmail into a local archive. That is a separate personal project with its own tools. Towpath never requires it, does not plan around it, and has no features for it. If someone later has a local mail archive, Towpath can read it as an ordinary optional source like any other ([integrations](integrations.md#sources)).
+**Operating a provider migration as an implicit part of indexing.** Discovery reads and references sources. Later ownership features may help a person preserve content and evaluate an independent local source, but transfers, provider retirement/deletion and recovery qualification remain separately scoped operational workflows. An existing local mail archive is an ordinary optional source. See [ADR 0001](adrs/0001-reference-first-digital-life.md).
 
 **Replacing existing tools.** Towpath does not aim to be a document manager, photo library, mail server, or archive, and it uses an existing mail-management tool while that tool fits.
 

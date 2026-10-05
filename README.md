@@ -1,11 +1,12 @@
 # Towpath
 
-Towpath is an open-source, self-hosted web application for managing your digital life, starting with email, and for building an evidence-linked life story from the sources you connect.
+Towpath is an open-source, self-hosted workspace to discover your digital life, organize and reuse its contents, and build an evidence-linked timeline and portfolio. Email is the first working source. See the [product vision](docs/vision.md).
 
 **Status: read-only command-line tools and an optional local email UI.** The CLI can index Gmail read-only (with your own OAuth client), find attachments, check whether Paperless-ngx or Immich already holds them, call explicitly configured model endpoints under policy, read Inbox Zero statistics, and optionally search folders, archives, and old mail backups through Recoll. The [local UI](docs/setup/local-ui.md) browses and searches the saved email metadata without credentials or mailbox access. There is no action runner yet. Portable acceptance tests use synthetic data and stubs; live deployment checks stay private. Container images of the CLI (with optional Recoll) are built and tested in GitHub Actions; publication to GHCR has additional [release gates](docs/evaluations/container-release-followup.md). The UI currently runs natively in Python. Follow the [local quickstart](docs/setup/local-quickstart.md) to connect your own sources.
 
 ## What it will do
 
+- **Discovery and reuse:** search connected accounts, files, exports and existing inventories; curate reference collections and source-linked packets for other applications or agents. See the [project rediscovery pilot](docs/specs/project-rediscovery-pilot.md).
 - **Mail management:** unsubscribing, important mail still waiting for your reply, draft replies, categories, and smart rules come from an integrated mail-management tool (Inbox Zero first) running in Towpath's Compose setup with its own Gmail access. Towpath adds routing attachments to your document system or photo library, through a separately permissioned action runner after you approve.
 - **Life stream:** find people, events, places, photos, and documents across connected sources and turn them into reviewable claims with citations, uncertain dates, and visible contradictions. Ask questions and get cited answers. In the long term, curate a story to share with family. It starts from mail but works with any source.
 
@@ -15,7 +16,7 @@ Towpath is the front end and coordinator. It connects to tools people already ru
 
 Model features use explicitly configured OpenAI-compatible endpoints: base URL, credential, model, and destination. Poundlock is one optional endpoint; a bundled local model server or any compatible API works the same way. Personal data is not sent to any endpoint outside the machine unless the owner grants it, and items can be kept local-only or excluded from models entirely. See [model providers](docs/model-providers.md).
 
-Moving mail out of a provider is not part of Towpath.
+Discovery and curation come first. Durable copies, source independence and physical organization are later phases with separately scoped operational workflows ([ADR 0001](docs/adrs/0001-reference-first-digital-life.md)).
 
 ## Running the first slice
 

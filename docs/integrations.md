@@ -56,6 +56,8 @@ Destinations report different hash algorithms, so presence checks compute the al
 
 ## Sources
 
+The broader source backlog includes IMAP, iMessage, file/project manifests, old mailbox backups, Takeout and Facebook exports. Existing source-specific importers are candidates to verify before adoption. The [vision](vision.md) records this scope; listing a source does not claim current support.
+
 | Source | Candidate | License class | Notes |
 | --- | --- | --- | --- |
 | Contacts | Google People API (`contacts.readonly`, plus `contacts.other.readonly` for automatically saved contacts); CardDAV through vdirsyncer and vobject | Open source libraries | Incremental sync tokens |

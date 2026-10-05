@@ -152,6 +152,10 @@ These are built into the current documents. The owner can accept or overturn eac
   - **Source retention (owner approved 2026-10-04):** published corresponding-source artifacts are retained indefinitely, including after matching images are retired. They have no expiry and are excluded from automated cleanup.
   - **Core image:** drops CPython's readline, gdbm, and Berkeley DB modules.
 
+### D19. Reference-first discovery and phased ownership
+
+**Accepted product direction 2026-10-05.** One interface for discovery, collections, evidence-linked reuse and a life timeline/portfolio across live sources, files, exports and backups. Develop references/curation first, selected durable copies and sync later, owner-chosen source independence later, physical organization last. Existing inventories and manifests are sources, not instructions to copy or clean up their contents. [ADR 0001](adrs/0001-reference-first-digital-life.md) records identity, provenance and operational boundaries. D9/D10 delivery priorities are under review in the ongoing interview; naming sources does not claim implemented support.
+
 ## Facts to verify before implementation
 
 | Claim used in the design | Affects |
@@ -198,3 +202,4 @@ These are built into the current documents. The owner can accept or overturn eac
 | 2026-10-04 | D18: container images (`towpath`, `towpath-recoll`) built and tested in GitHub Actions, published to GHCR from trusted refs only, deployed by digest with pull-only Compose | Accepted (owner requirement); first publish pending owner action |
 | 2026-10-04 | D18 revised after release review: canonical image per revision with release tags as digest aliases; verified promotion; corresponding source for every bundled distribution package published before binaries; core image drops CPython modules linking GPL or Sleepycat libraries | Accepted; first publish pending owner action |
 | 2026-10-04 | D18 source-retention policy: published corresponding-source artifacts are retained indefinitely, including after matching images are retired | Accepted (owner review) |
+| 2026-10-05 | D19: reference-first digital-life discovery and phased ownership; reuse existing inventories | Accepted product direction; delivery priorities pending interview |
