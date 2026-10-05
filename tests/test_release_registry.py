@@ -26,6 +26,7 @@ class State:
         self.token_requests = 0
         self.expire_on_patch = False
         self.reject_bearer = False
+        self.require_upload_headers = None
 
 
 def handler_for(state: State, port_holder: list):
@@ -105,9 +106,18 @@ def handler_for(state: State, port_holder: list):
                     return self._send(202, b"", {"Location": f"/v2/{name}/blobs/uploads/{upload}"})
                 upload = rest[1]
                 if self.command == "PATCH":
+                    if state.require_upload_headers == "PATCH" and (
+                        self.headers.get("Content-Range") != f"0-{len(body) - 1}"
+                        or self.headers.get("Content-Type") != "application/octet-stream"
+                    ):
+                        return self._error(404, "BLOB_UPLOAD_INVALID")
                     state.uploads[upload] += body
                     return self._send(202, b"", {"Location": f"/v2/{name}/blobs/uploads/{upload}?state=x"})
                 if self.command == "PUT":
+                    if state.require_upload_headers == "PUT" and (
+                        self.headers.get("Content-Type") != "application/octet-stream"
+                    ):
+                        return self._error(404, "BLOB_UPLOAD_INVALID")
                     digest = parse_qs(url.query)["digest"][0]
                     data = state.uploads.pop(upload) + body
                     if sha256_digest(data) != digest:
@@ -219,6 +229,18 @@ def test_streamed_blob_upload_and_redirected_download(server, tmp_path):
     uploads_before = len(state.blobs)
     client.upload_blob(repo, payload, digest, payload.stat().st_size)  # already present: skipped
     assert len(state.blobs) == uploads_before
+
+
+@pytest.mark.parametrize("phase", ["PATCH", "PUT"])
+def test_blob_upload_sends_required_range_and_binary_content_type(server, tmp_path, phase):
+    state, repo = server
+    state.require_upload_headers = phase
+    payload = tmp_path / "source.tar.xz"
+    payload.write_bytes(b"synthetic source archive\n" * 100)
+    digest = sha256_digest(payload.read_bytes())
+    client = HttpRegistry("user", "secret")
+    client.upload_blob(repo, payload, digest, payload.stat().st_size)
+    assert client.get_blob(repo, digest) == payload.read_bytes()
 
 
 def test_index_resolves_to_the_linux_amd64_image(server):

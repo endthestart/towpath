@@ -67,6 +67,28 @@ published canonical image rather than relying on later builds being identical.
 
 ## Remaining first-release gates
 
+### First live GHCR attempt
+
+PR #2 merged into `main` at `f6fa18a`. The owner's approved repository
+protections require all three Python test jobs and both container jobs on
+`main`, including for administrators. A release-tag ruleset restricts creation
+of `v*` tags to maintainers and administrators.
+
+[The first publishing run](https://github.com/endthestart/towpath/actions/runs/37359138296)
+passed both container suites and full corresponding-source collection. Both
+publication jobs then failed with `HTTP 404 BLOB_UPLOAD_INVALID` while uploading
+source blobs, before reaching the binary-image push.
+
+The client omitted the upload chunk's `Content-Range` and the closing request's
+binary `Content-Type`. The [OCI distribution specification](https://github.com/opencontainers/distribution-spec/blob/main/spec.md#pushing-a-blob-in-chunks)
+describes these upload headers. Two synthetic regression cases reject their
+omission with the same error; both failed before the fix and pass with it.
+Upload errors now identify whether PATCH or PUT failed without logging upload
+URLs or credentials. A successful live retry is still required to establish
+that this change resolves GHCR publication.
+
+### Outstanding validation
+
 - Follow-up integrated into the cloud working branch at `ea969d1`; merged-result
   [CI passed](https://github.com/endthestart/towpath/actions/runs/37248970575).
 - Source retention accepted by the owner on 2026-10-04: published source
