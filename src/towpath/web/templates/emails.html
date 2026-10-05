@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block title %}Email · Towpath{% endblock %}
+{% block content %}
+<header class="page-head compact"><p class="eyebrow">EMAIL EXPLORER</p><h1>Find what you remember.</h1>
+<p class="lead">Search your saved email metadata.</p></header>
+<form class="search" method="get" action="{% url 'emails' %}">
+  <label for="query" class="sr-only">Search subject, sender, or attachment name</label>
+  <input id="query" name="q" value="{{ query }}" maxlength="200" placeholder="Search subject, sender, or attachment name…" type="search">
+  <input type="hidden" name="view" value="{{ view }}"><button class="button" type="submit">Search →</button>
+</form>
+<nav class="tabs" aria-label="Email views">
+  <a href="?view=all&amp;q={{ query|urlencode }}" {% if view == 'all' %}aria-current="page"{% endif %}>All mail</a>
+  <a href="?view=inbox&amp;q={{ query|urlencode }}" {% if view == 'inbox' %}aria-current="page"{% endif %}>Inbox</a>
+  <a href="?view=sent&amp;q={{ query|urlencode }}" {% if view == 'sent' %}aria-current="page"{% endif %}>Sent</a>
+  <a href="?view=attachments&amp;q={{ query|urlencode }}" {% if view == 'attachments' %}aria-current="page"{% endif %}>With attachments</a>
+</nav>
+<div class="result-heading"><strong>{{ count|floatformat:'0g' }} message{{ count|pluralize }}</strong><span>Dates in UTC · {{ view_title }}</span></div>
+<section class="mail-list" aria-label="Search results">
+{% for row in rows %}
+  <a class="mail-row" href="{% url 'email' row.item_id %}">
+    <span class="sender">{{ row.from_addr|default:'Unknown sender' }}</span>
+    <span class="mail-title"><strong>{{ row.subject|default:'(No subject)' }}</strong>
+      <span class="mail-tags">{% if 'SENT' in row.labels %}<span>Sent</span>{% endif %}{% if row.attachment_count %}<span>{{ row.attachment_count }} file{{ row.attachment_count|pluralize }}</span>{% endif %}</span></span>
+    <time>{{ row.display_date|date:'M j, Y'|default:'Date unknown' }}</time><span class="row-arrow" aria-hidden="true">↗</span>
+  </a>
+{% empty %}<div class="empty"><h2>No messages found.</h2><p>Try a shorter phrase, a sender, or a file name.</p></div>{% endfor %}
+</section>
+<nav class="pagination" aria-label="Result pages"><span>Page {{ page|floatformat:'0g' }} of {{ pages|floatformat:'0g' }}</span>
+<div>{% if page > 1 %}<a href="{{ previous_url }}">← Previous</a>{% endif %}{% if page < pages %}<a href="{{ next_url }}">Next →</a>{% endif %}</div></nav>
+<p class="footnote">Search covers saved metadata, including attachment names. Message text and the contents of files are not searched.</p>
+{% endblock %}

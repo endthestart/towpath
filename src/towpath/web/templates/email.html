@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block title %}Message · Towpath{% endblock %}
+{% block content %}
+<a class="back-link" href="{% url 'emails' %}">← Email explorer</a>
+<header class="page-head"><p class="eyebrow">SAVED MESSAGE DETAILS</p><h1 class="message-subject">{{ item.subject|default:'(No subject)' }}</h1>
+<p class="lead">{{ item.from_addr|default:'Unknown sender' }}</p></header>
+<section class="detail-card"><dl><div><dt>Date</dt><dd>{{ item.display_date|date:'M j, Y · H:i'|default:'Unknown' }} UTC</dd></div>
+<div><dt>Labels</dt><dd>{% for label in item.labels %}<span class="tag">{{ label }}</span>{% empty %}None recorded{% endfor %}</dd></div>
+<div><dt>Evidence reference</dt><dd class="reference">{{ item.item_id }}</dd></div></dl>
+<p class="body-note">This view shows saved metadata. Message content is not displayed or downloaded by the UI.</p></section>
+<section class="detail-card"><p class="eyebrow">ATTACHMENT REFERENCES</p>
+{% for file in item.attachments %}<div class="attachment"><strong>{{ file.filename }}</strong><span>{{ file.mime_type }}{% if file.size %} · {{ file.size|filesizeformat }}{% endif %}</span></div>
+{% empty %}<p>No named attachments recorded.</p>{% endfor %}</section>
+{% endblock %}

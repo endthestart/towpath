@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{% block title %}Towpath{% endblock %}</title>
+  <link rel="stylesheet" href="{% url 'stylesheet' %}">
+</head>
+<body>
+  <aside class="sidebar">
+    <a href="{% url 'overview' %}" class="brand"><span class="brand-mark">↝</span> towpath</a>
+    <p class="brand-note">Make sense of what you keep.</p>
+    <nav aria-label="Main navigation">
+      <a href="{% url 'overview' %}" {% if nav == 'overview' %}aria-current="page"{% endif %}>Overview <span>↗</span></a>
+      <a href="{% url 'emails' %}" {% if nav == 'email' %}aria-current="page"{% endif %}>Email <span>↗</span></a>
+    </nav>
+    <div class="sidebar-bottom"><span class="status-dot"></span> Local · read only<p>Your existing index, on this computer.</p></div>
+  </aside>
+  <main>{% block content %}{% endblock %}</main>
+</body>
+</html>

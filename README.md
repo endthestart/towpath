@@ -2,7 +2,7 @@
 
 Towpath is an open-source, self-hosted web application for managing your digital life, starting with email, and for building an evidence-linked life story from the sources you connect.
 
-**Status: read-only command-line tools built and tested on synthetic data and stubs; not yet run against real accounts.** The repository has the design documents and a CLI that can index Gmail read-only (with your own OAuth client), find attachments, check whether Paperless-ngx or Immich already holds them, call explicitly configured model endpoints under policy, read Inbox Zero statistics, and (optionally) search folders, archives, and old mail backups through Recoll. Nothing here can change a mailbox or library. There is no web UI or action runner yet. Container images of the CLI (with optional Recoll for file discovery) are built and tested in GitHub Actions and published to GHCR from trusted refs ([containers](docs/setup/containers.md)); the Compose example only pulls them. To try it on your own accounts, follow the [local quickstart](docs/setup/local-quickstart.md).
+**Status: read-only command-line tools and an optional local email UI.** The CLI can index Gmail read-only (with your own OAuth client), find attachments, check whether Paperless-ngx or Immich already holds them, call explicitly configured model endpoints under policy, read Inbox Zero statistics, and optionally search folders, archives, and old mail backups through Recoll. The [local UI](docs/setup/local-ui.md) browses and searches the saved email metadata without credentials or mailbox access. There is no action runner yet. Portable acceptance tests use synthetic data and stubs; live deployment checks stay private. Container images of the CLI (with optional Recoll) are built and tested in GitHub Actions; publication to GHCR has additional [release gates](docs/evaluations/container-release-followup.md). The UI currently runs natively in Python. Follow the [local quickstart](docs/setup/local-quickstart.md) to connect your own sources.
 
 ## What it will do
 
@@ -25,7 +25,7 @@ Requires Python 3.11 or newer. Everything runs on generated synthetic data, with
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-python -m pytest                        # 94 tests: acceptance checks, slice 1b, adapters, sync hardening
+python -m pytest                        # acceptance checks for mail, models, discovery, releases, and UI
 towpath fixtures generate /tmp/towpath-demo
 cd /tmp/towpath-demo
 towpath connect sync                    # index synthetic accounts and destination folders
@@ -36,6 +36,17 @@ towpath proposals list
 ```
 
 Proposals cannot be executed; there is no write path. See [first slice](docs/first-slice.md) for what it tests and what it taught, and `towpath --help` for every command.
+
+## Local email UI
+
+Install the optional interface, then point it at the folder containing your existing `source.db`:
+
+```sh
+pip install -e ".[web]"
+towpath web serve --store-dir /path/to/private/state
+```
+
+Open `http://127.0.0.1:8790/`. The overview, email search, Inbox/Sent filters, and attachment references read the index only. Message bodies and file contents are not displayed or searched. For a credentials-free demo and the local preview's limits, see [local UI setup](docs/setup/local-ui.md).
 
 ## Design documents
 

@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block title %}Overview · Towpath{% endblock %}
+{% block content %}
+<header class="page-head"><p class="eyebrow">YOUR DIGITAL LIFE</p><h1>A place to find your way.</h1>
+<p class="lead">Start with your email. Find a conversation, revisit a moment, or recover a document.</p></header>
+<section class="metrics" aria-label="Email index summary">
+  <div class="metric"><p>Messages indexed</p><strong>{{ total|floatformat:'0g' }}</strong><span>Saved email metadata</span></div>
+  <div class="metric"><p>Sent messages</p><strong>{{ sent|floatformat:'0g' }}</strong><span>Your side of the conversation</span></div>
+  <div class="metric"><p>Attachment references</p><strong>{{ attachments|floatformat:'0g' }}</strong><span>Names and file details</span></div>
+</section>
+<section class="feature-card"><div><p class="eyebrow">EMAIL EXPLORER</p><h2>Find what you already have.</h2>
+<p>Search subjects, senders, and attachment names. Narrow the results to your inbox, sent mail, or messages with files.</p>
+<a class="button" href="{% url 'emails' %}">Explore email <span>→</span></a></div><div class="feature-art" aria-hidden="true"><span>↝</span></div></section>
+<section class="status-card"><div><p class="eyebrow">INDEX STATUS</p>
+{% if latest %}<h2>{% if not latest.finished_at %}A sync is in progress{% elif latest.complete %}Last sync completed{% else %}Progress is saved{% endif %}</h2>
+<p>{% if latest.finished_at %}Finished {{ latest.finished_at|date:'M j, Y · H:i' }} UTC{% else %}Started {{ latest.started_at|date:'M j, Y · H:i' }} UTC{% endif %}</p>
+{% else %}<h2>No sync recorded yet</h2><p>Your email index will appear here once the connector runs.</p>{% endif %}</div>
+<div class="scope-note"><strong>What’s available</strong><p>Subjects, senders, dates, labels, and attachment details.</p>
+{% if cached_parts == 0 %}<p>Message bodies and file contents haven’t been downloaded.</p>{% else %}<p>{{ cached_parts|floatformat:'0g' }} content objects are cached. This preview displays metadata only.</p>{% endif %}</div></section>
+<p class="footnote">Browsing here reads the saved index. Syncing remains a separate connector process.</p>
+{% endblock %}

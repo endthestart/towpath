@@ -14,6 +14,7 @@ from towpath import config as config_mod
 from towpath import connect, decisions, scan
 from towpath.fixtures import generator
 from towpath.fixtures.domains import check_paths
+from towpath.web.cli import app as web_app
 
 app = typer.Typer(no_args_is_help=True, add_completion=False,
                   help="Towpath: read-only tools for mail, documents, photos, and model endpoints.")
@@ -36,6 +37,7 @@ app.add_typer(model_app, name="model")
 app.add_typer(provider_app, name="provider")
 app.add_typer(config_app, name="config")
 app.add_typer(files_app, name="files")
+app.add_typer(web_app, name="web")
 
 ConfigOpt = typer.Option(Path("towpath.toml"), "--config", "-c", help="Configuration file.")
 

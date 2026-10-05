@@ -92,6 +92,8 @@ These are built into the current documents. The owner can accept or overturn eac
 
 **Accepted direction 2026-10-01.** No web framework in the first builds; Towpath stays a light Python and SQLite CLI until the workflows work. When the login and review UI is built, Django is the leading candidate, with Towpath's own views for its workflows (Django's admin is for internal management only, per its [documentation](https://docs.djangoproject.com/en/stable/ref/contrib/admin/)). Confirm at that milestone.
 
+**Local preview 2026-10-05.** The optional read-only email interface uses Django, with custom views over the source store's read-only role. It has no ORM, admin, authentication, or connector credential path. The CLI remains usable without Django. This establishes the framework for the local preview; the authenticated login and review UI remains a later milestone. See [local UI](setup/local-ui.md).
+
 ### D14. Gmail access for other self-hosters
 
 **Accepted 2026-10-01.** Gmail API only for the first release; no IMAP app-password option. App passwords add little here, since Inbox Zero still needs Google OAuth, and they are not available for every account configuration, so they cannot be a universal quick start ([Google's requirements](https://support.google.com/accounts/answer/185833)).
