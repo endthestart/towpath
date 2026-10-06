@@ -221,6 +221,8 @@ The action runner (`towpath-act`), where deployed, recomputes the digest, refuse
 }
 ```
 
+Validation and lossless round trips are implemented in `src/towpath/unified/claims.py` ([unified discovery](unified-discovery.md#timeline-claims)). It adds `when.basis` (which cited date facts the dates rest on; process dates alone cannot date a plan or event), `ref` citations, `date_facts`, `relations` and `review`.
+
 `modality` distinguishes `plan`, `occurred`, `recollected`, and `inferred`. An `external` citation references an item another system owns, such as a photo or document, by its native ID; Towpath does not copy it. `audience` is `owner` or `shareable`; `model_use` is `follow-grants`, `local-only`, or `excluded` ([life stream](life-stream.md#audience-and-model-use)). `captured_excerpt` is filled when the claim is accepted. `preserved` is optional: the person can also keep the whole message (`item`) or one attachment (`part`) as a [preserved artifact](scans-and-destinations.md#preserved-artifacts) when the source itself is valuable. A recollection citation points to a recollection version, with its author, in the decisions store.
 
 ## 5. Inference gateway (inside worker)
@@ -283,4 +285,4 @@ Records for discovered files (locator, occurrence, extraction, dates, coverage),
 
 ## 10. Unified discovery foundation (in development)
 
-The [foundation specification](specs/unified-discovery-foundation.md) wraps existing mail/file/project records in a common source-aware search/evidence envelope, while retaining their separate stores and provider contracts. It defines honest search depth/coverage, collection queries, scoped selected-content requests, agent context and typed-date/claim foundations. UI, CLI/API and later MCP/RAG consumers use this surface. The implemented shapes (`towpath.source-status/0`, `towpath.result/0`, `towpath.search/0`, `towpath.citation/0`) are described in [unified discovery](unified-discovery.md). Legacy mail records and `towpath.files.context/1` packets are unchanged.
+The [foundation specification](specs/unified-discovery-foundation.md) wraps existing mail/file/project records in a common source-aware search/evidence envelope, while retaining their separate stores and provider contracts. It defines honest search depth/coverage, collection queries, scoped selected-content requests, agent context and typed-date/claim foundations. UI, CLI/API and later MCP/RAG consumers use this surface. The implemented shapes (`towpath.source-status/0`, `towpath.result/0`, `towpath.search/0`, `towpath.citation/0`, `towpath.collection/0`, `towpath.collection-evaluation/0`, `towpath.context/1`) are described in [unified discovery](unified-discovery.md). Legacy mail records and `towpath.files.context/1` packets are unchanged.

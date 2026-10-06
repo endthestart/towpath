@@ -15,6 +15,7 @@ from towpath import connect, decisions, scan
 from towpath.fixtures import generator
 from towpath.fixtures.domains import check_paths
 from towpath.unified.cli import app as search_app
+from towpath.unified.cli import claims_app, collections_app
 from towpath.web.cli import app as web_app
 
 app = typer.Typer(no_args_is_help=True, add_completion=False,
@@ -40,6 +41,8 @@ app.add_typer(config_app, name="config")
 app.add_typer(files_app, name="files")
 app.add_typer(web_app, name="web")
 app.add_typer(search_app, name="search")
+app.add_typer(collections_app, name="collections")
+app.add_typer(claims_app, name="claims")
 
 ConfigOpt = typer.Option(Path("towpath.toml"), "--config", "-c", help="Configuration file.")
 

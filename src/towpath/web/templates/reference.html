@@ -27,7 +27,7 @@
 {% else %}
 <p>State: <strong>{{ content.state }}</strong>{% if content.reason %} · {{ content.reason }}{% endif %}{% if content.since %} · queued {{ content.since }}{% endif %}</p>
 {% if content.state == 'not-requested' %}<form method="post" action="{% url 'reference-request' %}">{% csrf_token %}<input type="hidden" name="r" value="{{ ref }}"><button class="button" type="submit">Request this part</button></form>
-<p class="footnote">Queues one part for <code>towpath connect fetch</code>. The UI does not contact the source.</p>{% endif %}
+<p class="footnote">Queues one part for <code>towpath connect fetch-requests</code>. The UI does not contact the source.</p>{% endif %}
 {% endif %}</section>{% endif %}
 
 <section class="detail-card"><p class="eyebrow">COLLECTIONS</p>

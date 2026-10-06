@@ -1,0 +1,54 @@
+[
+  {
+    "schema": "towpath.claim/0",
+    "claim_id": "clm_trip_plan",
+    "kind": "event",
+    "statement": "Planned a canal trip to Example Junction",
+    "modality": "plan",
+    "when": {"expression": "mid-May 2026", "earliest": "2026-05-10", "latest": "2026-05-20", "precision": "range",
+             "basis": [{"citation": 0, "meaning": "message-date"}]},
+    "citations": [{"ref": "gmail-fixture:18d0000000000001#part=0", "span": [0, 40],
+                   "excerpt_sha256": "5b2f1c7e3c1d0b8a9e6f4a2d7c3b1e0f9a8d7c6b5a4e3d2c1b0a9f8e7d6c5b4a",
+                   "date_facts": [{"meaning": "message-date", "value": "2026-04-02T10:15:00+00:00"}]}],
+    "audience": "owner", "model_use": "follow-grants", "producer": "owner", "state": "proposed",
+    "uncertainty": "A booking supports a plan, not that the trip happened.",
+    "relations": [{"type": "same-event", "claim_id": "clm_trip_photos"}]
+  },
+  {
+    "schema": "towpath.claim/0",
+    "claim_id": "clm_trip_photos",
+    "kind": "event",
+    "statement": "Walked the towpath at Example Junction",
+    "modality": "occurred",
+    "when": {"expression": "2026-05-15", "earliest": "2026-05-15", "latest": "2026-05-15", "precision": "day",
+             "basis": [{"citation": 0, "meaning": "file-modified"}]},
+    "citations": [{"ref": "files-inventory:occ_03f47eb9b5da1978", "version": "size=24117248;mtime=1779000000",
+                   "date_facts": [{"meaning": "file-modified", "value": "2026-05-15T18:31:00Z"}]}],
+    "producer": "owner", "state": "accepted", "review": {"by": "owner", "at": "2026-10-06T00:00:00Z"},
+    "uncertainty": "A file modification time can differ from when the photo was taken."
+  },
+  {
+    "schema": "towpath.claim/0",
+    "claim_id": "clm_trip_memory",
+    "kind": "event",
+    "statement": "Remembers the trip as early June",
+    "modality": "recollected",
+    "when": {"expression": "early June 2026", "earliest": "2026-06-01", "latest": "2026-06-10", "precision": "range"},
+    "citations": [], "producer": "owner", "author": "owner",
+    "relations": [{"type": "contradicts", "claim_id": "clm_trip_photos"}]
+  },
+  {
+    "schema": "towpath.claim/0",
+    "claim_id": "clm_thesis_year",
+    "kind": "accomplishment",
+    "statement": "Wrote the canal economy paper",
+    "modality": "inferred",
+    "when": {"expression": "2003", "earliest": "2003-01-01", "latest": "2003-12-31", "precision": "year",
+             "basis": [{"citation": 0, "meaning": "message-date"}]},
+    "citations": [{"ref": "files-fixture:occ_f8f99b1939b4ffe4",
+                   "date_facts": [{"meaning": "message-date", "value": "2003-05-05T10:00:00+00:00"},
+                                  {"meaning": "recovered-at", "value": "2026-10-01T00:00:00Z"}]}],
+    "producer": "rules/example@0", "state": "proposed",
+    "uncertainty": "The message that carried the paper dates it; recovery in 2026 does not."
+  }
+]

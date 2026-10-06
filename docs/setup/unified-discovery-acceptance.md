@@ -80,7 +80,7 @@ Prerequisites: `pip install -e ".[imap]"`, and a private config outside the repo
 5. Confirm the unread count from step 3 is unchanged. If the server keeps a protocol log, confirm it shows only EXAMINE, UID SEARCH, UID FETCH (BODY.PEEK) and LOGOUT.
 6. Move one message to another folder in your mail client. Run sync again. Expect the old identity to be marked absent and the new identity to be indexed.
 7. `towpath search query "<a word known to be only in a message body>" --source <imap-id>`. Expect the message at `provider-search` depth. Record whether your server's SEARCH matches substrings or whole words, and whether it searches attachments.
-8. Request one attachment through a scan or a queued content request, then run `towpath connect fetch`. Confirm the bytes match the original and the message is still unread.
+8. Request one attachment through a scan or a queued content request, then run `towpath connect fetch-requests`. Confirm the bytes match the original and the message is still unread.
 
 **Gmail**
 
@@ -117,7 +117,7 @@ Automated: `tests/test_unified_web.py`. It covers the UI never contacting a sour
 
 1. `towpath web serve --store-dir state --config towpath.toml`. Open `http://127.0.0.1:8790/search/?q=extension:nef`. Expect four source groups, each tagged `catalog`, and the notice "Not a complete answer" naming the incomplete inventory.
 2. Search `fundraiser`. Expect no IMAP result, and a note that keyword text matched metadata only. Choose **Queue provider search**, then run `towpath search run-requests` in another terminal and reload. Expect a stored provider result, "Canal boat club minutes", marked "not a verified passage" with the time it ran.
-3. Open the IMAP "Lock keeper's log" result, then its part 1. Choose **Request this part**, run `towpath connect fetch`, and reload. The text shows the literal `<script>` characters, escaped, under the untrusted-text notice.
+3. Open the IMAP "Lock keeper's log" result, then its part 1. Choose **Request this part**, run `towpath connect fetch-requests`, and reload. The text shows the literal `<script>` characters, escaped, under the untrusted-text notice.
 4. On **Collections**, create a reference set. Add two NEF references from their reference pages, then open the set. Expect `unchanged` for the inventory items. Delete `state/files.db`, run `towpath files import --provider inventory`, and reload. Expect the same references, still resolving.
 5. Save the `extension:nef` search as a query collection, open it and accept the current results. In `files/manifests/photos.jsonl`, change `"complete": false` to `true`, delete the `escape.NEF` line and one NEF line, and change another NEF line's `mtime`. Re-import and reload. Expect `removed`, `changed`, `unchanged`, and `unverified` for the Gmail part.
 
@@ -125,7 +125,61 @@ Automated: `tests/test_unified_web.py`. It covers the UI never contacting a sour
 
 1. Start the UI with the private store and config. Confirm the source list shows every configured source, with honest coverage and ungranted roots.
 2. Search for an owner-selected example across mail and files. Queue a provider search and run `towpath search run-requests`. Confirm the Gmail and IMAP provider results and their stored timestamp.
-3. Request one plain-text part and run `towpath connect fetch`. Confirm the text appears, and that the message's read state in the mail client is unchanged for IMAP.
+3. Request one plain-text part and run `towpath connect fetch-requests`. Confirm the text appears, and that the message's read state in the mail client is unchanged for IMAP.
 4. Build an owner-chosen collection, such as NEF photographs or project documents. Re-run an index import and confirm the collection still resolves.
 
 Still synthetic: the browser checks used Chromium on the generated environment only. No live account was used.
+
+## Increment 4: agent interface and evidence structures
+
+Built:
+
+- the `towpath.context/1` packet (file items reuse the files packet unchanged);
+- consumer grants for mail sources;
+- citation verification;
+- collections and claims commands;
+- typed-date and claim validation, round trips and timeline ordering.
+
+See [unified discovery](../unified-discovery.md#context-packets-towpathcontext1).
+
+Automated:
+
+- `tests/test_unified_context.py`: grants, exclusions, stale and absent references, budgets, untrusted labelling, collections, local mode, the unchanged files packet and the CLI;
+- `tests/test_claims.py`: precision rules, process-date refusal, the draft example shape, contradictions, round trips and the CLI.
+
+### A. Synthetic (continue from the `uni` folder, with the stub running)
+
+1. `towpath search context --purpose agent-context --query canal`. Expect `items: []`, and every reference omitted as `denied`.
+2. Grant purposes:
+
+   ```sh
+   for r in archive shared; do towpath files grant $r agent-context; done
+   towpath files grant archive excerpt
+   towpath search grant gmail-fixture agent-context
+   towpath search grant imap-fixture agent-context
+   ```
+
+   Repeat step 1. Expect Gmail, IMAP and file items. Archive items carry excerpts with `towpath.citation/0` citations. Shared and mail items give `excerpt_omitted_reason`. Mail items found by provider search say no passage was verified.
+3. Run `towpath search grant imap-fixture excerpt`. Request and fetch part 1 of the lock keeper's log (from the UI, or from increment 3's step 3). Then run:
+
+   ```sh
+   towpath search context --purpose agent-context --ref "imap-fixture:Archive/2008;UIDVALIDITY=1700000002;UID=2" --excerpt-bytes 40
+   ```
+
+   Expect the `<script>` text, cut at 40 bytes and labelled untrusted. Pass its citation to `towpath search cite '<json>'` and expect `current`.
+4. Append bytes to `files/roots/shared/copy-of-paper.docx` and build a packet with that occurrence's reference. Expect it omitted as `stale`.
+5. Run `towpath collections create NEF --query extension:nef`, then `towpath collections evaluate NEF --accept`, then `towpath collections evaluate NEF --local`. Expect five `added`, then `unchanged`, with Gmail `unverified`.
+6. Run `towpath claims validate $REPO/examples/claims.example.json` (valid) and `towpath claims timeline $REPO/examples/claims.example.json` (one contradiction listed, four entries).
+
+### B. Live (local operator)
+
+1. Grant one owner-chosen mail source and one root the `agent-context` purpose. Build a packet from an owner-selected query or collection. Confirm that versions, citations and bounded excerpts appear only where granted, and that a revoked grant turns items into `denied` omissions.
+2. Mark one item `towpath item set <item_id> --model-use excluded` and confirm it is omitted.
+3. Verify one file citation and one mail citation with `towpath search cite`. Then change the source file (or re-fetch a different part) and confirm the citation is `stale`.
+4. Write two or three real timeline claims for an owner-chosen event outside the repository, and validate them. Recovery or export dates must be rejected as event dates.
+
+### Still synthetic or not built in this foundation
+
+- No MCP transport, RAG or model enrichment. These were stretch goals and none was attempted.
+- Claims are validated, not stored, and nothing extracts them automatically.
+- Mail excerpts depend on parts the owner fetched first. No body text index is built.

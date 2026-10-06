@@ -130,6 +130,9 @@ CREATE TABLE IF NOT EXISTS model_grants (
 CREATE TABLE IF NOT EXISTS file_grants (
   root_alias TEXT NOT NULL, feature TEXT NOT NULL, author TEXT NOT NULL, at TEXT NOT NULL,
   PRIMARY KEY (root_alias, feature));
+CREATE TABLE IF NOT EXISTS source_grants (
+  source_id TEXT NOT NULL, feature TEXT NOT NULL, author TEXT NOT NULL, at TEXT NOT NULL,
+  PRIMARY KEY (source_id, feature));
 CREATE TABLE IF NOT EXISTS collections (
   collection_id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, kind TEXT NOT NULL, definition TEXT,
   author TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);

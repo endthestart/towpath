@@ -45,7 +45,7 @@ towpath web serve --store-dir /path/to/private/state --config /path/to/private/t
   - Keyword text there matches only names and metadata, and the page says so.
   - **Queue provider search** records the query for `towpath search run-requests` (towpath-connect). The stored responses appear on the page, with the time they ran. The UI never contacts Gmail, IMAP or a files provider itself.
 - **References** (`/ref/?r=<ref>`) show one result's record, version, typed dates, location and parts.
-  - **Request this part** queues one mail part for `towpath connect fetch`.
+  - **Request this part** queues one mail part for `towpath connect fetch-requests`.
   - Once fetched, a plain-text part is shown as escaped, untrusted text, cut at 20 KB. Other types are described, never rendered.
 - **Collections** (`/collections/`) are saved queries or explicit reference sets, stored as owner decisions in the decisions store.
   - Opening one re-evaluates it against the local catalogs and reports unchanged, changed, added, removed, unverified and unavailable references, and whether the evaluation was partial.

@@ -3,7 +3,7 @@
 The UI (web role) only appends to the queue store; towpath-connect reads the queue and does the work:
 
 - **Selected content**: one mail part, through the existing ``content_requests`` table, fetched by
-  ``towpath connect fetch`` into the source store's cache. Plain text is shown first; other types are
+  ``towpath connect fetch-requests`` into the source store's cache. Plain text is shown first; other types are
   described, never rendered.
 - **Provider search**: a query to run against the providers (Gmail ``q``, IMAP ``SEARCH``, a files
   content index), through ``search_requests``, run by ``towpath search run-requests``. Responses go to
