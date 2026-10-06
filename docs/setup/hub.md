@@ -68,4 +68,8 @@ than attempting speculative offset recovery. Authentication retries remain bound
 rewind file streams; failed transfers stop publication and later runs reuse verified blobs.
 Synthetic tests cover the previous failure status, empty/nonempty blobs, token expiry,
 exact bytes and opaque locations. Only a successful live publishing run establishes GHCR
-compatibility; synthetic passes do not close that gate.
+compatibility; synthetic passes do not close that gate. The first monolithic live attempt
+hit a transport write timeout at the original 60-second limit. Blob PUTs now have a bounded
+five-minute socket timeout; metadata requests retain their original timeout. Errors report
+the transfer stage, digest and size without exposing upload URLs or credentials. A synthetic
+delayed transfer fails with the old shared timeout and passes with the separate transfer limit.

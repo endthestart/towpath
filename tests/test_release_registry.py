@@ -5,6 +5,7 @@ import json
 import socket
 import sys
 import threading
+import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -29,6 +30,7 @@ class State:
         self.require_upload_headers = None
         self.reject_patch = False
         self.upload_methods = []
+        self.put_delay = 0
 
 
 def handler_for(state: State, port_holder: list):
@@ -119,6 +121,7 @@ def handler_for(state: State, port_holder: list):
                     state.uploads[upload] += body
                     return self._send(202, b"", {"Location": f"/v2/{name}/blobs/uploads/{upload}?state=x"})
                 if self.command == "PUT":
+                    time.sleep(state.put_delay)
                     if state.reject_patch and parse_qs(url.query).get("state") != ["opaque+token"]:
                         return self._error(404, "BLOB_UPLOAD_INVALID")
                     if state.require_upload_headers == "PUT" and (
@@ -259,6 +262,15 @@ def test_monolithic_upload_avoids_patch_range_failures_and_preserves_location(se
     client.upload_blob(repo, payload, digest, len(payload))
     assert state.blobs[digest] == payload
     assert state.upload_methods == ["PUT"]
+
+
+def test_blob_transfer_outlives_the_short_metadata_request_timeout(server):
+    state, repo = server
+    state.put_delay = 0.6
+    payload = b"synthetic source\n" * 1000
+    digest = sha256_digest(payload)
+    HttpRegistry("user", "secret", timeout=0.25).upload_blob(repo, payload, digest, len(payload))
+    assert state.blobs[digest] == payload
 
 
 def test_index_resolves_to_the_linux_amd64_image(server):

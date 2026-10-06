@@ -109,7 +109,7 @@ class HttpRegistry:
         return token
 
     def _request(self, method: str, host: str, path: str, *, scope: str, headers: dict | None = None,
-                 data=None, url: str | None = None, auth: str | None = None):
+                 data=None, url: str | None = None, auth: str | None = None, timeout: float | None = None):
         """Return (status, headers, body). Raises RegistryError for transport and auth failures."""
         # Allow the initial challenge, then one refresh if the cached bearer token was refused.
         # A persistently refused replacement still fails; uploads rewind before either retry.
@@ -119,7 +119,7 @@ class HttpRegistry:
             if auth:
                 request.add_header("Authorization", auth)
             try:
-                with self._opener.open(request, timeout=self.timeout) as response:
+                with self._opener.open(request, timeout=self.timeout if timeout is None else timeout) as response:
                     return response.status, response.headers, response.read()
             except urllib.error.HTTPError as exc:
                 body = exc.read()
@@ -235,9 +235,14 @@ class HttpRegistry:
         try:
             payload = handle if handle is not None else path_or_bytes
             joiner = "&" if "?" in location else "?"
-            status, headers, body = self._request(
-                "PUT", host, start, scope=scope, url=f"{location}{joiner}digest={digest}", auth=auth,
-                headers={"Content-Length": str(size), "Content-Type": "application/octet-stream"}, data=payload)
+            try:
+                status, headers, body = self._request(
+                    "PUT", host, start, scope=scope, url=f"{location}{joiner}digest={digest}", auth=auth,
+                    headers={"Content-Length": str(size), "Content-Type": "application/octet-stream"}, data=payload,
+                    timeout=max(self.timeout, 300))
+            except RegistryError as exc:
+                raise RegistryError(f"PUT upload failed (digest={digest}, size={size}): {exc}",
+                                    status=exc.status) from None
             if status != 201:
                 raise RegistryError(f"PUT upload failed (digest={digest}, size={size}): "
                                     f"{self._error(host, start, status, body)}", status=status)
