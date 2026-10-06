@@ -139,7 +139,8 @@ class MailAdapter(SourceAdapter):
     # -- catalog -------------------------------------------------------------------------------------------
 
     def _labels(self, db, item_id: str) -> list | None:
-        row = db.execute("SELECT labels FROM observations WHERE item_id = ? ORDER BY run_id DESC LIMIT 1",
+        row = db.execute("SELECT o.labels FROM observations o JOIN runs r ON r.run_id = o.run_id "
+                         "WHERE o.item_id = ? ORDER BY r.seq DESC LIMIT 1",
                          (item_id,)).fetchone()
         return json.loads(row["labels"]) if row else None
 
@@ -309,6 +310,9 @@ class MailAdapter(SourceAdapter):
         if part_id is not None and part_id not in {p["part_id"] for p in parts}:
             raise UnknownReference(f"{self.source_id}:{native}: no such part")
         result = envelopes.mail_result(self.source_id, self.source_type, dict(row), labels=labels)
+        if part_id is not None:
+            part = next(p for p in parts if p["part_id"] == part_id)
+            result = envelopes.mail_part_result(self.source_id, self.source_type, dict(row), part)
         return {
             "schema": "towpath.describe/0", "ref": str(Reference(self.source_id, native)), "result": result.to_dict(),
             "state": "absent" if row["absent_since_run"] else "present", "as_of_run": row["last_seen_run"],

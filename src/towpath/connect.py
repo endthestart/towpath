@@ -35,7 +35,8 @@ def _new_run(db, source_id: str, kind: str, cursor_before: str | None) -> str:
 
 
 def _latest_labels(db, iid: str):
-    row = db.execute("SELECT labels FROM observations WHERE item_id = ? ORDER BY run_id DESC LIMIT 1",
+    row = db.execute("SELECT o.labels FROM observations o JOIN runs r ON r.run_id = o.run_id "
+                     "WHERE o.item_id = ? ORDER BY r.seq DESC LIMIT 1",
                      (iid,)).fetchone()
     return json.loads(row["labels"]) if row else None
 

@@ -130,19 +130,30 @@ def accept(store_dir, key: str, evaluation: dict, author: str = "local-user") ->
             raise CollectionError(f"no collection {key!r}")
         if row["kind"] != "query" or evaluation.get("collection_id") != row["collection_id"]:
             raise CollectionError("only a query collection's own evaluation can become its baseline")
-        current = [i for i in evaluation["items"] if i["status"] in {"added", "unchanged", "changed"}]
+        current = [i for i in evaluation["items"] if i["status"] in {"added", "unchanged", "changed", "unverified"}]
+        previous = {item["ref"]: dict(item) for item in db.execute(
+            "SELECT * FROM collection_items WHERE collection_id = ? AND role = 'baseline'",
+            (row["collection_id"],))}
+        # A partial answer cannot establish that an unavailable baseline member stopped matching.
+        retained = [previous[i["ref"]] for i in evaluation["items"]
+                    if i["status"] == "unavailable" and i["ref"] in previous]
         db.execute("DELETE FROM collection_items WHERE collection_id = ? AND role = 'baseline'",
                    (row["collection_id"],))
         for item in current:
             db.execute("INSERT INTO collection_items VALUES (?,?,'baseline',?,?,?,?,?,?)",
                        (row["collection_id"], item["ref"], item["version_now"], item.get("title"),
                         item.get("source_type"), None, author, _now()))
+        for item in retained:
+            db.execute("INSERT INTO collection_items VALUES (?,?,'baseline',?,?,?,?,?,?)",
+                       (row["collection_id"], item["ref"], item["version"], item["title"],
+                        item["source_type"], item["note"], item["author"], item["added_at"]))
         db.execute("UPDATE collections SET updated_at = ? WHERE collection_id = ?", (_now(), row["collection_id"]))
         _log(db, "collection-accept", row["collection_id"],
-             {"items": len(current), "partial": evaluation["partial"], "evaluated_at": evaluation["evaluated_at"]},
+             {"items": len(current) + len(retained), "retained_unavailable": len(retained),
+              "partial": evaluation["partial"], "evaluated_at": evaluation["evaluated_at"]},
              author)
         db.commit()
-    return len(current)
+    return len(current) + len(retained)
 
 
 # -- evaluation ---------------------------------------------------------------------------------------

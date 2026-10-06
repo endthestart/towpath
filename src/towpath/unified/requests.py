@@ -54,12 +54,12 @@ def part_state(store_dir, source_id: str, native: str) -> dict:
                                (item["item_id"], part_id)).fetchone()
     base = {"item_id": item["item_id"], "part_id": part_id, "mime_type": part["mime_type"], "size": part["size"],
             "sha256": part["sha256"]}
+    if item["absent_since_run"]:
+        return {**base, "state": "unavailable", "reason": "the message is no longer in the source"}
     if part["sha256"]:
         return {**base, "state": "fetched"}
     if fetch is not None and fetch["status"] != "fetched":
         return {**base, "state": "failed", "reason": fetch["detail"]}
-    if item["absent_since_run"]:
-        return {**base, "state": "unavailable", "reason": "the message is no longer in the source"}
     if queued is not None:
         return {**base, "state": "queued", "since": queued["created_at"]}
     return {**base, "state": "not-requested"}
