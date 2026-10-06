@@ -232,10 +232,17 @@ def test_runs_unprivileged_with_no_network_and_read_only_mounts(box):
 
 
 def test_file_discovery_needs_no_gmail_or_models(box):
-    script = ("import importlib.util as u; print([m for m in ('googleapiclient', 'google_auth_oauthlib', 'openai') "
-              "if u.find_spec(m)])")
-    assert box.run("-c", script, entrypoint="python3").stdout.strip() == "[]"
-    status = box.json("files", "status")
+    script = textwrap.dedent("""\
+        import importlib.util
+        import sys
+        assert importlib.util.find_spec('openai') is None
+        for module in ('googleapiclient', 'google_auth_oauthlib', 'google.auth', 'imapclient', 'openai'):
+            sys.modules[module] = None  # fail if file discovery tries to import any of these
+        from towpath.cli import app
+        sys.argv = ['towpath', 'files', 'status', '--config', '/config/towpath.toml']
+        app()
+    """)
+    status = json.loads(box.run("-c", script, entrypoint="python3").stdout)
     assert status["configured"] and "fixture" in status["providers"]
     assert box.towpath("config", "check").returncode == 0
     assert not (box.writable["state"] / "source.db").exists()  # no mail store, no sync
