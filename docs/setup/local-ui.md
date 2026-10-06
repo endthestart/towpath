@@ -32,14 +32,36 @@ The completed index is usable immediately. The UI displays what is saved; it doe
 
 `--port` selects another local port if 8790 is occupied. The server always binds to `127.0.0.1` on the current computer. It has no login and uses a simple local WSGI server; remote access, reverse proxies, production serving and authenticated multi-user access require a separate design. The existing container images package the CLI, not this optional UI.
 
+## Unified search and collections (development branch)
+
+Adding `--config` lets the UI see file sources and their declared scope as well as mail. Loading the configuration resolves no credential.
+
+```sh
+towpath web serve --store-dir /path/to/private/state --config /path/to/private/towpath.toml
+```
+
+- **Search all** (`/search/`) runs one query over every source's local catalog.
+  - Each source shows its own status, depth, notes and errors. The page states every reason the answer is not complete.
+  - Keyword text there matches only names and metadata, and the page says so.
+  - **Queue provider search** records the query for `towpath search run-requests` (towpath-connect). The stored responses appear on the page, with the time they ran. The UI never contacts Gmail, IMAP or a files provider itself.
+- **References** (`/ref/?r=<ref>`) show one result's record, version, typed dates, location and parts.
+  - **Request this part** queues one mail part for `towpath connect fetch`.
+  - Once fetched, a plain-text part is shown as escaped, untrusted text, cut at 20 KB. Other types are described, never rendered.
+- **Collections** (`/collections/`) are saved queries or explicit reference sets, stored as owner decisions in the decisions store.
+  - Opening one re-evaluates it against the local catalogs and reports unchanged, changed, added, removed, unverified and unavailable references, and whether the evaluation was partial.
+  - For a saved query, **Accept current results** records the baseline for later comparisons.
+
+Without `--config`, Search all covers the mail sources found in `source.db`.
+
 ## Data and permissions
 
-- The source store is opened under the `web` role using SQLite's read-only mode. Browsing does not change index records, label mail, delete mail or send anything.
-- There are no content-fetch, model-call, delivery, approval or mailbox-action controls in this preview. Message details show metadata and named attachment references, even if other processes have cached content.
-- Routes accept GET only. Responses disable browser caching and embedding; mail metadata is rendered with HTML escaping. There is no browser JavaScript or external asset request.
+- The source and files stores are opened under the `web` role using SQLite's read-only mode. Browsing does not change index records, label mail, delete mail or send anything.
+- The only writes are owner decisions (collections, written to the decisions store and logged) and requests appended to the queue store (a content part to fetch, a provider search to run). towpath-connect carries out queued requests separately, under its own role.
+- There are no model-call, delivery, approval or mailbox-action controls. Selected content appears only after the owner requests that part and towpath-connect has fetched it.
+- Pages are GET-only. The forms that record decisions or queue requests are POSTs, protected by Django's CSRF check with a strict same-site cookie. Responses disable browser caching and embedding, and all source data is rendered with HTML escaping. There is no browser JavaScript and no external asset request.
 - Request logging is disabled so searches and message identifiers are not written to access logs. Searches still appear in the browser's address bar and may remain in its history.
 - Results use the provider's internal date where available, falling back to the parsed message date. Dates are shown in UTC. Overview counts describe the saved index, not a live provider query.
 
 ## Verification
 
-`tests/test_web.py` uses invented messages to check search, literal wildcard handling, current labels, paging, absent messages, escaped metadata, attachment references, missing records, read-only database enforcement, rejected writes/hosts, and unchanged database contents across requests. Browser checks use the existing synthetic corpus. Live checks should inspect aggregate counts only, leaving personal message browsing to the owner.
+`tests/test_web.py` and `tests/test_unified_web.py` use invented messages to check search, literal wildcard handling, current labels, paging, absent messages, escaped metadata, attachment references, missing records, read-only database enforcement, rejected writes/hosts, and unchanged database contents across requests. Browser checks use the existing synthetic corpus. Live checks should inspect aggregate counts only, leaving personal message browsing to the owner.

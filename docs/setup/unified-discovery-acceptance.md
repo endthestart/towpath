@@ -97,3 +97,35 @@ Prerequisites: `pip install -e ".[imap]"`, and a private config outside the repo
 - IMAP behavior against a real server: TLS, SEARCH semantics, limits, folder names.
 - Gmail `q` against the live API: only a fake of Google's discovery client is exercised.
 - Manifest import of a real inventory: the format is new, so an existing inventory may need a small conversion script, written locally.
+
+## Increment 3: UI and collections
+
+Built:
+
+- Search all, with per-source status, depth, notes and incompleteness;
+- reference inspection;
+- selected-content requests, with escaped plain-text display;
+- queued provider searches;
+- durable set and query collections, with evaluation and accepted baselines;
+- CSRF-protected POST forms.
+
+See [local UI](local-ui.md#unified-search-and-collections-development-branch) and [unified discovery](../unified-discovery.md#collections).
+
+Automated: `tests/test_unified_web.py`. It covers the UI never contacting a source, CSRF, escaping, the queue, collections surviving a deleted and re-imported `files.db`, query baselines, and decisions-only writes. `tests/test_web.py` still passes for the original pages.
+
+### A. Synthetic (continue from increment 2's `uni` folder, with the stub running)
+
+1. `towpath web serve --store-dir state --config towpath.toml`. Open `http://127.0.0.1:8790/search/?q=extension:nef`. Expect four source groups, each tagged `catalog`, and the notice "Not a complete answer" naming the incomplete inventory.
+2. Search `fundraiser`. Expect no IMAP result, and a note that keyword text matched metadata only. Choose **Queue provider search**, then run `towpath search run-requests` in another terminal and reload. Expect a stored provider result, "Canal boat club minutes", marked "not a verified passage" with the time it ran.
+3. Open the IMAP "Lock keeper's log" result, then its part 1. Choose **Request this part**, run `towpath connect fetch`, and reload. The text shows the literal `<script>` characters, escaped, under the untrusted-text notice.
+4. On **Collections**, create a reference set. Add two NEF references from their reference pages, then open the set. Expect `unchanged` for the inventory items. Delete `state/files.db`, run `towpath files import --provider inventory`, and reload. Expect the same references, still resolving.
+5. Save the `extension:nef` search as a query collection, open it and accept the current results. In `files/manifests/photos.jsonl`, change `"complete": false` to `true`, delete the `escape.NEF` line and one NEF line, and change another NEF line's `mtime`. Re-import and reload. Expect `removed`, `changed`, `unchanged`, and `unverified` for the Gmail part.
+
+### B. Live (local operator)
+
+1. Start the UI with the private store and config. Confirm the source list shows every configured source, with honest coverage and ungranted roots.
+2. Search for an owner-selected example across mail and files. Queue a provider search and run `towpath search run-requests`. Confirm the Gmail and IMAP provider results and their stored timestamp.
+3. Request one plain-text part and run `towpath connect fetch`. Confirm the text appears, and that the message's read state in the mail client is unchanged for IMAP.
+4. Build an owner-chosen collection, such as NEF photographs or project documents. Re-run an index import and confirm the collection still resolves.
+
+Still synthetic: the browser checks used Chromium on the generated environment only. No live account was used.

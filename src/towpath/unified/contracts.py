@@ -258,6 +258,15 @@ class Filters:
                 fields[key] = value
         return cls(**{k: tuple(v) if isinstance(v, list) else v for k, v in fields.items()})
 
+    def to_query(self) -> str:
+        """The filter syntax that parses back to these filters (sources excluded)."""
+        parts = [f"kind:{k}" for k in self.kinds] + [f"extension:{e}" for e in self.extensions]
+        parts += [f"type:{m}" for m in self.media_types]
+        parts += [f"name:{self.name}"] if self.name else []
+        parts += [f"after:{self.after}"] if self.after else []
+        parts += [f"before:{self.before}"] if self.before else []
+        return " ".join(parts + ([self.text] if self.text else []))
+
     def to_dict(self) -> dict:
         return {"text": self.text, "sources": list(self.sources), "kinds": list(self.kinds),
                 "extensions": list(self.extensions), "media_types": list(self.media_types), "name": self.name,

@@ -149,10 +149,40 @@ password = "env:TOWPATH_IMAP_PASSWORD"   # a credential reference, never the sec
 towpath search sources [--local]                 # the registry
 towpath search query "canal" [--local] [--source ID]... [--limit N] [--cursor TOKEN]
 towpath search describe "imap-personal:INBOX;UIDVALIDITY=7;UID=42#part=2" [--local]
+towpath search run-requests                      # provider searches queued by the UI
 towpath fixtures unified OUT [--imap-port PORT]  # a synthetic environment for trying all of this
 ```
 
 Output is JSON. Errors are `{"error": {"code", "message"}}`, with exit code 2 for a bad request and 1 for a reference that is not found.
+
+## Collections
+
+`towpath.unified.collections` stores collections in the decisions store, which the web role writes. Every change is logged in `decision_log`. A collection holds references and versions only.
+
+- **set**: explicit references (`member` rows), each with the version seen when it was added and an optional note.
+- **query**: stored filters, plus a `baseline` of the results the owner last accepted.
+
+Evaluation (`collections.evaluate(adapters, collection)`, schema `towpath.collection-evaluation/0`) never changes the collection.
+
+| Status | Meaning |
+| --- | --- |
+| `unchanged` | Same version as recorded |
+| `changed` | The source reports a different version |
+| `unverified` | The reference resolves, but there is no version token to compare. Gmail messages have none |
+| `added` | Matches the query now; not in the accepted baseline |
+| `removed` | In the baseline, and its source answered completely without it |
+| `unavailable` | Absent, missing, or its source did not answer. Never replaced by another copy |
+
+`partial: true` lists every reason the evaluation cannot be trusted as complete. An inventory whose scope is incomplete cannot establish absence: a member that disappears from it stays as last known until a complete import marks it missing.
+
+Collections are stored apart from every regenerated index, and references are stable identities, so deleting `files.db` and re-importing leaves them resolving to the same references. A test checks this.
+
+## Queued requests
+
+`towpath.unified.requests` lets the UI ask for work without doing it:
+
+- `request_part` appends a mail part to the existing `content_requests` queue. `towpath connect fetch` fetches it, and `part_text` shows plain text only.
+- `request_search` appends filters to `search_requests`. `towpath search run-requests` runs them in connect mode and stores each response in the source store's `search_runs`. The UI shows the latest stored response with its time.
 
 ## Legacy compatibility
 

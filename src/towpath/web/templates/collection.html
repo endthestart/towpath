@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block title %}{{ collection.name }} · Towpath{% endblock %}
+{% block content %}
+<a class="back-link" href="{% url 'collections' %}">← Collections</a>
+<header class="page-head"><p class="eyebrow">{% if collection.kind == 'query' %}QUERY COLLECTION{% else %}REFERENCE SET{% endif %}</p><h1 class="message-subject">{{ collection.name }}</h1>
+{% if query_url %}<p class="lead">Query: <a href="{{ query_url }}" class="reference">{{ collection.filters.text }}{% for e in collection.filters.extensions %} extension:{{ e }}{% endfor %}{% for k in collection.filters.kinds %} kind:{{ k }}{% endfor %}{% for m in collection.filters.media_types %} type:{{ m }}{% endfor %}</a></p>{% endif %}</header>
+<section class="notice {% if evaluation.partial %}warn{% else %}ok{% endif %}">
+<strong>Evaluated {{ evaluation.evaluated_at }} (UTC), against local catalogs.</strong>
+{% for k, v in evaluation.counts.items %}<span class="tag">{{ k }} {{ v }}</span>{% endfor %}
+{% if evaluation.partial %}<ul>{% for reason in evaluation.incomplete_because %}<li>{{ reason }}</li>{% endfor %}</ul>{% endif %}
+</section>
+{% if collection.kind == 'query' %}<form method="post" action="{% url 'collection-accept' collection.collection_id %}">{% csrf_token %}<button class="button" type="submit">Accept current results as the baseline</button></form>
+<p class="footnote">Accepting records today's references and versions. Later evaluations report what was added, removed, changed or unavailable since.</p>{% endif %}
+<section class="mail-list">
+{% for item in evaluation.items %}<div class="mail-row"><span class="sender"><span class="tag">{{ item.status }}</span></span>
+<span class="mail-title"><a href="{{ item.url }}"><strong>{{ item.title|default:item.ref }}</strong></a><span class="mail-tags"><span class="reference">{{ item.ref }}</span>{% if item.reason %}<span>{{ item.reason }}</span>{% endif %}{% if item.note %}<span>note: {{ item.note }}</span>{% endif %}</span></span>
+<time>{{ item.source_type|default:'' }}</time>
+{% if collection.kind == 'set' %}<form method="post" action="{% url 'collection-remove' collection.collection_id %}">{% csrf_token %}<input type="hidden" name="r" value="{{ item.ref }}"><button class="link-button" type="submit" aria-label="Remove">×</button></form>{% else %}<span></span>{% endif %}</div>
+{% empty %}<div class="empty"><p>{% if collection.kind == 'set' %}No references yet. Open a search result and add it here.{% else %}No results now, and nothing accepted yet.{% endif %}</p></div>{% endfor %}
+</section>
+{% endblock %}

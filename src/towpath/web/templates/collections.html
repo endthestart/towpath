@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block title %}Collections · Towpath{% endblock %}
+{% block content %}
+<header class="page-head compact"><p class="eyebrow">COLLECTIONS</p><h1>Keep what matters, by reference.</h1>
+<p class="lead">A collection is a saved query or an explicit set of references. It never copies contents, and it survives re-indexing.</p></header>
+<section class="mail-list">
+{% for c in collections %}<a class="mail-row" href="{% url 'collection' c.collection_id %}"><span class="sender">{{ c.kind }}</span><span class="mail-title"><strong>{{ c.name }}</strong><span class="mail-tags">{% if c.kind == 'set' %}<span>{{ c.members }} reference{{ c.members|pluralize }}</span>{% else %}<span>{{ c.baseline }} accepted result{{ c.baseline|pluralize }}</span>{% endif %}</span></span><time>{{ c.updated_at|slice:':10' }}</time><span class="row-arrow" aria-hidden="true">↗</span></a>
+{% empty %}<div class="empty"><h2>No collections yet.</h2><p>Save a search, or create a reference set below.</p></div>{% endfor %}
+</section>
+<section class="detail-card"><p class="eyebrow">NEW REFERENCE SET</p>
+<form method="post" action="{% url 'collection-create' %}" class="inline-form">{% csrf_token %}<label>Name <input name="name" maxlength="120" required></label><button class="button" type="submit">Create</button></form>
+<p class="footnote">To save a query instead, run it on the Search page and choose “Save as a query collection”.</p></section>
+{% endblock %}

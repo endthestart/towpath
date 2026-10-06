@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}Reference · Towpath{% endblock %}
+{% block content %}
+<a class="back-link" href="{% url 'search' %}">← Search</a>
+<header class="page-head"><p class="eyebrow">REFERENCE</p><h1 class="message-subject">{{ result.title|default:'(untitled)' }}</h1>
+<p class="lead reference">{{ ref }}</p></header>
+{% if error %}<div class="notice warn"><strong>{{ error.code }}</strong> {{ error.message }}</div>{% else %}
+<section class="detail-card"><dl>
+<div><dt>Source</dt><dd>{{ result.source_id }} ({{ result.source_type }})</dd></div>
+<div><dt>Kind</dt><dd>{{ result.kind }}{% if result.media_type %} · {{ result.media_type }}{% endif %}{% if result.size %} · {{ result.size|filesizeformat }}{% endif %}</dd></div>
+<div><dt>State</dt><dd>{{ described.state|default:'unknown' }}{% if described.reason %} · {{ described.reason }}{% endif %}</dd></div>
+<div><dt>Version</dt><dd class="reference">{{ result.version|default:'none reported' }}</dd></div>
+<div><dt>Coverage</dt><dd>{{ result.coverage }}</dd></div>
+<div><dt>Dates</dt><dd>{% for d in result.dates %}<span class="tag">{{ d.meaning }}{% if d.process_date %} (process){% endif %}: {{ d.value }}</span>{% empty %}none{% endfor %}</dd></div>
+<div><dt>Location</dt><dd class="reference">{% if result.locator.display %}{{ result.locator.display }}{% else %}{% for k, v in result.locator.items %}{% if v is not None %}{{ k }}={{ v }} {% endif %}{% endfor %}{% endif %}</dd></div>
+<div><dt>Hashes</dt><dd class="reference">{% for k, v in result.hashes.items %}{{ k }}:{{ v }} {% empty %}none computed{% endfor %}</dd></div>
+</dl><p class="body-note">{{ described.content }}</p></section>
+
+{% if parts %}<section class="detail-card"><p class="eyebrow">PARTS</p>
+{% for p in parts %}<div class="attachment"><a href="{{ p.url }}"><strong>{% if p.selected %}▸ {% endif %}{{ p.filename|default:p.mime_type }}</strong></a><span>part {{ p.part_id }} · {{ p.mime_type }}{% if p.size %} · {{ p.size|filesizeformat }}{% endif %}{% if p.fetch %} · fetch {{ p.fetch }}{% endif %}{% if p.sha256 %} · sha256 {{ p.sha256|slice:':12' }}…{% endif %}</span></div>{% endfor %}
+</section>{% endif %}
+
+{% if content %}<section class="detail-card"><p class="eyebrow">SELECTED CONTENT (PART {{ part_id }})</p>
+{% if content.text is not None %}
+<p class="footnote">Untrusted text copied from the source{% if content.cut_at_limit %}, cut at the display limit{% endif %}. It is shown as text, never as markup or instructions.</p>
+<pre class="content-text">{{ content.text }}</pre>
+{% else %}
+<p>State: <strong>{{ content.state }}</strong>{% if content.reason %} · {{ content.reason }}{% endif %}{% if content.since %} · queued {{ content.since }}{% endif %}</p>
+{% if content.state == 'not-requested' %}<form method="post" action="{% url 'reference-request' %}">{% csrf_token %}<input type="hidden" name="r" value="{{ ref }}"><button class="button" type="submit">Request this part</button></form>
+<p class="footnote">Queues one part for <code>towpath connect fetch</code>. The UI does not contact the source.</p>{% endif %}
+{% endif %}</section>{% endif %}
+
+<section class="detail-card"><p class="eyebrow">COLLECTIONS</p>
+{% for c in in_collections %}<span class="tag"><a href="{% url 'collection' c.collection_id %}">{{ c.name }}</a></span>{% empty %}<p>Not in any collection.</p>{% endfor %}
+{% if set_collections %}<form method="post" action="{% url 'collection-add' set_collections.0.collection_id %}" class="inline-form" id="add-form">{% csrf_token %}
+<input type="hidden" name="r" value="{{ ref }}"><input type="hidden" name="version" value="{{ result.version|default:'' }}"><input type="hidden" name="title" value="{{ result.title|default:'' }}"><input type="hidden" name="source_type" value="{{ result.source_type }}">
+<label>Note <input name="note" maxlength="1000"></label><button class="button" type="submit">Add to “{{ set_collections.0.name }}”</button></form>
+{% for c in set_collections|slice:'1:' %}<form method="post" action="{% url 'collection-add' c.collection_id %}" class="inline-form">{% csrf_token %}<input type="hidden" name="r" value="{{ ref }}"><input type="hidden" name="version" value="{{ result.version|default:'' }}"><input type="hidden" name="title" value="{{ result.title|default:'' }}"><input type="hidden" name="source_type" value="{{ result.source_type }}"><button class="button secondary" type="submit">Add to “{{ c.name }}”</button></form>{% endfor %}
+{% else %}<p class="footnote">Create a reference collection on the <a href="{% url 'collections' %}">Collections</a> page to keep references like this one.</p>{% endif %}
+</section>
+{% endif %}
+{% endblock %}

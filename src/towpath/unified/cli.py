@@ -100,3 +100,18 @@ def describe_cmd(ref: str = typer.Argument(..., help="A result reference, <sourc
         _fail(page.error.code, page.error.message, 1)
     finally:
         federation.close_all(adapters)
+
+
+@app.command("run-requests")
+def run_requests_cmd(limit: int = typer.Option(20, "--limit", min=1, max=federation.MAX_LIMIT,
+                                               help="Results per source for each queued search."),
+                     config: Path = ConfigOpt):
+    """Run provider searches the local UI queued (towpath-connect) and store their responses for the UI."""
+    from towpath import config as config_mod
+    from towpath.unified import requests
+
+    try:
+        cfg = config_mod.load(config)
+    except (config_mod.ConfigError, OSError) as exc:
+        _fail("invalid-config", str(exc))
+    _emit(requests.run_searches(cfg, limit))

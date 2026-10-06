@@ -80,6 +80,8 @@ CREATE TABLE IF NOT EXISTS matches (
 CREATE TABLE IF NOT EXISTS destination_lookups (
   source_id TEXT NOT NULL, algorithm TEXT NOT NULL, checksum TEXT NOT NULL, present INTEGER NOT NULL,
   remote_id TEXT, checked_run TEXT NOT NULL, checked_at TEXT NOT NULL, PRIMARY KEY (source_id, algorithm, checksum));
+CREATE TABLE IF NOT EXISTS search_runs (
+  request_seq INTEGER PRIMARY KEY, request_key TEXT NOT NULL, ran_at TEXT NOT NULL, response TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS coverage (
   run_id TEXT PRIMARY KEY, source_id TEXT NOT NULL, complete INTEGER NOT NULL, items_seen INTEGER NOT NULL,
   items_new INTEGER NOT NULL, items_absent INTEGER NOT NULL, items_indexed_total INTEGER NOT NULL,
@@ -90,6 +92,9 @@ CREATE TABLE IF NOT EXISTS content_requests (
   seq INTEGER PRIMARY KEY AUTOINCREMENT, item_id TEXT NOT NULL, part_id TEXT NOT NULL,
   requested_by TEXT NOT NULL, priority TEXT NOT NULL, created_at TEXT NOT NULL,
   UNIQUE (item_id, part_id));
+CREATE TABLE IF NOT EXISTS search_requests (
+  seq INTEGER PRIMARY KEY AUTOINCREMENT, request_key TEXT NOT NULL, filters TEXT NOT NULL,
+  requested_by TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS presence_requests (
   seq INTEGER PRIMARY KEY AUTOINCREMENT, destination_id TEXT NOT NULL, algorithm TEXT NOT NULL,
   checksum TEXT NOT NULL, requested_by TEXT NOT NULL, created_at TEXT NOT NULL,
@@ -125,6 +130,12 @@ CREATE TABLE IF NOT EXISTS model_grants (
 CREATE TABLE IF NOT EXISTS file_grants (
   root_alias TEXT NOT NULL, feature TEXT NOT NULL, author TEXT NOT NULL, at TEXT NOT NULL,
   PRIMARY KEY (root_alias, feature));
+CREATE TABLE IF NOT EXISTS collections (
+  collection_id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, kind TEXT NOT NULL, definition TEXT,
+  author TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS collection_items (
+  collection_id TEXT NOT NULL, ref TEXT NOT NULL, role TEXT NOT NULL, version TEXT, title TEXT, source_type TEXT,
+  note TEXT, author TEXT NOT NULL, added_at TEXT NOT NULL, PRIMARY KEY (collection_id, ref, role));
 CREATE TABLE IF NOT EXISTS decision_log (
   seq INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, target_id TEXT NOT NULL, detail TEXT NOT NULL,
   author TEXT NOT NULL, at TEXT NOT NULL);

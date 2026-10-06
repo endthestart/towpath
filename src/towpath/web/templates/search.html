@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% block title %}Search · Towpath{% endblock %}
+{% block content %}
+<header class="page-head compact"><p class="eyebrow">SEARCH ALL SOURCES</p><h1>One search, every source.</h1>
+<p class="lead">Keyword text and filters such as <code>extension:nef</code>, <code>kind:mail-part</code>, <code>type:image/</code>, <code>after:2010-01-01</code>. Each source answers on its own, at its own depth.</p></header>
+<form class="search" method="get" action="{% url 'search' %}">
+  <label for="query" class="sr-only">Search</label>
+  <input id="query" name="q" value="{{ query }}" maxlength="512" placeholder="canal  ·  extension:nef  ·  kind:mail-part type:application/pdf" type="search">
+  <button class="button" type="submit">Search →</button>
+  <fieldset class="source-picks"><legend class="sr-only">Sources</legend>
+  {% for s in statuses %}<label><input type="checkbox" name="source" value="{{ s.source_id }}" {% if s.source_id in chosen %}checked{% endif %}> {{ s.source_id }}</label>{% endfor %}
+  </fieldset>
+</form>
+{% if error %}<div class="notice warn" role="alert"><strong>Not searched.</strong> {{ error }}</div>{% endif %}
+{% if response %}
+<section class="notice {% if response.complete %}ok{% else %}warn{% endif %}">
+  {% if response.complete %}<strong>Complete for the sources searched.</strong>
+  {% else %}<strong>Not a complete answer.</strong><ul>{% for reason in response.incomplete_because %}<li>{{ reason }}</li>{% endfor %}</ul>{% endif %}
+  <p class="footnote">Results are grouped by source, in each source's own order. There is no combined total, and ranks are not comparable across sources.</p>
+</section>
+{% for g in groups %}
+<section class="source-group">
+  <div class="result-heading"><strong>{{ g.source_id }}</strong>
+    <span><span class="tag">{{ g.status }}</span>{% if g.depth %}<span class="tag">{{ g.depth }}</span>{% endif %}{{ g.result_count }} on this page{% if g.more_may_exist %} · more may exist{% elif g.more_may_exist is None %} · the source cannot say whether more exist{% endif %}{% if g.estimate %} · provider estimate {{ g.estimate.value }}{% endif %}</span></div>
+  {% if g.error %}<div class="notice warn"><strong>{{ g.error.code }}</strong> {{ g.error.message }}</div>{% endif %}
+  {% for note in g.notes %}<p class="footnote">{{ note }}</p>{% endfor %}
+  <div class="mail-list">
+  {% for r in g.results %}
+    <a class="mail-row" href="{{ r.url }}">
+      <span class="sender">{{ r.kind }}{% if r.extension %} · .{{ r.extension }}{% endif %}</span>
+      <span class="mail-title"><strong>{{ r.title|default:'(untitled)' }}</strong>
+        <span class="mail-tags"><span>{{ r.coverage }}</span>{% if r.availability != 'present' %}<span>{{ r.availability }}</span>{% endif %}{% for f in r.match.fields %}<span>matched {{ f }}</span>{% endfor %}</span></span>
+      <time>{% for d in r.dates %}{% if forloop.first %}{{ d.value|slice:':10' }}{% endif %}{% empty %}no date{% endfor %}</time><span class="row-arrow" aria-hidden="true">↗</span>
+    </a>
+  {% empty %}{% if not g.error %}<div class="empty"><p>No results from this source{% if g.depth == 'catalog' and query %} in its catalog (names, types, dates){% endif %}.</p></div>{% endif %}{% endfor %}
+  </div>
+</section>
+{% endfor %}
+{% if next_url %}<nav class="pagination"><span>Only sources with more results are asked for the next page.</span><div><a href="{{ next_url }}">Next page →</a></div></nav>{% endif %}
+
+{% if not filters.metadata_only %}
+<section class="detail-card provider-card"><p class="eyebrow">PROVIDER SEARCH</p>
+  <p>This page searched local catalogs only. Gmail and IMAP can search message text themselves, and a files index can search extracted text. The UI never contacts them: it queues the search for <code>towpath search run-requests</code> (towpath-connect).</p>
+  {% if waiting %}<p><strong>Queued.</strong> Waiting for towpath-connect to run it.</p>{% endif %}
+  <form method="post" action="{% url 'search-request' %}">{% csrf_token %}<input type="hidden" name="q" value="{{ query }}">{% for s in chosen %}<input type="hidden" name="source" value="{{ s }}">{% endfor %}<button class="button" type="submit">Queue provider search</button></form>
+  {% if provider %}
+  <p class="footnote">Last provider search ran at {{ provider.ran_at }} (UTC). It is a stored result, not live.</p>
+  {% if not provider.response.complete %}<ul>{% for reason in provider.response.incomplete_because %}<li>{{ reason }}</li>{% endfor %}</ul>{% endif %}
+  {% for g in provider.groups %}
+    <div class="result-heading"><strong>{{ g.source_id }}</strong><span><span class="tag">{{ g.status }}</span>{% if g.depth %}<span class="tag">{{ g.depth }}</span>{% endif %}{{ g.result_count }} results</span></div>
+    {% if g.error %}<div class="notice warn"><strong>{{ g.error.code }}</strong> {{ g.error.message }}</div>{% endif %}
+    <div class="mail-list">{% for r in g.results %}<a class="mail-row" href="{{ r.url }}"><span class="sender">{{ r.kind }}</span><span class="mail-title"><strong>{{ r.title|default:'(untitled)' }}</strong><span class="mail-tags"><span>{{ r.coverage }}</span><span>not a verified passage</span></span></span><time>{% for d in r.dates %}{% if forloop.first %}{{ d.value|slice:':10' }}{% endif %}{% endfor %}</time><span class="row-arrow" aria-hidden="true">↗</span></a>{% endfor %}</div>
+  {% endfor %}
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="detail-card"><p class="eyebrow">SAVE THIS SEARCH</p>
+  <form method="post" action="{% url 'collection-create' %}" class="inline-form">{% csrf_token %}
+    <input type="hidden" name="q" value="{{ query }}">{% for s in chosen %}<input type="hidden" name="source" value="{{ s }}">{% endfor %}
+    <label>Collection name <input name="name" maxlength="120" required></label><button class="button" type="submit">Save as a query collection</button></form>
+  <p class="footnote">A query collection stores the query, not the results. Opening it re-evaluates the query and reports what changed.</p>
+</section>
+{% else %}
+<section class="detail-card"><p class="eyebrow">SOURCES</p>
+{% for s in statuses %}<div class="attachment"><strong>{{ s.source_id }} <span class="tag">{{ s.state }}</span>{% for d in s.depths %}<span class="tag">{{ d }}</span>{% endfor %}</strong>
+<span>{{ s.display_name }}{% if s.reason %} · {{ s.reason }}{% endif %}</span>
+<span>Inventory complete: {{ s.coverage.inventory_complete|yesno:'yes,no,not established' }} · Content complete: {{ s.coverage.content_complete|yesno:'yes,no,not established' }}{% for k, v in s.coverage.counts.items %} · {{ k }} {{ v }}{% endfor %}</span>
+{% for note in s.coverage.notes %}<span class="footnote">{{ note }}</span>{% endfor %}</div>{% empty %}<p>No sources are indexed yet.</p>{% endfor %}
+</section>
+{% endif %}
+{% endblock %}

@@ -9,13 +9,16 @@ from django.conf import settings
 from django.core.wsgi import get_wsgi_application
 
 
-def configure(store_dir: Path):
+def configure(store_dir: Path, config=None):
+    """``config`` (optional, already loaded) adds file sources and declared scope; secrets in it are never resolved."""
     if not settings.configured:
         settings.configure(
             SECRET_KEY=secrets.token_hex(32), DEBUG=False, ALLOWED_HOSTS=["127.0.0.1", "localhost"],
-            ROOT_URLCONF="towpath.web.urls", TOWPATH_STORE_DIR=store_dir, USE_TZ=True, TIME_ZONE="UTC",
-            INSTALLED_APPS=[],
-            MIDDLEWARE=["towpath.web.views.LocalPrivacyMiddleware"],
+            ROOT_URLCONF="towpath.web.urls", TOWPATH_STORE_DIR=store_dir, TOWPATH_CONFIG=config, USE_TZ=True,
+            TIME_ZONE="UTC", INSTALLED_APPS=[],
+            # Forms that record decisions or queue requests are POSTs protected by Django's CSRF check.
+            MIDDLEWARE=["towpath.web.views.LocalPrivacyMiddleware", "django.middleware.csrf.CsrfViewMiddleware"],
+            CSRF_COOKIE_SAMESITE="Strict", CSRF_COOKIE_HTTPONLY=True,
             TEMPLATES=[{"BACKEND": "django.template.backends.django.DjangoTemplates",
                         "DIRS": [str(Path(__file__).parent / "templates")], "APP_DIRS": False}],
         )
@@ -28,7 +31,7 @@ class QuietHandler(WSGIRequestHandler):
         pass
 
 
-def launch(store_dir: Path, port: int):
-    configure(store_dir)
+def launch(store_dir: Path, port: int, config=None):
+    configure(store_dir, config)
     with make_server("127.0.0.1", port, get_wsgi_application(), handler_class=QuietHandler) as server:
         server.serve_forever()
