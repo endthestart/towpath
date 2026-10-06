@@ -7,9 +7,8 @@ The optional Django interface reads an existing email metadata index. It gives y
 From your Towpath checkout, using Python 3.11 or newer:
 
 ```sh
-python -m venv .venv
+uv sync --locked --extra web
 source .venv/bin/activate
-pip install -e ".[web]"
 towpath fixtures generate /tmp/towpath-ui-demo
 cd /tmp/towpath-ui-demo
 towpath connect sync

@@ -5,7 +5,7 @@ Status: handoff for the local operator. The cloud branch was built from GitHub-v
 Prerequisite for every increment:
 
 ```sh
-pip install -e ".[dev]"
+uv sync --locked --extra dev && source .venv/bin/activate
 python -m pytest -q -rs
 ruff check src tests packaging
 towpath fixtures check-domains src tests docs examples deploy packaging README.md CONTRIBUTING.md

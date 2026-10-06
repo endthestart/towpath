@@ -16,9 +16,8 @@ Requires Python 3.11 or newer, Git, and a browser.
 git clone https://github.com/endthestart/towpath.git
 cd towpath
 git checkout claude/happy-gauss-ugprmu
-python3 -m venv .venv
+uv sync --locked --extra dev
 source .venv/bin/activate
-pip install -e ".[dev]"
 python -m pytest -q          # expect: 94 passed
 ruff check src tests         # expect: All checks passed!
 ```

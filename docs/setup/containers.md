@@ -43,6 +43,8 @@ The core image removes CPython's `readline`, `_gdbm`, and `_dbm` modules. They l
 - `/usr/share/common-licenses/`: the license texts;
 - `/usr/share/licenses/python/`: Python distributions, their license files, and CPython's license (core only).
 
+Python dependencies are not upgraded at build time: both images install exactly the hash-pinned versions in `packaging/requirements-image.txt`, exported from `uv.lock` (the same lock CI tests against), then run `pip check`. CI fails if the export is stale.
+
 **How corresponding source is delivered** ([GPL FAQ: unchanged binaries](https://www.gnu.org/licenses/gpl-faq.en.html#UnchangedJustBinary); [GPL-2.0](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html) §3; [GPL-3.0](https://www.gnu.org/licenses/gpl.en.html) §6):
 
 - **Upgrade at build time.** Every distribution package is upgraded to the archive's current version, so each installed version's source is still in the archive. A version from the pinned base image can be superseded; the Ubuntu base held a superseded `audit` build until this step was added.

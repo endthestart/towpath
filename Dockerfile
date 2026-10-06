@@ -11,6 +11,8 @@
 # Package archives may change between builds; releases reuse the first tested canonical image.
 # Every distribution package is upgraded to the archive's current version at build time, so CI
 # can fetch and publish the exact corresponding source for each one (packaging/release/sources.py).
+# Python dependencies are the hash-pinned versions exported from uv.lock
+# (packaging/requirements-image.txt); the build fails if any is missing or does not match.
 
 ARG PYTHON_IMAGE=python:3.12-slim@sha256:dddfd7e07f9d15aeeca61529320492139d21cac7f0070c00609243e51e4e0016
 ARG UBUNTU_IMAGE=ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55
@@ -53,10 +55,13 @@ RUN groupadd --system --gid 10001 towpath \
  && useradd --system --uid 10001 --gid 10001 --home-dir /state --no-create-home --shell /usr/sbin/nologin towpath \
  && mkdir -p /state /recovered /config /data && chown 10001:10001 /state /recovered
 COPY --from=wheel /wheels /tmp/wheels
+COPY packaging/requirements-image.txt /tmp/requirements-image.txt
 RUN --mount=type=secret,id=build_ca,required=false \
     if [ -f /run/secrets/build_ca ]; then export PIP_CERT=/run/secrets/build_ca; fi; \
-    for wheel in /tmp/wheels/*.whl; do pip install --no-cache-dir "$wheel[web,gmail,imap]"; done \
- && rm -rf /tmp/wheels
+    pip install --no-cache-dir --require-hashes --no-deps -r /tmp/requirements-image.txt \
+ && pip install --no-cache-dir --no-deps /tmp/wheels/*.whl \
+ && pip check \
+ && rm -rf /tmp/wheels /tmp/requirements-image.txt
 COPY packaging/licenses/ /usr/local/lib/towpath/
 RUN sh /usr/local/lib/towpath/collect-licenses.sh python3 \
  && cp /usr/local/lib/towpath/NOTICE-core.md /usr/share/licenses/NOTICE.md && rm -rf /usr/local/lib/towpath
@@ -95,11 +100,14 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 # Towpath in a virtualenv that can see the system's Recoll binding (built for this Python only).
 COPY --from=wheel /wheels /tmp/wheels
+COPY packaging/requirements-image.txt /tmp/requirements-image.txt
 RUN --mount=type=secret,id=build_ca,required=false \
     if [ -f /run/secrets/build_ca ]; then export PIP_CERT=/run/secrets/build_ca; fi; \
     python3 -m venv --system-site-packages /opt/towpath \
- && for wheel in /tmp/wheels/*.whl; do /opt/towpath/bin/pip install --no-cache-dir "$wheel[web,gmail,imap]"; done \
- && rm -rf /tmp/wheels \
+ && /opt/towpath/bin/pip install --no-cache-dir --require-hashes --no-deps -r /tmp/requirements-image.txt \
+ && /opt/towpath/bin/pip install --no-cache-dir --no-deps /tmp/wheels/*.whl \
+ && /opt/towpath/bin/pip check \
+ && rm -rf /tmp/wheels /tmp/requirements-image.txt \
  && /opt/towpath/bin/python -c "import recoll.recoll, recoll.rclextract"
 COPY packaging/licenses/ /usr/local/lib/towpath/
 RUN sh /usr/local/lib/towpath/collect-licenses.sh /opt/towpath/bin/python \

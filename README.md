@@ -20,12 +20,11 @@ Discovery and curation come first. Durable copies, source independence and physi
 
 ## Running the first slice
 
-Requires Python 3.11 or newer. Everything runs on generated synthetic data, with no network access or credentials.
+Requires Python 3.11 or newer and [uv](https://docs.astral.sh/uv/). Dependencies are pinned in `uv.lock`, which local development, CI and the container images all install from. Everything runs on generated synthetic data, with no network access or credentials.
 
 ```sh
-python -m venv .venv
+uv sync --locked --extra dev
 source .venv/bin/activate
-pip install -e ".[dev]"
 python -m pytest                        # acceptance checks for mail, models, discovery, releases, and UI
 towpath fixtures generate /tmp/towpath-demo
 cd /tmp/towpath-demo
@@ -43,7 +42,7 @@ Proposals cannot be executed; there is no write path. See [first slice](docs/fir
 Install the optional interface, then point it at the folder containing your existing `source.db`:
 
 ```sh
-pip install -e ".[web]"
+uv sync --locked --extra web
 towpath web serve --store-dir /path/to/private/state
 ```
 

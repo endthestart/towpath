@@ -42,7 +42,21 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install -e ".[dev]"
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.12.9"
+          enable-cache: false
+      # Dependencies come only from uv.lock. Fails if the lock or the image export is out of date.
+      - name: Install the locked environment
+        env:
+          UV_PYTHON_DOWNLOADS: never
+        run: |
+          set -euo pipefail
+          uv lock --check
+          uv export --frozen --no-dev --extra web --extra gmail --extra imap --no-emit-project --format requirements-txt -o packaging/requirements-image.txt
+          git diff --exit-code packaging/requirements-image.txt
+          uv sync --locked --extra dev --python "${{ matrix.python-version }}"
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
       - run: ruff check src tests packaging
       - run: towpath fixtures check-domains src tests docs examples deploy packaging README.md CONTRIBUTING.md
       - run: python -m pytest -q
@@ -65,7 +79,17 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
-      - run: pip install -e ".[dev]"
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.12.9"
+          enable-cache: false
+      - name: Install the locked environment
+        env:
+          UV_PYTHON_DOWNLOADS: never
+        run: |
+          set -euo pipefail
+          uv sync --locked --extra dev --python 3.12
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
       - name: Build the candidate image
         # Build arguments depend on the commit, never on the ref. Package archives can change
         # between runs; publication reuses the first tested canonical image for this revision.
