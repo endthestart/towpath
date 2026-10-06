@@ -10,6 +10,9 @@ verified digests. Neither Arcane nor the deployment host builds source.
 
 Start with [the Hub Compose example](../../deploy/compose.hub.example.yml). Set both image
 references to the tested, published digests from the release records, not moving tags.
+The verified Recoll image includes the same UI and mail clients and can serve both roles:
+set both image variables to that published digest when the core image is not yet qualified.
+The services retain their separate commands and mounts; only the connector receives tokens.
 
 - `web`: core image, host networking, listening only at `127.0.0.1:8790`. Mount the state folder
   and a separate configuration folder with no actual secrets. Source credential references
@@ -73,3 +76,22 @@ hit a transport write timeout at the original 60-second limit. Blob PUTs now hav
 five-minute socket timeout; metadata requests retain their original timeout. Errors report
 the transfer stage, digest and size without exposing upload URLs or credentials. A synthetic
 delayed transfer fails with the old shared timeout and passes with the separate transfer limit.
+
+The longer limit alone did not resolve core publication. A direct GHCR upload POST on
+2026-10-06 advertised a pull-only authentication scope. The client previously cached that
+token under `pull`, then looked under `pull,push` for the following PUT and started its body
+without authorization. A synthetic regression reproduced this scope mismatch. The client
+now requests the operation's explicit scope, authenticates the first PUT, and still permits
+only one refresh when that upload token expires. This removes the reproduced missing-header
+case; only a successful live core publication will establish that it resolves that upload.
+
+The Recoll image at revision `75e361a` did publish on a bounded retry in
+[run 37466516946](https://github.com/endthestart/towpath/actions/runs/37466516946).
+Its complete corresponding-source artifact passed an anonymous download and checksum
+verification (396 source files, 574,725,703 source bytes), including the retention notice.
+Its anonymous image pull on the deployment host matched the tested config digest and
+revision. A disposable, read-only, unprivileged container with no external network or
+private mounts passed synthetic metadata sync, explicit store upgrade, one worker poll,
+and UI/collections HTTP checks. This is host runtime qualification with invented data;
+it does not establish persistent operation, private-store handover or live source acceptance.
+Core publication remains open; the overall workflow did not pass.

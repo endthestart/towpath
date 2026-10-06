@@ -85,7 +85,13 @@ class HttpRegistry:
         realm = params.pop("realm", None)
         if not realm:
             raise RegistryError(f"{host}: unusable authentication challenge")
-        params.setdefault("scope", scope_hint)
+        # GHCR can advertise only pull even on an upload POST. Request the caller's
+        # operation scope so the POST token is cached under the key used by its PUT.
+        # Otherwise a large PUT starts without auth and may stall before reading 401.
+        if scope_hint:
+            params["scope"] = scope_hint
+        else:
+            params.setdefault("scope", "")
         key = (host, params.get("scope", ""))
         if refresh:
             self._tokens.pop(key, None)

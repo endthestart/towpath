@@ -31,6 +31,9 @@ class State:
         self.reject_patch = False
         self.upload_methods = []
         self.put_delay = 0
+        self.challenge_scope = None
+        self.token_scopes = []
+        self.blob_put_authorizations = []
 
 
 def handler_for(state: State, port_holder: list):
@@ -51,6 +54,8 @@ def handler_for(state: State, port_holder: list):
             self._send(status, json.dumps({"errors": [{"code": code}]}).encode(), {"Content-Type": "application/json"})
 
         def _authorized(self, name):
+            if self.command == "PUT" and "/blobs/uploads/" in self.path:
+                state.blob_put_authorizations.append(self.headers.get("Authorization"))
             if self.command == "PUT" and state.expire_on_put:
                 state.token_generation += 1
                 state.expire_on_put = False
@@ -61,8 +66,9 @@ def handler_for(state: State, port_holder: list):
             if self.command in {"PATCH", "PUT"}:
                 self.rfile.read(int(self.headers.get("Content-Length") or 0))
             realm = f"http://127.0.0.1:{port_holder[0]}/token"
+            scope = state.challenge_scope or f"repository:{name}:pull,push"
             self._send(401, b"", {"WWW-Authenticate": f'Bearer realm="{realm}",service="test",'
-                                                      f'scope="repository:{name}:pull,push"'})
+                                                      f'scope="{scope}"'})
             return False
 
         def _route(self):
@@ -72,6 +78,7 @@ def handler_for(state: State, port_holder: list):
                     return self._send(401)
                 scope = parse_qs(url.query).get("scope", [""])[0]
                 state.token_requests += 1
+                state.token_scopes.append(scope)
                 return self._send(200, json.dumps({"token": f"t-{state.token_generation}-{scope}"}).encode())
             if url.path.startswith("/storage/"):
                 state.redirect_saw_auth.append(self.headers.get("Authorization"))
@@ -189,7 +196,10 @@ def test_token_expiry_during_streamed_upload_rewinds_the_payload(server, tmp_pat
     state.expire_on_put = True
     client.upload_blob(repo, payload, digest, payload.stat().st_size)
     assert state.blobs[digest] == payload.read_bytes()
-    assert state.token_requests == 2
+    assert state.token_scopes == ["repository:owner/towpath:pull", "repository:owner/towpath:pull,push",
+                                  "repository:owner/towpath:pull,push"]  # one refresh of the upload token
+    assert state.blob_put_authorizations == ["Bearer t-1-repository:owner/towpath:pull,push",
+                                             "Bearer t-2-repository:owner/towpath:pull,push"]
 
 
 def test_bearer_refresh_is_bounded_when_new_tokens_are_also_refused(server):
@@ -271,6 +281,18 @@ def test_blob_transfer_outlives_the_short_metadata_request_timeout(server):
     digest = sha256_digest(payload)
     HttpRegistry("user", "secret", timeout=0.25).upload_blob(repo, payload, digest, len(payload))
     assert state.blobs[digest] == payload
+
+
+def test_upload_uses_requested_scope_when_challenge_advertises_only_pull(server):
+    state, repo = server
+    state.challenge_scope = "repository:owner/towpath:pull"
+    payload = b"synthetic source archive"
+    digest = sha256_digest(payload)
+    HttpRegistry("user", "secret").upload_blob(repo, payload, digest, len(payload))
+    assert state.blobs[digest] == payload
+    assert state.token_scopes == ["repository:owner/towpath:pull", "repository:owner/towpath:pull,push"]
+    # A large body can stall before receiving an early 401. Authenticate its first attempt.
+    assert state.blob_put_authorizations == ["Bearer t-1-repository:owner/towpath:pull,push"]
 
 
 def test_index_resolves_to_the_linux_amd64_image(server):
