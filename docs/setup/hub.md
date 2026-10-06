@@ -6,14 +6,14 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `78be5ec` (single-account login; same-origin referrer policy so browser form posts pass
-the CSRF origin check), publishing run
-[37500369484](https://github.com/endthestart/towpath/actions/runs/37500369484):
+Revision `b82450f` (search page redesign), publishing run
+[37521004657](https://github.com/endthestart/towpath/actions/runs/37521004657):
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:71802c79b40857e7c4eb04e136db9d7c36064d1237a816832cbc19076b5e16a9`
-- `connect`: `ghcr.io/endthestart/towpath-recoll@sha256:96d7e3ed96146ac58aee80d97dfa8250e5ec29fd58a036ff9f34831fa160787b`
+- `web`: `ghcr.io/endthestart/towpath@sha256:cc0bcfe915591e1d9185b44ac56758bb3fa572af30052f435b0b396988492071`
+- `connect`: `ghcr.io/endthestart/towpath-recoll@sha256:eee29738156e4447fc0d1d33f5731c7987b927bffaa011ed72a622398ed20177`
 
-It replaced `b3f9108` (`towpath@sha256:d43b189a…`, `towpath-recoll@sha256:5b95c639…`), whose forms
+It replaced `78be5ec` (`towpath@sha256:71802c79…`, `towpath-recoll@sha256:96d7e3ed…`; single-account
+login with a same-origin referrer policy), which is the rollback target. That replaced `b3f9108` (`towpath@sha256:d43b189a…`, `towpath-recoll@sha256:5b95c639…`), whose forms
 failed in browsers: its `no-referrer` policy made browsers send `Origin: null`. That in turn replaced revision `1e808f0` (deployed the same day, loopback-only UI):
 `ghcr.io/endthestart/towpath@sha256:1d79e5ebb92e3508ce00829ecfb58b42a369332ca1da67b11c1dfc18daf070bb` and
 `ghcr.io/endthestart/towpath-recoll@sha256:00e2044577ea200a05ace7f547e0b0e008d8c35ecceb7121c50345a295db725f`.
@@ -27,6 +27,8 @@ Verified before and after deployment (private evidence is kept with the operator
   post through the proxy (real origin, no referrer) passed the CSRF check.
 - The handed-over stores match the Mac snapshots byte for byte (SHA-256, row counts, integrity).
   State, secrets and tokens are owned by the service identity 10001 with modes 0700/0600.
+- End to end: an owner search queued from the UI was answered by the worker in six seconds with one
+  Gmail list call (5 quota units), nothing fetched or cached.
 - The one queued search had already been answered, so the worker found nothing pending. After
   start, after restarting both containers, and after each redeploy the stores were byte-identical: same source ID, item
   and receipt counts, no cached content, no new runs or quota attempts, no grants or collections
@@ -42,8 +44,8 @@ Verified before and after deployment (private evidence is kept with the operator
 and configuration is retired read-only; the owner moves its OAuth token out of use. A Mac UI, worker or
 sync must not run against the same account or stores; returning to the Mac requires stopping Hub first.
 
-**Rollback.** Do not roll back to `b3f9108` (its forms fail in browsers). The previous working digests
-are the `1e808f0` pair above. Rolling back to them
+**Rollback.** Roll back to `78be5ec` with the same compose (only the digests differ). Do not roll back
+to `b3f9108` (its forms fail in browsers). The last loopback-only digests are the `1e808f0` pair above. Rolling back to them
 restores the loopback-only UI with no login, so restore the earlier compose (host networking, no
 proxy network) and remove the proxy entry at the same time. The older fallback is the Recoll image
 `ghcr.io/endthestart/towpath-recoll@sha256:2c42510606db8c2606222f40fc9295311c139019a2c52d502bf83303d93bba49`
