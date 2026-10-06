@@ -155,7 +155,7 @@ Automated: `tests/test_unified_web.py` and `tests/test_cached_search_policy.py`.
 ### A. Synthetic (continue from increment 2's `uni` folder, with the stub running)
 
 1. `towpath web serve --store-dir state --config towpath.toml`. Open `http://127.0.0.1:8790/search/?q=extension:nef`. Expect four source groups, each tagged `catalog`, and the notice "Not a complete answer" naming the incomplete inventory.
-2. Search `fundraiser`. Expect no IMAP result, and a note that keyword text matched metadata only. Choose **Queue provider search**, then run `towpath search run-requests` in another terminal and reload. Expect a stored provider result, "Canal boat club minutes", marked "not a verified passage" with the time it ran.
+2. Search `fundraiser`. Expect no IMAP result, and a note that keyword text matched metadata only. Choose **Search inside messages**, then run `towpath search run-requests` in another terminal; the waiting page refreshes itself. Expect "Canal boat club minutes" under *Inside messages*, with when it ran, and the note that Towpath has not verified a passage under *About these results*.
    Then, for stored results under current policy:
 
    ```sh

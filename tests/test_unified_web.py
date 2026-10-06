@@ -80,10 +80,11 @@ def test_metadata_query_shows_each_source_with_depth_status_and_honest_completen
     page = web.get("/search/", {"q": "extension:nef"})
     assert page.status_code == 200
     html = page.content.decode()
-    for source in ("gmail-fixture", "imap-fixture", "files-fixture", "files-inventory"):
-        assert source in html
-    assert "Not a complete answer." in html and "inventory of the declared scope is not known" in html
-    assert html.count("catalog") >= 4 and "no combined total" in html
+    for label in ("Gmail", "IMAP mail", "Files (files-fixture)", "Files (files-inventory)"):
+        assert f'<h3 class="group-label">{label} <span>' in html
+    assert html.count("<h2>Subjects, senders and names</h2>") == 1
+    assert "Why some results may be missing" in html and "inventory of the declared scope is not known" in html
+    assert "no combined total" in html and "Not a complete answer" not in html
     assert len(_refs(html)) == 5  # 1 Gmail part, 1 IMAP part, 3 inventory references
     assert "DCIM/DSC_0001.NEF" in html
 
@@ -91,10 +92,13 @@ def test_metadata_query_shows_each_source_with_depth_status_and_honest_completen
 def test_keyword_query_is_catalog_only_and_offers_a_queued_provider_search(web, uni):
     html = web.get("/search/", {"q": "fundraiser"}).content.decode()
     assert "keyword text matched metadata only" in html
-    assert "Queue provider search" in html and "Canal boat club minutes" not in html
+    assert "Search inside messages too?" in html and "Canal boat club minutes" not in html
+    assert html.index('id="full-text"') < html.index('class="index-results"')  # offered above the results
+    assert 'http-equiv="refresh"' not in html
     response = web.post("/search/request", {"q": "fundraiser"})
     assert response.status_code == 302
-    assert "Waiting for towpath-connect" in web.get("/search/", {"q": "fundraiser"}).content.decode()
+    waiting = web.get("/search/", {"q": "fundraiser"}).content.decode()
+    assert "Searching inside messages…" in waiting and '<meta http-equiv="refresh" content="5">' in waiting
     with closing(open_store(uni.config.store_dir, "queue", "connect")) as q:
         assert [json.loads(r["filters"])["text"] for r in q.execute("SELECT filters FROM search_requests")] == [
             "fundraiser"]
@@ -107,8 +111,9 @@ def test_queued_provider_results_are_shown_as_stored_and_dated(uni):
     with override_settings(TOWPATH_STORE_DIR=uni.config.store_dir, TOWPATH_CONFIG=uni.config,
                            TOWPATH_LOGIN_REQUIRED=False, ALLOWED_HOSTS=["testserver"], MIDDLEWARE=MIDDLEWARE):
         html = Client().get("/search/", {"q": "fundraiser"}).content.decode()
-    assert "Last provider search ran at" in html and "stored result, not live" in html
-    assert "Canal boat club minutes" in html and "not a verified passage" in html
+    assert "<h2>Inside messages</h2>" in html and "Full message text, searched by" in html and "just now" in html
+    assert "Canal boat club minutes" in html and "Towpath has not verified a passage" in html
+    assert "Search again" in html and 'http-equiv="refresh"' not in html
 
 
 def test_posts_need_a_csrf_token(uni):

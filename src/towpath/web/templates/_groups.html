@@ -1,0 +1,7 @@
+{% for g in groups %}
+  {% if groups|length > 1 %}<h3 class="group-label">{{ g.label }} <span>{{ g.summary }}{% if next_url and g.more %} · <a href="{{ next_url }}">Next {{ page_size }} →</a>{% endif %}</span></h3>{% endif %}
+  {% if g.withheld %}<div class="notice warn"><strong>{{ g.withheld }} stored result{{ g.withheld|pluralize }} withheld</strong> under today's settings:{% for reason, n in g.withheld_reasons.items %} {{ n }} {{ reason }}{% if not forloop.last %};{% endif %}{% endfor %}.</div>{% endif %}
+  {% if g.error %}<div class="notice warn"><strong>{{ g.label }} couldn't search.</strong> {{ g.error.message }}</div>
+  {% elif g.rows %}{% include '_rows.html' with rows=g.rows %}
+  {% elif groups|length == 1 %}<p class="empty-line">{{ empty_text }}</p>{% endif %}
+{% endfor %}

@@ -57,7 +57,7 @@ def ui_provider_refs(uni, query: str, config, monkeypatch) -> tuple[set, str]:
         html = Client().get("/search/", {"q": query}).content.decode()
     monkeypatch.undo()
     assert uni.state.transcript == []
-    section = html.split("PROVIDER SEARCH", 1)[1]
+    section = html.split('id="full-text"', 1)[1].split('class="index-results"', 1)[0]
     refs = {unquote(r) for r in re.findall(r'href="/ref/\?r=([^"]+)"', section)}
     return refs, section
 

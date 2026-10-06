@@ -16,6 +16,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from towpath import stores
 from towpath.unified import collections, federation, requests, sources
+from towpath.web import present
 from towpath.unified.contracts import ContractError, Filters, Reference, split_part
 
 PAGE = 20
@@ -45,12 +46,14 @@ def _ref_url(ref: str) -> str:
     return reverse("reference") + "?" + urlencode({"r": ref})
 
 
-def _group(response: dict) -> list[dict]:
-    groups = []
+def _present(response: dict, labels: dict, types: dict) -> list[dict]:
+    """Each source's page as plain-language rows, in the source's own order."""
+    out = []
     for page in response["sources"]:
-        results = [dict(r, url=_ref_url(r["ref"])) for r in response["results"] if r["source_id"] == page["source_id"]]
-        groups.append({**page, "results": results})
-    return groups
+        sid = page["source_id"]
+        rows = [present.row(r, _ref_url(r["ref"])) for r in response["results"] if r["source_id"] == sid]
+        out.append(present.group(page, rows, labels.get(sid, sid), types.get(sid, "")))
+    return out
 
 
 @require_GET
@@ -59,8 +62,18 @@ def search(request):
     chosen = request.GET.getlist("source")
     cursor = request.GET.get("cursor") or None
     adapters = _adapters()
-    context = {"nav": "search", "query": query, "chosen": chosen, "statuses": federation.statuses(adapters),
-               "error": None, "response": None, "provider": None, "waiting": False}
+    statuses = federation.statuses(adapters)
+    labels = present.source_labels(statuses)
+    types = {s["source_id"]: s["source_type"] for s in statuses}
+    deep = present.deep_sources(statuses, chosen)
+    context = {"nav": "search", "query": query, "chosen": chosen, "statuses": statuses, "labels": labels,
+               "sources": [{**s, "label": labels[s["source_id"]],
+                            "checked": not chosen or s["source_id"] in chosen} for s in statuses],
+               "deep_labels": [labels[s] for s in deep], "deep_names": present.join([labels[s] for s in deep]),
+               "deep_verb": "are" if len(deep) > 1 else "is", "overview": [present.overview(s, labels[s["source_id"]])
+                                                                     for s in statuses],
+               "error": None, "response": None, "provider": None,
+               "waiting": False}
     if query:
         try:
             filters = Filters.parse(query, sources=chosen or None)
@@ -68,15 +81,18 @@ def search(request):
         except ContractError as exc:
             context["error"] = str(exc)
         else:
-            context.update(response=response, groups=_group(response), filters=filters)
+            context.update(response=response, groups=_present(response, labels, types), filters=filters,
+                           reasons=present.reasons(response, labels), first_page=cursor is None, page_size=PAGE)
             if response["next_cursor"]:
                 context["next_url"] = _search_url(query, chosen) + "&" + urlencode({"cursor": response["next_cursor"]})
-            if not filters.metadata_only:
+            if not filters.metadata_only and deep:
                 stored = requests.latest_search(_store(), filters)
                 if stored:  # re-check against today's grants, exclusions, scope and catalogs before showing
                     stored["response"] = requests.apply_current_policy(
                         _store(), getattr(settings, "TOWPATH_CONFIG", None), stored["response"])
-                    stored["groups"] = _group(stored["response"])
+                    stored["groups"] = _present(stored["response"], labels, types)
+                    stored["reasons"] = present.reasons(stored["response"], labels)
+                    stored["ago"] = present.ago(stored["ran_at"])
                 context.update(provider=stored, waiting=requests.search_waiting(_store(), filters))
     context["set_collections"] = [c for c in collections.list_all(_store()) if c["kind"] == "set"]
     return render(request, "search.html", context)

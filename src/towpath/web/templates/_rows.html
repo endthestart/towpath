@@ -1,0 +1,7 @@
+<div class="mail-list">
+{% for r in rows %}<a class="mail-row" href="{{ r.url }}">
+  <span class="sender">{{ r.lead }}</span>
+  <span class="mail-title"><strong>{{ r.title }}</strong>{% if r.context %}<span class="row-context">{{ r.context }}</span>{% endif %}{% if r.tags %}<span class="mail-tags">{% for t in r.tags %}<span>{{ t }}</span>{% endfor %}</span>{% endif %}</span>
+  <time>{{ r.date|default:'' }}</time><span class="row-arrow" aria-hidden="true">↗</span>
+</a>{% endfor %}
+</div>
