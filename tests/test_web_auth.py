@@ -159,3 +159,16 @@ def test_public_url_behind_a_tls_proxy(store):
 def test_serve_rejects_a_malformed_public_url(store):
     result = CliRunner().invoke(app, ["web", "serve", "--store-dir", str(store), "--public-url", "towpath.example.org"])
     assert result.exit_code == 2
+
+
+def test_browser_style_posts_pass_csrf_behind_the_proxy(store):
+    """Browsers send Origin (no Referer) on form posts; the referrer policy must let it be the real origin."""
+    proxied = address_settings("https://towpath.example.org")
+    with override_settings(**proxied):
+        browser = Client(enforce_csrf_checks=True, HTTP_HOST="towpath.example.org", HTTP_X_FORWARDED_PROTO="https")
+        page = browser.get("/setup", secure=True)
+        assert page["Referrer-Policy"] == "same-origin"
+        form = {"code": "wrong", "username": "owner", "password": PASSWORD, "confirm": PASSWORD,
+                "csrfmiddlewaretoken": page.cookies["csrftoken"].value}
+        assert browser.post("/setup", form, HTTP_ORIGIN="https://towpath.example.org").status_code == 400
+        assert browser.post("/setup", form, HTTP_ORIGIN="https://evil.example").status_code == 403

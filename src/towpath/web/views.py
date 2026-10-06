@@ -20,7 +20,9 @@ class LocalPrivacyMiddleware:
         response["Cache-Control"] = "no-store"
         response["X-Frame-Options"] = "DENY"
         response["X-Content-Type-Options"] = "nosniff"
-        response["Referrer-Policy"] = "no-referrer"
+        # Not "no-referrer": browsers then send "Origin: null" with every form post, which the CSRF check rejects.
+        # "same-origin" still sends nothing, not even the origin, to other sites.
+        response["Referrer-Policy"] = "same-origin"
         response["Content-Security-Policy"] = (
             "default-src 'self'; style-src 'self'; script-src 'none'; img-src 'self'; "
             "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
