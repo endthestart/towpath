@@ -7,8 +7,9 @@ daily total nor allows a burst. An exclusive file lock per budget keeps two
 Towpath commands from spending the same budget at once.
 
 These are Towpath's own conservative budgets, not claims about Google's
-limits. The defaults are also the maximums: a deployment may set lower values
-when its project's actual quotas require, never higher without a code change.
+limits. The defaults are the maximums unless the owner explicitly records the
+per-user quota verified in Cloud Console. That opt-in permits up to 30% of the
+verified quota, capped at 1,800 units/minute, without changing the daily ceiling.
 """
 
 import fcntl
@@ -44,8 +45,9 @@ class PacingSettings:
     backoff_base_seconds: float = 2.0
     backoff_max_seconds: float = 300.0
     checkpoint_every: int = 25
+    verified_units_per_minute: int | None = None
 
-    # (minimum, maximum) for each numeric setting. Defaults are the maximum rates.
+    # Baseline bounds; higher rates require an explicit verified quota below.
     LIMITS = {
         "min_interval_seconds": (1.0, 3600.0),
         "units_per_minute": (max(METHOD_COSTS.values()), 1200),
@@ -69,11 +71,19 @@ class PacingSettings:
     def validate(self) -> None:
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", self.budget_id):
             raise ValueError("budget_id must be 1-64 letters, digits, '-' or '_'")
-        for name, (low, high) in self.LIMITS.items():
+        limits = dict(self.LIMITS)
+        if self.verified_units_per_minute is not None:
+            verified = self.verified_units_per_minute
+            if type(verified) is not int or verified < 1:
+                raise ValueError("verified_units_per_minute must be a positive integer from Cloud Console")
+            limits["units_per_minute"] = (max(METHOD_COSTS.values()), min(1800, verified * 3 // 10))
+            limits["min_interval_seconds"] = (0.5, 3600.0)
+        for name, (low, high) in limits.items():
             value = getattr(self, name)
             if not (low <= value <= high):
                 raise ValueError(f"{name} must be between {low} and {high} (got {value}); "
-                                 "Towpath's defaults are its maximum rates")
+                                 "higher rates require verified_units_per_minute and must stay within "
+                                 "30% of it and the 1800-unit ceiling")
         if self.backoff_max_seconds < self.backoff_base_seconds:
             raise ValueError("backoff_max_seconds must be at least backoff_base_seconds")
         _zone(self.day_timezone)

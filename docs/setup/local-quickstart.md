@@ -100,10 +100,10 @@ A pass applies to the messages sampled. Before using a primary account, also ver
 
 Every Gmail request Towpath makes is paced by a persistent budget in `state/quota.db`:
 
-- **Minimum interval:** at least 1 second between request attempts.
-- **Per minute:** at most 1,200 quota units, counted per account.
+- **Minimum interval:** at least 1 second between request attempts by default; the verified-quota opt-in permits a minimum of 0.5 seconds.
+- **Per minute:** at most 1,200 quota units by default, counted per account. An explicit `verified_units_per_minute` opt-in allows up to 30% of the verified per-user quota, capped at 1,800 units/minute; only use a value confirmed in your Cloud Console.
 - **Per day:** at most 1,800,000 units for the whole Google project. The budget day follows Google's Pacific-time quota day.
-- **What counts:** every attempt, including retries, listing, history, probes, `verify-structure`, and attachment fetches. Each is charged at its published unit cost: a message read is 20 units, so about one message per second at most.
+- **What counts:** every attempt, including retries, listing, history, probes, `verify-structure`, and attachment fetches. Each is charged at its published unit cost: a message read is 20 units, so about one message per second at most at the default pace.
 - **One command at a time:** a lock admits one Gmail command per budget. A second one exits with code 8 instead of doubling the rate.
 
 These are Towpath's own conservative budgets, not Google's limits. Confirm your project's actual quotas in Cloud console (**APIs & Services → Gmail API → Quotas**). You may lower the budgets, never raise them, in `towpath.toml`:

@@ -80,6 +80,11 @@ Sources: [message listing](https://developers.google.com/workspace/gmail/api/ref
    project quotas demand them. At 20 units per message read, this is roughly one
    message per second before other requests and retries, with substantial
    headroom against the published per-user limit.
+   An explicit `verified_units_per_minute` opt-in records the per-user quota
+   checked by the operator in Cloud Console. It permits up to 30% of that value,
+   capped at 1,800 units per minute and a 0.5-second minimum interval. It leaves
+   the daily ceiling unchanged; no verified quota means the defaults remain
+   the maximum rates.
 2. Account for every attempt using the method's quota cost, including retries,
    listing, verification, probes, history, and on-demand attachment reads. Route
    SDK retries through the same limiter or disable nested SDK retries. Avoid an
@@ -132,7 +137,7 @@ Every item below is tested on synthetic data with a fake clock and Google-shaped
 
 | Requirement | Where | How |
 | --- | --- | --- |
-| 1. Pacing settings | `src/towpath/quota.py` (`PacingSettings`), `[gmail_pacing]` in config | Defaults are 1 s, 1,200 units per minute, and 1,800,000 units per day. They are also the maximums: config may only lower them. Values are validated, unknown keys are rejected, and `budget_id` names one budget per Cloud project |
+| 1. Pacing settings | `src/towpath/quota.py` (`PacingSettings`), `[gmail_pacing]` in config | Defaults are 1 s, 1,200 units per minute, and 1,800,000 units per day. Without an explicitly recorded verified per-user quota, config may only lower those rates. The optional `verified_units_per_minute` setting permits at most 30% of that value, capped at 1,800 units/minute with a minimum interval of 0.5 s; the daily ceiling is unchanged. Values are validated, unknown keys are rejected, and `budget_id` names one budget per Cloud project |
 | 2. Every attempt accounted | `QuotaLimiter.acquire`, `GoogleGmailClient._execute` | Each attempt books its method's published cost before sending. This covers retries, listing, history, profile probes, `verify-structure`, and attachment reads. The API client's own retries are disabled (`num_retries=0`). `build_connector` always attaches the limiter, so the ordinary CLI is paced |
 | 3. Shared, persistent budget | `quota.db` `attempts` table; `BudgetLock` | Daily units are counted per budget (the whole project). Per-minute units are counted per account. The minimum interval is counted per budget. All of it persists across restarts. An exclusive `flock` per budget admits one Gmail command at a time; another exits with code 8 |
 | 4. Retries and error classes | `classify`, `error_details`, `_execute` | Waits honor `Retry-After`. Otherwise equal-jitter exponential backoff is used (base 2 s, cap 300 s, at most 6 attempts). A requested wait longer than the cap stops instead of sleeping. Waits are cancellable with Ctrl-C. Stops are distinct and exit nonzero: quota (3), daily budget (3), auth (4), permission (5), request (6), server or network (7), lock (8). Reasons carry the status and the API reason code only, never URLs or messages |

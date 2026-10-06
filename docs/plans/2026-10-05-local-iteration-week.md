@@ -2,6 +2,12 @@
 
 Status: Working execution plan after seven goal-alignment questions. Replaces the earlier email-viewer schedule. [Confirmed direction](goal-alignment-2026-10-05.md), [vision](../vision.md), [ADR 0001](../adrs/0001-reference-first-digital-life.md), [implementation specification](../specs/unified-discovery-foundation.md).
 
+## Local checkpoint
+
+The owner chose to continue implementation and integration locally, avoiding frequent agent handoffs. The unified foundation and its review fixes are integrated into the local working branch. A backed-up private-store copy passed the additive upgrade with every existing row preserved; the live upgrade and restarted interface passed. Live Gmail provider search and an explicitly queued keyword search passed through the existing read-only client and pacing, with no content downloaded. Search and collections pages are available in the running local interface.
+
+The existing verified-quota opt-in was recovered from earlier local sync work and retained with its 30%/1,800-unit ceiling. Public regression fixtures are synthetic; account configuration, logs, copies and operational runner stay private. Source setup and feature acceptance continue here. No new cloud handoff is planned. IMAP credentials/server acceptance, NAS provider qualification and broad indexing, export imports, and timeline/context acceptance remain open. These results do not close the remaining Gmail incremental-sync validation gates.
+
 ## Friday target
 
 A useful cross-source foundation: Gmail and IMAP keyword/content search, NAS indexing working toward complete coverage, one search UI, durable collection queries, and an agent-readable evidence/context interface. Source references and date/claim contracts prepare the life timeline. Full NAS and Gmail coverage is the target; long extraction runs may continue beyond Friday with explicit progress and gaps. AI processing is a stretch goal.

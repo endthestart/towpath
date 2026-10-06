@@ -6,12 +6,16 @@
 [stores]
 dir = "state"
 
-# Gmail pacing. These are Towpath's defaults and also its maximum rates;
+# Gmail pacing. These defaults are the maximum rates without a verified quota;
 # lower them if your Google Cloud project's quotas require. One budget per project.
 [gmail_pacing]
 budget_id = "default"
 min_interval_seconds = 1.0
 units_per_minute = 1200
+# Optional: record the per-user quota verified in your own Cloud Console.
+# verified_units_per_minute = <verified positive integer>
+# Opt-in permits at most 30% of that quota, capped at 1800 units/minute.
+# It does not increase daily_units.
 daily_units = 1800000
 checkpoint_every = 25
 

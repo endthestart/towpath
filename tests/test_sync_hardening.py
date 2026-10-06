@@ -456,6 +456,51 @@ def test_pacing_settings_allow_only_lower_rates(ws, values, ok):
             set_pacing(ws, **values)
 
 
+@pytest.mark.parametrize("values,ok", [
+    ({"verified_units_per_minute": 6000, "units_per_minute": 1800, "min_interval_seconds": 0.667}, True),
+    ({"verified_units_per_minute": 6000, "units_per_minute": 1801}, False),
+    ({"verified_units_per_minute": 4000, "units_per_minute": 1201}, False),
+    ({"verified_units_per_minute": 15000, "units_per_minute": 1801}, False),
+    ({"verified_units_per_minute": 6000, "min_interval_seconds": 0.49}, False),
+    ({"verified_units_per_minute": 6000, "daily_units": 1800001}, False),
+    ({"verified_units_per_minute": 0}, False),
+    ({"verified_units_per_minute": True}, False),
+])
+def test_verified_quota_opt_in_is_limited_to_thirty_percent(ws, values, ok):
+    if ok:
+        set_pacing(ws, **values)
+        assert ws.config.gmail_pacing.verified_units_per_minute == values["verified_units_per_minute"]
+    else:
+        with pytest.raises(config_mod.ConfigError):
+            set_pacing(ws, **values)
+
+
+def test_faster_budget_remains_persistent_and_respects_every_rolling_window(paced):
+    set_pacing(paced, verified_units_per_minute=6000, units_per_minute=1800, min_interval_seconds=0.5)
+    settings = paced.config.gmail_pacing
+    # Multiple minutes and a limiter restart; mixed listing, reads, and retries all count.
+    for _ in range(2):
+        limiter = QuotaLimiter(paced.config.store_dir, settings, "src_a", clock=paced.clock, sleep=paced.clock.sleep)
+        try:
+            for i in range(120):
+                limiter.acquire("users.messages.list" if i % 10 == 0 else "users.messages.get")
+        finally:
+            limiter.close()
+    rows = attempts(paced)
+    assert len(rows) == 240
+    assert all(b["at"] - a["at"] >= 0.5 for a, b in zip(rows, rows[1:], strict=False))
+    for row in rows:
+        assert sum(r["units"] for r in rows if row["at"] - 60 < r["at"] <= row["at"]) <= 1800
+
+
+def test_faster_pacing_keeps_shared_daily_ceiling(paced):
+    set_pacing(paced, verified_units_per_minute=6000, units_per_minute=1800,
+               min_interval_seconds=0.667, daily_units=300)
+    assert connect.sync(paced.config, "src_a")["termination"] == "daily-budget-stop"
+    assert connect.sync(paced.config, "src_b")["termination"] == "daily-budget-stop"
+    assert sum(r["units"] for r in attempts(paced)) <= 300
+
+
 def test_progress_reports_counts_and_waits_without_identifying_data(paced):
     set_pacing(paced, units_per_minute=200)
     snaps = []
