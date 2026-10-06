@@ -187,6 +187,10 @@ Collections are stored apart from every regenerated index, and references are st
 
 - `request_part` appends a mail part to the existing `content_requests` queue. `towpath connect fetch-requests` fetches it, and `part_text` shows plain text only.
 - `request_search` appends filters to `search_requests`. `towpath search run-requests` runs them in connect mode and stores each response in the source store's `search_runs`. The UI shows the latest stored response with its time.
+- Before showing a stored response, `apply_current_policy` re-checks every result against today's state, using local configuration and stores only. Anything that no longer qualifies is withheld, counted per source with its reason, and the answer is marked incomplete:
+  - **Files:** file discovery still enabled, provider and root still configured, root still granted `search`, path not excluded now, occurrence still in the catalog.
+  - **Mail:** source still configured, mailbox still in the configured scope, message not marked absent by a later sync.
+  - **No configuration:** a UI started without `--config` cannot check file grants, so it withholds stored file results.
 
 ## Context packets (`towpath.context/1`)
 

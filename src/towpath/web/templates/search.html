@@ -44,10 +44,11 @@
   {% if waiting %}<p><strong>Queued.</strong> Waiting for towpath-connect to run it.</p>{% endif %}
   <form method="post" action="{% url 'search-request' %}">{% csrf_token %}<input type="hidden" name="q" value="{{ query }}">{% for s in chosen %}<input type="hidden" name="source" value="{{ s }}">{% endfor %}<button class="button" type="submit">Queue provider search</button></form>
   {% if provider %}
-  <p class="footnote">Last provider search ran at {{ provider.ran_at }} (UTC). It is a stored result, not live.</p>
+  <p class="footnote">Last provider search ran at {{ provider.ran_at }} (UTC). It is a stored result, not live. It was re-checked just now against current grants, exclusions, configured sources and local catalogs.</p>
   {% if not provider.response.complete %}<ul>{% for reason in provider.response.incomplete_because %}<li>{{ reason }}</li>{% endfor %}</ul>{% endif %}
   {% for g in provider.groups %}
     <div class="result-heading"><strong>{{ g.source_id }}</strong><span><span class="tag">{{ g.status }}</span>{% if g.depth %}<span class="tag">{{ g.depth }}</span>{% endif %}{{ g.result_count }} results</span></div>
+    {% if g.withheld %}<div class="notice warn"><strong>{{ g.withheld }} stored result{{ g.withheld|pluralize }} withheld</strong> under today's settings:{% for reason, n in g.withheld_reasons.items %} {{ n }} {{ reason }}{% if not forloop.last %};{% endif %}{% endfor %}.</div>{% endif %}
     {% if g.error %}<div class="notice warn"><strong>{{ g.error.code }}</strong> {{ g.error.message }}</div>{% endif %}
     <div class="mail-list">{% for r in g.results %}<a class="mail-row" href="{{ r.url }}"><span class="sender">{{ r.kind }}</span><span class="mail-title"><strong>{{ r.title|default:'(untitled)' }}</strong><span class="mail-tags"><span>{{ r.coverage }}</span><span>not a verified passage</span></span></span><time>{% for d in r.dates %}{% if forloop.first %}{{ d.value|slice:':10' }}{% endif %}{% endfor %}</time><span class="row-arrow" aria-hidden="true">↗</span></a>{% endfor %}</div>
   {% endfor %}

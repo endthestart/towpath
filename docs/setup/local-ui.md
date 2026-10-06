@@ -43,7 +43,7 @@ towpath web serve --store-dir /path/to/private/state --config /path/to/private/t
 - **Search all** (`/search/`) runs one query over every source's local catalog.
   - Each source shows its own status, depth, notes and errors. The page states every reason the answer is not complete.
   - Keyword text there matches only names and metadata, and the page says so.
-  - **Queue provider search** records the query for `towpath search run-requests` (towpath-connect). The stored responses appear on the page, with the time they ran. The UI never contacts Gmail, IMAP or a files provider itself.
+  - **Queue provider search** records the query for `towpath search run-requests` (towpath-connect). The stored responses appear on the page, with the time they ran, after being re-checked against current grants, exclusions, configured sources and catalogs. Results that no longer qualify are withheld, with a count and reason per source. The UI never contacts Gmail, IMAP or a files provider itself.
 - **References** (`/ref/?r=<ref>`) show one result's record, version, typed dates, location and parts.
   - **Request this part** queues one mail part for `towpath connect fetch-requests`.
   - Once fetched, a plain-text part is shown as escaped, untrusted text, cut at 20 KB. Other types are described, never rendered.

@@ -150,12 +150,21 @@ Built:
 
 See [local UI](local-ui.md#unified-search-and-collections-development-branch) and [unified discovery](../unified-discovery.md#collections).
 
-Automated: `tests/test_unified_web.py`. It covers the UI never contacting a source, CSRF, escaping, the queue, collections surviving a deleted and re-imported `files.db`, query baselines, and decisions-only writes. `tests/test_web.py` still passes for the original pages.
+Automated: `tests/test_unified_web.py` and `tests/test_cached_search_policy.py`. The second checks that stored provider results respect revoked grants, new exclusions, removed or disabled sources, absent messages and mailbox scope, that permitted results stay visible, and that no configuration means stored file results are withheld. The first covers the UI never contacting a source, CSRF, escaping, the queue, collections surviving a deleted and re-imported `files.db`, query baselines, and decisions-only writes. `tests/test_web.py` still passes for the original pages.
 
 ### A. Synthetic (continue from increment 2's `uni` folder, with the stub running)
 
 1. `towpath web serve --store-dir state --config towpath.toml`. Open `http://127.0.0.1:8790/search/?q=extension:nef`. Expect four source groups, each tagged `catalog`, and the notice "Not a complete answer" naming the incomplete inventory.
 2. Search `fundraiser`. Expect no IMAP result, and a note that keyword text matched metadata only. Choose **Queue provider search**, then run `towpath search run-requests` in another terminal and reload. Expect a stored provider result, "Canal boat club minutes", marked "not a verified passage" with the time it ran.
+   Then, for stored results under current policy:
+
+   ```sh
+   # queue "canal source:files-fixture" from the page, then:
+   towpath search run-requests
+   towpath files revoke archive search
+   ```
+
+   Reload the page. The three archive results are withheld, with a notice "3 stored results withheld … no search grant on root archive now", and the shared-root result stays. Re-grant with `towpath files grant archive search` afterwards.
 3. Open the IMAP "Lock keeper's log" result, then its part 1. Choose **Request this part**, run `towpath connect fetch-requests`, and reload. The text shows the literal `<script>` characters, escaped, under the untrusted-text notice.
 4. On **Collections**, create a reference set. Add two NEF references from their reference pages, then open the set. Expect `unchanged` for the inventory items. Delete `state/files.db`, run `towpath files import --provider inventory`, and reload. Expect the same references, still resolving.
 5. Save the `extension:nef` search as a query collection, open it and accept the current results. In `files/manifests/photos.jsonl`, change `"complete": false` to `true`, delete the `escape.NEF` line and one NEF line, and change another NEF line's `mtime`. Re-import and reload. Expect `removed`, `changed`, `unchanged`, and `unverified` for the Gmail part.

@@ -73,7 +73,9 @@ def search(request):
                 context["next_url"] = _search_url(query, chosen) + "&" + urlencode({"cursor": response["next_cursor"]})
             if not filters.metadata_only:
                 stored = requests.latest_search(_store(), filters)
-                if stored:
+                if stored:  # re-check against today's grants, exclusions, scope and catalogs before showing
+                    stored["response"] = requests.apply_current_policy(
+                        _store(), getattr(settings, "TOWPATH_CONFIG", None), stored["response"])
                     stored["groups"] = _group(stored["response"])
                 context.update(provider=stored, waiting=requests.search_waiting(_store(), filters))
     context["set_collections"] = [c for c in collections.list_all(_store()) if c["kind"] == "set"]

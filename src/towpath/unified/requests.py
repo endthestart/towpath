@@ -162,3 +162,95 @@ def latest_search(store_dir, filters: Filters) -> dict | None:
 def search_waiting(store_dir, filters: Filters) -> bool:
     key = search_key(filters)
     return any(r["request_key"] == key for r in pending_searches(store_dir))
+
+
+# -- current policy for stored provider results --------------------------------------------------------
+
+
+def _mail_reason(db, config, source_ids: dict, result: dict) -> str | None:
+    if result["source_id"] not in source_ids:
+        return "the source is no longer configured"
+    source = source_ids[result["source_id"]]  # None when known only from the store (no configuration)
+    mailbox = result["locator"].get("mailbox")
+    boxes = getattr(source, "mailboxes", None)
+    if mailbox is not None and boxes and mailbox not in boxes:
+        return "outside the configured mailboxes"
+    message, _ = split_part(result["native"])
+    row = db.execute("SELECT absent_since_run FROM items WHERE source_id = ? AND native_id = ?",
+                     (result["source_id"], message)).fetchone()
+    if row is not None and row["absent_since_run"]:
+        return "no longer in the source (as of the last sync)"
+    return None  # not yet indexed locally: nothing local contradicts the provider's match
+
+
+def _file_reason(files_db, config, grants: dict, result: dict) -> str | None:
+    from towpath.discovery import refs
+
+    files = getattr(config, "files", None) if config is not None else None
+    if config is None:
+        return "file results need their grants checked: start the UI with --config"
+    if files is None or not files.enabled:
+        return "file discovery is disabled"
+    provider = files.providers.get(result["source_id"][len("files-"):])
+    root, path = result["locator"].get("root"), result["locator"].get("path")
+    if provider is None:
+        return "the files provider is no longer configured"
+    if root not in provider.roots or root not in files.roots:
+        return "the root is no longer configured"
+    if "search" not in grants.get(root, set()):
+        return f"no search grant on root {root} now"
+    if refs.excluded(files.roots[root], path or ""):
+        return "now excluded by the root's configuration"
+    row = files_db.execute("SELECT missing_since_run FROM occurrences WHERE occurrence_id = ?",
+                           (result["native"],)).fetchone()
+    if row is None or row["missing_since_run"]:
+        return "no longer in the files catalog"
+    return None
+
+
+def apply_current_policy(store_dir, config, response: dict) -> dict:
+    """A stored provider-search response filtered by today's configuration, grants and catalogs.
+
+    Reads only local configuration and stores (no credential, connector or provider process).
+    Withheld results are counted per source with their reasons, never shown, and the answer is
+    marked incomplete.
+    """
+    import copy
+
+    out = copy.deepcopy(response)
+    if config is not None:
+        source_ids = {sid: s for sid, s in config.sources.items() if s.kind == "mail-provider"}
+    else:
+        with closing(open_store(store_dir, "source", "web")) as db:
+            source_ids = {r["source_id"]: None for r in db.execute(
+                "SELECT source_id FROM sources WHERE kind = 'mail-provider'")}
+    grants = {}
+    if config is not None and getattr(config, "files", None) is not None:
+        from towpath.discovery import policy
+
+        grants = policy.granted(config)
+    kept, withheld = [], {}
+    with closing(open_store(store_dir, "source", "web")) as db, closing(open_store(store_dir, "files", "web")) as fdb:
+        for result in out["results"]:
+            if result["source_type"] == "files":
+                reason = _file_reason(fdb, config, grants, result)
+            else:
+                reason = _mail_reason(db, config, source_ids, result)
+            if reason is None:
+                kept.append(result)
+            else:
+                counts = withheld.setdefault(result["source_id"], {})
+                counts[reason] = counts.get(reason, 0) + 1
+    out["results"] = kept
+    for page in out["sources"]:
+        reasons = withheld.get(page["source_id"], {})
+        page["result_count"] = sum(1 for r in kept if r["source_id"] == page["source_id"])
+        page["withheld"] = sum(reasons.values())
+        page["withheld_reasons"] = reasons
+    for source_id, reasons in withheld.items():
+        detail = "; ".join(f"{n} {reason}" for reason, n in sorted(reasons.items()))
+        out["incomplete_because"] = [*out["incomplete_because"],
+                                     f"{source_id}: {sum(reasons.values())} stored results withheld ({detail})"]
+        out["complete"] = False
+    out["policy_checked"] = {"at": _now(), "withheld": sum(sum(r.values()) for r in withheld.values())}
+    return out
