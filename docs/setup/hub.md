@@ -6,13 +6,15 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `b3f9108` (single-account login), publishing run
-[37491243174](https://github.com/endthestart/towpath/actions/runs/37491243174):
+Revision `78be5ec` (single-account login; same-origin referrer policy so browser form posts pass
+the CSRF origin check), publishing run
+[37500369484](https://github.com/endthestart/towpath/actions/runs/37500369484):
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:d43b189a28c1a49390303f0d554f54ff1af4d1d3f638b6c5eed6e750a3d3156b`
-- `connect`: `ghcr.io/endthestart/towpath-recoll@sha256:5b95c63931d70f30457037ae8fc36f36612f69235aad8ff44f07e3a42c37c5fc`
+- `web`: `ghcr.io/endthestart/towpath@sha256:71802c79b40857e7c4eb04e136db9d7c36064d1237a816832cbc19076b5e16a9`
+- `connect`: `ghcr.io/endthestart/towpath-recoll@sha256:96d7e3ed96146ac58aee80d97dfa8250e5ec29fd58a036ff9f34831fa160787b`
 
-It replaced revision `1e808f0` (deployed the same day, loopback-only UI):
+It replaced `b3f9108` (`towpath@sha256:d43b189a…`, `towpath-recoll@sha256:5b95c639…`), whose forms
+failed in browsers: its `no-referrer` policy made browsers send `Origin: null`. That in turn replaced revision `1e808f0` (deployed the same day, loopback-only UI):
 `ghcr.io/endthestart/towpath@sha256:1d79e5ebb92e3508ce00829ecfb58b42a369332ca1da67b11c1dfc18daf070bb` and
 `ghcr.io/endthestart/towpath-recoll@sha256:00e2044577ea200a05ace7f547e0b0e008d8c35ecceb7121c50345a295db725f`.
 
@@ -20,12 +22,13 @@ Verified before and after deployment (private evidence is kept with the operator
 
 - For each revision, both corresponding-source artifacts downloaded anonymously and verified;
   anonymous host pulls matched the tested config digests and revision; a disposable, no-network
-  synthetic run passed sync, store upgrade, one worker poll and the UI (for `b3f9108`: setup code
-  logged, every page redirects to setup until the account exists).
+  synthetic run passed sync, store upgrade, one worker poll and the UI (from `b3f9108`: setup code
+  logged, every page redirects to setup until the account exists). For `78be5ec`, a browser-style
+  post through the proxy (real origin, no referrer) passed the CSRF check.
 - The handed-over stores match the Mac snapshots byte for byte (SHA-256, row counts, integrity).
   State, secrets and tokens are owned by the service identity 10001 with modes 0700/0600.
 - The one queued search had already been answered, so the worker found nothing pending. After
-  start, after restarting both containers, and after redeploying `b3f9108` the stores were byte-identical: same source ID, item
+  start, after restarting both containers, and after each redeploy the stores were byte-identical: same source ID, item
   and receipt counts, no cached content, no new runs or quota attempts, no grants or collections
   before or after, OAuth token unchanged.
 - The running worker loads the verified pacing: 1,800 units/minute (30% of the verified 6,000),
@@ -39,7 +42,8 @@ Verified before and after deployment (private evidence is kept with the operator
 and configuration is retired read-only; the owner moves its OAuth token out of use. A Mac UI, worker or
 sync must not run against the same account or stores; returning to the Mac requires stopping Hub first.
 
-**Rollback.** The previous deployed digests are the `1e808f0` pair above. Rolling back to them
+**Rollback.** Do not roll back to `b3f9108` (its forms fail in browsers). The previous working digests
+are the `1e808f0` pair above. Rolling back to them
 restores the loopback-only UI with no login, so restore the earlier compose (host networking, no
 proxy network) and remove the proxy entry at the same time. The older fallback is the Recoll image
 `ghcr.io/endthestart/towpath-recoll@sha256:2c42510606db8c2606222f40fc9295311c139019a2c52d502bf83303d93bba49`
