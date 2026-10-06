@@ -53,6 +53,8 @@ towpath web serve --store-dir /path/to/private/state --config /path/to/private/t
 
 Without `--config`, Search all covers the mail sources found in `source.db`.
 
+Stores made by an earlier version need one explicit upgrade before the unified pages work: `towpath stores upgrade --store-dir <folder>`. Stop the UI and copy the folder first. The UI refuses to start until the upgrade has run, and it never changes a store's layout itself. See [upgrading stores](unified-discovery-acceptance.md#before-anything-else-upgrade-existing-stores).
+
 ## Data and permissions
 
 - The source and files stores are opened under the `web` role using SQLite's read-only mode. Browsing does not change index records, label mail, delete mail or send anything.

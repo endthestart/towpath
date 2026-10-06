@@ -48,14 +48,9 @@ def demo(query: str = typer.Argument(..., help="Keyword text and/or filters, e.g
 
 
 def _adapters(config: Path, local: bool):
-    from towpath import config as config_mod
     from towpath.unified import sources
 
-    try:
-        cfg = config_mod.load(config)
-    except (config_mod.ConfigError, OSError) as exc:
-        _fail("invalid-config", str(exc))
-    return sources.build_adapters(cfg, connect=not local)
+    return sources.build_adapters(_config(config), connect=not local)
 
 
 @app.command("sources")
@@ -107,23 +102,25 @@ def run_requests_cmd(limit: int = typer.Option(20, "--limit", min=1, max=federat
                                                help="Results per source for each queued search."),
                      config: Path = ConfigOpt):
     """Run provider searches the local UI queued (towpath-connect) and store their responses for the UI."""
-    from towpath import config as config_mod
     from towpath.unified import requests
+
+    _emit(requests.run_searches(_config(config), limit))
+
+
+def _config(config: Path):
+    """Load the configuration and refuse stores older than this version (see `towpath stores upgrade`)."""
+    from towpath import config as config_mod
+    from towpath import stores
 
     try:
         cfg = config_mod.load(config)
     except (config_mod.ConfigError, OSError) as exc:
         _fail("invalid-config", str(exc))
-    _emit(requests.run_searches(cfg, limit))
-
-
-def _config(config: Path):
-    from towpath import config as config_mod
-
     try:
-        return config_mod.load(config)
-    except (config_mod.ConfigError, OSError) as exc:
-        _fail("invalid-config", str(exc))
+        stores.require_current(cfg.store_dir, None)
+    except stores.SchemaOutdated as exc:
+        _fail("store-upgrade-needed", str(exc))
+    return cfg
 
 
 @app.command("context")

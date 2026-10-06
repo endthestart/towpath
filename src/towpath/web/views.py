@@ -1,3 +1,4 @@
+import sqlite3
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -25,6 +26,28 @@ class LocalPrivacyMiddleware:
             "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
         )
         return response
+
+
+class StoreSchemaMiddleware:
+    """A store older than this version answers with an actionable 503, never a raw database error."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        return self.get_response(request)
+
+    def process_exception(self, request, exception):
+        from towpath import stores
+
+        if isinstance(exception, stores.SchemaOutdated) or (
+                isinstance(exception, sqlite3.OperationalError)
+                and str(exception).startswith(("no such table", "no such column"))):
+            response = render(request, "upgrade.html", {"nav": None, "command": stores.UPGRADE_COMMAND,
+                                                        "reports": getattr(exception, "reports", [])})
+            response.status_code = 503
+            return response
+        return None
 
 
 @require_GET

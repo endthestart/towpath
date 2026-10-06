@@ -14,13 +14,18 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
+from towpath import stores
 from towpath.unified import collections, federation, requests, sources
 from towpath.unified.contracts import ContractError, Filters, Reference, split_part
 
 PAGE = 20
 
 
+UNIFIED_STORES = ("source", "queue", "decisions", "files")
+
+
 def _adapters():
+    stores.require_current(settings.TOWPATH_STORE_DIR, UNIFIED_STORES)  # raises SchemaOutdated: a 503 page
     config = getattr(settings, "TOWPATH_CONFIG", None)
     if config is not None:
         return sources.build_adapters(config, connect=False)
@@ -28,6 +33,7 @@ def _adapters():
 
 
 def _store():
+    stores.require_current(settings.TOWPATH_STORE_DIR, UNIFIED_STORES)
     return settings.TOWPATH_STORE_DIR
 
 

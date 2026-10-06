@@ -16,6 +16,12 @@ def serve(store_dir: Path = typer.Option(..., "--store-dir", help="Folder contai
     """Serve on this computer at 127.0.0.1. Does not sync, fetch content or call a model."""
     if not (store_dir / "source.db").is_file():
         raise typer.BadParameter("source.db is missing; create the email index first.")
+    from towpath import stores
+
+    try:  # the UI never migrates a store; it refuses to start until an explicit upgrade has run
+        stores.require_current(store_dir, None)
+    except stores.SchemaOutdated as exc:
+        raise typer.BadParameter(str(exc)) from None
     loaded = None
     if config is not None:
         from towpath import config as config_mod

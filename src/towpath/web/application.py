@@ -17,7 +17,8 @@ def configure(store_dir: Path, config=None):
             ROOT_URLCONF="towpath.web.urls", TOWPATH_STORE_DIR=store_dir, TOWPATH_CONFIG=config, USE_TZ=True,
             TIME_ZONE="UTC", INSTALLED_APPS=[],
             # Forms that record decisions or queue requests are POSTs protected by Django's CSRF check.
-            MIDDLEWARE=["towpath.web.views.LocalPrivacyMiddleware", "django.middleware.csrf.CsrfViewMiddleware"],
+            MIDDLEWARE=["towpath.web.views.LocalPrivacyMiddleware", "towpath.web.views.StoreSchemaMiddleware",
+                        "django.middleware.csrf.CsrfViewMiddleware"],
             CSRF_COOKIE_SAMESITE="Strict", CSRF_COOKIE_HTTPONLY=True,
             TEMPLATES=[{"BACKEND": "django.template.backends.django.DjangoTemplates",
                         "DIRS": [str(Path(__file__).parent / "templates")], "APP_DIRS": False}],

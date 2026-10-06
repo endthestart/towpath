@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block title %}Upgrade needed · Towpath{% endblock %}
+{% block content %}
+<header class="page-head"><p class="eyebrow">STORES NEED AN UPGRADE</p><h1>This page needs newer stores.</h1>
+<p class="lead">Your index was created by an earlier Towpath version. The UI never changes a store's layout itself. Stop the UI, keep a copy of the store folder, then run:</p></header>
+<section class="detail-card"><pre class="content-text">{{ command }}</pre>
+{% for r in reports %}<div class="attachment"><strong>{{ r.store }}</strong><span>missing: {{ r.missing_tables|join:', ' }}{% for t, cols in r.missing_columns.items %} {{ t }}({{ cols|join:', ' }}){% endfor %}</span></div>{% endfor %}
+<p class="body-note">The upgrade only adds tables and columns. It keeps every message, part, run, grant, setting and decision, and no rescan is needed. Pages that need nothing new, such as Email, keep working.</p></section>
+{% endblock %}

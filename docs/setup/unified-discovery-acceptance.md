@@ -11,6 +11,42 @@ ruff check src tests packaging
 towpath fixtures check-domains src tests docs examples deploy packaging README.md CONTRIBUTING.md
 ```
 
+## Before anything else: upgrade existing stores
+
+Stores created by an earlier version, including `codex/local-email-ui` at `3b13228`, lack tables that this branch reads: `source.search_runs`, `queue.search_requests`, and `decisions.source_grants`, `collections` and `collection_items`. Readers open stores read-only and never migrate them. Until the upgrade runs:
+
+- `towpath web serve` refuses to start;
+- unified UI pages answer with a 503 page that names the command;
+- `towpath search`, `collections` and `claims` commands stop with `store-upgrade-needed`.
+
+The Email pages keep working, because they need nothing new.
+
+```sh
+# stop the UI and any running towpath command; keep a copy of the store folder first
+cp -a /path/to/private/state /path/to/private/state-backup-$(date +%Y%m%d)
+towpath stores status  --store-dir /path/to/private/state   # read-only; exit 1 lists what is missing
+towpath stores upgrade --store-dir /path/to/private/state   # adds the missing tables and columns
+towpath stores status  --store-dir /path/to/private/state   # exit 0: every store current
+```
+
+- **Writer roles.** Each store is opened only by its own writer role: source by connect, queue and decisions by web, files by connect.
+- **Data safety.** Only `CREATE TABLE IF NOT EXISTS` and `ADD COLUMN` run. Every message, part, run, cache entry, request, grant, setting and decision stays as it was.
+- **Repeatable.** Running the upgrade again changes nothing.
+- **Missing stores.** Stores that do not exist are not created.
+- **No rescan.** No mail resync is needed.
+
+Automated: `tests/test_store_upgrade.py`. It builds source, queue and decisions stores from the exact DDL of `3b13228` (`tests/legacy_stores_3b13228.py`), with invented content and approvals, and checks:
+
+- status and upgrade results;
+- content preserved;
+- a repeated upgrade is a no-op;
+- each store is opened only by its writer role;
+- the UI refuses to start and answers 503 without touching `source.db`;
+- the UI works after the upgrade;
+- the CLI preflight.
+
+Live (local operator): run the four commands above against a copy of the private store first. Compare `towpath connect status <source>` before and after (indexed counts unchanged). Then upgrade the real folder.
+
 ## Increment 1: contracts
 
 Built: source status, result envelope, typed filters, per-source paging and errors, coverage states, typed dates, citations, legacy wrapping, and a synthetic federation demo. See [unified discovery](../unified-discovery.md).
