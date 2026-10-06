@@ -215,7 +215,11 @@ class HttpRegistry:
         return body
 
     def upload_blob(self, repository: str, path_or_bytes, digest: str, size: int) -> None:
-        """Upload one blob unless the registry already has it (streamed, then committed by digest)."""
+        """Stream a whole blob with OCI POST-then-PUT; preserve the opaque upload URL.
+
+        There is no PATCH range/offset state to recover. Authentication retries rewind
+        the stream; other failures stop publication and a later run starts a new session.
+        """
         if self.blob_exists(repository, digest):
             return
         host, name = split_reference(repository)
@@ -230,22 +234,16 @@ class HttpRegistry:
         handle = open(path_or_bytes, "rb") if not isinstance(path_or_bytes, bytes) else None
         try:
             payload = handle if handle is not None else path_or_bytes
-            chunk_headers = {"Content-Type": "application/octet-stream", "Content-Length": str(size)}
-            if size:
-                chunk_headers["Content-Range"] = f"0-{size - 1}"
-            status, headers, body = self._request(
-                "PATCH", host, start, scope=scope, url=location, auth=auth, data=payload,
-                headers=chunk_headers)
-            if status != 202:
-                raise RegistryError(f"PATCH upload failed: {self._error(host, start, status, body)}", status=status)
-            location = urllib.parse.urljoin(location, headers["Location"])
             joiner = "&" if "?" in location else "?"
-            auth = self._auth_for(host, scope)  # PATCH may have refreshed an expired token.
-            status, _, body = self._request("PUT", host, start, scope=scope, url=f"{location}{joiner}digest={digest}",
-                                            auth=auth, headers={"Content-Length": "0",
-                                                               "Content-Type": "application/octet-stream"}, data=b"")
+            status, headers, body = self._request(
+                "PUT", host, start, scope=scope, url=f"{location}{joiner}digest={digest}", auth=auth,
+                headers={"Content-Length": str(size), "Content-Type": "application/octet-stream"}, data=payload)
             if status != 201:
-                raise RegistryError(f"PUT upload failed: {self._error(host, start, status, body)}", status=status)
+                raise RegistryError(f"PUT upload failed (digest={digest}, size={size}): "
+                                    f"{self._error(host, start, status, body)}", status=status)
+            stated = headers.get("Docker-Content-Digest")
+            if stated and stated != digest:
+                raise RegistryError("PUT upload returned a different blob digest")
         finally:
             if handle is not None:
                 handle.close()

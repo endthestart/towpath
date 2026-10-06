@@ -1,6 +1,6 @@
 # Towpath container images. Built and tested by GitHub Actions; deployments only pull them.
 #
-#   core    the towpath CLI, no optional extras (no Gmail or model client libraries)
+#   core    Towpath CLI, local UI, Gmail and IMAP clients (no model client libraries)
 #   recoll  the towpath CLI plus Recoll 1.36 with its Python binding and document helpers
 #
 # Both run as an unprivileged user, start no service, and only run the command given
@@ -55,7 +55,8 @@ RUN groupadd --system --gid 10001 towpath \
 COPY --from=wheel /wheels /tmp/wheels
 RUN --mount=type=secret,id=build_ca,required=false \
     if [ -f /run/secrets/build_ca ]; then export PIP_CERT=/run/secrets/build_ca; fi; \
-    pip install --no-cache-dir /tmp/wheels/*.whl && rm -rf /tmp/wheels
+    for wheel in /tmp/wheels/*.whl; do pip install --no-cache-dir "$wheel[web,gmail,imap]"; done \
+ && rm -rf /tmp/wheels
 COPY packaging/licenses/ /usr/local/lib/towpath/
 RUN sh /usr/local/lib/towpath/collect-licenses.sh python3 \
  && cp /usr/local/lib/towpath/NOTICE-core.md /usr/share/licenses/NOTICE.md && rm -rf /usr/local/lib/towpath
@@ -97,7 +98,8 @@ COPY --from=wheel /wheels /tmp/wheels
 RUN --mount=type=secret,id=build_ca,required=false \
     if [ -f /run/secrets/build_ca ]; then export PIP_CERT=/run/secrets/build_ca; fi; \
     python3 -m venv --system-site-packages /opt/towpath \
- && /opt/towpath/bin/pip install --no-cache-dir /tmp/wheels/*.whl && rm -rf /tmp/wheels \
+ && for wheel in /tmp/wheels/*.whl; do /opt/towpath/bin/pip install --no-cache-dir "$wheel[web,gmail,imap]"; done \
+ && rm -rf /tmp/wheels \
  && /opt/towpath/bin/python -c "import recoll.recoll, recoll.rclextract"
 COPY packaging/licenses/ /usr/local/lib/towpath/
 RUN sh /usr/local/lib/towpath/collect-licenses.sh /opt/towpath/bin/python \

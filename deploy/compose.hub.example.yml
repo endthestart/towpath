@@ -1,0 +1,68 @@
+# Initial single-owner deployment. CI builds; Arcane pulls these immutable image references.
+# UI stays on Hub loopback: reach it through SSH, never publish it through a proxy without auth.
+name: towpath
+
+x-runtime: &runtime
+  image: ${TOWPATH_IMAGE:?set a published core image digest}
+  user: "10001:10001"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  init: true
+  tmpfs: ["/tmp:size=64m,mode=1777"]
+  stop_grace_period: 60s
+
+services:
+  web:
+    <<: *runtime
+    network_mode: host
+    command: ["web", "serve", "--store-dir", "/state", "--config", "/config/towpath.toml", "--port", "8790"]
+    restart: unless-stopped
+    volumes:
+      - ${TOWPATH_STATE_DIR:?set private state directory}:/state
+      - ${TOWPATH_WEB_CONFIG_DIR:?set credential-free UI configuration directory}:/config:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8790/', timeout=5).close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  connect:
+    <<: *runtime
+    image: ${TOWPATH_RECOLL_IMAGE:?set a published Recoll image digest}
+    command: ["connect", "run-worker", "--config", "/config/towpath.toml"]
+    restart: "on-failure:3"
+    volumes:
+      - ${TOWPATH_STATE_DIR}:/state
+      - ${TOWPATH_CONFIG_DIR:?set private connector configuration directory}:/config:ro
+      - ${TOWPATH_SECRETS_DIR:?set private credential directory}:/run/secrets:ro
+      - ${TOWPATH_TOKEN_DIR:?set private refreshable OAuth token directory}:/run/tokens
+      - ${TOWPATH_SOURCE_DIR:?set read-only NAS root}:/data/roots/archive:ro
+      - ${TOWPATH_INDEX_DIR:?set separate index directory}:/index:ro
+
+  # Manual metadata sync, not started by normal deployment. Existing shared quota accounting applies.
+  mail-sync:
+    <<: *runtime
+    profiles: ["mail-sync"]
+    command: ["connect", "sync", "${TOWPATH_MAIL_SOURCE:-gmail}", "--config", "/config/towpath.toml"]
+    restart: "no"
+    volumes:
+      - ${TOWPATH_STATE_DIR}:/state
+      - ${TOWPATH_CONFIG_DIR}:/config:ro
+      - ${TOWPATH_SECRETS_DIR}:/run/secrets:ro
+      - ${TOWPATH_TOKEN_DIR}:/run/tokens
+
+  # Manual only. Supply the qualified NAS root, separate on-disk index and scratch directories.
+  recoll-index:
+    <<: *runtime
+    image: ${TOWPATH_RECOLL_IMAGE:?set a published Recoll image digest}
+    profiles: ["index"]
+    network_mode: none
+    entrypoint: ["recollindex"]
+    command: ["-c", "/index/recoll"]
+    restart: "no"
+    tmpfs: []
+    volumes:
+      - ${TOWPATH_SOURCE_DIR:?set read-only NAS root}:/data/roots/archive:ro
+      - ${TOWPATH_INDEX_DIR:?set separate index directory}:/index
+      - ${TOWPATH_SCRATCH_DIR:?set on-disk scratch directory}:/tmp

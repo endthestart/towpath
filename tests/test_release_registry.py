@@ -24,9 +24,11 @@ class State:
         self.redirect_saw_auth = []
         self.token_generation = 1
         self.token_requests = 0
-        self.expire_on_patch = False
+        self.expire_on_put = False
         self.reject_bearer = False
         self.require_upload_headers = None
+        self.reject_patch = False
+        self.upload_methods = []
 
 
 def handler_for(state: State, port_holder: list):
@@ -47,14 +49,14 @@ def handler_for(state: State, port_holder: list):
             self._send(status, json.dumps({"errors": [{"code": code}]}).encode(), {"Content-Type": "application/json"})
 
         def _authorized(self, name):
-            if self.command == "PATCH" and state.expire_on_patch:
+            if self.command == "PUT" and state.expire_on_put:
                 state.token_generation += 1
-                state.expire_on_patch = False
+                state.expire_on_put = False
             if not state.reject_bearer and self.headers.get("Authorization", "").startswith(
                     f"Bearer t-{state.token_generation}-"):
                 return True
             # Consume a rejected upload body so the client receives the 401 rather than a reset.
-            if self.command == "PATCH":
+            if self.command in {"PATCH", "PUT"}:
                 self.rfile.read(int(self.headers.get("Content-Length") or 0))
             realm = f"http://127.0.0.1:{port_holder[0]}/token"
             self._send(401, b"", {"WWW-Authenticate": f'Bearer realm="{realm}",service="test",'
@@ -103,9 +105,12 @@ def handler_for(state: State, port_holder: list):
                 if self.command == "POST":
                     upload = str(uuid.uuid4())
                     state.uploads[upload] = b""
-                    return self._send(202, b"", {"Location": f"/v2/{name}/blobs/uploads/{upload}"})
+                    return self._send(202, b"", {"Location": f"/v2/{name}/blobs/uploads/{upload}?state=opaque%2Btoken"})
                 upload = rest[1]
+                state.upload_methods.append(self.command)
                 if self.command == "PATCH":
+                    if state.reject_patch:
+                        return self._error(416, "REQUESTED_RANGE_NOT_SATISFIABLE")
                     if state.require_upload_headers == "PATCH" and (
                         self.headers.get("Content-Range") != f"0-{len(body) - 1}"
                         or self.headers.get("Content-Type") != "application/octet-stream"
@@ -114,6 +119,8 @@ def handler_for(state: State, port_holder: list):
                     state.uploads[upload] += body
                     return self._send(202, b"", {"Location": f"/v2/{name}/blobs/uploads/{upload}?state=x"})
                 if self.command == "PUT":
+                    if state.reject_patch and parse_qs(url.query).get("state") != ["opaque+token"]:
+                        return self._error(404, "BLOB_UPLOAD_INVALID")
                     if state.require_upload_headers == "PUT" and (
                         self.headers.get("Content-Type") != "application/octet-stream"
                     ):
@@ -176,7 +183,7 @@ def test_token_expiry_during_streamed_upload_rewinds_the_payload(server, tmp_pat
     payload = tmp_path / "source.tar.xz"
     payload.write_bytes(b"source package\n" * 20_000)
     digest = sha256_digest(payload.read_bytes())
-    state.expire_on_patch = True
+    state.expire_on_put = True
     client.upload_blob(repo, payload, digest, payload.stat().st_size)
     assert state.blobs[digest] == payload.read_bytes()
     assert state.token_requests == 2
@@ -231,16 +238,27 @@ def test_streamed_blob_upload_and_redirected_download(server, tmp_path):
     assert len(state.blobs) == uploads_before
 
 
-@pytest.mark.parametrize("phase", ["PATCH", "PUT"])
-def test_blob_upload_sends_required_range_and_binary_content_type(server, tmp_path, phase):
+def test_blob_upload_sends_binary_content_type(server, tmp_path):
     state, repo = server
-    state.require_upload_headers = phase
+    state.require_upload_headers = "PUT"
     payload = tmp_path / "source.tar.xz"
     payload.write_bytes(b"synthetic source archive\n" * 100)
     digest = sha256_digest(payload.read_bytes())
     client = HttpRegistry("user", "secret")
     client.upload_blob(repo, payload, digest, payload.stat().st_size)
     assert client.get_blob(repo, digest) == payload.read_bytes()
+
+
+@pytest.mark.parametrize("payload", [b"", b"synthetic source archive\n" * 10000], ids=["empty", "source-archive"])
+def test_monolithic_upload_avoids_patch_range_failures_and_preserves_location(server, payload):
+    state, repo = server
+    state.reject_patch = True
+    state.require_upload_headers = "PUT"
+    digest = sha256_digest(payload)
+    client = HttpRegistry("user", "secret")
+    client.upload_blob(repo, payload, digest, len(payload))
+    assert state.blobs[digest] == payload
+    assert state.upload_methods == ["PUT"]
 
 
 def test_index_resolves_to_the_linux_amd64_image(server):

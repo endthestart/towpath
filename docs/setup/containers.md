@@ -6,7 +6,7 @@ GitHub Actions tests Towpath, builds its container images, tests the built image
 
 | Image | Contents | Use |
 | --- | --- | --- |
-| `ghcr.io/<owner>/towpath` | Towpath CLI on `python:3.12-slim`, no optional extras (no Gmail or model client libraries) | File discovery with the fixture provider, `config check`, and tooling |
+| `ghcr.io/<owner>/towpath` | Towpath CLI on `python:3.12-slim`, with the local UI, Gmail and IMAP clients; no model client libraries | UI, explicitly queued requests, metadata sync, fixture file discovery and tooling |
 | `ghcr.io/<owner>/towpath-recoll` | Towpath CLI on Ubuntu 24.04 with Recoll 1.36.1, its Python binding, and document helpers (`python3-lxml` for DOCX and ODT, `poppler-utils` for PDF, `antiword` for legacy DOC, `unrtf` for RTF, `pff-tools` for PST) | File discovery through Recoll: index, search, excerpt, recover |
 
 Both images:
@@ -16,7 +16,10 @@ Both images:
 - **Are built for `linux/amd64` only.** An `arm64` build would be a separate change.
 - **Record their source revision** in OCI labels (`org.opencontainers.image.revision`, `.source`, `.version`, `.created`) and in `/usr/share/towpath/build-info.json`.
 
-The core image leaves out Gmail and model libraries on purpose: file discovery does not need them. To get them, build locally with `pip install '.[gmail,models]'` in a derived image. That is not published here, and mail sync stays with the existing local setup.
+Both images include the `web`, `gmail` and `imap` extras for the [Hub deployment](hub.md).
+Installing those libraries starts no service and grants no source access. Model libraries
+remain excluded. The default command still prints help; persistent services and manual
+sync/index profiles are selected explicitly in Compose.
 
 ### Licenses and corresponding source
 

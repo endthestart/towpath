@@ -10,6 +10,12 @@ The existing verified-quota opt-in was recovered from earlier local sync work an
 
 ## Friday target
 
+The owner approved moving persistent operation to Hub/Arcane before Fastmail setup or broad
+NAS indexing. [Hub setup](../setup/hub.md) defines the first SSH-only deployment, private-store
+handover, explicit request worker and manual indexing profiles. Fix and qualify publication,
+deploy verified GitHub-built images, then resume source acceptance. Development continues
+locally; personal state and source configuration remain private on the deployment host.
+
 A useful cross-source foundation: Gmail and IMAP keyword/content search, NAS indexing working toward complete coverage, one search UI, durable collection queries, and an agent-readable evidence/context interface. Source references and date/claim contracts prepare the life timeline. Full NAS and Gmail coverage is the target; long extraction runs may continue beyond Friday with explicit progress and gaps. AI processing is a stretch goal.
 
 The Gmail metadata index and local UI already work. A Recoll adapter, file-context packets and bounded native/local trials exist. IMAP, the unified UI/service and shared collection/evidence interfaces require development. This plan builds on those pieces rather than starting another crawler, parser, search engine or inference platform.

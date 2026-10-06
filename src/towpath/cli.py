@@ -57,6 +57,20 @@ def _load(path: Path):
         raise typer.BadParameter(str(exc)) from exc
 
 
+@connect_app.command("run-worker")
+def request_worker(config: Path = ConfigOpt,
+                   poll_seconds: int = typer.Option(10, min=2, max=3600),
+                   once: bool = typer.Option(False, "--once")):
+    """Process explicitly queued searches and content requests. No automatic sync or model calls."""
+    from towpath import request_worker as worker
+
+    try:
+        worker.run(_load(config), poll_seconds=poll_seconds, once=once)
+    except Exception as exc:  # noqa: BLE001 - never log account data from an exception message
+        typer.echo(f"request worker stopped ({type(exc).__name__})", err=True)
+        raise typer.Exit(1) from None
+
+
 def _emit(data, as_json: bool) -> None:
     if as_json:
         typer.echo(json.dumps(data, indent=2, sort_keys=True))
