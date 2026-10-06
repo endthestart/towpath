@@ -70,11 +70,11 @@ These are built into the current documents. The owner can accept or overturn eac
 
 ### D9. Life-stream sources after mail
 
-**Accepted 2026-10-01.** Contacts first (they resolve who appears in mail), then calendars (dated evidence for planned events), then photo libraries and document systems as their integrations are ready. Each source stays independently usable.
+**Revised product priority 2026-10-05.** The current foundation prioritizes Gmail, another IMAP source and file/NAS indexing, with optional export registration/import. iMessage, contacts, calendars, photo libraries and document systems remain later source integrations; each stays independently usable. Earlier contacts-first life-stream ordering is historical, not a dependency for broad discovery. See [D20](#d20-foundation-before-ai-and-agent-consumers).
 
 ### D10. Order
 
-**Accepted 2026-10-01.** Mail management first, starting with a real read-only Gmail connector. The life stream follows, starting from mail, then contacts, photos, and documents. Its design still does not depend on mail.
+**Revised 2026-10-05.** Source integrations, unified keyword/content search and evidence/collection contracts lead development. Optional mail-management integration and AI enrichment are independent later/stretch work. Life-timeline and agent/RAG/MCP foundations reuse the same evidence references. The earlier mail-management-first sequence is superseded by the completed goal interview ([D20](#d20-foundation-before-ai-and-agent-consumers)).
 
 ### D11. Draft replies
 
@@ -154,7 +154,11 @@ These are built into the current documents. The owner can accept or overturn eac
 
 ### D19. Reference-first discovery and phased ownership
 
-**Accepted product direction 2026-10-05.** One interface for discovery, collections, evidence-linked reuse and a life timeline/portfolio across live sources, files, exports and backups. Develop references/curation first, selected durable copies and sync later, owner-chosen source independence later, physical organization last. Existing inventories and manifests are sources, not instructions to copy or clean up their contents. [ADR 0001](adrs/0001-reference-first-digital-life.md) records identity, provenance and operational boundaries. D9/D10 delivery priorities are under review in the ongoing interview; naming sources does not claim implemented support.
+**Accepted product direction 2026-10-05.** One interface for discovery, collections, evidence-linked reuse and a life timeline/portfolio across live sources, files, exports and backups. Develop references/curation first, selected durable copies and sync later, owner-chosen source independence later, physical organization last. Existing inventories and manifests are sources, not instructions to copy or clean up their contents. [ADR 0001](adrs/0001-reference-first-digital-life.md) records identity, provenance and operational boundaries. D9/D10 delivery priorities are revised by the completed interview and D20; naming sources does not claim implemented support.
+
+### D20. Foundation before AI and agent consumers
+
+**Accepted product direction 2026-10-05 from seven interview answers.** Build Gmail, IMAP and full-NAS discovery toward complete coverage; useful keyword/full-text search first; source/version/citation, collection and typed-date/claim contracts shared by the UI and agents. Long indexing runs may continue with visible coverage/gaps. Reuse existing tools and inventories. Integrations and evidence structures come before AI enrichment, which is a stretch goal. MCP and RAG are long-term consumers of the same permission-aware retrieval/context interface. See the [weekly plan](plans/2026-10-05-local-iteration-week.md) and [specification](specs/unified-discovery-foundation.md). This records scope/order, not completed support, a provider adoption, broader credentials, or a transport deployment.
 
 ## Facts to verify before implementation
 
@@ -203,3 +207,4 @@ These are built into the current documents. The owner can accept or overturn eac
 | 2026-10-04 | D18 revised after release review: canonical image per revision with release tags as digest aliases; verified promotion; corresponding source for every bundled distribution package published before binaries; core image drops CPython modules linking GPL or Sleepycat libraries | Accepted; first publish pending owner action |
 | 2026-10-04 | D18 source-retention policy: published corresponding-source artifacts are retained indefinitely, including after matching images are retired | Accepted (owner review) |
 | 2026-10-05 | D19: reference-first digital-life discovery and phased ownership; reuse existing inventories | Accepted product direction; delivery priorities pending interview |
+| 2026-10-05 | D20: cross-source foundation before AI; D9/D10 priorities revised; shared agent/MCP/RAG retrieval direction | Accepted product direction; implementation/live qualification pending |

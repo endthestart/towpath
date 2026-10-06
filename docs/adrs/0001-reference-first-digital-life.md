@@ -1,8 +1,8 @@
 # ADR 0001: Reference-first digital-life discovery and phased ownership
 
 - Date: 2026-10-05
-- Status: Accepted product boundary; implementation details and delivery order remain open
-- Basis: Owner's goal-alignment interview, answers 1 and 2
+- Status: Accepted product boundary; delivery priorities confirmed by D20; implementation and live qualification remain pending
+- Basis: Owner's seven-answer goal-alignment interview; ownership phases established in answers 1 and 2
 
 ## Context
 
@@ -23,7 +23,7 @@ Earlier documents separated Gmail migration from Towpath. The owner has now clar
 ## Consequences and specification impact
 
 - [Vision](../vision.md) is the product-scope authority. Architecture and roadmap must describe discovery and reuse alongside mail management and life stream.
-- [D3](../decisions.md#d3-first-real-mail-source) still selects Gmail for the implemented first mail connector. [D9](../decisions.md#d9-life-stream-sources-after-mail) and [D10](../decisions.md#d10-order) retain their historical decisions; their next delivery order will be revised after the current interview.
+- [D3](../decisions.md#d3-first-real-mail-source) still selects Gmail for the implemented first mail connector. [D20](../decisions.md#d20-foundation-before-ai-and-agent-consumers) revises [D9](../decisions.md#d9-life-stream-sources-after-mail) and [D10](../decisions.md#d10-order): Gmail, IMAP and NAS discovery lead, followed by shared search, collections and evidence/agent interfaces. AI processing is a stretch goal. The [foundation specification](../specs/unified-discovery-foundation.md) and [weekly plan](../plans/2026-10-05-local-iteration-week.md) describe the proposed implementation.
 - [D17](../decisions.md#d17-file-discovery-boundary) remains the optional-provider boundary for file discovery. The manifest pilot does not adopt a crawler or a second search engine.
 - [D4](../decisions.md#d4-archive-input) and [D7](../decisions.md#d7-coverage-report-home) remain withdrawn migration-specific designs. Ordinary archive sources and honest per-source coverage belong in general discovery; durable ownership needs a future preservation contract.
 - Common result references, collections and imported verification metadata need specification work. Reuse existing interfaces and stores where they fit; do not select a new storage platform through this ADR.

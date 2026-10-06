@@ -280,3 +280,7 @@ Towpath can export approved proposals, preserved artifacts with provenance, and 
 
 Records for discovered files (locator, occurrence, extraction, dates, coverage), the provider contract, and the `towpath.files.context/1` packet are defined in [file discovery](file-discovery.md). File records share canonical IDs and the evidence-reference shape with the rest of Towpath. They never reuse mail fields.
 
+
+## 10. Unified discovery foundation (proposed)
+
+The [foundation specification](specs/unified-discovery-foundation.md) wraps existing mail/file/project records in a common source-aware search/evidence envelope, while retaining their separate stores and provider contracts. It defines honest search depth/coverage, collection queries, scoped selected-content requests, agent context and typed-date/claim foundations. UI, CLI/API and later MCP/RAG consumers use this surface. Implementation is pending; legacy packet versions remain supported.
