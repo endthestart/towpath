@@ -1,6 +1,6 @@
 # Foundation week: October 5–9, 2026
 
-Status (2026-10-06): work proceeds one task at a time, each finished or reported as blocked before the next starts. There is no Friday deadline; the days below are an ordering, not a schedule. Done: Hub handover and persistent deployment ([Hub setup](../setup/hub.md); UI access waits on enabling SSH forwarding on the host). Next in order: Fastmail/IMAP qualification, then NAS indexing.
+Status (2026-10-06): work proceeds one task at a time, each finished or reported as blocked before the next starts. There is no Friday deadline; the days below are an ordering, not a schedule. Done: Hub handover and persistent deployment, with the UI behind the host's reverse proxy and a single-account login ([Hub setup](../setup/hub.md)). Next in order: Fastmail/IMAP qualification, then NAS indexing.
 
 Originally: working execution plan after seven goal-alignment questions. Replaces the earlier email-viewer schedule. [Confirmed direction](goal-alignment-2026-10-05.md), [vision](../vision.md), [ADR 0001](../adrs/0001-reference-first-digital-life.md), [implementation specification](../specs/unified-discovery-foundation.md).
 

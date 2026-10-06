@@ -1,39 +1,47 @@
 # Hub deployment: persistent services beside storage
 
-Status (2026-10-06): deployed and verified except UI access from the Mac, which waits on one host
-setting (below). Work proceeds one task at a time; there is no Friday deadline.
+Status (2026-10-06): deployed and verified. The UI is served by the host's reverse proxy behind the
+single-account login; the account is created by the owner at first visit. Work proceeds one task at
+a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `1e808f0` (dependencies pinned by `uv.lock`), CI runs
-[37480821315](https://github.com/endthestart/towpath/actions/runs/37480821315) and
-[37482364421](https://github.com/endthestart/towpath/actions/runs/37482364421) (publish):
+Revision `b3f9108` (single-account login), publishing run
+[37491243174](https://github.com/endthestart/towpath/actions/runs/37491243174):
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:1d79e5ebb92e3508ce00829ecfb58b42a369332ca1da67b11c1dfc18daf070bb`
-- `connect`: `ghcr.io/endthestart/towpath-recoll@sha256:00e2044577ea200a05ace7f547e0b0e008d8c35ecceb7121c50345a295db725f`
+- `web`: `ghcr.io/endthestart/towpath@sha256:d43b189a28c1a49390303f0d554f54ff1af4d1d3f638b6c5eed6e750a3d3156b`
+- `connect`: `ghcr.io/endthestart/towpath-recoll@sha256:5b95c63931d70f30457037ae8fc36f36612f69235aad8ff44f07e3a42c37c5fc`
+
+It replaced revision `1e808f0` (deployed the same day, loopback-only UI):
+`ghcr.io/endthestart/towpath@sha256:1d79e5ebb92e3508ce00829ecfb58b42a369332ca1da67b11c1dfc18daf070bb` and
+`ghcr.io/endthestart/towpath-recoll@sha256:00e2044577ea200a05ace7f547e0b0e008d8c35ecceb7121c50345a295db725f`.
 
 Verified before and after deployment (private evidence is kept with the operator's records):
 
-- Both corresponding-source artifacts downloaded anonymously and verified; anonymous host pulls
-  matched the tested config digests and revision; a disposable, no-network synthetic run passed
-  sync, store upgrade, one worker poll and UI pages on the host.
+- For each revision, both corresponding-source artifacts downloaded anonymously and verified;
+  anonymous host pulls matched the tested config digests and revision; a disposable, no-network
+  synthetic run passed sync, store upgrade, one worker poll and the UI (for `b3f9108`: setup code
+  logged, every page redirects to setup until the account exists).
 - The handed-over stores match the Mac snapshots byte for byte (SHA-256, row counts, integrity).
   State, secrets and tokens are owned by the service identity 10001 with modes 0700/0600.
 - The one queued search had already been answered, so the worker found nothing pending. After
-  start and after restarting both containers the stores were byte-identical: same source ID, item
+  start, after restarting both containers, and after redeploying `b3f9108` the stores were byte-identical: same source ID, item
   and receipt counts, no cached content, no new runs or quota attempts, no grants or collections
   before or after, OAuth token unchanged.
 - The running worker loads the verified pacing: 1,800 units/minute (30% of the verified 6,000),
   0.667-second minimum interval, 1,800,000 units/day, one shared quota store.
-- The UI listens only on Hub loopback and is healthy; there is no published port.
-- **Open:** the host's SSH service has TCP forwarding disabled, so the tunnel in step 6 is reset.
-  Next action: the owner enables TCP port forwarding for SSH on the host, then the tunnel is re-tested.
+- The UI container is healthy, joins only the proxy's network and publishes no port. Through the
+  proxy (valid TLS, from the LAN and through the public name) every page redirects to first-run
+  setup; the CSRF cookie is Secure, HttpOnly and SameSite=Strict. The proxy does not restrict
+  client addresses: the login is the access control. The session key is the only new file in the state folder.
 
 **Single writer.** Hub now owns the stores and the Gmail quota accounting. The Mac copy of the stores
 and configuration is retired read-only; the owner moves its OAuth token out of use. A Mac UI, worker or
 sync must not run against the same account or stores; returning to the Mac requires stopping Hub first.
 
-**Rollback.** There is no earlier deployed digest. The fallback is the Recoll image
+**Rollback.** The previous deployed digests are the `1e808f0` pair above. Rolling back to them
+restores the loopback-only UI with no login, so restore the earlier compose (host networking, no
+proxy network) and remove the proxy entry at the same time. The older fallback is the Recoll image
 `ghcr.io/endthestart/towpath-recoll@sha256:2c42510606db8c2606222f40fc9295311c139019a2c52d502bf83303d93bba49`
 (revision `75e361a`, fully qualified, serves both roles): check the stores read-only with its
 `stores status`, set both image variables to it, then update, pull and redeploy. Hub state is covered
