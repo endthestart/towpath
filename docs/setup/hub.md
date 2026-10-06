@@ -1,5 +1,47 @@
 # Hub deployment: persistent services beside storage
 
+Status (2026-10-06): deployed and verified except UI access from the Mac, which waits on one host
+setting (below). Work proceeds one task at a time; there is no Friday deadline.
+
+## Current deployment
+
+Revision `1e808f0` (dependencies pinned by `uv.lock`), CI runs
+[37480821315](https://github.com/endthestart/towpath/actions/runs/37480821315) and
+[37482364421](https://github.com/endthestart/towpath/actions/runs/37482364421) (publish):
+
+- `web`: `ghcr.io/endthestart/towpath@sha256:1d79e5ebb92e3508ce00829ecfb58b42a369332ca1da67b11c1dfc18daf070bb`
+- `connect`: `ghcr.io/endthestart/towpath-recoll@sha256:00e2044577ea200a05ace7f547e0b0e008d8c35ecceb7121c50345a295db725f`
+
+Verified before and after deployment (private evidence is kept with the operator's records):
+
+- Both corresponding-source artifacts downloaded anonymously and verified; anonymous host pulls
+  matched the tested config digests and revision; a disposable, no-network synthetic run passed
+  sync, store upgrade, one worker poll and UI pages on the host.
+- The handed-over stores match the Mac snapshots byte for byte (SHA-256, row counts, integrity).
+  State, secrets and tokens are owned by the service identity 10001 with modes 0700/0600.
+- The one queued search had already been answered, so the worker found nothing pending. After
+  start and after restarting both containers the stores were byte-identical: same source ID, item
+  and receipt counts, no cached content, no new runs or quota attempts, no grants or collections
+  before or after, OAuth token unchanged.
+- The running worker loads the verified pacing: 1,800 units/minute (30% of the verified 6,000),
+  0.667-second minimum interval, 1,800,000 units/day, one shared quota store.
+- The UI listens only on Hub loopback and is healthy; there is no published port.
+- **Open:** the host's SSH service has TCP forwarding disabled, so the tunnel in step 6 is reset.
+  Next action: the owner enables TCP port forwarding for SSH on the host, then the tunnel is re-tested.
+
+**Single writer.** Hub now owns the stores and the Gmail quota accounting. The Mac copy of the stores
+and configuration is retired read-only; the owner moves its OAuth token out of use. A Mac UI, worker or
+sync must not run against the same account or stores; returning to the Mac requires stopping Hub first.
+
+**Rollback.** There is no earlier deployed digest. The fallback is the Recoll image
+`ghcr.io/endthestart/towpath-recoll@sha256:2c42510606db8c2606222f40fc9295311c139019a2c52d502bf83303d93bba49`
+(revision `75e361a`, fully qualified, serves both roles): check the stores read-only with its
+`stores status`, set both image variables to it, then update, pull and redeploy. Hub state is covered
+by hourly local ZFS snapshots kept for three days; there is no off-pool backup yet. Returning to
+Mac-local operation means stopping Hub, bringing back Hub's stores with SQLite online backups if Hub
+has written since the handover (otherwise the retired Mac copy), and restoring the retired
+configuration and token.
+
 The first single-owner deployment runs the existing local UI on the host's loopback address,
 and reaches it through SSH. It has no public login flow. Do not expose this preview through a
 LAN port or public reverse proxy. The Mac remains the development machine; the storage host
@@ -94,4 +136,4 @@ revision. A disposable, read-only, unprivileged container with no external netwo
 private mounts passed synthetic metadata sync, explicit store upgrade, one worker poll,
 and UI/collections HTTP checks. This is host runtime qualification with invented data;
 it does not establish persistent operation, private-store handover or live source acceptance.
-Core publication remains open; the overall workflow did not pass.
+That run's core publication failed; the scope fix above resolved it, and revisions `dd8df26` and `1e808f0` published both images.

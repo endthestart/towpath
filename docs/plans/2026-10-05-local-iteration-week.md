@@ -1,6 +1,8 @@
 # Foundation week: October 5–9, 2026
 
-Status: Working execution plan after seven goal-alignment questions. Replaces the earlier email-viewer schedule. [Confirmed direction](goal-alignment-2026-10-05.md), [vision](../vision.md), [ADR 0001](../adrs/0001-reference-first-digital-life.md), [implementation specification](../specs/unified-discovery-foundation.md).
+Status (2026-10-06): work proceeds one task at a time, each finished or reported as blocked before the next starts. There is no Friday deadline; the days below are an ordering, not a schedule. Done: Hub handover and persistent deployment ([Hub setup](../setup/hub.md); UI access waits on enabling SSH forwarding on the host). Next in order: Fastmail/IMAP qualification, then NAS indexing.
+
+Originally: working execution plan after seven goal-alignment questions. Replaces the earlier email-viewer schedule. [Confirmed direction](goal-alignment-2026-10-05.md), [vision](../vision.md), [ADR 0001](../adrs/0001-reference-first-digital-life.md), [implementation specification](../specs/unified-discovery-foundation.md).
 
 ## Local checkpoint
 
@@ -8,7 +10,7 @@ The owner chose to continue implementation and integration locally, avoiding fre
 
 The existing verified-quota opt-in was recovered from earlier local sync work and retained with its 30%/1,800-unit ceiling. Public regression fixtures are synthetic; account configuration, logs, copies and operational runner stay private. Source setup and feature acceptance continue here. No new cloud handoff is planned. IMAP credentials/server acceptance, NAS provider qualification and broad indexing, export imports, and timeline/context acceptance remain open. These results do not close the remaining Gmail incremental-sync validation gates.
 
-## Friday target
+## Target
 
 The owner approved moving persistent operation to Hub/Arcane before Fastmail setup or broad
 NAS indexing. [Hub setup](../setup/hub.md) defines the first SSH-only deployment, private-store
@@ -22,7 +24,7 @@ The Gmail metadata index and local UI already work. A Recoll adapter, file-conte
 
 ## Five-day delivery plan
 
-| Day | Development and integration | Local work and daily proof |
+| Order (original day) | Development and integration | Local work and proof |
 | --- | --- | --- |
 | **Monday, October 5 — Contracts and execution lanes** | Finish the goal record, source/evidence/search contracts and acceptance fixtures. Establish common source registry, result envelope, typed filters, coverage and provider capability model. Prepare GitHub-only development handoffs. Triage the container publication blocker in a separate release lane. | Map existing Gmail, file-index and project-catalog work to the contracts. Identify the IMAP connection setup and intended NAS roots, existing indexes, read paths, output capacity and current read-load/consistency constraints. Demonstrate a synthetic query across the three source kinds with partial/unavailable states. |
 | **Tuesday, October 6 — Broad NAS indexing** | Connect existing file/inventory providers through the common interface; integrate project/provenance manifests. Add restartable progress/coverage and file type/path/date filters. Include metadata references for formats a text provider cannot extract. | Qualify the read-only paths and exact provider build, keep derivatives separate, then launch indexing across the intended NAS scope at a measured sustainable pace. Demonstrate source tracing and a NEF collection query. Use GitHub-built/published images for custom host deployment; release failure is a visible gate, never a reason for a server build. |
@@ -49,4 +51,4 @@ Core integration/evidence work comes before inference. Self-hosted AI uses the e
 5. A timeline fixture preserves date meaning/precision and cited evidence; owner decisions persist independently of regenerated data.
 6. Appropriate synthetic tests and local qualification pass, originals stay unchanged, and private data is absent from public commits and handoffs.
 
-A Friday core demo should be live for the connected sources. Anything still synthetic, blocked or waiting on long scans is labeled separately with its next action. A finished polished timeline, natural-language answers, physical consolidation and provider deletion are not core commitments.
+The core demo should be live for the connected sources. Anything still synthetic, blocked or waiting on long scans is labeled separately with its next action. A finished polished timeline, natural-language answers, physical consolidation and provider deletion are not core commitments.
