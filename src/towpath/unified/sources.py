@@ -60,6 +60,18 @@ def _like(word: str) -> str:
     return "%" + word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
 
 
+def _expansion_cursor(cursor: str | None) -> dict:
+    if cursor is None:
+        return {"page": None, "after": None}
+    try:
+        state = json.loads(cursor)
+    except ValueError:
+        state = None
+    if not isinstance(state, dict) or set(state) != {"page", "after"}:
+        raise StaleReference("this cursor does not belong to this source")
+    return state
+
+
 def _any(clause: str, n: int) -> str:
     return "(" + " OR ".join([clause] * n) + ")"
 
@@ -238,50 +250,71 @@ class MailAdapter(SourceAdapter):
             r = replace(r, coverage="discovered", locator={**r.locator, "indexed_locally": False})
         return [r] if filters.accepts_metadata(r) else []
 
+    def _provider_page(self, connector, db, filters: Filters, token, limit: int) -> tuple[list, str | None, int | None]:
+        """One provider page, expanded into results (messages, or their matching parts), in a stable order."""
+        results = []
+        if self.source_type == "gmail":
+            found = connector.search(filters.text, token, limit)
+            for rank, native in enumerate(found["ids"], start=1):
+                row = db.execute("SELECT * FROM items WHERE source_id = ? AND native_id = ?",
+                                 (self.source_id, native)).fetchone()
+                if row is not None:
+                    row, indexed = dict(row), True
+                    parts = [dict(p) for p in db.execute("SELECT * FROM parts WHERE item_id = ? ORDER BY part_id",
+                                                         (row["item_id"],))]
+                else:
+                    record = connector.confirm(native)  # listed by Gmail, not yet in the local index
+                    if record is None:
+                        continue
+                    row, indexed = self._from_record(db, record)
+                    parts = record["parts"]
+                results += self._expand(db, row, parts, indexed, rank, filters)
+            return results, found["next_cursor"], found["estimate"]
+        from towpath.adapters.errors import NotFound
+
+        try:
+            found = connector.search(filters.words, token, limit)
+        except NotFound as exc:
+            raise StaleReference(str(exc)) from None
+        except ValueError:
+            raise StaleReference("this cursor does not belong to this source") from None
+        for rank, record in enumerate(found["records"], start=1):
+            row, indexed = self._from_record(db, record)
+            results += self._expand(db, row, record["parts"], indexed, rank, filters)
+        return results, found["next_cursor"], None
+
     def _provider(self, filters: Filters, cursor: str | None, limit: int) -> SourcePage:
+        """Provider search, one provider page per call.
+
+        A provider page can expand into more results than fit (a message with several matching
+        parts), so the continuation is ``{"page": <provider token of this page>, "after": <last ref
+        returned>}``: the next call asks the provider for the same page and resumes after that
+        reference. If the provider no longer returns it there, the search stops as stale rather than
+        skipping or repeating results.
+        """
+        state = _expansion_cursor(cursor)
         connector = self.connector()
         db = self._db()
-        results = []
         try:
-            if self.source_type == "gmail":
-                found = connector.search(filters.text, cursor, limit)
-                estimate = found["estimate"]
-                for rank, native in enumerate(found["ids"], start=1):
-                    row = db.execute("SELECT * FROM items WHERE source_id = ? AND native_id = ?",
-                                     (self.source_id, native)).fetchone()
-                    if row is not None:
-                        row, indexed = dict(row), True
-                        parts = [dict(p) for p in db.execute("SELECT * FROM parts WHERE item_id = ?",
-                                                             (row["item_id"],))]
-                    else:
-                        record = connector.confirm(native)  # listed by Gmail, not yet in the local index
-                        if record is None:
-                            continue
-                        row, indexed = self._from_record(db, record)
-                        parts = record["parts"]
-                    results += self._expand(db, row, parts, indexed, rank, filters)
-                next_cursor = found["next_cursor"]
-            else:
-                from towpath.adapters.errors import NotFound
-
-                try:
-                    found = connector.search(filters.words, cursor, limit)
-                except NotFound as exc:
-                    raise StaleReference(str(exc)) from None
-                except ValueError:
-                    raise StaleReference("this cursor does not belong to this source") from None
-                estimate = None
-                for rank, record in enumerate(found["records"], start=1):
-                    row, indexed = self._from_record(db, record)
-                    results += self._expand(db, row, record["parts"], indexed, rank, filters)
-                next_cursor = found["next_cursor"]
+            expanded, next_token, estimate = self._provider_page(connector, db, filters, state["page"], limit)
         finally:
             db.close()
+        if state["after"] is not None:
+            refs = [str(r.ref) for r in expanded]
+            if state["after"] not in refs:
+                raise StaleReference("the provider's answer for this page changed since the last page; search again")
+            expanded = expanded[refs.index(state["after"]) + 1:]
+        if len(expanded) > limit:
+            results = expanded[:limit]
+            next_cursor = json.dumps({"page": state["page"], "after": str(results[-1].ref)}, sort_keys=True)
+        else:
+            results = expanded
+            next_cursor = json.dumps({"page": next_token, "after": None}, sort_keys=True) if next_token else None
         notes = ["provider search: the source matched these; Towpath has not verified a passage"]
         if filters.extensions or filters.media_types or filters.kinds or filters.after or filters.before \
                 or filters.name:
             notes.append("typed filters were applied after the provider's own matching; a page may be short")
-        return SourcePage(self.source_id, "ok", "provider-search", tuple(results[:limit]), next_cursor,
+        return SourcePage(self.source_id, "ok", "provider-search", tuple(results), next_cursor,
                           next_cursor is not None,
                           {"value": estimate, "basis": "Gmail resultSizeEstimate (an estimate, not a count)"}
                           if estimate is not None else None,

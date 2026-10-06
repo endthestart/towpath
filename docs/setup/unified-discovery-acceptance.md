@@ -79,7 +79,8 @@ Automated:
 
 - `tests/test_imap.py`: the synthetic IMAP server, transcripts and identity cases;
 - `tests/test_unified_sources.py`: Gmail, IMAP, files and manifest adapters together;
-- `tests/test_gmail_client.py::test_provider_search_uses_q_under_the_same_scope_client_and_budget`.
+- `tests/test_gmail_client.py::test_provider_search_uses_q_under_the_same_scope_client_and_budget`;
+- `tests/test_provider_pagination.py`: provider pages that expand into several parts, for Gmail (stubbed provider over the real index) and IMAP (real protocol path). It covers limits 1 to 5, multiple attachments and messages, typed filtering, and a changed provider answer reported as `stale`.
 
 ### A. Synthetic end to end (no private data)
 
@@ -100,8 +101,9 @@ towpath files import --provider inventory
 2. `towpath search query "extension:nef" --local`. Expect one Gmail part (`DSC_0042.NEF`), one IMAP part (`DSC_0044.NEF`), and three inventory references, including `DCIM/DSC_0001.NEF` inside `2003/camera-backup.zip`. Expect `complete: false` because the manifest declares an incomplete scope.
 3. `towpath search query "canal"`. Expect Gmail and IMAP at `provider-search` depth, `files-fixture` at `content-index` depth, and `files-inventory` at `catalog` depth. The results include the Gmail newsletter, both IMAP messages that mention the canal, and the paper occurrences.
 4. `towpath search query "fundraiser"` finds the IMAP minutes, a body-only match. With `--local`, it finds nothing at IMAP, and `incomplete_because` says the match was metadata only.
-5. Stop the stub (`kill %1`) and repeat step 3. Expect `imap-fixture` with status `unavailable` and error `server-stop`, while the other sources still answer.
-6. To see the stub's own check, run it in the foreground in a second terminal instead of with `&`. When stopped with Ctrl-C, it prints `violations: []` if no write or non-PEEK read was attempted.
+5. `towpath search query "walk extension:nef" --limit 1`, then repeat with `--cursor <next_cursor>` until it is `null`. Expect each matching NEF part exactly once (Gmail `DSC_0042.NEF`, IMAP `DSC_0044.NEF`). A page that ends partway through a message's parts continues from that message.
+6. Stop the stub (`kill %1`) and repeat step 3. Expect `imap-fixture` with status `unavailable` and error `server-stop`, while the other sources still answer.
+7. To see the stub's own check, run it in the foreground in a second terminal instead of with `&`. When stopped with Ctrl-C, it prints `violations: []` if no write or non-PEEK read was attempted.
 
 ### B. Live verification (local operator, private configuration)
 
@@ -121,7 +123,8 @@ Prerequisites: `pip install -e ".[imap]"`, and a private config outside the repo
 **Gmail**
 
 1. `towpath search query "<word in a known message body>" --source <gmail-id>`. Expect `provider-search` results with an `estimate`.
-2. `towpath connect status <gmail-id>`. Confirm the budget shows the extra `users.messages.list` calls (5 units each), and that the scope is still `gmail.readonly`, with no re-authorization asked.
+2. Pick a query whose messages have several matching attachments, for example `"<word> extension:pdf"`. Page with `--limit 1` and confirm every attachment appears exactly once.
+3. `towpath connect status <gmail-id>`. Confirm the budget shows the extra `users.messages.list` calls (5 units each), and that the scope is still `gmail.readonly`, with no re-authorization asked.
 
 **Files**
 

@@ -341,7 +341,8 @@ def test_provider_search_uses_q_under_the_same_scope_client_and_budget(gmail_ws,
         federation.close_all(adapters)
     page = resp["sources"][0]
     assert page["status"] == "ok" and page["depth"] == "provider-search" and len(resp["results"]) == 3
-    assert page["next_cursor"] == "3" and page["estimate"]["value"] == 6
+    assert json.loads(page["next_cursor"]) == {"page": "3", "after": None}  # Gmail's own token inside
+    assert page["estimate"]["value"] == 6
     lists = [kw for name, kw in service.calls if name == "messages.list"]
     assert lists == [{"userId": "me", "pageToken": None, "maxResults": 3, "includeSpamTrash": False,
                       "fields": "messages(id,threadId),nextPageToken,resultSizeEstimate", "q": "statement"}]

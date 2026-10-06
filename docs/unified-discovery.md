@@ -133,6 +133,10 @@ password = "env:TOWPATH_IMAP_PASSWORD"   # a credential reference, never the sec
 - **Provider search.** `UID SEARCH TEXT` for each word, newest first, mailbox by mailbox. The cursor pins the mailbox position and UIDVALIDITY. If the identity changes between pages, the search stops with a `stale` error.
 - **Selected content.** Content requests in the queue are fetched by `towpath connect fetch-requests` with `BODY.PEEK[part]`. Parts use IMAP numbering (`1`, `1.2`, `2`). Base64 and quoted-printable are decoded. A part over 50 MB, or one that cannot be decoded, fails alone without stopping the batch.
 
+### Provider pages that expand into parts
+
+Gmail and IMAP return messages. When typed filters ask for parts (`extension:nef`, `type:`, `kind:mail-part`), each message expands into its matching parts, so one provider page can hold more results than the per-source limit. The continuation is `{"page": <the provider's token for this page>, "after": <the last reference returned>}`. The next call asks the provider for the same page again and resumes after that reference, so every part is returned exactly once, in provider order and then part order. If the provider no longer returns that reference on that page, the source reports a `stale` error instead of skipping or repeating results. Re-asking for a page costs one more provider call (5 Gmail units, or one IMAP `SEARCH`).
+
 ### Files
 
 - **Catalog.** Occurrences in `files.db` under roots granted `search`:
