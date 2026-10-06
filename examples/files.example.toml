@@ -40,3 +40,15 @@ python = "/usr/bin/python3"
 # adapter = "sist2"
 # roots = ["old-backups"]
 # command = ["sist2"]
+
+# An existing inventory of files a text indexer skips (for example camera raw images). Towpath reads the
+# manifest, never the files: references and metadata only. Format: docs/file-discovery.md#manifest-adapter
+# [[files.roots]]
+# alias = "photos"
+# path = "/srv/archive/photos"
+#
+# [[files.providers]]
+# id = "inventory"
+# adapter = "manifest"
+# roots = ["photos"]
+# manifests = ["/srv/inventories/photos.jsonl"]

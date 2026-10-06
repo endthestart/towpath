@@ -16,6 +16,7 @@ SOURCE_KINDS = {"mail-provider", "document-system", "photo-library"}
 ADAPTER_KEYS = {
     "fixture-gmail": {"path"},
     "gmail": {"client_secrets", "token"},
+    "imap": {"host", "username", "password"},
     "folder": {"path"},
     "paperless": {"base_url", "token"},
     "immich": {"base_url", "token"},
@@ -23,10 +24,14 @@ ADAPTER_KEYS = {
 ADAPTER_KINDS = {
     "fixture-gmail": {"mail-provider"},
     "gmail": {"mail-provider"},
+    "imap": {"mail-provider"},
     "folder": {"document-system", "photo-library"},
     "paperless": {"document-system"},
     "immich": {"photo-library"},
 }
+ADAPTER_OPTIONAL = {"imap": {"port", "security", "mailboxes", "timeout_seconds"}}
+IMAP_SECURITY = {"tls": 993, "starttls": 143, "plain-loopback": 143}
+LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 SELECTOR_KEYS = {"id", "media_types", "disposition", "min_bytes", "max_bytes", "destination",
                  "exclude_labels", "classifier"}
 ENDPOINT_KEYS = {"base_url", "credential", "model", "kind", "destination", "allow_data", "timeout_seconds"}
@@ -52,6 +57,13 @@ class Source:
     token: Path | None = None
     base_url: str | None = None
     credential: str | None = None
+    # IMAP (adapter "imap"): server, login name, TLS mode, and mailboxes (None: every selectable one).
+    host: str | None = None
+    port: int | None = None
+    username: str | None = None
+    security: str | None = None
+    mailboxes: tuple[str, ...] | None = None
+    timeout_seconds: float = 60.0
 
 
 @dataclass(frozen=True)
@@ -124,7 +136,8 @@ def _source(raw: dict, root: Path) -> Source:
     adapter = raw.get("adapter")
     if adapter not in ADAPTER_KEYS:
         raise ConfigError(f"source {sid}: unknown adapter {adapter!r}")
-    _check_keys(raw, {"id", "kind", "adapter"} | ADAPTER_KEYS[adapter], f"source {sid}")
+    _check_keys(raw, {"id", "kind", "adapter"} | ADAPTER_KEYS[adapter] | ADAPTER_OPTIONAL.get(adapter, set()),
+                f"source {sid}")
     if raw["kind"] not in SOURCE_KINDS or raw["kind"] not in ADAPTER_KINDS[adapter]:
         raise ConfigError(f"source {sid}: adapter {adapter} cannot be kind {raw['kind']!r}")
     missing = ADAPTER_KEYS[adapter] - set(raw)
@@ -132,11 +145,40 @@ def _source(raw: dict, root: Path) -> Source:
         raise ConfigError(f"source {sid}: missing {', '.join(sorted(missing))}")
     resolve = lambda key: (root / raw[key]).resolve() if key in raw else None  # noqa: E731
     token = raw.get("token")
+    if adapter == "imap":
+        return _imap_source(sid, raw, root)
     if adapter in {"paperless", "immich"}:
         return Source(sid, raw["kind"], adapter, base_url=raw["base_url"].rstrip("/"),
                       credential=_cred(token, f"source {sid}", root))
     return Source(sid, raw["kind"], adapter, path=resolve("path"), client_secrets=resolve("client_secrets"),
                   token=resolve("token"))
+
+
+def _imap_source(sid: str, raw: dict, root: Path) -> Source:
+    where = f"source {sid}"
+    security = raw.get("security", "tls")
+    if security not in IMAP_SECURITY:
+        raise ConfigError(f"{where}: security must be one of {', '.join(sorted(IMAP_SECURITY))}")
+    host = raw["host"]
+    if not isinstance(host, str) or not host or "/" in host:
+        raise ConfigError(f"{where}: host must be a host name or address")
+    if security == "plain-loopback" and host not in LOOPBACK_HOSTS:
+        raise ConfigError(f"{where}: plain-loopback (no TLS) is allowed only for a loopback host")
+    port = raw.get("port", IMAP_SECURITY[security])
+    if isinstance(port, bool) or not isinstance(port, int) or not 0 < port < 65536:
+        raise ConfigError(f"{where}: port must be 1-65535")
+    mailboxes = raw.get("mailboxes")
+    if mailboxes is not None and (not isinstance(mailboxes, list) or not mailboxes
+                                  or not all(isinstance(m, str) and m for m in mailboxes)):
+        raise ConfigError(f"{where}: mailboxes must be a non-empty list of mailbox names (omit it for all)")
+    timeout = raw.get("timeout_seconds", 60)
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not 1 <= timeout <= 600:
+        raise ConfigError(f"{where}: timeout_seconds must be between 1 and 600")
+    if not isinstance(raw["username"], str) or not raw["username"]:
+        raise ConfigError(f"{where}: username must be a non-empty string")
+    return Source(sid, raw["kind"], "imap", credential=_cred(raw["password"], where, root), host=host, port=port,
+                  username=raw["username"], security=security,
+                  mailboxes=tuple(mailboxes) if mailboxes else None, timeout_seconds=float(timeout))
 
 
 def _endpoint(eid: str, raw: dict, root: Path) -> Endpoint:

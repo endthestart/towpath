@@ -6,6 +6,7 @@ It does not prove how Gmail itself responds; that is the local check in
 docs/setup/local-quickstart.md.
 """
 
+import base64
 import json
 
 import pytest
@@ -60,6 +61,9 @@ class FakeService:
     def list(self, **kw):
         self.calls.append(("messages.list", kw))
         ids = sorted(self.data["messages"], reverse=True)
+        if kw.get("q"):  # plain words against the synthetic raw message, standing in for Gmail's search
+            ids = [i for i in ids if all(w.lower() in base64.urlsafe_b64decode(
+                self.data["messages"][i]["raw"] + "==").decode("utf-8", "replace").lower() for w in kw["q"].split())]
         start = int(kw.get("pageToken") or 0)
         size = kw["maxResults"]
 
@@ -68,6 +72,8 @@ class FakeService:
                                 for i in ids[start:start + size]]}
             if start + size < len(ids):
                 out["nextPageToken"] = str(start + size)
+            if kw.get("q"):
+                out["resultSizeEstimate"] = len(ids)
             return out
         return Call(run)
 
@@ -316,3 +322,33 @@ def test_failed_token_replacement_preserves_previous_file(tmp_path, monkeypatch)
         google_gmail._write_private(path, '{"new":"synthetic"}')
     assert path.read_text() == '{"old":"synthetic"}'
     assert list(tmp_path.iterdir()) == [path]
+
+
+def test_provider_search_uses_q_under_the_same_scope_client_and_budget(gmail_ws, monkeypatch):
+    from towpath.stores import open_store
+    from towpath.unified import federation, sources
+    from towpath.unified.contracts import Filters
+
+    service = gmail_ws.service
+    monkeypatch.setattr(GoogleGmailClient, "from_token",
+                        classmethod(lambda cls, path, **kw: cls(service, page_size=10, limiter=kw.get("limiter"))))
+    connect.sync(gmail_ws.config, "src_a")
+    service.calls.clear()
+    adapters = {"src_a": sources.MailAdapter(gmail_ws.config, gmail_ws.config.sources["src_a"], connect=True)}
+    try:
+        resp = federation.search(adapters, Filters.parse("statement"), limit=3).to_dict()
+    finally:
+        federation.close_all(adapters)
+    page = resp["sources"][0]
+    assert page["status"] == "ok" and page["depth"] == "provider-search" and len(resp["results"]) == 3
+    assert page["next_cursor"] == "3" and page["estimate"]["value"] == 6
+    lists = [kw for name, kw in service.calls if name == "messages.list"]
+    assert lists == [{"userId": "me", "pageToken": None, "maxResults": 3, "includeSpamTrash": False,
+                      "fields": "messages(id,threadId),nextPageToken,resultSizeEstimate", "q": "statement"}]
+    assert not [c for c in service.calls if c[0] == "messages.get"]  # indexed matches need no extra reads
+    quota = open_store(gmail_ws.config.store_dir, "quota", "connect")
+    try:
+        methods = [(r["method"], r["units"]) for r in quota.execute("SELECT method, units FROM attempts")]
+    finally:
+        quota.close()
+    assert methods[-1] == ("users.messages.list", 5)  # accounted and paced like every other call

@@ -24,6 +24,10 @@ def build_connector(source, config=None, **options):
         connector = GmailConnector(source.id, client)
         connector.limiter = limiter
         return connector
+    if source.adapter == "imap":
+        from towpath.adapters.imap import ImapConnector, connect_session
+
+        return ImapConnector(source.id, lambda: connect_session(source), source.mailboxes)
     if source.adapter == "paperless":
         from towpath.adapters.destinations import PaperlessConnector
         return PaperlessConnector(source)

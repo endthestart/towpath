@@ -2,7 +2,7 @@
 
 import importlib
 
-MODULES = {"fixture": "fixture", "recoll": "recoll", "sist2": "sist2"}
+MODULES = {"fixture": "fixture", "recoll": "recoll", "sist2": "sist2", "manifest": "manifest"}
 
 
 def build(provider_config, files_config):

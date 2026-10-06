@@ -23,6 +23,17 @@ adapter = "gmail"
 client_secrets = "secrets/google-oauth-client.json"
 token = "secrets/gmail-token.json"
 
+# Another mail account over IMAP, read-only (EXAMINE and BODY.PEEK only). Needs: pip install 'towpath[imap]'.
+# [[sources]]
+# id = "imap_personal"
+# kind = "mail-provider"
+# adapter = "imap"
+# host = "imap.example.net"
+# username = "me@example.net"
+# password = "env:TOWPATH_IMAP_PASSWORD"   # or file:secrets/imap-password; never the secret itself
+# security = "tls"                        # tls (port 993) or starttls (port 143)
+# mailboxes = ["INBOX", "Archive"]        # omit for every selectable mailbox
+
 # Paperless-ngx, read through a view-only user's API token.
 [[sources]]
 id = "paperless"

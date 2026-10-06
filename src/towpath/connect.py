@@ -343,9 +343,10 @@ def fetch_requests(config) -> dict:
                     run_ids[source_id] = _new_run(db, source_id, "fetch", None)
                 try:
                     data = connectors[source_id].fetch(item["native_id"], req["part_id"])
-                except NotFound:
+                except NotFound as exc:
                     db.execute("INSERT INTO fetches VALUES (?,?,?,?,?,?)",
-                               (request_id, req["item_id"], req["part_id"], "failed", "not found", now()))
+                               (request_id, req["item_id"], req["part_id"], "failed",
+                                getattr(exc, "detail", "not found"), now()))
                     result["failed"] += 1
                     continue
                 h = _hashes(data)

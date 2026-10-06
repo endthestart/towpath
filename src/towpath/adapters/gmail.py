@@ -45,17 +45,33 @@ class FixtureGmailClient:
         self.calls.append(("get_profile",))
         return {"emailAddress": self.data["emailAddress"], "historyId": self.data["historyId"]}
 
-    def list_messages(self, page_token: str | None = None, max_results: int = 10) -> dict:
-        self.calls.append(("list_messages", page_token))
+    def list_messages(self, page_token: str | None = None, max_results: int = 10, q: str | None = None) -> dict:
+        """``q`` here is plain words, all required, matched case-insensitively against the subject, sender
+        and text parts of the synthetic message. A test aid: Gmail's own search syntax is far richer."""
+        self.calls.append(("list_messages", page_token) if q is None else ("list_messages", page_token, q))
         if page_token in self.invalid_page_tokens:
             raise InvalidPageToken("synthetic invalid page token")
         ids = sorted(self.data["messages"], reverse=True)  # newest first, as Gmail lists them
+        if q is not None:
+            ids = [i for i in ids if self._matches(self.data["messages"][i], q)]
         start = int(page_token or 0)
         page = ids[start:start + max_results]
         result = {"messages": [{"id": i, "threadId": self.data["messages"][i]["threadId"]} for i in page]}
         if start + max_results < len(ids):
             result["nextPageToken"] = str(start + max_results)
+        if q is not None:
+            result["resultSizeEstimate"] = len(ids)
         return result
+
+    @staticmethod
+    def _matches(message: dict, q: str) -> bool:
+        from email import message_from_bytes, policy
+
+        parsed = message_from_bytes(b64url_decode(message.get("raw", "")), policy=policy.default)
+        texts = [str(parsed.get("Subject", "")), str(parsed.get("From", ""))]
+        texts += [p.get_content() for p in parsed.walk() if p.get_content_type() == "text/plain"]
+        haystack = "\n".join(texts).lower()
+        return all(word.lower() in haystack for word in q.split())
 
     def get_message(self, message_id: str, fields: str | None = None) -> dict:
         self.calls.append(("get_message", message_id, fields))
@@ -115,7 +131,7 @@ class GmailConnector:
     def describe(self) -> dict:
         return {"schema": "towpath.source/0", "source_id": self.source_id, "kind": self.kind,
                 "connector": "gmail/0", "authority": "read",
-                "capabilities": ["enumerate", "fetch_part", "labels", "incremental_cursor"],
+                "capabilities": ["enumerate", "fetch_part", "labels", "incremental_cursor", "provider_search"],
                 "retention": "on-demand"}
 
     def probe(self) -> dict:
@@ -313,6 +329,18 @@ class GmailConnector:
             yield ("phase", "confirm")
         yield ("confirm", None)
         yield ("done", {"kind": "full", "cursor": state["history_id"], "complete": True})
+
+    def search(self, query: str, page_token: str | None, limit: int) -> dict:
+        """Gmail's own search (``messages.list`` with ``q``): one page of message IDs, newest first.
+
+        Same read-only scope and the same paced client as indexing; each page costs one list call.
+        ``estimate`` is Gmail's ``resultSizeEstimate``, an estimate and never a count.
+        """
+        if not query.strip():
+            raise RequestStop("provider search needs query text")
+        page = self.client.list_messages(page_token=page_token, max_results=limit, q=query)
+        return {"ids": [m["id"] for m in page.get("messages", [])], "next_cursor": page.get("nextPageToken"),
+                "estimate": page.get("resultSizeEstimate")}
 
     def confirm(self, native_id: str) -> dict | None:
         """Re-read one message. None means Gmail says it no longer exists."""

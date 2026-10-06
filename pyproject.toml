@@ -15,7 +15,8 @@ dependencies = ["typer>=0.12"]
 models = ["openai>=1.40", "jsonschema>=4.20", "json-repair>=0.30"]
 gmail = ["google-api-python-client>=2.100", "google-auth>=2.30", "google-auth-oauthlib>=1.2"]
 web = ["Django>=5.2.17,<5.3"]
-dev = ["pytest>=8", "ruff>=0.6", "towpath[models,gmail,web]"]
+imap = ["IMAPClient>=4.1,<5"]
+dev = ["pytest>=8", "ruff>=0.6", "towpath[models,gmail,web,imap]"]
 
 [project.scripts]
 towpath = "towpath.cli:app"

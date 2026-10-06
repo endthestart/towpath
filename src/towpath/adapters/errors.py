@@ -10,6 +10,14 @@ class NotFound(Exception):
     pass
 
 
+class Unfetchable(NotFound):
+    """This one part cannot be fetched (too large, undecodable); the rest of a batch continues."""
+
+    @property
+    def detail(self) -> str:
+        return str(self)
+
+
 class InvalidPageToken(Exception):
     """A saved listing page token is no longer accepted; listing restarts from the first page."""
 

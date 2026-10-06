@@ -290,6 +290,16 @@ def fixtures_check(paths: list[Path]):
     raise typer.Exit(1 if found else 0)
 
 
+@fixtures_app.command("unified")
+def fixtures_unified(out: Path, imap_port: int = typer.Option(None, "--imap-port",
+                                                              help="Add an IMAP source at 127.0.0.1:PORT "
+                                                                   "(run tests/imap_stub.py PORT).")):
+    """Generate a synthetic Gmail account, files corpus, NEF inventory manifest, and a config using them."""
+    from towpath.unified import environment
+
+    typer.echo(json.dumps(environment.generate(out, imap_port), indent=2))
+
+
 @fixtures_app.command("files")
 def fixtures_files(out: Path):
     """Generate the synthetic file discovery corpus, its fixture catalog, and an example config."""
@@ -408,6 +418,9 @@ def config_check(config: Path = ConfigOpt):
                 problems += not ok and label == "client secrets"
                 state.append(f"{label} {'present' if ok else 'missing'}")
             detail = ", ".join(state)
+        elif s.adapter == "imap":
+            boxes = ", ".join(s.mailboxes) if s.mailboxes else "all selectable mailboxes"
+            detail = f"{s.host}:{s.port} ({s.security}), password {secret(s.credential)}, {boxes}"
         elif s.credential:
             detail = f"{s.base_url}, credential {secret(s.credential)}"
         else:

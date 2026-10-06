@@ -72,11 +72,27 @@ class SourceAdapter:
         pass
 
 
-def _error_page(source_id: str, exc: BaseException) -> SourcePage:
+def error_page(source_id: str, exc: BaseException) -> SourcePage:
     """A failed source as data. Unexpected errors report their type only (messages can hold mail data)."""
-    from towpath.discovery import policy
-    from towpath.discovery import service as files_service
-    from towpath.discovery.providers.base import LimitExceeded, Unavailable
+    from towpath.adapters.errors import AuthStop, PermissionStop, SyncStop
+
+    if isinstance(exc, (AuthStop, PermissionStop)):
+        return SourcePage(source_id, "denied", error=SourceError(exc.code, exc.reason[:300]))
+    if isinstance(exc, SyncStop):
+        return SourcePage(source_id, "unavailable", error=SourceError(exc.code, exc.reason[:300], True))
+    if isinstance(exc, (StaleReference, UnknownReference)):
+        return SourcePage(source_id, "error", error=SourceError(exc.code, str(exc)[:300]))
+    if isinstance(exc, (SourceDenied, SourceUnavailable, NotSupported, ContractError)):
+        status = {SourceDenied: "denied", SourceUnavailable: "unavailable", NotSupported: "not-supported"}.get(
+            type(exc), "error")
+        code = "invalid-request" if isinstance(exc, ContractError) else exc.code
+        return SourcePage(source_id, status, error=SourceError(code, str(exc)[:300], status == "unavailable"))
+    try:  # file discovery is optional; its errors exist only when it is installed and used
+        from towpath.discovery import policy
+        from towpath.discovery import service as files_service
+        from towpath.discovery.providers.base import LimitExceeded, Unavailable
+    except ImportError:  # pragma: no cover
+        return SourcePage(source_id, "error", error=SourceError("error", f"unexpected {type(exc).__name__}"))
 
     if isinstance(exc, (SourceDenied, policy.Denied)):
         status, code, message = "denied", "denied", str(exc)
@@ -99,7 +115,7 @@ def statuses(adapters: dict[str, SourceAdapter]) -> list[dict]:
         try:
             out.append(adapter.status().to_dict())
         except Exception as exc:  # noqa: BLE001 - reported as the source's state
-            page = _error_page(source_id, exc)
+            page = error_page(source_id, exc)
             out.append({"source_id": source_id, "source_type": adapter.source_type, "state": "unavailable",
                         "reason": page.error.message})
     return out
@@ -134,7 +150,7 @@ def search(adapters: dict[str, SourceAdapter], filters: Filters, limit: int = 20
         except KeyboardInterrupt:
             raise
         except Exception as exc:  # noqa: BLE001 - one source's failure must not erase the others
-            page = _error_page(source_id, exc)
+            page = error_page(source_id, exc)
         pages.append(page)
     return SearchResponse(filters, tuple(pages), limit, now())
 

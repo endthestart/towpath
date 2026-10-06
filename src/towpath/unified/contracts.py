@@ -19,7 +19,7 @@ import binascii
 import json
 import re
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from urllib.parse import quote, unquote
 
 SEARCH_SCHEMA = "towpath.search/0"
@@ -47,7 +47,7 @@ DATE_MEANINGS = EVIDENCE_DATES + PROCESS_DATES
 PRECISIONS = ("instant", "day", "month", "year", "range", "unknown")
 
 MAX_CURSOR_BYTES = 4096
-SOURCE_ID = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+SOURCE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
 
 
 class ContractError(ValueError):
@@ -62,7 +62,7 @@ def _one_of(value, allowed, what: str):
 
 def check_source_id(source_id: str) -> str:
     if not isinstance(source_id, str) or not SOURCE_ID.match(source_id):
-        raise ContractError(f"source id {source_id!r} must be lowercase letters, digits, '-' or '_'")
+        raise ContractError(f"source id {source_id!r} must be letters, digits, '.', '-' or '_' (no ':')")
     return source_id
 
 
@@ -166,7 +166,11 @@ class TypedDate:
         if self.precision == "unknown":
             return None
         parsed = _parse_iso(self.value)
-        return parsed.date().isoformat() if isinstance(parsed, datetime) else parsed.isoformat()
+        if isinstance(parsed, datetime):
+            if parsed.tzinfo is not None:
+                parsed = parsed.astimezone(timezone.utc)
+            return parsed.date().isoformat()
+        return parsed.isoformat()
 
 
 # -- filters --------------------------------------------------------------------------------------

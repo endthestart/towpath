@@ -38,7 +38,7 @@ Mail sync, scans, adapters, quota pacing, and the model gateway never import `to
 | `discovery/policy.py` | Fail-closed grants per root and feature |
 | `discovery/store.py` | `files.db`: runs, coverage, occurrences, versions, citations, recoveries |
 | `discovery/service.py` | Probe, status, bounded search, describe, excerpt, recover, import |
-| `discovery/providers/` | `base` contract; `fixture` (test aid); `recoll`; `sist2` (capability slot) |
+| `discovery/providers/` | `base` contract; `fixture` (test aid); `recoll`; `sist2` (capability slot); `manifest` (inventory references, no text) |
 | `discovery/bridges/recoll_bridge.py` | Standalone script run by the interpreter that has Recoll's binding; JSON over stdin/stdout |
 | `discovery/run.py` | Runs external tools: argument lists only, time limit, output cap, kill |
 | `discovery/evaluate.py` | Native evaluation harness over a generated corpus |
@@ -67,7 +67,7 @@ exclude = ["private/**"]          # relative globs; matches are never shown
 
 [[files.providers]]
 id = "recoll"
-adapter = "recoll"                # fixture | recoll | sist2
+adapter = "recoll"                # fixture | recoll | sist2 | manifest
 roots = ["old-backups"]
 confdir = "/srv/recoll/old-backups"
 python = "/usr/bin/python3"       # interpreter that has Recoll's Python binding
@@ -213,6 +213,35 @@ Evidence, versions, and commits are in the [provider evaluation](evaluations/fil
 | Root scoping in queries | Verified: `dir:` clause; Towpath also filters every result | Not evaluated |
 | Hashes | None (`sig` is a change token) | `--checksums` option (not evaluated) |
 | Status here | Adapter built; stub tests plus an optional native test (runs when Recoll is installed) | Slot: probe and capability report; search and the rest answer "not implemented" |
+
+### Manifest adapter
+
+An existing inventory, such as a backup catalog or a `find`/`stat` listing, can describe files that a text indexer skips, for example camera raw images. The `manifest` adapter reads such inventories and never the files themselves. Every entry becomes a reference with metadata only: extraction status `skipped`, or the entry's own `unreadable` or `failed`. Searching matches path and member names, so this provider never answers at content depth.
+
+```toml
+[[files.providers]]
+id = "inventory"
+adapter = "manifest"
+roots = ["photos"]
+manifests = ["/srv/inventories/photos.jsonl"]   # each manifest names one of the provider's roots
+```
+
+The format is `towpath.files.manifest/1`. It is a JSON object with an `entries` list, or JSON Lines whose first line is the header and each later line one entry:
+
+```json
+{"format": "towpath.files.manifest/1", "manifest_id": "photos-1", "root": "photos",
+ "produced_by": {"tool": "inventory job", "version": "1"}, "captured_at": "2026-10-01T00:00:00Z",
+ "scope": {"complete": false, "notes": "one folder still being listed"}}
+{"path": "2011/aqueduct/DSC_0042.NEF", "size": 24117248, "mtime": "2011-08-20T18:31:00Z", "media_type": "image/x-nikon-nef"}
+{"path": "2003/camera-backup.zip", "members": [["archive-member", "DCIM/DSC_0001.NEF", null]], "sha256": "..."}
+```
+
+Entry fields: `path` (relative to the root), `size`, `mtime` (ISO 8601 or epoch seconds), `media_type`, `sha256` (only if the inventory computed it), `members`, `status` and `detail`.
+
+- An entry with unknown fields, an escaping path, or a malformed hash is rejected and counted in `probe`.
+- An import is complete only when every manifest for the root declares `scope.complete: true` and none of its entries was rejected. Otherwise absence is never established.
+- `captured_at` becomes an `indexed-at` date, which is a process date, never an event date.
+- Excerpts and recovery answer "not implemented".
 
 ### Recoll adapter
 

@@ -51,7 +51,7 @@ def test_imap_identity_requires_mailbox_uidvalidity_and_uid(bad):
         imap_native("INBOX", 0, 1)
 
 
-@pytest.mark.parametrize("text", ["no-colon", "Upper:x", ":native", "src:"])
+@pytest.mark.parametrize("text", ["no-colon", "-dash:x", ":native", "src:", "sp ace:x"])
 def test_references_reject_malformed_text(text):
     with pytest.raises(ContractError):
         Reference.parse(text)
@@ -86,7 +86,7 @@ def test_filter_syntax_separates_typed_filters_from_keywords():
 
 
 @pytest.mark.parametrize("query", ["", "   ", "extension:ne.f", "kind:folder x", "after:yesterday x",
-                                   "source:Bad x"])
+                                   "source:-bad x"])
 def test_invalid_filters_are_rejected(query):
     with pytest.raises(ContractError):
         Filters.parse(query)
@@ -175,7 +175,7 @@ def test_cursor_round_trip_and_tampering():
     token = encode_cursor({"files-a": "20", "gmail-a": "tok/en", "done": None})
     assert decode_cursor(token) == {"files-a": "20", "gmail-a": "tok/en"}
     assert encode_cursor({"x": None}) is None
-    for bad in ["not base64 !", "e30", "WyJhIl0", "eyJCQUQiOiAiMSJ9"]:  # {}, ["a"], {"BAD": "1"}
+    for bad in ["not base64 !", "e30", "WyJhIl0", "eyJhOmIiOiAiMSJ9"]:  # {}, ["a"], {"a:b": "1"}
         if bad == "e30":
             assert decode_cursor(bad) == {}
             continue

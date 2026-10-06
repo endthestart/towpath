@@ -231,10 +231,17 @@ class GoogleGmailClient:
     def get_profile(self) -> dict:
         return self._execute(lambda: self.service.users().getProfile(userId="me"), "users.getProfile")
 
-    def list_messages(self, page_token: str | None = None, max_results: int | None = None) -> dict:
-        return self._execute(lambda: self.service.users().messages().list(
-            userId="me", pageToken=page_token, maxResults=max_results or self.page_size, includeSpamTrash=False,
-            fields="messages(id,threadId),nextPageToken"), "users.messages.list", page_token)
+    def list_messages(self, page_token: str | None = None, max_results: int | None = None,
+                      q: str | None = None) -> dict:
+        """One page of message IDs. ``q`` is Gmail's own search syntax, under the same read-only scope
+        and the same per-call cost and pacing as an unfiltered listing."""
+        kwargs = {"userId": "me", "pageToken": page_token, "maxResults": max_results or self.page_size,
+                  "includeSpamTrash": False, "fields": "messages(id,threadId),nextPageToken"}
+        if q:
+            kwargs["q"] = q
+            kwargs["fields"] += ",resultSizeEstimate"
+        return self._execute(lambda: self.service.users().messages().list(**kwargs), "users.messages.list",
+                             page_token)
 
     def get_message(self, message_id: str, fields: str | None = None) -> dict:
         kwargs = {"userId": "me", "id": message_id, "format": "full"}

@@ -17,6 +17,8 @@ ADAPTERS = {
     "recoll": {"required": {"confdir"}, "optional": {"python"}},
     # Capability slot only: probe reports the version, search is not implemented.
     "sist2": {"required": {"command"}, "optional": {"index"}},
+    # Existing inventory manifests: file references with metadata only, never text (providers/manifest.py).
+    "manifest": {"required": {"manifests"}, "optional": set()},
 }
 FILES_KEYS = {"enabled", "recover_dir", "limits", "roots", "providers"}
 ROOT_KEYS = {"alias", "path", "exclude"}
@@ -133,6 +135,11 @@ def _provider(raw: dict, roots: dict[str, Root], root: Path) -> ProviderConfig:
             options["python"] = value  # a command name, looked up on PATH (for example "python3")
         else:
             options["python"] = str(_path(value, root, f"files provider {pid} python"))
+    if "manifests" in raw:
+        manifests = raw["manifests"]
+        if not isinstance(manifests, list) or not manifests:
+            raise FilesConfigError(f"files provider {pid}: manifests must be a non-empty list of paths")
+        options["manifests"] = tuple(_path(m, root, f"files provider {pid} manifests") for m in manifests)
     if "command" in raw:
         command = raw["command"]
         if not isinstance(command, list) or not command or not all(isinstance(c, str) and c for c in command):
