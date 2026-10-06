@@ -141,10 +141,21 @@ def test_discovery_imports_only_shared_core():
 
 def test_mail_code_does_not_import_discovery_statically():
     src = REPO / "src" / "towpath"
+    unified = src / "unified"
     for path in src.rglob("*.py"):
         if DISCOVERY in path.parents or path.parent == src and path.name in {"config.py", "cli.py"}:
             continue
+        if unified in path.parents:  # the cross-source layer; checked below
+            continue
         assert not any(n.startswith("towpath.discovery") for n in _imports(path)), path
+
+
+def test_unified_layer_loads_discovery_only_when_files_are_used():
+    """Mail-only installs import the unified contracts without pulling in file discovery."""
+    code = ("import sys, towpath.unified.contracts, towpath.unified.federation, towpath.unified.envelopes; "
+            "print(any(m.startswith('towpath.discovery') for m in sys.modules))")
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
+    assert out.stdout.strip() == "False"
 
 
 def test_records_keep_occurrences_apart_and_refuse_fabrication():

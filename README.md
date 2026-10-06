@@ -67,6 +67,7 @@ Open `http://127.0.0.1:8790/`. The overview, email search, Inbox/Sent filters, a
 | [Local quickstart](docs/setup/local-quickstart.md) | Exact steps to test against your own Gmail, Paperless, Immich, and a local model |
 | [Container images and releases](docs/setup/containers.md) | Images built and tested in GitHub Actions, published to GHCR, pulled by digest; pull, deploy, verify, roll back |
 | [File discovery handoff](docs/setup/file-discovery-handoff.md) | Numbered steps for a local agent to validate file discovery on real archives |
+| [Unified discovery](docs/unified-discovery.md) and [local acceptance](docs/setup/unified-discovery-acceptance.md) | One source-aware search and evidence surface over Gmail, IMAP and file sources (in development) |
 | [Local agent handoff](docs/setup/local-agent-handoff.md) | A prompt for a coding agent on your machine to continue the verification |
 | [Tooling review, October 2026](docs/research/2026-10-tooling-review.md) | Research on existing tools, licenses, Gmail access rules, and model servers, with sources |
 | [Inbox Zero evaluation plan](docs/evaluations/inbox-zero-plan.md) | Checks to run on a dedicated test mailbox before relying on the integration |
