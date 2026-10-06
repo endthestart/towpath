@@ -27,3 +27,15 @@ After the fixes, the full suite passed: **367 passed, 5 skipped**, exit 0, measu
 | Cached provider results and current grants | Queue/run `canal source:files-fixture` in `Uni`; revoke `archive`'s `search` grant; GET the same search page. The fresh catalog obeys revocation, but all three old archive reference links remain in the stored-provider section. | Reapply current scope/grants/exclusions/source availability before exposing stored results. Filtering must remain store-only in the UI, with no credential, connector or provider subprocess. Preserve useful permitted results and show why other stored results were withheld. |
 
 See the [cloud follow-up](../setup/unified-discovery-review-followup.md). A synthetic preview may be used for evaluation while these remain open; neither passing synthetic tests nor that preview qualifies real accounts or NAS indexing.
+
+## Resolution on the implementation branch
+
+The local fixes above were incorporated unchanged, as a fast-forward to `96ca401`. The three gates were then fixed in separate commits on `claude/happy-gauss-ugprmu`. Each commit added failing synthetic regressions first, then passed Ruff, the fixture-domain scan, the relative-link check and the full suite.
+
+| Gate | Commit | Fix | Regressions |
+| --- | --- | --- | --- |
+| Existing-store upgrade | `e19502b` | `towpath stores status\|upgrade`. Each existing store is opened only by its writer role, using only `CREATE TABLE IF NOT EXISTS` and `ADD COLUMN`; the upgrade is idempotent and creates no missing stores. The UI refuses to start, and unified pages answer 503 with the command, until the upgrade has run. The UI never migrates `source.db`. CLI preflight: `store-upgrade-needed` | `tests/test_store_upgrade.py`, using the exact 3b13228 DDL in `tests/legacy_stores_3b13228.py` |
+| Attachment pagination | `ac32c0b` | The continuation `{"page": provider token, "after": last ref}` resumes inside an expanded provider page. If the provider answer changed, the source reports `stale` | `tests/test_provider_pagination.py` (Gmail stubbed provider over the real index; IMAP through the real synthetic protocol) |
+| Cached results and current policy | `bb95895` | `requests.apply_current_policy` re-checks grants, exclusions, configured sources and mailbox scope, and catalog or index availability, from local stores only. Withheld results are counted per source with reasons | `tests/test_cached_search_policy.py` |
+
+After these commits, the cloud suite reports 393 passed, 1 skipped (sist2). Real accounts, the NAS and private configuration remain the local operator's acceptance; see [the acceptance guide](../setup/unified-discovery-acceptance.md).

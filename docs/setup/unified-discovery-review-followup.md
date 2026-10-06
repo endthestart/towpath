@@ -1,5 +1,7 @@
 # Cloud follow-up: local review of unified discovery
 
+Status: completed on `claude/happy-gauss-ugprmu`. The local fixes were incorporated, and the three gates were fixed in `e19502b`, `ac32c0b` and `bb95895`. See [resolution](../evaluations/unified-local-review.md#resolution-on-the-implementation-branch).
+
 Continue from PR [#4](https://github.com/endthestart/towpath/pull/4), original head `594c133`. Read [local findings](../evaluations/unified-local-review.md) and the original [foundation handoff](unified-discovery-cloud-handoff.md). The local fixes are on `codex/unified-local-review-fixes`; review and incorporate that branch before continuing, without losing your existing work. Keep the PR's target `codex/local-email-ui`. Nothing is authorized for main merge, publication, deployment or private-source access.
 
 ## Existing local fixes
