@@ -52,7 +52,7 @@ def ui_provider_refs(uni, query: str, config, monkeypatch) -> tuple[set, str]:
     monkeypatch.setattr("towpath.discovery.service.provider", forbidden)
     uni.state.transcript.clear()
     configure(uni.config.store_dir, config)
-    with override_settings(TOWPATH_STORE_DIR=uni.config.store_dir, TOWPATH_CONFIG=config,
+    with override_settings(TOWPATH_LOGIN_REQUIRED=False, TOWPATH_STORE_DIR=uni.config.store_dir, TOWPATH_CONFIG=config,
                            ALLOWED_HOSTS=["testserver"], MIDDLEWARE=MIDDLEWARE):
         html = Client().get("/search/", {"q": query}).content.decode()
     monkeypatch.undo()

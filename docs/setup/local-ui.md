@@ -15,7 +15,7 @@ towpath connect sync
 towpath web serve --store-dir ./state
 ```
 
-Open `http://127.0.0.1:8790/`. Try searching for `invoice`, then open a result to see its attachment references. Stop the server with Ctrl+C. The generated data is invented; this demo needs no credentials or network connection after installation.
+Open `http://127.0.0.1:8790/`. The first visit asks you to create the instance's one account: enter the setup code the server printed when it started, a username and a password of at least 12 characters. Try searching for `invoice`, then open a result to see its attachment references. Stop the server with Ctrl+C. The generated data is invented; this demo needs no credentials or network connection after installation.
 
 ## Use your existing Gmail index
 
@@ -29,7 +29,11 @@ Replace the path with the folder containing `source.db`, outside your checkout. 
 
 The completed index is usable immediately. The UI displays what is saved; it does not start or schedule a sync. To refresh mail, run the existing connector separately using your private configuration and existing pacing. Refresh the page after it finishes. Each request opens the store again, so restarting the UI is unnecessary.
 
-`--port` selects another local port if 8790 is occupied. The server always binds to `127.0.0.1` on the current computer. It has no login and uses a simple local WSGI server; remote access, reverse proxies, production serving and authenticated multi-user access require a separate design. The existing container images package the CLI, not this optional UI.
+`--port` selects another port if 8790 is occupied. By default the server binds to `127.0.0.1` on the current computer.
+
+**Login.** Every page requires the instance's single account, which can do everything the UI can; there are no other users or roles. Until it exists, every page leads to `/setup`, which asks for a one-time setup code that the server prints to its log (container logs, when deployed), so only someone who can read the host's logs can claim the instance. The account is a salted PBKDF2 hash in `web-login.json` beside the stores, and sessions are signed cookies (key in `web-secret.key`, both mode 0600) that last 30 days. Failed sign-ins are slowed, and a burst of them pauses sign-in for a few minutes. To recover a lost password, run `towpath web reset-login --store-dir <folder>`: everyone is signed out and the next visit starts setup with a new code in the log.
+
+**Behind a reverse proxy.** To reach the UI from other machines, keep it off the network itself and put it behind a TLS reverse proxy: `--host 0.0.0.0` inside a container that publishes no port, on the proxy's network, with `--public-url https://towpath.example.org` so that host is accepted, its forms pass the CSRF origin check, and the proxy's `X-Forwarded-Proto` marks cookies Secure. See [Hub setup](hub.md) and `deploy/swag-towpath.subdomain.conf.example`. The server is a simple single-process WSGI server meant for one owner.
 
 ## Unified search and collections (development branch)
 

@@ -1,0 +1,12 @@
+{% extends 'auth_base.html' %}
+{% block title %}Sign in · Towpath{% endblock %}
+{% block content %}
+<header class="page-head compact"><p class="eyebrow">SIGN IN</p><h1>Welcome back.</h1></header>
+{% if error %}<div class="notice warn">{{ error }}</div>{% endif %}
+<section class="detail-card">
+<form method="post" action="/login" class="auth-form">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
+<label>Username <input name="username" maxlength="64" autocomplete="username" required autofocus></label>
+<label>Password <input type="password" name="password" autocomplete="current-password" required></label>
+<button class="button" type="submit">Sign in</button>
+</form></section>
+{% endblock %}

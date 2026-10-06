@@ -46,7 +46,7 @@ uv sync --locked --extra web
 towpath web serve --store-dir /path/to/private/state
 ```
 
-Open `http://127.0.0.1:8790/`. The overview, email search, Inbox/Sent filters, and attachment references read the index only. Message bodies and file contents are not displayed or searched. For a credentials-free demo and the local preview's limits, see [local UI setup](docs/setup/local-ui.md).
+Open `http://127.0.0.1:8790/` and create the instance's one account with the setup code the server printed. The overview, email search, Inbox/Sent filters, and attachment references read the index only. Message bodies and file contents are not displayed or searched. For a credentials-free demo and the local preview's limits, see [local UI setup](docs/setup/local-ui.md).
 
 ## Design documents
 

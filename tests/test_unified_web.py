@@ -60,7 +60,7 @@ def web(uni, monkeypatch):
 
     configure(uni.config.store_dir, uni.config)
     with override_settings(TOWPATH_STORE_DIR=uni.config.store_dir, TOWPATH_CONFIG=uni.config,
-                           ALLOWED_HOSTS=["testserver"], MIDDLEWARE=MIDDLEWARE):
+                           TOWPATH_LOGIN_REQUIRED=False, ALLOWED_HOSTS=["testserver"], MIDDLEWARE=MIDDLEWARE):
         monkeypatch.setattr(towpath.adapters, "build_connector", guarded(towpath.adapters.build_connector))
         monkeypatch.setattr(files_service, "provider", guarded(files_service.provider))
         uni.state.transcript.clear()
@@ -105,7 +105,7 @@ def test_queued_provider_results_are_shown_as_stored_and_dated(uni):
     assert requests.run_searches(uni.config) == {"requests": 1, "searches_run": 1}
     configure(uni.config.store_dir, uni.config)
     with override_settings(TOWPATH_STORE_DIR=uni.config.store_dir, TOWPATH_CONFIG=uni.config,
-                           ALLOWED_HOSTS=["testserver"], MIDDLEWARE=MIDDLEWARE):
+                           TOWPATH_LOGIN_REQUIRED=False, ALLOWED_HOSTS=["testserver"], MIDDLEWARE=MIDDLEWARE):
         html = Client().get("/search/", {"q": "fundraiser"}).content.decode()
     assert "Last provider search ran at" in html and "stored result, not live" in html
     assert "Canal boat club minutes" in html and "not a verified passage" in html
@@ -114,7 +114,7 @@ def test_queued_provider_results_are_shown_as_stored_and_dated(uni):
 def test_posts_need_a_csrf_token(uni):
     configure(uni.config.store_dir, uni.config)
     with override_settings(TOWPATH_STORE_DIR=uni.config.store_dir, TOWPATH_CONFIG=uni.config,
-                           ALLOWED_HOSTS=["testserver"], MIDDLEWARE=MIDDLEWARE):
+                           TOWPATH_LOGIN_REQUIRED=False, ALLOWED_HOSTS=["testserver"], MIDDLEWARE=MIDDLEWARE):
         strict = Client(enforce_csrf_checks=True)
         for path, data in (("/search/request", {"q": "canal"}), ("/collections/new", {"name": "x"}),
                            ("/ref/request", {"r": "gmail-fixture:x#part=1"})):
@@ -149,7 +149,7 @@ def test_fetched_text_is_escaped_untrusted_and_binary_parts_are_not_rendered(uni
     assert connect.fetch_requests(uni.config)["fetched"] == 2
     configure(uni.config.store_dir, uni.config)
     with override_settings(TOWPATH_STORE_DIR=uni.config.store_dir, TOWPATH_CONFIG=uni.config,
-                           ALLOWED_HOSTS=["testserver"], MIDDLEWARE=MIDDLEWARE):
+                           TOWPATH_LOGIN_REQUIRED=False, ALLOWED_HOSTS=["testserver"], MIDDLEWARE=MIDDLEWARE):
         client = Client()
         text = client.get("/ref/", {"r": f"imap-fixture:{log_native}#part=1"}).content.decode()
         binary = client.get("/ref/", {"r": f"imap-fixture:{nef}#part=2"}).content.decode()
@@ -241,7 +241,7 @@ def test_new_routes_refuse_the_wrong_method_and_keep_security_headers(web):
 
 def test_without_a_config_the_ui_searches_the_mail_sources_it_can_see(uni):
     configure(uni.config.store_dir, None)
-    with override_settings(TOWPATH_STORE_DIR=uni.config.store_dir, TOWPATH_CONFIG=None,
+    with override_settings(TOWPATH_LOGIN_REQUIRED=False, TOWPATH_STORE_DIR=uni.config.store_dir, TOWPATH_CONFIG=None,
                            ALLOWED_HOSTS=["testserver"], MIDDLEWARE=MIDDLEWARE):
         html = Client().get("/search/", {"q": "extension:nef"}).content.decode()
     assert "gmail-fixture" in html and "imap-fixture" in html and "files-inventory" not in html

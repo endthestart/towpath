@@ -1,5 +1,6 @@
-# Initial single-owner deployment. CI builds; Arcane pulls these immutable image references.
-# UI stays on Hub loopback: reach it through SSH, never publish it through a proxy without auth.
+# Single-owner deployment. CI builds; Arcane pulls these immutable image references.
+# The UI publishes no port: it joins the reverse proxy's network and every page needs the one account
+# (first-run setup code in the web container's log). See docs/setup/hub.md.
 name: towpath
 
 x-runtime: &runtime
@@ -15,8 +16,11 @@ x-runtime: &runtime
 services:
   web:
     <<: *runtime
-    network_mode: host
-    command: ["web", "serve", "--store-dir", "/state", "--config", "/config/towpath.toml", "--port", "8790"]
+    command: ["web", "serve", "--store-dir", "/state", "--config", "/config/towpath.toml", "--port", "8790",
+              "--host", "0.0.0.0", "--public-url", "${TOWPATH_PUBLIC_URL:?set the proxy's https URL}"]
+    networks:
+      proxy:
+        aliases: [towpath-web]
     restart: unless-stopped
     volumes:
       - ${TOWPATH_STATE_DIR:?set private state directory}:/state
@@ -66,3 +70,8 @@ services:
       - ${TOWPATH_SOURCE_DIR:?set read-only NAS root}:/data/roots/archive:ro
       - ${TOWPATH_INDEX_DIR:?set separate index directory}:/index
       - ${TOWPATH_SCRATCH_DIR:?set on-disk scratch directory}:/tmp
+
+networks:
+  proxy:
+    external: true
+    name: ${TOWPATH_PROXY_NETWORK:?set the reverse proxy's Docker network}

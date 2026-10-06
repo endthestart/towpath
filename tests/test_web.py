@@ -43,7 +43,7 @@ def mail_index(tmp_path):
 @pytest.fixture
 def client(mail_index):
     configure(mail_index)
-    with override_settings(TOWPATH_STORE_DIR=mail_index, ALLOWED_HOSTS=["testserver"]):
+    with override_settings(TOWPATH_LOGIN_REQUIRED=False, TOWPATH_STORE_DIR=mail_index, ALLOWED_HOSTS=["testserver"]):
         yield Client()
 
 

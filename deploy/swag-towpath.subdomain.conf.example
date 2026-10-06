@@ -1,0 +1,24 @@
+# SWAG (nginx) proxy for the Towpath UI. Copy to <swag config>/nginx/proxy-confs/towpath.subdomain.conf.
+# SWAG terminates TLS; Towpath enforces its own single-account login on every page.
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+
+    server_name towpath.*;
+
+    include /config/nginx/ssl.conf;
+
+    client_max_body_size 1M;
+
+    location / {
+        include /config/nginx/proxy.conf;
+        include /config/nginx/resolver.conf;
+
+        set $upstream_app towpath-web;
+        set $upstream_port 8790;
+        set $upstream_proto http;
+
+        proxy_pass $upstream_proto://$upstream_app:$upstream_port;
+    }
+}

@@ -42,9 +42,9 @@ Mac-local operation means stopping Hub, bringing back Hub's stores with SQLite o
 has written since the handover (otherwise the retired Mac copy), and restoring the retired
 configuration and token.
 
-The first single-owner deployment runs the existing local UI on the host's loopback address,
-and reaches it through SSH. It has no public login flow. Do not expose this preview through a
-LAN port or public reverse proxy. The Mac remains the development machine; the storage host
+The single-owner deployment serves the UI through the host's existing TLS reverse proxy (SWAG) at
+its own name. The container publishes no port; the proxy terminates TLS, and every page requires
+the instance's one account ([login](local-ui.md)). The Mac remains the development machine; the storage host
 runs persistent services and indexers. GitHub builds and tests images, and Arcane pulls the
 verified digests. Neither Arcane nor the deployment host builds source.
 
@@ -56,7 +56,10 @@ The verified Recoll image includes the same UI and mail clients and can serve bo
 set both image variables to that published digest when the core image is not yet qualified.
 The services retain their separate commands and mounts; only the connector receives tokens.
 
-- `web`: core image, host networking, listening only at `127.0.0.1:8790`. Mount the state folder
+- `web`: core image on the reverse proxy's Docker network (alias `towpath-web`), listening on port
+  8790 inside the container with `--public-url` set to the proxy's https address; no published
+  port. On first start its log shows the setup code for creating the account at `/setup`.
+  Mount the state folder (which also holds the login hash and session key)
   and a separate configuration folder with no actual secrets. Source credential references
   may name unavailable files: the UI never resolves them. No secret or OAuth token directory is mounted.
 - `connect`: Recoll image with Gmail, IMAP and UI dependencies. Runs `connect run-worker`,
@@ -74,7 +77,8 @@ The services retain their separate commands and mounts; only the connector recei
 
 Private environment values name `TOWPATH_IMAGE`, `TOWPATH_RECOLL_IMAGE`, `TOWPATH_STATE_DIR`,
 `TOWPATH_CONFIG_DIR`, `TOWPATH_WEB_CONFIG_DIR`, `TOWPATH_SECRETS_DIR`, `TOWPATH_TOKEN_DIR`, `TOWPATH_SOURCE_DIR`,
-`TOWPATH_INDEX_DIR`, and `TOWPATH_SCRATCH_DIR`. Set `TOWPATH_MAIL_SOURCE` when invoking the
+`TOWPATH_INDEX_DIR`, `TOWPATH_SCRATCH_DIR`, `TOWPATH_PUBLIC_URL` (the proxy's https address) and
+`TOWPATH_PROXY_NETWORK` (the proxy's existing Docker network). Set `TOWPATH_MAIL_SOURCE` when invoking the
 manual sync profile. Folders must allow the container's UID/GID 10001 access; keep secrets
 and private state restricted to the owner and that service identity. Use local filesystem
 storage for SQLite, not an SMB/NFS mount. App passwords and OAuth material go in private
@@ -99,8 +103,8 @@ atomically save refreshed access tokens. Neither directory is mounted into the w
 5. Update the existing Arcane project, pull the immutable images, then deploy. Confirm each
    streamed operation completes successfully. Inspect running revision/digest, mounts,
    loopback listener, health and bounded logs. Check the original local copy is intact.
-6. Open an SSH tunnel from the Mac: `ssh -N -L 8792:127.0.0.1:8790 <storage-host>`, then browse
-   `http://127.0.0.1:8792/`. Test search, collections and one explicit queued search. Ordinary
+6. Install the proxy configuration (`deploy/swag-towpath.subdomain.conf.example`), open the public URL from the Mac, and create the account with the setup
+   code from the web container's log. Test search, collections and one explicit queued search. Ordinary
    navigation must not cause content downloads. Fastmail credentials are configured on
    Hub afterward; qualify its read-only connector before starting full metadata indexing.
 

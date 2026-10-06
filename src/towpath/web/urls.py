@@ -1,9 +1,12 @@
 from django.urls import path
 
-from towpath.web import unified_views, views
+from towpath.web import auth, unified_views, views
 
 urlpatterns = [
     path("", views.overview, name="overview"),
+    path("setup", auth.setup, name="setup"),
+    path("login", auth.login, name="login"),
+    path("logout", auth.logout, name="logout"),
     path("email/", views.emails, name="emails"),
     path("email/<str:item_id>/", views.email, name="email"),
     path("search/", unified_views.search, name="search"),

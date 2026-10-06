@@ -1,0 +1,15 @@
+{% extends 'auth_base.html' %}
+{% block title %}Set up · Towpath{% endblock %}
+{% block content %}
+<header class="page-head compact"><p class="eyebrow">FIRST RUN</p><h1>Create the Towpath account.</h1>
+<p class="lead">This instance has one account, and it can do everything here. Enter the setup code printed in the Towpath server log.</p></header>
+{% if errors %}<div class="notice warn"><ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div>{% endif %}
+<section class="detail-card">
+<form method="post" action="/setup" class="auth-form">{% csrf_token %}
+<label>Setup code <input name="code" autocomplete="off" required></label>
+<label>Username <input name="username" value="{{ username }}" maxlength="64" autocomplete="username" required></label>
+<label>Password <input type="password" name="password" minlength="{{ min_password }}" autocomplete="new-password" required></label>
+<label>Confirm password <input type="password" name="confirm" minlength="{{ min_password }}" autocomplete="new-password" required></label>
+<button class="button" type="submit">Create account</button>
+</form></section>
+{% endblock %}

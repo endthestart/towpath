@@ -126,7 +126,7 @@ def test_the_ui_refuses_outdated_stores_with_an_actionable_message_and_never_mig
     assert out.exit_code == 2 and "towpath stores upgrade" in out.output
     configure(legacy, None)
     with override_settings(TOWPATH_STORE_DIR=legacy, TOWPATH_CONFIG=None, ALLOWED_HOSTS=["testserver"],
-                           MIDDLEWARE=MIDDLEWARE):
+                           TOWPATH_LOGIN_REQUIRED=False, MIDDLEWARE=MIDDLEWARE):
         client = Client()
         for path in ("/search/?q=canal", "/collections/"):
             response = client.get(path)
@@ -140,7 +140,7 @@ def test_after_the_upgrade_the_ui_works_and_old_decisions_still_apply(legacy):
     stores.upgrade(legacy)
     configure(legacy, None)
     with override_settings(TOWPATH_STORE_DIR=legacy, TOWPATH_CONFIG=None, ALLOWED_HOSTS=["testserver"],
-                           MIDDLEWARE=MIDDLEWARE):
+                           TOWPATH_LOGIN_REQUIRED=False, MIDDLEWARE=MIDDLEWARE):
         client = Client()
         page = client.get("/search/", {"q": "extension:nef"})
         assert page.status_code == 200 and b"DSC_0001.NEF" in page.content

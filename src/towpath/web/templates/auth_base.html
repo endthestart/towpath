@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{% block title %}Towpath{% endblock %}</title>
+  <link rel="stylesheet" href="{% url 'stylesheet' %}">
+</head>
+<body class="auth-page">
+  <main><p class="brand"><span class="brand-mark">↝</span> towpath</p>{% block content %}{% endblock %}</main>
+</body>
+</html>

@@ -15,7 +15,8 @@
       <a href="{% url 'search' %}" {% if nav == 'search' %}aria-current="page"{% endif %}>Search all <span>↗</span></a>
       <a href="{% url 'collections' %}" {% if nav == 'collections' %}aria-current="page"{% endif %}>Collections <span>↗</span></a>
     </nav>
-    <div class="sidebar-bottom"><span class="status-dot"></span> Local · sources read only<p>Your existing indexes, on this computer. Sources are contacted only by towpath-connect.</p></div>
+    <div class="sidebar-bottom"><span class="status-dot"></span> Sources read only<p>Your existing indexes. Sources are contacted only by towpath-connect.</p>
+      <form method="post" action="/logout" class="signout">{% csrf_token %}<button type="submit">Sign out</button></form></div>
   </aside>
   <main>{% block content %}{% endblock %}</main>
 </body>
