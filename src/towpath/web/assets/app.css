@@ -61,3 +61,4 @@ details.tips ul,details.why ul{margin:8px 0;padding-left:18px}
 code.copyable{display:inline-block;margin-top:6px;padding:6px 10px;background:var(--soft);border-radius:6px;user-select:all;overflow-wrap:anywhere}
 .inline-form label{display:flex;flex-direction:column;gap:6px;font-size:13px;min-width:260px}
 .steps a{text-decoration:underline}
+.folder-tree .child{padding-left:56px}.folder-row.unreadable{opacity:.6}

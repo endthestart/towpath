@@ -58,6 +58,10 @@ class Query:
         return len(self._rows)
     def fetchone(self):
         return Doc(self._rows.pop(0)) if self._rows else None
+    def scroll(self, value, mode="relative"):
+        if value > len(self._rows):
+            raise IndexError("position out of range")
+        self._rows = self._rows[value:]
 
 class Db:
     def __init__(self, confdir):

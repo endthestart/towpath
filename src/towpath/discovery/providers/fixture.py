@@ -91,8 +91,8 @@ class Provider(BaseProvider):
             hits.append(self._hit(entry, {"kind": "text-offset", "start": start} if start >= 0 else None))
         return Listing(hits, exhausted, len(rows))
 
-    def enumerate(self, root, max_rows: int, timeout: float) -> Listing:
-        rows, exhausted = self._bounded([e for e in self._catalog() if e["root"] == root.alias], max_rows)
+    def enumerate(self, root, max_rows: int, timeout: float, offset: int = 0) -> Listing:
+        rows, exhausted = self._bounded([e for e in self._catalog() if e["root"] == root.alias][offset:], max_rows)
         return Listing([self._hit(e) for e in rows], exhausted, len(rows))
 
     def describe(self, native_id: str, timeout: float) -> Hit:

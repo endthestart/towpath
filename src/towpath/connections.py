@@ -30,6 +30,7 @@ PROVIDERS = {
     "fastmail": {"label": "Fastmail", "host": "imap.fastmail.com", "port": 993, "security": "tls",
                  "help_url": "https://www.fastmail.help/hc/en-us/articles/360058752854-App-passwords"},
     "imap": {"label": "Email (IMAP)", "host": None, "port": 993, "security": "tls", "help_url": None},
+    "folders": {"label": "Folders on this server", "host": None, "port": None, "security": None, "help_url": None},
 }
 # Folders left out by default: special use (RFC 6154) first, then common names for servers that omit it.
 SKIP_SPECIAL = {"\\trash", "\\junk", "\\drafts"}
@@ -59,6 +60,8 @@ def token_path(credentials_dir: Path, c: dict) -> Path:
 
 
 def has_credential(credentials_dir: Path, c: dict) -> bool:
+    if c["adapter"] == "recoll":
+        return True  # folders on the NAS need no sign-in
     path = token_path(credentials_dir, c) if c["adapter"] == "gmail" else secret_path(credentials_dir, c["source_id"])
     return path.is_file()
 
@@ -279,7 +282,9 @@ def merged(config, credentials_dir: Path | None, role: str = ROLE):
     pacing = gmail_pacing(config, role)
     if added or pacing is not config.gmail_pacing:
         config = dataclasses.replace(config, sources={**config.sources, **added}, gmail_pacing=pacing)
-    return config
+    from towpath import folders
+
+    return folders.with_files(config, Path(config.store_dir).parent / "index", role)
 
 
 # -- Gmail -----------------------------------------------------------------------------------------------
@@ -475,8 +480,8 @@ def index_pending(config, credentials_dir: Path, slice_seconds: float = SLICE_SE
     store_dir = config.store_dir
     summaries = []
     for c in all_connections(store_dir):
-        if c["indexing"] not in ("requested", "running") or c["state"] != "ready":
-            continue
+        if c["indexing"] not in ("requested", "running") or c["state"] != "ready" or c["adapter"] == "recoll":
+            continue  # folders are indexed by towpath.folders
         sid = c["source_id"]
         _update(store_dir, sid, "indexing-slice" if c["indexing"] == "running" else "indexing-started",
                 indexing="running")

@@ -31,7 +31,7 @@ class Provider(BaseProvider):
     def search(self, query, roots, max_rows, timeout):
         raise Unavailable(REASON.format(op="search"))
 
-    def enumerate(self, root, max_rows, timeout):
+    def enumerate(self, root, max_rows, timeout, offset=0):
         raise Unavailable(REASON.format(op="enumerate"))
 
     def describe(self, native_id, timeout):

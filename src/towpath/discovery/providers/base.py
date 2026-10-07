@@ -83,8 +83,8 @@ class BaseProvider:
         """``Hit`` rows in the provider's rank order from at most ``max_rows`` raw rows."""
         raise Unavailable("search is not implemented")
 
-    def enumerate(self, root, max_rows: int, timeout: float) -> Listing:
-        """Every item under ``root``, from at most ``max_rows`` raw rows."""
+    def enumerate(self, root, max_rows: int, timeout: float, offset: int = 0) -> Listing:
+        """Every item under ``root``, from at most ``max_rows`` raw rows after the first ``offset``."""
         raise Unavailable("enumerate is not implemented")
 
     def describe(self, native_id: str, timeout: float) -> Hit:

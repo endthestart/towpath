@@ -442,8 +442,14 @@ def recover(config, occurrence_id: str) -> dict:
 
 
 def import_catalog(config, provider_id: str | None = None, root: str | None = None,
-                   max_items: int = 10000) -> list[dict]:
-    """Copy references (never text) for granted roots into files.db, recording coverage honestly."""
+                   max_items: int = 10000, page_size: int | None = None, progress=None, should_stop=None,
+                   deadline_seconds: float | None = None) -> list[dict]:
+    """Copy references (never text) for granted roots into files.db, recording coverage honestly.
+
+    By default one listing of up to ``max_items`` rows within the per-call time limit. With ``page_size``,
+    a large root is listed page by page within one run: each page has the per-call limit, the whole run has
+    ``deadline_seconds`` (none if unset), ``progress(seen)`` is called after every page, and
+    ``should_stop()`` is checked between pages. Absence is established only by a complete listing."""
     fc = files_config(config)
     prov = provider(config, provider_id)
     if root is not None:
@@ -462,32 +468,50 @@ def import_catalog(config, provider_id: str | None = None, root: str | None = No
         run = fstore.begin_run(db, prov.id, "import")
         statuses, refused, seen, changed = Counter(), 0, 0, 0
         complete, reason, termination = True, None, "complete"
-        deadline = time.monotonic() + fc.limits["timeout_seconds"]
+        limit = deadline_seconds if page_size else fc.limits["timeout_seconds"]
+        deadline = time.monotonic() + limit if limit is not None else None
+        offset = 0
         try:
-            # Completeness comes from the provider's raw rows, never from how many hits survive filtering.
-            listing = prov.enumerate(prov.roots[alias], max_items, fc.limits["timeout_seconds"])
-            if listing.exhausted is False:
-                complete, reason = False, f"the provider holds more than max_items={max_items} rows"
-            elif listing.exhausted is None:
-                complete, reason = False, "the provider did not confirm that the listing was exhaustive"
-            for hit in listing.hits:
-                if time.monotonic() > deadline:
-                    complete, reason = False, "time limit reached"
+            while True:
+                page = min(page_size, max_items - offset) if page_size else max_items
+                # Completeness comes from the provider's raw rows, never from how many hits survive filtering.
+                listing = (prov.enumerate(prov.roots[alias], page, fc.limits["timeout_seconds"], offset=offset)
+                           if offset else prov.enumerate(prov.roots[alias], page, fc.limits["timeout_seconds"]))
+                for hit in listing.hits:
+                    if deadline is not None and time.monotonic() > deadline:
+                        complete, reason = False, "time limit reached"
+                        break
+                    try:
+                        located, rel = refs.locate(hit.url, prov.roots)
+                    except refs.BadReference:
+                        refused += 1
+                        continue
+                    if located == alias and refs.excluded(prov.roots[alias], rel):
+                        continue
+                    occ = _accept(hit, prov, {alias})
+                    if occ is None:
+                        refused += 1
+                        continue
+                    seen += 1
+                    statuses[occ.extraction.status] += 1
+                    changed += fstore.observe(db, occ, run) == "changed"
+                offset += listing.raw_rows
+                if not complete:
                     break
-                try:
-                    located, rel = refs.locate(hit.url, prov.roots)
-                except refs.BadReference:
-                    refused += 1
-                    continue
-                if located == alias and refs.excluded(prov.roots[alias], rel):
-                    continue
-                occ = _accept(hit, prov, {alias})
-                if occ is None:
-                    refused += 1
-                    continue
-                seen += 1
-                statuses[occ.extraction.status] += 1
-                changed += fstore.observe(db, occ, run) == "changed"
+                if listing.exhausted is None:
+                    complete, reason = False, "the provider did not confirm that the listing was exhaustive"
+                    break
+                if listing.exhausted:
+                    break
+                if not page_size or offset >= max_items:
+                    complete, reason = False, f"the provider holds more than max_items={max_items} rows"
+                    break
+                db.commit()
+                if progress is not None:
+                    progress(seen)
+                if should_stop is not None and should_stop():
+                    complete, reason, termination = False, "paused", "interrupted"
+                    break
         except KeyboardInterrupt:
             complete, reason, termination = False, "cancelled", "interrupted"
             db.commit()

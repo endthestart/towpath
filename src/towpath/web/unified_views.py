@@ -34,8 +34,10 @@ def _adapters():
 
 
 def _connection_names() -> dict[str, str]:
-    return {c["source_id"]: c["display_name"]
-            for c in connections.all_connections(settings.TOWPATH_STORE_DIR, role="web")}
+    names = {}
+    for c in connections.all_connections(settings.TOWPATH_STORE_DIR, role="web"):
+        names["files-" + c["source_id"] if c["adapter"] == "recoll" else c["source_id"]] = c["display_name"]
+    return names
 
 
 def _store():

@@ -96,6 +96,16 @@ Each phase ships through CI, is deployed by digest, and is accepted before the n
 3. **Self-initialising install.** Data-folder layout created by the containers; configuration files become
    optional; install guide with no shell steps.
 
+## Folders on the server (2026-10-07)
+
+*Connections → Folders on this server* lists folders under the read-only library mount two levels deep
+(unreadable ones are shown and explained). The chosen folders become search-granted roots; the connector
+writes the Recoll configuration (media by name only, common junk skipped), runs `recollindex` at low CPU and
+idle I/O priority with progress from Recoll's status file (counts only, never file names), stops it on Pause,
+and when it finishes lists the index into the files store page by page (5,000 rows per page, one run per
+folder, absence recorded only from a complete listing). File contents are searched through Recoll by the
+request worker, like Gmail and IMAP full-text search.
+
 ## Later connection types (owner request, not scheduled)
 
 - **Calendars (CalDAV):** past events as dated evidence for the life stream (who, when, where), read-only.

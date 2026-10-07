@@ -3,6 +3,7 @@
 #
 # One data folder holds everything; the containers create its layout on first start. The web service sees
 # only state/; passwords and tokens in credentials/ are visible only to the two connector services.
+# Folders to index are mounted read-only under /library, also only in the connector services.
 # Install guide: docs/setup/install.md.
 name: towpath
 
@@ -28,8 +29,10 @@ services:
       default: {}
       proxy:
         aliases: [towpath-connect-setup]
+    group_add: ["${TOWPATH_READ_GROUP:-568}"]  # a group allowed to read the library, if it needs one
     volumes:
       - ${TOWPATH_DATA_DIR:?set the data folder}:/data
+      - ${TOWPATH_LIBRARY_DIR:-${TOWPATH_DATA_DIR}/library}:/library:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8791/assets/app.css', timeout=5).close()"]
       interval: 30s
@@ -44,8 +47,10 @@ services:
     restart: unless-stopped
     depends_on:
       connect-setup: {condition: service_healthy}
+    group_add: ["${TOWPATH_READ_GROUP:-568}"]
     volumes:
       - ${TOWPATH_DATA_DIR}:/data
+      - ${TOWPATH_LIBRARY_DIR:-${TOWPATH_DATA_DIR}/library}:/library:ro
 
   web:
     <<: *runtime

@@ -8,7 +8,9 @@ import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
-from towpath import connect, connections
+from pathlib import Path
+
+from towpath import connect, connections, folders
 from towpath.unified import requests
 
 
@@ -36,6 +38,8 @@ def run_once(config, credentials_dir=None):
     search = requests.run_searches(config, limit=20)
     fetched = connect.fetch_requests(config)
     indexing = connections.index_pending(config, credentials_dir) if credentials_dir is not None else []
+    if credentials_dir is not None:  # folders, when this connector has a data folder
+        indexing += folders.index_pending(config, Path(config.store_dir).parent)
     return {"searches": search["searches_run"], "fetched": fetched["fetched"],
             "failed": fetched["failed"], "presence_checked": fetched.get("presence_checked", 0),
             "termination": fetched["termination"], "indexing": indexing}

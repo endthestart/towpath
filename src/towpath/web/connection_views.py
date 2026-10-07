@@ -67,7 +67,27 @@ def _redirect_uri(request) -> str:
     return base.rstrip("/") + "/connections/google/callback"
 
 
+def _folders_view(c: dict) -> dict:
+    progress = c["progress"] or {}
+    roots = c["settings"].get("roots") or []
+    busy = c["indexing"] in ("requested", "running")
+    phase = progress.get("phase")
+    text = {"reading": "Reading files…", "adding": "Adding to search…"}.get(phase, "Starting…") if busy else None
+    count = lambda key: f"{progress[key]:,}" if isinstance(progress.get(key), int) and progress[key] else None  # noqa: E731
+    view = {**c, "status": {**status(c), **({"text": text} if text else {})},
+            "address": f"{len(roots)} folder{'s' if len(roots) != 1 else ''}",
+            "folders_chosen": [r["rel"] for r in roots], "indexed": progress.get("indexed"), "rate": None,
+            "indexed_text": f"{progress['indexed']:,}" if progress.get("indexed") is not None else None,
+            "files_text": count("files"), "total_text": count("total"), "errors": progress.get("errors") or 0,
+            "phase": phase}
+    when = progress.get("at")
+    view["updated"] = when[:16].replace("T", " ") + " UTC" if when else None
+    return view
+
+
 def _view(c: dict) -> dict:
+    if c["adapter"] == "recoll":
+        return _folders_view(c)
     progress = c["progress"] or {}
     rate = (progress.get("rate") or {}).get("per_minute")
     when = progress.get("at")
@@ -103,6 +123,8 @@ def connection_list(request):
 def add(request, provider):
     if provider == "gmail":
         return _gmail_page(request)
+    if provider == "folders":
+        return _folders_page(request)
     if provider not in connections.PROVIDERS:
         raise Http404
     preset = connections.PROVIDERS[provider]
@@ -137,6 +159,8 @@ def add(request, provider):
 
 @require_http_methods(["GET", "POST"])
 def folders(request, sid):
+    if _get(sid)["adapter"] == "recoll":
+        return _folders_page(request)
     c = _get(sid)
     error = None
     if request.method == "POST":
@@ -313,3 +337,30 @@ def pacing(request, sid):
     else:
         return redirect(f"/connections/{sid}/")
     return render(request, "connection_detail.html", {**_detail_context(sid), "pacing_error": error}, status=400)
+
+
+# -- Folders ---------------------------------------------------------------------------------------------
+
+
+def _folders_page(request):
+    from towpath import folders
+
+    error = None
+    current = connections.get(_store(), folders.SID)
+    chosen = {r["path"] for r in (current["settings"]["roots"] if current else [])}
+    if request.method == "POST":
+        picks = request.POST.getlist("folder")
+        try:
+            folders.choose(settings.TOWPATH_CONFIG, picks)
+            if request.POST.get("start"):
+                connections.start_indexing(_store(), _creds(), folders.SID)
+        except ConnectionProblem as exc:
+            error, chosen = str(exc), set(picks)
+        else:
+            return redirect(f"/connections/{folders.SID}/")
+    library = folders.library()
+    response = render(request, "connection_folders_pick.html", {
+        "nav": "connections", "tree": folders.tree(library), "library_ok": library.is_dir(), "chosen": chosen,
+        "error": error, "first_time": current is None})
+    response.status_code = 400 if error else 200
+    return response

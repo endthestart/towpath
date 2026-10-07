@@ -116,4 +116,5 @@ def test_hub_example_keeps_credentials_away_from_the_web_service():
     env = (DEPLOY / "env.hub.example").read_text()
     assert set(re.findall(r"^(TOWPATH_\w+)=", env, re.M)) == {
         "TOWPATH_IMAGE", "TOWPATH_RECOLL_IMAGE", "TOWPATH_DATA_DIR", "TOWPATH_PUBLIC_URL", "TOWPATH_PROXY_NETWORK",
-        "TOWPATH_USER"}
+        "TOWPATH_USER", "TOWPATH_LIBRARY_DIR", "TOWPATH_READ_GROUP"}
+    assert compose.count(":/library:ro") == 2 and "/library" not in web  # never writable, never in the web service

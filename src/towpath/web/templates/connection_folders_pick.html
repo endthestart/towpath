@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block title %}Folders · Towpath{% endblock %}
+{% block content %}
+<header class="page-head compact"><p class="eyebrow"><a href="/connections/">CONNECTIONS</a></p><h1>{% if first_time %}Add folders{% else %}Change folders{% endif %}</h1>
+<p class="lead">Choose the folders on this server that Towpath should index. It reads them only: nothing in them is changed, moved or deleted. Photos, video and music are indexed by name; documents by their text too.</p></header>
+{% if error %}<div class="notice warn" role="alert">{{ error }}</div>{% endif %}
+{% if not library_ok %}<div class="notice warn">No folders are shared with Towpath yet. Add your folders to its library in the install settings (see the install guide), then come back.</div>
+{% else %}
+<form method="post">{% csrf_token %}
+<section class="mail-list folder-tree">
+{% for top in tree %}
+  <label class="mail-row folder-row {% if not top.readable %}unreadable{% endif %}"><input type="checkbox" name="folder" value="{{ top.path }}" {% if top.path in chosen %}checked{% endif %} {% if not top.readable %}disabled{% endif %}>
+    <span class="mail-title"><strong>{{ top.name }}</strong>{% if not top.readable %}<span class="row-context">Towpath can't read this folder yet</span>{% endif %}</span><time></time></label>
+  {% for child in top.children %}
+  <label class="mail-row folder-row child {% if not child.readable %}unreadable{% endif %}"><input type="checkbox" name="folder" value="{{ child.path }}" {% if child.path in chosen %}checked{% endif %} {% if not child.readable %}disabled{% endif %}>
+    <span class="mail-title"><strong>{{ child.name }}</strong>{% if not child.readable %}<span class="row-context">Towpath can't read this folder yet</span>{% endif %}</span><time></time></label>
+  {% endfor %}
+{% empty %}<div class="empty"><p>The library is empty.</p></div>{% endfor %}
+</section>
+<p class="footnote">Ticking a folder includes everything inside it. Ticking both a folder and something inside it is fine; the outer one is used.</p>
+<div class="form-actions">
+  <button class="button" type="submit" name="start" value="1">{% if first_time %}Save and start indexing{% else %}Save and index{% endif %}</button>
+  <button class="button secondary" type="submit">Save only</button>
+</div>
+</form>
+{% endif %}
+{% endblock %}

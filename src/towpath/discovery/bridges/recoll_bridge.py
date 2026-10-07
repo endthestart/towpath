@@ -8,7 +8,7 @@ the owner; nothing from Recoll is copied here).
 
 Interfaces used, as documented by the installed module (Recoll 1.36.1):
 ``recoll.connect(confdir=...)``, ``Db.query()``, ``Query.execute(q)``,
-``Query.fetchone()``, ``Db.getDoc(udi)``, ``Doc`` attributes, and
+``Query.fetchone()``, ``Query.scroll(n, mode="absolute")``, ``Db.getDoc(udi)``, ``Doc`` attributes, and
 ``rclextract.Extractor(doc).textextract(ipath)`` / ``.idoctofile(ipath, mimetype, ofilename=...)``.
 
 Search rows never include document text; ``excerpt`` is the only text read.
@@ -68,11 +68,19 @@ def _db(req):
     return recoll.connect(confdir=req["confdir"])
 
 
-def _query(db, text: str, max_rows: int) -> tuple[list[dict], bool]:
-    """Up to ``max_rows`` rows, and whether the query is exhausted: one more row is fetched (and
-    not returned) to tell a listing that ended from one that reached the cap."""
+def _query(db, text: str, max_rows: int, offset: int = 0) -> tuple[list[dict], bool]:
+    """Up to ``max_rows`` rows after the first ``offset``, and whether the query is exhausted: one more
+    row is fetched (and not returned) to tell a listing that ended from one that reached the cap. Pages
+    of one listing stay consistent while the index is not being updated."""
     q = db.query()
-    q.execute(text)
+    count = q.execute(text)
+    if offset:
+        if isinstance(count, int) and offset >= count:
+            return [], True
+        try:
+            q.scroll(offset, mode="absolute")
+        except IndexError:
+            return [], True
     rows = []
     while True:
         doc = q.fetchone()
@@ -110,7 +118,7 @@ def handle(req: dict) -> dict:
             exhausted = exhausted and done
         return {"rows": rows, "exhausted": exhausted}
     if op == "enumerate":
-        rows, exhausted = _query(db, f'dir:"{req["dir"]}"', req["max_rows"])
+        rows, exhausted = _query(db, f'dir:"{req["dir"]}"', req["max_rows"], req.get("offset", 0))
         return {"rows": rows, "exhausted": exhausted}
     doc = _doc(db, req["udi"])
     if doc is None:

@@ -52,6 +52,20 @@ can do everything; there are no other users.
 Open **Connections** and add Fastmail, Gmail or another mail account. Each page explains what to do at the
 provider. Nothing is indexed until you choose **Start indexing**.
 
+## 6. Index folders (optional)
+
+Towpath can index folders on the same server: names, types, sizes and dates of every file, and the text of
+documents. It reads them only, through a read-only mount, and never changes, moves or deletes anything.
+
+1. Set `TOWPATH_LIBRARY_DIR` to the folder that contains what you want indexed (on TrueNAS, a dataset or its
+   parent). To mount several datasets, give the connector services one read-only line each under `/library`.
+2. The containers' user must be able to read those folders. If it can't, create a group in TrueNAS
+   (**Credentials → Groups → Add**), give it **Read** with **Inherit** on each dataset (**Edit Permissions**),
+   and set `TOWPATH_READ_GROUP` to its ID. Only Towpath's connector services join that group.
+3. Redeploy, open **Connections → Folders on this server**, tick folders and choose **Save and start indexing**.
+   Photos, video and music are indexed by name; documents by their text too. Indexing runs at low priority,
+   shows its progress, can be paused, and picks up changes when you index again.
+
 ## Updating, rolling back and backing up
 
 - **Update:** put the new release's two digests in the environment and redeploy.

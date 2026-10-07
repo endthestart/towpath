@@ -149,8 +149,8 @@ class Provider(BaseProvider):
                     break
         return Listing(matches[:max_rows], len(matches) <= max_rows, min(len(matches), max_rows))
 
-    def enumerate(self, root, max_rows: int, timeout: float) -> Listing:
-        rows = self._all({root.alias})
+    def enumerate(self, root, max_rows: int, timeout: float, offset: int = 0) -> Listing:
+        rows = self._all({root.alias})[offset:]
         complete_scope = all((h.get("scope") or {}).get("complete") is True and not rejected
                              for h, _, rejected in self._manifests() if h["root"] == root.alias)
         if len(rows) > max_rows:

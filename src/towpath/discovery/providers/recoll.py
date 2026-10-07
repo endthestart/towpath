@@ -181,9 +181,9 @@ class Provider(BaseProvider):
         return self._listing(self._call({"op": "search", "query": query, "dirs": dirs, "max_rows": max_rows},
                                         timeout))
 
-    def enumerate(self, root, max_rows: int, timeout: float) -> Listing:
+    def enumerate(self, root, max_rows: int, timeout: float, offset: int = 0) -> Listing:
         return self._listing(self._call({"op": "enumerate", "dir": os.path.realpath(root.path),
-                                         "max_rows": max_rows}, timeout))
+                                         "max_rows": max_rows, "offset": offset}, timeout))
 
     def describe(self, native_id: str, timeout: float) -> Hit:
         hit = self._hit(self._call({"op": "describe", "udi": native_id}, timeout)["row"])
