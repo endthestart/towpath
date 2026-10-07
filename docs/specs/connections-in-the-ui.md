@@ -1,6 +1,9 @@
 # Connections in the UI
 
-Status: **accepted 2026-10-06**; phase 1 (Fastmail/IMAP from the UI) implemented, awaiting owner acceptance. Implements [R3](../decisions.md#recommendations-in-this-design)
+Status: **accepted 2026-10-06**. Phase 1 (Fastmail/IMAP from the UI) accepted 2026-10-07: an account added
+entirely in the browser indexed every message in its chosen folders (counts matched the server's per folder),
+in resumable slices; a later check read only new mail; full-text search ran through the worker; unread
+counts were unchanged, and the provider-side app password was IMAP-only and read-only. Phase 2 next. Implements [R3](../decisions.md#recommendations-in-this-design)
 and [components](../components.md#services) as designed, replacing the interim file-and-shell setup used for the
 first Hub deployment.
 
@@ -87,6 +90,15 @@ Each phase ships through CI, is deployed by digest, and is accepted before the n
    synthetic or test credentials.
 3. **Self-initialising install.** Data-folder layout created by the containers; configuration files become
    optional; install guide with no shell steps.
+
+## Later connection types (owner request, not scheduled)
+
+- **Calendars (CalDAV):** past events as dated evidence for the life stream (who, when, where), read-only.
+- **Contacts (CardDAV):** names for addresses in mail, messages and other sources, as identity hints, never merged
+  automatically ([R5](../decisions.md#recommendations-in-this-design)).
+
+Both fit the same page and storage: Fastmail offers per-protocol app passwords (CalDAV, CardDAV) with a read-only
+option, like the IMAP password used in phase 1.
 
 ## Decisions (owner, 2026-10-06)
 
