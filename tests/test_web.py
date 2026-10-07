@@ -3,6 +3,7 @@
 from contextlib import closing
 import hashlib
 import json
+import re
 import sqlite3
 
 from django.test import Client, override_settings
@@ -135,4 +136,5 @@ def test_cli_starts_on_an_empty_store_folder_but_not_a_missing_one(tmp_path, mon
     assert result.exit_code == 0 and launched  # a fresh install: setup first, accounts later
     assert list(tmp_path.iterdir()) == []  # the UI creates no store of its own
     missing = CliRunner().invoke(app, ["web", "serve", "--store-dir", str(tmp_path / "absent")])
-    assert missing.exit_code == 2 and "is not a folder" in missing.output and not (tmp_path / "absent").exists()
+    plain = re.sub(r"[\s│╭╮╰╯─]+", " ", re.sub(r"\x1b\[[0-9;]*m", "", missing.output))  # however the terminal wraps it
+    assert missing.exit_code == 2 and "is not a folder" in plain and not (tmp_path / "absent").exists()
