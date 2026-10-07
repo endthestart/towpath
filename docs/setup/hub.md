@@ -6,14 +6,17 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `0d9f36f` (Connections page), publishing run
-[37561452668](https://github.com/endthestart/towpath/actions/runs/37561452668):
+Revision `c9ff8e7` (Gmail on the Connections page), publishing run
+[37625270029](https://github.com/endthestart/towpath/actions/runs/37625270029):
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:9617634be834d1e7f9ee23c38caa62371bfb7d6078f2e89b06e26efcbaa361cb`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:384d82710f1f8b8c8f3907f8df94de4ac4568da28f321407a1ccfe189690e7b9`
+- `web`: `ghcr.io/endthestart/towpath@sha256:02dbfba08622d8ee47393773170a0540cc7aac79b44032201b582327df04c38f`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:b56beb7f127ce484942380f3ca993e05f147698f89868f73b103d5041916398f`
 
-The proxy sends `/connections/` to `connect-setup`. Host qualification also started the setup server
-(sign-in required, no setup code announced). It replaced `b82450f` (search redesign;
+On first start the configured Gmail connection was imported onto the Connections page with its token file,
+index and quota history byte-identical (no Google call). It replaced `0d9f36f` (Connections page, IMAP;
+`towpath@sha256:9617634b…`, `towpath-recoll@sha256:384d8271…`), the rollback target with the same compose.
+The proxy sends `/connections/` to `connect-setup`. Host qualification also starts the setup server
+(sign-in required, no setup code announced). Before that, `0d9f36f` replaced `b82450f` (search redesign;
 `towpath@sha256:cc0bcfe9…`, `towpath-recoll@sha256:eee29738…`), the rollback target, which replaced `78be5ec` (`towpath@sha256:71802c79…`, `towpath-recoll@sha256:96d7e3ed…`; single-account
 login with a same-origin referrer policy), which is the rollback target. That replaced `b3f9108` (`towpath@sha256:d43b189a…`, `towpath-recoll@sha256:5b95c639…`), whose forms
 failed in browsers: its `no-referrer` policy made browsers send `Origin: null`. That in turn replaced revision `1e808f0` (deployed the same day, loopback-only UI):
@@ -46,8 +49,9 @@ Verified before and after deployment (private evidence is kept with the operator
 and configuration is retired read-only; the owner moves its OAuth token out of use. A Mac UI, worker or
 sync must not run against the same account or stores; returning to the Mac requires stopping Hub first.
 
-**Rollback.** Roll back to `b82450f` with its compose (no `connect-setup` service, no `/connections/` proxy
-route). Accounts added on the Connections page then stay stored but are not indexed until restored. Do not roll back
+**Rollback.** Roll back to `0d9f36f` by digest (same compose); the configured Gmail entry then applies again
+and the imported row is ignored. Before that, `b82450f` with its compose (no `connect-setup` service, no
+`/connections/` route); accounts added on the Connections page then stay stored but are not indexed. Do not roll back
 to `b3f9108` (its forms fail in browsers). The last loopback-only digests are the `1e808f0` pair above. Rolling back to them
 restores the loopback-only UI with no login, so restore the earlier compose (host networking, no
 proxy network) and remove the proxy entry at the same time. The older fallback is the Recoll image
