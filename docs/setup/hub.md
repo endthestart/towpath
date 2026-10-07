@@ -6,13 +6,15 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `b82450f` (search page redesign), publishing run
-[37521004657](https://github.com/endthestart/towpath/actions/runs/37521004657):
+Revision `0d9f36f` (Connections page), publishing run
+[37561452668](https://github.com/endthestart/towpath/actions/runs/37561452668):
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:cc0bcfe915591e1d9185b44ac56758bb3fa572af30052f435b0b396988492071`
-- `connect`: `ghcr.io/endthestart/towpath-recoll@sha256:eee29738156e4447fc0d1d33f5731c7987b927bffaa011ed72a622398ed20177`
+- `web`: `ghcr.io/endthestart/towpath@sha256:9617634be834d1e7f9ee23c38caa62371bfb7d6078f2e89b06e26efcbaa361cb`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:384d82710f1f8b8c8f3907f8df94de4ac4568da28f321407a1ccfe189690e7b9`
 
-It replaced `78be5ec` (`towpath@sha256:71802c79…`, `towpath-recoll@sha256:96d7e3ed…`; single-account
+The proxy sends `/connections/` to `connect-setup`. Host qualification also started the setup server
+(sign-in required, no setup code announced). It replaced `b82450f` (search redesign;
+`towpath@sha256:cc0bcfe9…`, `towpath-recoll@sha256:eee29738…`), the rollback target, which replaced `78be5ec` (`towpath@sha256:71802c79…`, `towpath-recoll@sha256:96d7e3ed…`; single-account
 login with a same-origin referrer policy), which is the rollback target. That replaced `b3f9108` (`towpath@sha256:d43b189a…`, `towpath-recoll@sha256:5b95c639…`), whose forms
 failed in browsers: its `no-referrer` policy made browsers send `Origin: null`. That in turn replaced revision `1e808f0` (deployed the same day, loopback-only UI):
 `ghcr.io/endthestart/towpath@sha256:1d79e5ebb92e3508ce00829ecfb58b42a369332ca1da67b11c1dfc18daf070bb` and
@@ -44,7 +46,8 @@ Verified before and after deployment (private evidence is kept with the operator
 and configuration is retired read-only; the owner moves its OAuth token out of use. A Mac UI, worker or
 sync must not run against the same account or stores; returning to the Mac requires stopping Hub first.
 
-**Rollback.** Roll back to `78be5ec` with the same compose (only the digests differ). Do not roll back
+**Rollback.** Roll back to `b82450f` with its compose (no `connect-setup` service, no `/connections/` proxy
+route). Accounts added on the Connections page then stay stored but are not indexed until restored. Do not roll back
 to `b3f9108` (its forms fail in browsers). The last loopback-only digests are the `1e808f0` pair above. Rolling back to them
 restores the loopback-only UI with no login, so restore the earlier compose (host networking, no
 proxy network) and remove the proxy entry at the same time. The older fallback is the Recoll image
