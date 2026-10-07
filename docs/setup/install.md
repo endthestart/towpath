@@ -33,7 +33,7 @@ in the environment:
 | Setting | Value |
 | --- | --- |
 | `TOWPATH_IMAGE`, `TOWPATH_RECOLL_IMAGE` | The published image digests for the release you want ([containers](containers.md)) |
-| `TOWPATH_DATA_DIR` | The dataset's path, for example `/mnt/tank/appdata/towpath` |
+| `TOWPATH_DATA_DIR` | The dataset's path, for example `/mnt/pool/apps/towpath` |
 | `TOWPATH_PUBLIC_URL` | The address from step 2 |
 | `TOWPATH_PROXY_NETWORK` | Your proxy's Docker network (SWAG's is often `proxy`) |
 | `TOWPATH_USER` | `568:568`, or your dedicated user from step 1 |
