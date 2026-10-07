@@ -134,6 +134,8 @@ def test_signing_key_persists_across_restarts(store):
     key = auth.secret_key(store)
     assert auth.secret_key(store) == key and len(key) == 64
     assert stat.S_IMODE((store / auth.SECRET_FILE).stat().st_mode) == 0o600
+    fresh = store / "not-created-yet"  # a fresh install: the folder appears with its first file
+    assert len(auth.secret_key(fresh)) == 64 and auth.create_account(fresh, "owner", PASSWORD)
 
 
 def test_public_url_behind_a_tls_proxy(store):

@@ -36,6 +36,8 @@ services:
     image: ${TOWPATH_RECOLL_IMAGE:?set a published Recoll image digest}
     command: ["connect", "run-worker", "--config", "/config/towpath.toml"]
     restart: "on-failure:3"
+    environment:
+      TOWPATH_CREDENTIALS_DIR: /run/tokens  # passwords added on the Connections page
     volumes:
       - ${TOWPATH_STATE_DIR}:/state
       - ${TOWPATH_CONFIG_DIR:?set private connector configuration directory}:/config:ro
@@ -43,6 +45,31 @@ services:
       - ${TOWPATH_TOKEN_DIR:?set private refreshable OAuth token directory}:/run/tokens
       - ${TOWPATH_SOURCE_DIR:?set read-only NAS root}:/data/roots/archive:ro
       - ${TOWPATH_INDEX_DIR:?set separate index directory}:/index:ro
+
+  # Connection setup pages (/connections/): the only service that receives passwords. The proxy sends
+  # /connections/ here and everything else to web. It writes only the connections store and the
+  # credentials folder; indexing itself runs in connect.
+  connect-setup:
+    <<: *runtime
+    image: ${TOWPATH_RECOLL_IMAGE}
+    command: ["connect", "serve-setup", "--config", "/config/towpath.toml", "--host", "0.0.0.0", "--port", "8791",
+              "--public-url", "${TOWPATH_PUBLIC_URL}"]
+    restart: unless-stopped
+    environment:
+      TOWPATH_CREDENTIALS_DIR: /run/tokens
+    networks:
+      default: {}
+      proxy:
+        aliases: [towpath-connect-setup]
+    volumes:
+      - ${TOWPATH_STATE_DIR}:/state
+      - ${TOWPATH_CONFIG_DIR}:/config:ro
+      - ${TOWPATH_TOKEN_DIR}:/run/tokens
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8791/assets/app.css', timeout=5).close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Manual metadata sync, not started by normal deployment. Existing shared quota accounting applies.
   mail-sync:

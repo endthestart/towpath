@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}{{ c.display_name }} · Towpath{% endblock %}
+{% block head %}{% if c.status.busy %}<meta http-equiv="refresh" content="5">{% endif %}{% endblock %}
+{% block content %}
+<header class="page-head compact"><p class="eyebrow"><a href="/connections/">CONNECTIONS</a></p><h1>{{ c.display_name }}</h1>
+<p class="lead">{{ c.address }} · <span class="status {{ c.status.tone }}">{{ c.status.text }}</span></p></header>
+{% if error %}<div class="notice warn" role="alert">{{ error }}</div>{% endif %}
+{% if c.last_error and not c.status.busy %}<div class="notice warn" role="alert">{{ c.last_error }}</div>{% endif %}
+<section class="metrics">
+  <div class="metric"><p>Messages indexed</p><strong>{{ c.indexed|default:"0" }}</strong><span>{% if c.updated %}as of {{ c.updated }}{% else %}not indexed yet{% endif %}</span></div>
+  <div class="metric"><p>Folders</p><strong>{{ c.folders_chosen|length }}</strong><span>{{ c.folders_chosen|join:", "|default:"none chosen yet" }}</span></div>
+  <div class="metric"><p>Speed</p><strong>{% if c.status.busy and c.rate %}{{ c.rate }}{% else %}–{% endif %}</strong><span>{% if c.status.busy and c.rate %}messages a minute, measured{% else %}shown while indexing{% endif %}</span></div>
+</section>
+<section class="detail-card connection-actions">
+  {% if c.state == 'choose-folders' %}<a class="button" href="/connections/{{ c.source_id }}/folders">Choose folders</a>
+  {% elif c.state == 'ready' %}
+    {% if c.status.busy %}<form method="post" action="/connections/{{ c.source_id }}/pause">{% csrf_token %}<button class="button" type="submit">Pause</button></form>
+    {% else %}<form method="post" action="/connections/{{ c.source_id }}/start">{% csrf_token %}<button class="button" type="submit">{% if c.indexing == 'paused' %}Resume indexing{% elif c.indexed %}Check for new mail{% else %}Start indexing{% endif %}</button></form>{% endif %}
+    <a class="button secondary" href="/connections/{{ c.source_id }}/folders">Change folders</a>
+  {% endif %}
+  {% if c.state != 'disconnected' %}<a class="button secondary" href="/connections/{{ c.source_id }}/password">Replace password</a>
+  <a class="button secondary" href="/connections/{{ c.source_id }}/disconnect">Disconnect</a>
+  {% else %}<a class="button" href="/connections/{{ c.source_id }}/password">Reconnect with a password</a>{% endif %}
+</section>
+<p class="footnote">{% if c.status.busy %}This page refreshes by itself. Indexing continues if you leave; pausing keeps everything indexed so far.{% else %}New mail is picked up when you check for it; Towpath never indexes on its own.{% endif %}</p>
+{% endblock %}

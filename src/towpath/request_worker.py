@@ -1,4 +1,5 @@
-"""Single local connector process for explicitly queued requests; never schedules sync or models."""
+"""Single connector process for explicitly queued requests and owner-started indexing; never schedules
+sync or models on its own."""
 
 import fcntl
 import json
@@ -7,7 +8,7 @@ import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
-from towpath import connect
+from towpath import connect, connections
 from towpath.unified import requests
 
 
@@ -24,16 +25,22 @@ def singleton(store_dir):
             fcntl.flock(handle, fcntl.LOCK_UN)
 
 
-def run_once(config):
-    """Existing queue receipts survive restart; idle polling makes no provider calls."""
+def run_once(config, credentials_dir=None):
+    """Existing queue receipts survive restart; idle polling makes no provider calls.
+
+    Accounts added in the UI are read afresh each poll, so a new connection needs no restart. Indexing runs
+    only for connections the owner started, one bounded slice each, after searches and content requests."""
+    if credentials_dir is not None:
+        config = connections.merged(config, credentials_dir)
     search = requests.run_searches(config, limit=20)
     fetched = connect.fetch_requests(config)
+    indexing = connections.index_pending(config, credentials_dir) if credentials_dir is not None else []
     return {"searches": search["searches_run"], "fetched": fetched["fetched"],
             "failed": fetched["failed"], "presence_checked": fetched.get("presence_checked", 0),
-            "termination": fetched["termination"]}
+            "termination": fetched["termination"], "indexing": indexing}
 
 
-def run(config, poll_seconds=10, once=False):
+def run(config, poll_seconds=10, once=False, credentials_dir=None):
     stopping = False
 
     def stop(signum, frame):
@@ -44,8 +51,8 @@ def run(config, poll_seconds=10, once=False):
     try:
         with singleton(config.store_dir):
             while not stopping:
-                result = run_once(config)
-                if any(result[k] for k in ("searches", "fetched", "failed", "presence_checked")) or (
+                result = run_once(config, credentials_dir)
+                if any(result[k] for k in ("searches", "fetched", "failed", "presence_checked", "indexing")) or (
                         result["termination"] != "complete"):
                     print(json.dumps({"at": datetime.now(timezone.utc).isoformat(), **result}), flush=True)
                 if once:

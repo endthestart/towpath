@@ -44,3 +44,17 @@ details.tips ul,details.why ul{margin:8px 0;padding-left:18px}
 .group-label a{color:var(--green);text-decoration:underline}
 @media (max-width:720px){.sidebar nav{flex-wrap:wrap;gap:6px}.sidebar nav a{gap:8px;padding:7px 12px}.sidebar nav a span{display:none}
 .sidebar-bottom{display:block;margin-top:10px}.sidebar-bottom>span,.sidebar-bottom>p{display:none}.signout{margin-top:0}}
+.status{font-size:12px;padding:3px 9px;border-radius:999px;background:var(--soft);color:#3d5e4a;white-space:nowrap}
+.status.warn{background:#f6eedd;color:#7a5a1c}.status.busy{background:#e3ecf5;color:#2f4f6f}
+.card-title{font-size:20px;letter-spacing:-.4px;margin-bottom:12px}
+.provider-choices,.connection-actions,.form-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.provider-choices .button,.connection-actions .button,.form-actions .button{margin-top:0}
+.connection-actions form{margin:0}
+.steps ol{margin:0 0 12px;padding-left:20px;font-size:14px;line-height:1.7}
+.folder-row{grid-template-columns:24px minmax(180px,1fr) 140px;cursor:pointer}
+.folder-row input{width:18px;height:18px;accent-color:var(--green)}
+.form-actions{margin-top:18px}
+.auth-form select{border:1px solid #cdd7cc;border-radius:6px;padding:10px 12px;background:white;font:inherit}
+.eyebrow a{text-decoration:underline}
+.footnote a,.detail-card p a,.lead a{text-decoration:underline}
+.auth-form .button{align-self:flex-start}

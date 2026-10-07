@@ -57,15 +57,21 @@ def _load(path: Path):
         raise typer.BadParameter(str(exc)) from exc
 
 
+CredentialsDirOpt = typer.Option(None, "--credentials-dir", envvar="TOWPATH_CREDENTIALS_DIR",
+                                 help="The connector's private folder for passwords added in the UI.")
+
+
 @connect_app.command("run-worker")
 def request_worker(config: Path = ConfigOpt,
                    poll_seconds: int = typer.Option(10, min=2, max=3600),
-                   once: bool = typer.Option(False, "--once")):
-    """Process explicitly queued searches and content requests. No automatic sync or model calls."""
+                   once: bool = typer.Option(False, "--once"),
+                   credentials_dir: Path = CredentialsDirOpt):
+    """Process explicitly queued searches and content requests, and indexing the owner started in the UI.
+    No automatic sync or model calls."""
     from towpath import request_worker as worker
 
     try:
-        worker.run(_load(config), poll_seconds=poll_seconds, once=once)
+        worker.run(_load(config), poll_seconds=poll_seconds, once=once, credentials_dir=credentials_dir)
     except Exception as exc:  # noqa: BLE001 - never log account data from an exception message
         typer.echo(f"request worker stopped ({type(exc).__name__})", err=True)
         raise typer.Exit(1) from None
@@ -105,6 +111,30 @@ def _run_guarded(fn):
     except KeyboardInterrupt:
         typer.echo("cancelled; progress is saved and the next run resumes", err=True)
         raise typer.Exit(130) from None
+
+
+@connect_app.command("serve-setup")
+def serve_setup(config: Path = ConfigOpt, credentials_dir: Path = CredentialsDirOpt,
+                port: int = typer.Option(8791, min=1024, max=65535),
+                host: str = typer.Option("127.0.0.1", "--host"),
+                public_url: str = typer.Option(None, "--public-url",
+                                               help="Address the reverse proxy serves, e.g. https://towpath.example.org.")):
+    """Serve the connection setup pages (/connections/). Runs in towpath-connect, the only service that
+    receives passwords; the reverse proxy sends /connections/ here and everything else to the web service."""
+    if credentials_dir is None:
+        raise typer.BadParameter("set --credentials-dir (or TOWPATH_CREDENTIALS_DIR) to the connector's private folder")
+    cfg = _load(config)
+    credentials_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if public_url is not None and not public_url.startswith(("https://", "http://")):
+        raise typer.BadParameter("--public-url must start with https:// or http://")
+    from towpath.web.application import launch
+
+    typer.echo(f"Towpath connection setup is ready at {public_url or f'http://{host}:{port}'}/connections/")
+    try:
+        launch(cfg.store_dir, port, cfg, host, public_url, urlconf="towpath.web.connection_urls",
+               TOWPATH_CREDENTIALS_DIR=credentials_dir.resolve())
+    except KeyboardInterrupt:
+        typer.echo("Connection setup stopped.")
 
 
 @connect_app.command("sync")

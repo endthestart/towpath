@@ -25,9 +25,11 @@ def _family(source_type: str) -> str:
     return "files" if source_type == "files" else "mail"
 
 
-def source_labels(statuses: list[dict]) -> dict[str, str]:
-    """Friendly names: 'Gmail', or 'Gmail (work)' only when two sources share a type."""
-    base = {s["source_id"]: TYPE_NAMES.get(s["source_type"], s["source_type"]) for s in statuses}
+def source_labels(statuses: list[dict], names: dict[str, str] | None = None) -> dict[str, str]:
+    """Friendly names: the name given when the account was added (such as 'Fastmail'), else the type
+    ('Gmail'), with the source ID added only when two sources would otherwise share a name."""
+    base = {s["source_id"]: (names or {}).get(s["source_id"]) or TYPE_NAMES.get(s["source_type"], s["source_type"])
+            for s in statuses}
     counts: dict[str, int] = {}
     for name in base.values():
         counts[name] = counts.get(name, 0) + 1

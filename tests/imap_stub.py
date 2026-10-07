@@ -30,6 +30,7 @@ class Mailbox:
     uidvalidity: int
     messages: dict = field(default_factory=dict)  # uid -> Message
     noselect: bool = False
+    special: str | None = None  # an RFC 6154 special-use attribute such as \\Trash, sent in LIST
 
     @property
     def uidnext(self) -> int:
@@ -249,6 +250,8 @@ class Handler(socketserver.StreamRequestHandler):
     def cmd_list(self, tag, args):
         for name, box in sorted(self.state.mailboxes.items()):
             flags = "\\Noselect" if box.noselect else "\\HasNoChildren"
+            if box.special:
+                flags += " " + box.special
             self.send(f'* LIST ({flags}) "/" {_quote(utf7_encode(name).decode())}\r\n')
         self.send(f"{tag} OK done\r\n")
 

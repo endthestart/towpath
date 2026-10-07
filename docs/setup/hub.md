@@ -84,6 +84,11 @@ The services retain their separate commands and mounts; only the connector recei
   server stops wait at least five minutes before another poll. Unexpected errors log only
   their type and stop; the container has a bounded restart policy. It never schedules sync,
   models, source mutations or NAS crawling. Current grants and scope still govern results.
+- `connect-setup`: the Connections pages (`/connections/`), served by the connector image on the
+  proxy's network (alias `towpath-connect-setup`). The only service that receives passwords: an account
+  added there is tested, its password written to the connector's credentials folder (`/run/tokens`,
+  mode 0600), and its settings to the connections store. `connect` reads new connections at each poll
+  and indexes only when the owner presses *Start indexing* ([spec](../specs/connections-in-the-ui.md)).
 - `mail-sync`: manual profile for metadata sync using existing Gmail pacing and checkpoints.
 - `recoll-index`: manual profile with no network, NAS input mounted read-only, and separate
   writable index and on-disk scratch folders. Begin with a qualified small folder before

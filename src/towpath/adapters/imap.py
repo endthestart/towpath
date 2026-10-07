@@ -67,11 +67,16 @@ class ReadOnlySession:
 
     def mailboxes(self) -> list[str]:
         """Selectable mailboxes from LIST."""
+        return [name for name, _ in self.folders()]
+
+    def folders(self) -> list[tuple[str, list[str]]]:
+        """Selectable mailboxes from LIST, with their attributes (including special use such as \\Trash)."""
         out = []
         for flags, _, name in self._client.list_folders():
-            if any(_text(f).lower() in {"\\noselect", "\\nonexistent"} for f in flags):
+            names = [_text(f) for f in flags]
+            if any(f.lower() in {"\\noselect", "\\nonexistent"} for f in names):
                 continue
-            out.append(_text(name))
+            out.append((_text(name), names))
         return out
 
     def examine(self, mailbox: str) -> dict:
@@ -105,8 +110,9 @@ class ReadOnlySession:
             pass
 
 
-def connect_session(source) -> ReadOnlySession:
-    """Open, secure and log in. The password is resolved here and kept nowhere."""
+def connect_session(source, password: str | None = None) -> ReadOnlySession:
+    """Open, secure and log in. The password is resolved here (or passed in, while a person is setting
+    the connection up) and kept nowhere."""
     from imapclient import IMAPClient
 
     from towpath import credentials
@@ -119,7 +125,8 @@ def connect_session(source) -> ReadOnlySession:
         if source.security == "starttls":
             client.starttls()
         session = ReadOnlySession(client)
-        session.login(source.username, credentials.resolve(source.credential) or "")
+        session.login(source.username, password if password is not None else
+                      credentials.resolve(source.credential) or "")
     except BaseException:
         try:
             client.shutdown()

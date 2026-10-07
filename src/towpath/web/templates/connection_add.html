@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block title %}Add {{ preset.label }} · Towpath{% endblock %}
+{% block content %}
+<header class="page-head compact"><p class="eyebrow"><a href="/connections/">CONNECTIONS</a></p><h1>Add {{ preset.label }}</h1></header>
+{% if error %}<div class="notice warn" role="alert">{{ error }}</div>{% endif %}
+{% if provider == 'fastmail' %}
+<section class="detail-card steps"><h2 class="card-title">First, make an app password in Fastmail</h2>
+<ol>
+  <li>In Fastmail, open <strong>Settings → Privacy &amp; Security</strong>, then <strong>Manage app passwords and access</strong>, and choose <strong>New app password</strong>.</li>
+  <li>Name it <strong>Towpath</strong>. For access, pick the narrowest option that includes mail (IMAP). Read-only is best if offered.</li>
+  <li>Choose <strong>Generate password</strong>, copy it, and paste it below. Fastmail shows it only once.</li>
+</ol>
+<p class="footnote">Towpath only reads: it opens folders read-only and never changes, moves, deletes or marks mail as read. The app password itself may allow more, which is why the narrowest access is worth choosing. You can revoke it in Fastmail at any time. <a href="{{ preset.help_url }}" target="_blank" rel="noopener noreferrer">Fastmail's help on app passwords</a></p>
+</section>
+{% endif %}
+<section class="detail-card">
+<form method="post" class="auth-form" autocomplete="off">{% csrf_token %}
+  <label>Email address <input type="email" name="username" value="{{ form.username }}" required autocomplete="username"></label>
+  <label>{% if provider == 'fastmail' %}App password{% else %}Password{% endif %} <input type="password" name="password" required autocomplete="new-password"></label>
+  {% if not preset.host %}
+  <label>Server <input name="host" value="{{ form.host }}" required placeholder="imap.example.com"></label>
+  <label>Port <input name="port" value="{{ form.port }}" inputmode="numeric" required></label>
+  <label>Security <select name="security"><option value="tls" {% if form.security == 'tls' %}selected{% endif %}>SSL/TLS</option><option value="starttls" {% if form.security == 'starttls' %}selected{% endif %}>STARTTLS</option></select></label>
+  {% endif %}
+  <button class="button" type="submit">Test and continue</button>
+  <p class="footnote">Towpath signs in, lists your folders and opens each one read-only. Nothing is indexed until you choose folders and start.</p>
+</form></section>
+{% endblock %}

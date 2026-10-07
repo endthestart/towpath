@@ -14,7 +14,7 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
-from towpath import stores
+from towpath import connections, stores
 from towpath.unified import collections, federation, requests, sources
 from towpath.web import present
 from towpath.unified.contracts import ContractError, Filters, Reference, split_part
@@ -28,9 +28,14 @@ UNIFIED_STORES = ("source", "queue", "decisions", "files")
 def _adapters():
     stores.require_current(settings.TOWPATH_STORE_DIR, UNIFIED_STORES)  # raises SchemaOutdated: a 503 page
     config = getattr(settings, "TOWPATH_CONFIG", None)
-    if config is not None:
-        return sources.build_adapters(config, connect=False)
+    if config is not None:  # accounts added in the UI, read afresh; the web service gets no credential reference
+        return sources.build_adapters(connections.merged(config, None, role="web"), connect=False)
     return sources.store_adapters(settings.TOWPATH_STORE_DIR)
+
+
+def _connection_names() -> dict[str, str]:
+    return {c["source_id"]: c["display_name"]
+            for c in connections.all_connections(settings.TOWPATH_STORE_DIR, role="web")}
 
 
 def _store():
@@ -63,7 +68,7 @@ def search(request):
     cursor = request.GET.get("cursor") or None
     adapters = _adapters()
     statuses = federation.statuses(adapters)
-    labels = present.source_labels(statuses)
+    labels = present.source_labels(statuses, _connection_names())
     types = {s["source_id"]: s["source_type"] for s in statuses}
     deep = present.deep_sources(statuses, chosen)
     context = {"nav": "search", "query": query, "chosen": chosen, "statuses": statuses, "labels": labels,

@@ -80,3 +80,9 @@ def email(request, item_id):
 @require_GET
 def stylesheet(request):
     return HttpResponse((Path(__file__).parent / "assets" / "app.css").read_text(), content_type="text/css")
+
+
+@require_GET
+def connections_elsewhere(request):
+    """Only reached when no reverse proxy sends /connections/ to the connector (for example in development)."""
+    return render(request, "connections_elsewhere.html", {"nav": "connections"})

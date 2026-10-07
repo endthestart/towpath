@@ -51,4 +51,4 @@ def test_clean_stop_without_presence_result_is_reported_without_sensitive_reason
     monkeypatch.setattr(request_worker.connect, "fetch_requests", lambda *a: {
         "fetched": 0, "failed": 0, "termination": "auth-stop", "reason": "private server detail"})
     assert request_worker.run_once(None) == {
-        "searches": 0, "fetched": 0, "failed": 0, "presence_checked": 0, "termination": "auth-stop"}
+        "searches": 0, "fetched": 0, "failed": 0, "presence_checked": 0, "termination": "auth-stop", "indexing": []}

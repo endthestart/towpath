@@ -70,3 +70,21 @@ Stores made by an earlier version need one explicit upgrade before the unified p
 ## Verification
 
 `tests/test_web.py` and `tests/test_unified_web.py` use invented messages to check search, literal wildcard handling, current labels, paging, absent messages, escaped metadata, attachment references, missing records, read-only database enforcement, rejected writes/hosts, and unchanged database contents across requests. Browser checks use the existing synthetic corpus. Live checks should inspect aggregate counts only, leaving personal message browsing to the owner.
+
+## Connections
+
+Accounts are added on the **Connections** page, which is served by the connector (`towpath connect serve-setup`),
+not by the web service, so the UI never handles a password. In a deployment the reverse proxy sends
+`/connections/` to it; see [Hub setup](hub.md). For local development, run it beside `web serve`:
+
+```sh
+towpath connect serve-setup --config towpath.toml --credentials-dir /path/to/private/credentials --port 8791
+towpath connect run-worker --config towpath.toml --credentials-dir /path/to/private/credentials
+```
+
+*Add an account* tests the sign-in, lists folders with their message counts and opens each read-only;
+trash, spam and drafts start unticked. Indexing starts only when you press *Start indexing*, runs in the
+worker in short resumable slices, shows progress on the account's page, and can be paused. *Replace
+password* tests a new password before storing it; *Disconnect* deletes the stored password and keeps
+what was indexed. New mail is read when you choose *Check for new mail*. See the
+[specification](../specs/connections-in-the-ui.md).

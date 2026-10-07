@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block title %}Folders · {{ c.display_name }} · Towpath{% endblock %}
+{% block content %}
+<header class="page-head compact"><p class="eyebrow"><a href="/connections/">CONNECTIONS</a> · {{ c.display_name }}</p><h1>Choose folders</h1>
+<p class="lead">{% if first_time %}Connected to {{ c.address }}. {% endif %}Pick the folders Towpath should index. Trash, spam and drafts start unticked.</p></header>
+{% if error %}<div class="notice warn" role="alert">{{ error }}</div>{% endif %}
+<form method="post">{% csrf_token %}
+<section class="mail-list folder-list">
+{% for f in folders %}<label class="mail-row folder-row"><input type="checkbox" name="folder" value="{{ f.name }}" {% if f.checked %}checked{% endif %}>
+  <span class="mail-title"><strong>{{ f.name }}</strong>{% if f.special %}<span class="mail-tags"><span>{{ f.special|lower }}</span></span>{% endif %}</span>
+  <time>{{ f.messages }} message{{ f.messages|pluralize }}</time></label>{% endfor %}
+</section>
+<div class="form-actions">
+  <button class="button" type="submit" name="start" value="1">{% if first_time %}Save and start indexing{% else %}Save and index{% endif %}</button>
+  <button class="button secondary" type="submit">Save only</button>
+</div>
+</form>
+{% endblock %}

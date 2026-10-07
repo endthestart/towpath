@@ -14,6 +14,7 @@ urlpatterns = [
     path("ref/", unified_views.reference, name="reference"),
     path("ref/request", unified_views.reference_request, name="reference-request"),
     path("collections/", unified_views.collection_list, name="collections"),
+    path("connections/", views.connections_elsewhere, name="connections-elsewhere"),
     path("collections/new", unified_views.collection_create, name="collection-create"),
     path("collections/<str:cid>/", unified_views.collection_detail, name="collection"),
     path("collections/<str:cid>/add", unified_views.collection_add, name="collection-add"),

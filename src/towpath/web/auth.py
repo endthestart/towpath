@@ -40,6 +40,7 @@ _failures: list[float] = []
 
 def _write_new(path: Path, data: bytes) -> bool:
     """Create ``path`` (0600) only if it does not exist yet; False if another writer got there first."""
+    path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(f".{path.name}.{secrets.token_hex(4)}")
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     try:

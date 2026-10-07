@@ -11,6 +11,18 @@ server {
 
     client_max_body_size 1M;
 
+    # Connection setup (passwords) is served by towpath-connect, never by the web service.
+    location /connections/ {
+        include /config/nginx/proxy.conf;
+        include /config/nginx/resolver.conf;
+
+        set $upstream_app towpath-connect-setup;
+        set $upstream_port 8791;
+        set $upstream_proto http;
+
+        proxy_pass $upstream_proto://$upstream_app:$upstream_port;
+    }
+
     location / {
         include /config/nginx/proxy.conf;
         include /config/nginx/resolver.conf;

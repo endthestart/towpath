@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}Connections · Towpath{% endblock %}
+{% block head %}{% for c in connections %}{% if c.status.busy %}<meta http-equiv="refresh" content="5">{% endif %}{% endfor %}{% endblock %}
+{% block content %}
+<header class="page-head compact"><h1>Connections</h1>
+<p class="lead">The accounts Towpath reads. Access is read-only: Towpath never changes, moves, deletes or marks mail as read.</p></header>
+<section class="mail-list connection-list">
+{% for c in connections %}<a class="mail-row" href="/connections/{{ c.source_id }}/">
+  <span class="sender">{{ c.display_name }}</span>
+  <span class="mail-title"><strong>{{ c.address }}</strong>{% if c.indexed is not None %}<span class="row-context">{{ c.indexed }} messages indexed</span>{% endif %}</span>
+  <span class="status {{ c.status.tone }}">{{ c.status.text }}</span><span class="row-arrow" aria-hidden="true">↗</span>
+</a>{% endfor %}
+{% for s in configured %}<div class="mail-row"><span class="sender">{% if s.adapter == 'gmail' %}Gmail{% else %}{{ s.adapter }}{% endif %}</span>
+  <span class="mail-title"><strong>{{ s.source_id }}</strong><span class="row-context">Set up from the configuration file; it moves to this page in a later update.</span></span>
+  <span class="status ok">Connected</span><span></span></div>{% endfor %}
+{% if not connections and not configured %}<div class="empty"><p>No accounts yet.</p></div>{% endif %}
+</section>
+<section class="detail-card"><h2 class="card-title">Add an account</h2>
+  <div class="provider-choices">
+  {% for key, p in providers.items %}<a class="button {% if not forloop.first %}secondary{% endif %}" href="/connections/add/{{ key }}">{{ p.label }}</a>{% endfor %}
+  </div>
+  <p class="footnote">Gmail moves here in a later update; the current Gmail connection keeps working.</p>
+</section>
+{% endblock %}

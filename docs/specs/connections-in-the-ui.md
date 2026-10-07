@@ -1,0 +1,95 @@
+# Connections in the UI
+
+Status: **accepted 2026-10-06**; phase 1 (Fastmail/IMAP from the UI) implemented, awaiting owner acceptance. Implements [R3](../decisions.md#recommendations-in-this-design)
+and [components](../components.md#services) as designed, replacing the interim file-and-shell setup used for the
+first Hub deployment.
+
+## Goal
+
+A person sets Towpath up the way they set up any self-hosted app: create one folder for its data, start the
+containers, open the site, and do everything else in the browser. Adding Fastmail, connecting Gmail, choosing
+folders, starting and watching indexing, replacing a password and disconnecting an account are all pages,
+not files, scripts or SSH sessions. The same flow works for every instance and every user.
+
+## What stays true
+
+- **The web service never sees a credential.** Passwords and OAuth tokens are typed into, and returned to, pages
+  served by `towpath-connect`, which stores them in its own secret folder. The web service shows status only.
+- **Read-only.** Mail access stays EXAMINE/BODY.PEEK for IMAP and `gmail.readonly` for Gmail.
+- **Nothing runs on its own.** Indexing starts when the owner clicks *Start indexing* and can be paused. The
+  connector still never schedules syncs, crawls or model calls by itself.
+- **One login.** Connection pages require the same single account as the rest of the UI.
+
+## How it fits together
+
+```
+browser ── https://towpath.example.org ── reverse proxy ─┬─ /connections/…  → towpath-connect (setup pages)
+                                                          └─ everything else → towpath-web
+```
+
+- `towpath-connect` gains a small setup web server beside its request worker. It serves only `/connections/…`
+  and checks the same signed session cookie as the web service, so there is one sign-in.
+- Non-secret connection settings (provider, address, host, chosen folders, status) live in a connections
+  store that both services read. Secrets live only in the connector's secret folder, one file per connection,
+  mode 0600. A secret is never displayed again; it can only be replaced or deleted.
+- The connector reads configured connections at each poll, so a new connection needs no restart.
+
+## The flows
+
+**Add Fastmail (or another IMAP account).** *Connections → Add account → Fastmail.*
+1. The page explains, with a direct link, how to make an app password in Fastmail and which access to choose.
+2. The person enters their address and pastes the password. Server, port and TLS are filled in for Fastmail;
+   *Other IMAP* shows those fields.
+3. *Test connection*: the connector logs in, lists folders and confirms that EXAMINE opens them read-only. The
+   page shows the folders with message counts, or a plain error (“Fastmail rejected the password”).
+4. The person ticks folders to include. Trash, Spam/Junk and Drafts start unticked.
+5. *Save*, then *Start indexing*. A progress panel shows messages indexed, folders done, rate and any stop
+   reason; *Pause* and *Resume* work across restarts (the sync engine already checkpoints).
+
+**Connect Gmail.** *Connections → Add account → Gmail.*
+1. Google requires each self-hoster to have their own OAuth client ([D14](../decisions.md#d14-gmail-access-for-other-self-hosters)). A
+   one-time guide walks through creating a *Web application* client in Google Cloud and shows the exact
+   redirect URI to paste (`https://<site>/connections/google/callback`). The person pastes the client ID and
+   secret into the connector's page.
+2. *Connect Gmail* goes to Google's consent screen for `gmail.readonly` only, and back to Towpath. The
+   connector exchanges the code and stores the refresh token. A broader scope is refused.
+3. Pacing: the existing safe default applies. The verified-quota opt-in (30% of the Cloud Console figure,
+   1,800-unit ceiling) becomes a field on the connection's settings page, with the same validation.
+4. Folders and indexing as for Fastmail.
+
+**Existing Gmail connection.** On first start of the new version, the connector imports the current
+configuration file's sources, client file and token into the connections store and its secret folder,
+keeping the source ID, pacing, quota history and index. No re-consent and no re-indexing.
+
+**Manage.** Each connection's page shows status, last indexed, counts, folders, pacing; *Replace password*,
+*Reconnect*, *Change folders*, *Pause/Resume*, and *Disconnect* (removes the secret; the index stays unless
+the person also chooses *Delete index*). It links to the provider's page for revoking access.
+
+## Installing without a shell
+
+- One data folder per instance (for example a TrueNAS dataset), owned by the service user 10001, which the
+  TrueNAS permissions editor can set. The containers create `state/`, `secrets/`, `tokens/` and `index/`
+  inside it on first start, with correct modes. No hand-made subfolders, configuration files or ownership fixes.
+- Compose and an example env file in the repository; the only values a person sets are the data folder, the
+  public URL and the proxy network. Everything else has a default or a page.
+- First run: the site shows account setup (with the code from the container log), then an empty Connections
+  page.
+
+## Phases
+
+Each phase ships through CI, is deployed by digest, and is accepted before the next starts.
+
+1. **Fastmail from the UI.** Connections store, connector setup server, proxy route, IMAP add/test/folders,
+   start/pause/progress for indexing. Acceptance: the owner adds Fastmail entirely in the browser; flags and
+   unread counts unchanged; a re-run is incremental; full-text search works.
+2. **Gmail from the UI.** OAuth web flow, import of the existing connection, pacing settings, manage page.
+   Acceptance: the existing index keeps working with no re-consent; a fresh connection works end to end on
+   synthetic or test credentials.
+3. **Self-initialising install.** Data-folder layout created by the containers; configuration files become
+   optional; install guide with no shell steps.
+
+## Decisions (owner, 2026-10-06)
+
+1. Setup pages are served by `towpath-connect` behind the same hostname; the web service never receives a secret (R3).
+2. Phases in the order above: Fastmail first.
+3. *Delete index* is deferred; phase 1 *Disconnect* removes the secret and keeps the index, labelled disconnected.

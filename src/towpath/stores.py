@@ -9,6 +9,7 @@
 | ledger    | worker  | web            |
 | quota     | connect | connect        |
 | files     | connect | worker, web    |
+| connections | connect | worker, web  |
 
 Readers open with ``mode=ro`` so the database itself refuses writes.
 """
@@ -24,6 +25,7 @@ WRITERS = {
     "ledger": {"worker"},
     "quota": {"connect"},
     "files": {"connect"},
+    "connections": {"connect"},
 }
 
 # Columns and tables added after a store was first released. Applied on every
@@ -142,6 +144,17 @@ CREATE TABLE IF NOT EXISTS collection_items (
 CREATE TABLE IF NOT EXISTS decision_log (
   seq INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, target_id TEXT NOT NULL, detail TEXT NOT NULL,
   author TEXT NOT NULL, at TEXT NOT NULL);
+""",
+    # Accounts added in the UI: non-secret settings, chosen folders, indexing state and progress. Secrets are
+    # never stored here; they live in the connector's credentials folder (towpath.connections).
+    "connections": """
+CREATE TABLE IF NOT EXISTS connections (
+  source_id TEXT PRIMARY KEY, provider TEXT NOT NULL, adapter TEXT NOT NULL, display_name TEXT NOT NULL,
+  settings TEXT NOT NULL, folders TEXT, state TEXT NOT NULL, indexing TEXT NOT NULL, progress TEXT,
+  last_error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS connection_events (
+  seq INTEGER PRIMARY KEY AUTOINCREMENT, source_id TEXT NOT NULL, at TEXT NOT NULL, event TEXT NOT NULL,
+  detail TEXT);
 """,
     "quota": """
 CREATE TABLE IF NOT EXISTS attempts (

@@ -229,7 +229,8 @@ def test_session_facade_refuses_state_changing_fetches_and_hides_the_client():
         with pytest.raises(ReadOnlyViolation):
             session.fetch([1], (item,))
     public = {n for n in dir(session) if not n.startswith("_")}
-    assert public == {"login", "capabilities", "mailboxes", "examine", "search_all", "search_text", "fetch", "logout"}
+    assert public == {"login", "capabilities", "mailboxes", "folders", "examine", "search_all", "search_text",
+                      "fetch", "logout"}
 
 
 def test_selected_content_goes_through_the_queue_and_reads_with_peek(env):

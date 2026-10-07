@@ -1,0 +1,7 @@
+{% extends 'base.html' %}
+{% block title %}Connections · Towpath{% endblock %}
+{% block content %}
+<header class="page-head compact"><h1>Connections</h1>
+<p class="lead">Accounts are added and managed by Towpath's connector service, the only part of Towpath that handles passwords. It isn't reachable at this address.</p></header>
+<section class="detail-card"><p>In a deployment, the reverse proxy sends <code>/connections/</code> to the connector (<code>towpath connect serve-setup</code>); see the Hub setup guide. For local development, run that command and open its address.</p></section>
+{% endblock %}
