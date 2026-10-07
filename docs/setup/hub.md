@@ -6,21 +6,21 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `6205160` (single data folder, shell-free install; bounded source downloads), publishing run
-[37685874091](https://github.com/endthestart/towpath/actions/runs/37685874091):
+Revision `522ca49` (folders on the server from the Connections page), publishing run
+[37698184333](https://github.com/endthestart/towpath/actions/runs/37698184333):
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:9880ac3f1def7bc7db0bedd678fa89948318a946cfc399e91b27c4034bc63e91`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:b4de739516f355ba51380f83ce9a65c676347c43cb08ba049d43d358a083ca6b`
+- `web`: `ghcr.io/endthestart/towpath@sha256:724e5780119d54ba3521483e96568976c8ab9a717500d4573e641a7ad1f69592`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:7b26805ccfa5f2c246d5d125aa0e58021907e0d76dd101af2748146f352e138d`
 
-The instance moved to the [install guide's](install.md) layout: its existing folder became the data folder,
-`tokens/` became `credentials/` on first start, the settings file's Gmail pacing moved onto the Connections
-page, and the services now run as the owner's chosen `apps` user (568). A rehearsal on a copy came first.
-Stores, login and tokens were byte-identical afterwards; the old `config/`, `web-config/` and `secrets/`
-folders are unused. Source collection took 55 minutes in this run (downloads from the runner to Ubuntu's
-archive were slow; two stalled downloads succeeded on retry). Earlier deployments, newest first (web digest, connector digest):
+The four personal datasets are mounted read-only under `/library` in the two connector services only. The
+containers' user can read the media dataset; the others wait for a read-only group set in the TrueNAS GUI.
+Before deploying, `recollindex` ran in the hardened container under `nice` and idle I/O priority.
+
+Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `6205160` | Single data folder, shell-free install, user 568; bounded source downloads | `towpath@sha256:9880ac3f…`, `towpath-recoll@sha256:b4de7395…` |
 | `8f5f0c8` | Plain-language Gmail pages; separate folders, user 10001 | `towpath@sha256:293a4011…`, `towpath-recoll@sha256:fc83ae31…` |
 | `c9ff8e7` | Gmail on the Connections page (configured connection imported, no Google call) | `towpath@sha256:02dbfba0…`, `towpath-recoll@sha256:b56beb7f…` |
 | `0d9f36f` | Connections page for IMAP; `connect-setup` service and `/connections/` proxy route | `towpath@sha256:9617634b…`, `towpath-recoll@sha256:384d8271…` |
