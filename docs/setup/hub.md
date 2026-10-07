@@ -6,24 +6,28 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `8f5f0c8` (plain-language Gmail speed and sign-in pages), publishing run
-[37655570846](https://github.com/endthestart/towpath/actions/runs/37655570846) (its first attempt lost the
-registry connection during a source upload; re-running the publish job pushed the already tested image):
+Revision `6205160` (single data folder, shell-free install; bounded source downloads), publishing run
+[37685874091](https://github.com/endthestart/towpath/actions/runs/37685874091):
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:293a40112b0f19bc4f48595ffd3b90b0d27d0adf849a338333bf968da4e9a1cd`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:fc83ae311e7a14ffdbaef36c01cd6fc6a290220a64122593248710edb7ab9b97`
+- `web`: `ghcr.io/endthestart/towpath@sha256:9880ac3f1def7bc7db0bedd678fa89948318a946cfc399e91b27c4034bc63e91`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:b4de739516f355ba51380f83ce9a65c676347c43cb08ba049d43d358a083ca6b`
 
-It replaced `c9ff8e7` (`towpath@sha256:02dbfba0…`, `towpath-recoll@sha256:b56beb7f…`), the rollback target
-with the same compose. When `c9ff8e7` first started the configured Gmail connection was imported onto the Connections page with its token file,
-index and quota history byte-identical (no Google call). It replaced `0d9f36f` (Connections page, IMAP;
-`towpath@sha256:9617634b…`, `towpath-recoll@sha256:384d8271…`), the rollback target with the same compose.
-The proxy sends `/connections/` to `connect-setup`. Host qualification also starts the setup server
-(sign-in required, no setup code announced). Before that, `0d9f36f` replaced `b82450f` (search redesign;
-`towpath@sha256:cc0bcfe9…`, `towpath-recoll@sha256:eee29738…`), the rollback target, which replaced `78be5ec` (`towpath@sha256:71802c79…`, `towpath-recoll@sha256:96d7e3ed…`; single-account
-login with a same-origin referrer policy), which is the rollback target. That replaced `b3f9108` (`towpath@sha256:d43b189a…`, `towpath-recoll@sha256:5b95c639…`), whose forms
-failed in browsers: its `no-referrer` policy made browsers send `Origin: null`. That in turn replaced revision `1e808f0` (deployed the same day, loopback-only UI):
-`ghcr.io/endthestart/towpath@sha256:1d79e5ebb92e3508ce00829ecfb58b42a369332ca1da67b11c1dfc18daf070bb` and
-`ghcr.io/endthestart/towpath-recoll@sha256:00e2044577ea200a05ace7f547e0b0e008d8c35ecceb7121c50345a295db725f`.
+The instance moved to the [install guide's](install.md) layout: its existing folder became the data folder,
+`tokens/` became `credentials/` on first start, the settings file's Gmail pacing moved onto the Connections
+page, and the services now run as the owner's chosen `apps` user (568). A rehearsal on a copy came first.
+Stores, login and tokens were byte-identical afterwards; the old `config/`, `web-config/` and `secrets/`
+folders are unused. Source collection took 55 minutes in this run (downloads from the runner to Ubuntu's
+archive were slow; two stalled downloads succeeded on retry). Earlier deployments, newest first (web digest, connector digest):
+
+| Revision | Change | Images |
+| --- | --- | --- |
+| `8f5f0c8` | Plain-language Gmail pages; separate folders, user 10001 | `towpath@sha256:293a4011…`, `towpath-recoll@sha256:fc83ae31…` |
+| `c9ff8e7` | Gmail on the Connections page (configured connection imported, no Google call) | `towpath@sha256:02dbfba0…`, `towpath-recoll@sha256:b56beb7f…` |
+| `0d9f36f` | Connections page for IMAP; `connect-setup` service and `/connections/` proxy route | `towpath@sha256:9617634b…`, `towpath-recoll@sha256:384d8271…` |
+| `b82450f` | Search page redesign | `towpath@sha256:cc0bcfe9…`, `towpath-recoll@sha256:eee29738…` |
+| `78be5ec` | Single-account login, same-origin referrer policy | `towpath@sha256:71802c79…`, `towpath-recoll@sha256:96d7e3ed…` |
+| `b3f9108` | Login; do not use: its `no-referrer` policy made browser forms fail CSRF | `towpath@sha256:d43b189a…`, `towpath-recoll@sha256:5b95c639…` |
+| `1e808f0` | First deployment; loopback-only UI, no login | `towpath@sha256:1d79e5eb…`, `towpath-recoll@sha256:00e20445…` |
 
 Verified before and after deployment (private evidence is kept with the operator's records):
 
@@ -51,7 +55,8 @@ Verified before and after deployment (private evidence is kept with the operator
 and configuration is retired read-only; the owner moves its OAuth token out of use. A Mac UI, worker or
 sync must not run against the same account or stores; returning to the Mac requires stopping Hub first.
 
-**Rollback.** Roll back to `c9ff8e7` by digest (same compose). Before that, `0d9f36f` (same compose); the
+**Rollback.** To return to `8f5f0c8`: restore its compose and environment, rename `credentials/` back to
+`tokens/` and give the folder back to user 10001. Before that, `c9ff8e7` by digest with the same compose as `8f5f0c8`. Before that, `0d9f36f` (same compose); the
 configured Gmail entry then applies again and the imported row is ignored. Before that, `b82450f` with its compose (no `connect-setup` service, no
 `/connections/` route); accounts added on the Connections page then stay stored but are not indexed. Do not roll back
 to `b3f9108` (its forms fail in browsers). The last loopback-only digests are the `1e808f0` pair above. Rolling back to them
