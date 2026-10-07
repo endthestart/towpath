@@ -50,15 +50,26 @@ done
 for f in /etc/apt/sources.list.d/*.sources; do sed -i 's/^Types: deb$/Types: deb deb-src/' "$f"; done
 if ! apt-get update -qq > /out/apt-update.log 2>&1; then cat /out/apt-update.log >&2; exit 3; fi
 : > /out/failed.tsv
-cut -f3,4 /out/dpkg.tsv | sort -u | while IFS="$(printf '\t')" read -r src ver; do
+cut -f3,4 /out/dpkg.tsv | sort -u > /out/source-list.tsv
+total=$(wc -l < /out/source-list.tsv); n=0
+echo "sources: $mode $total source packages" >&2
+# Each download gets five minutes and three attempts, so a stalled connection recovers or fails visibly.
+while IFS="$(printf '\t')" read -r src ver; do
+  n=$((n + 1))
   if [ "$mode" = collect ]; then
-    if ! (cd /out/sources && apt-get source --download-only -qq "$src=$ver" >> /out/apt-source.log 2>&1); then
-      printf '%s\t%s\n' "$src" "$ver" >> /out/failed.tsv
-    fi
-  elif ! apt-get source --print-uris -qq "$src=$ver" > "/out/uris/${src}_${ver}.txt" 2>> /out/apt-source.log; then
+    ok=
+    for attempt in 1 2 3; do
+      if (cd /out/sources && timeout 300 apt-get source --download-only -qq "$src=$ver" >> /out/apt-source.log 2>&1 \
+          < /dev/null); then ok=1; break; fi
+      echo "sources: $src $ver attempt $attempt failed or timed out" >&2
+    done
+    [ -n "$ok" ] || printf '%s\t%s\n' "$src" "$ver" >> /out/failed.tsv
+  elif ! timeout 120 apt-get source --print-uris -qq "$src=$ver" > "/out/uris/${src}_${ver}.txt" \
+      2>> /out/apt-source.log < /dev/null; then
     printf '%s\t%s\n' "$src" "$ver" >> /out/failed.tsv
   fi
-done
+  if [ $((n % 10)) -eq 0 ] || [ "$n" -eq "$total" ]; then echo "sources: $n of $total" >&2; fi
+done < /out/source-list.tsv
 cp -a /usr/share/licenses/. /out/licenses/
 cp -a /usr/share/common-licenses /out/licenses/common-licenses
 chown -R "$owner" /out
@@ -219,9 +230,13 @@ def run_container(image: str, mode: str, work: Path, network: str | None) -> Non
     if network:
         cmd += ["--network", network]
     cmd += [image, "-c", CONTAINER_SCRIPT, "sources", mode, f"{os.getuid()}:{os.getgid()}"]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=7200)
+    # Progress goes straight to the job log; a whole run stops before the CI job's own time limit.
+    try:
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, text=True, timeout=3600)
+    except subprocess.TimeoutExpired:
+        raise SourceError(f"source {mode} did not finish within an hour; see the progress lines above") from None
     if result.returncode != 0:
-        raise SourceError(f"source {mode} container failed ({result.returncode}): {result.stderr[-3000:]}")
+        raise SourceError(f"source {mode} container failed ({result.returncode}); see the log above")
 
 
 def config_digest_from_save(tar_path: Path) -> str:
