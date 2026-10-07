@@ -6,13 +6,15 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `c9ff8e7` (Gmail on the Connections page), publishing run
-[37625270029](https://github.com/endthestart/towpath/actions/runs/37625270029):
+Revision `8f5f0c8` (plain-language Gmail speed and sign-in pages), publishing run
+[37655570846](https://github.com/endthestart/towpath/actions/runs/37655570846) (its first attempt lost the
+registry connection during a source upload; re-running the publish job pushed the already tested image):
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:02dbfba08622d8ee47393773170a0540cc7aac79b44032201b582327df04c38f`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:b56beb7f127ce484942380f3ca993e05f147698f89868f73b103d5041916398f`
+- `web`: `ghcr.io/endthestart/towpath@sha256:293a40112b0f19bc4f48595ffd3b90b0d27d0adf849a338333bf968da4e9a1cd`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:fc83ae311e7a14ffdbaef36c01cd6fc6a290220a64122593248710edb7ab9b97`
 
-On first start the configured Gmail connection was imported onto the Connections page with its token file,
+It replaced `c9ff8e7` (`towpath@sha256:02dbfba0…`, `towpath-recoll@sha256:b56beb7f…`), the rollback target
+with the same compose. When `c9ff8e7` first started the configured Gmail connection was imported onto the Connections page with its token file,
 index and quota history byte-identical (no Google call). It replaced `0d9f36f` (Connections page, IMAP;
 `towpath@sha256:9617634b…`, `towpath-recoll@sha256:384d8271…`), the rollback target with the same compose.
 The proxy sends `/connections/` to `connect-setup`. Host qualification also starts the setup server
@@ -49,8 +51,8 @@ Verified before and after deployment (private evidence is kept with the operator
 and configuration is retired read-only; the owner moves its OAuth token out of use. A Mac UI, worker or
 sync must not run against the same account or stores; returning to the Mac requires stopping Hub first.
 
-**Rollback.** Roll back to `0d9f36f` by digest (same compose); the configured Gmail entry then applies again
-and the imported row is ignored. Before that, `b82450f` with its compose (no `connect-setup` service, no
+**Rollback.** Roll back to `c9ff8e7` by digest (same compose). Before that, `0d9f36f` (same compose); the
+configured Gmail entry then applies again and the imported row is ignored. Before that, `b82450f` with its compose (no `connect-setup` service, no
 `/connections/` route); accounts added on the Connections page then stay stored but are not indexed. Do not roll back
 to `b3f9108` (its forms fail in browsers). The last loopback-only digests are the `1e808f0` pair above. Rolling back to them
 restores the loopback-only UI with no login, so restore the earlier compose (host networking, no
