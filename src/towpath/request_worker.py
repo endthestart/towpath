@@ -31,6 +31,7 @@ def run_once(config, credentials_dir=None):
     Accounts added in the UI are read afresh each poll, so a new connection needs no restart. Indexing runs
     only for connections the owner started, one bounded slice each, after searches and content requests."""
     if credentials_dir is not None:
+        connections.import_configured(config, credentials_dir)
         config = connections.merged(config, credentials_dir)
     search = requests.run_searches(config, limit=20)
     fetched = connect.fetch_requests(config)

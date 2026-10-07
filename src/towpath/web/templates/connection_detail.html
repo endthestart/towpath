@@ -7,8 +7,9 @@
 {% if error %}<div class="notice warn" role="alert">{{ error }}</div>{% endif %}
 {% if c.last_error and not c.status.busy %}<div class="notice warn" role="alert">{{ c.last_error }}</div>{% endif %}
 <section class="metrics">
-  <div class="metric"><p>Messages indexed</p><strong>{{ c.indexed|default:"0" }}</strong><span>{% if c.updated %}as of {{ c.updated }}{% else %}not indexed yet{% endif %}</span></div>
-  <div class="metric"><p>Folders</p><strong>{{ c.folders_chosen|length }}</strong><span>{{ c.folders_chosen|join:", "|default:"none chosen yet" }}</span></div>
+  <div class="metric"><p>Messages indexed</p><strong>{{ c.indexed_text|default:"0" }}</strong><span>{% if c.updated %}as of {{ c.updated }}{% else %}not indexed yet{% endif %}</span></div>
+  {% if c.adapter == 'gmail' %}<div class="metric"><p>Scope</p><strong>All mail</strong><span>except spam and trash</span></div>
+  {% else %}<div class="metric"><p>Folders</p><strong>{{ c.folders_chosen|length }}</strong><span>{{ c.folders_chosen|join:", "|default:"none chosen yet" }}</span></div>{% endif %}
   <div class="metric"><p>Speed</p><strong>{% if c.status.busy and c.rate %}{{ c.rate }}{% else %}–{% endif %}</strong><span>{% if c.status.busy and c.rate %}messages a minute, measured{% else %}shown while indexing{% endif %}</span></div>
 </section>
 <section class="detail-card connection-actions">
@@ -16,11 +17,22 @@
   {% elif c.state == 'ready' %}
     {% if c.status.busy %}<form method="post" action="/connections/{{ c.source_id }}/pause">{% csrf_token %}<button class="button" type="submit">Pause</button></form>
     {% else %}<form method="post" action="/connections/{{ c.source_id }}/start">{% csrf_token %}<button class="button" type="submit">{% if c.indexing == 'paused' %}Resume indexing{% elif c.indexed %}Check for new mail{% else %}Start indexing{% endif %}</button></form>{% endif %}
-    <a class="button secondary" href="/connections/{{ c.source_id }}/folders">Change folders</a>
+    {% if c.adapter != 'gmail' %}<a class="button secondary" href="/connections/{{ c.source_id }}/folders">Change folders</a>{% endif %}
   {% endif %}
-  {% if c.state != 'disconnected' %}<a class="button secondary" href="/connections/{{ c.source_id }}/password">Replace password</a>
+  {% if c.adapter == 'gmail' %}
+    <a class="button {% if c.state == 'disconnected' %}{% else %}secondary{% endif %}" href="/connections/add/gmail?reconnect={{ c.source_id }}">Reconnect Gmail</a>
+    {% if c.state != 'disconnected' %}<a class="button secondary" href="/connections/{{ c.source_id }}/disconnect">Disconnect</a>{% endif %}
+  {% elif c.state != 'disconnected' %}<a class="button secondary" href="/connections/{{ c.source_id }}/password">Replace password</a>
   <a class="button secondary" href="/connections/{{ c.source_id }}/disconnect">Disconnect</a>
   {% else %}<a class="button" href="/connections/{{ c.source_id }}/password">Reconnect with a password</a>{% endif %}
 </section>
+{% if pacing %}<section class="detail-card"><h2 class="card-title">Gmail speed limit</h2>
+<p>{% if pacing.verified %}Using {{ pacing.units }} quota units a minute: 30% of your project's verified {{ pacing.verified_text }} per user, capped at 1,800.{% else %}Using Google's safe default of {{ pacing.units }} quota units a minute.{% endif %} Daily cap {{ pacing.daily }} units. Every Gmail request counts against one shared budget, so searches, sign-in checks and indexing never exceed it together.</p>
+{% if pacing_error %}<div class="notice warn" role="alert">{{ pacing_error }}</div>{% endif %}
+<form method="post" action="/connections/{{ c.source_id }}/pacing" class="inline-form">{% csrf_token %}
+  <label>Verified per-user quota (units a minute) <input name="verified" inputmode="numeric" value="{{ pacing.verified|default:'' }}" placeholder="from Google Cloud → Gmail API → Quotas"></label>
+  <button class="button secondary" type="submit">Save</button></form>
+<p class="footnote">Copy the “per minute per user” figure from Google Cloud Console's Gmail API quotas. Leave it empty to use Google's default. Towpath uses 30% of it so other apps on your account keep their share.</p>
+</section>{% endif %}
 <p class="footnote">{% if c.status.busy %}This page refreshes by itself. Indexing continues if you leave; pausing keeps everything indexed so far.{% else %}New mail is picked up when you check for it; Towpath never indexes on its own.{% endif %}</p>
 {% endblock %}

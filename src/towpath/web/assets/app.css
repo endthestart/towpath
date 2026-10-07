@@ -58,3 +58,6 @@ details.tips ul,details.why ul{margin:8px 0;padding-left:18px}
 .eyebrow a{text-decoration:underline}
 .footnote a,.detail-card p a,.lead a{text-decoration:underline}
 .auth-form .button{align-self:flex-start}
+code.copyable{display:inline-block;margin-top:6px;padding:6px 10px;background:var(--soft);border-radius:6px;user-select:all;overflow-wrap:anywhere}
+.inline-form label{display:flex;flex-direction:column;gap:6px;font-size:13px;min-width:260px}
+.steps a{text-decoration:underline}

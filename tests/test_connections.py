@@ -170,7 +170,7 @@ def test_a_rejected_password_stops_cleanly_and_can_be_replaced(env):
     env.state.password = "changed-at-the-provider"
     connections.index_pending(env.config, env.credentials)
     found = connections.get(env.store, sid)
-    assert found["indexing"] == "idle" and "Replace it" in found["last_error"]
+    assert found["indexing"] == "idle" and "replace the password" in found["last_error"]
     folders = connections.test_imap(env.settings, "changed-at-the-provider")
     connections.replace_password(env.store, env.credentials, sid, "changed-at-the-provider", folders)
     connections.start_indexing(env.store, env.credentials, sid)

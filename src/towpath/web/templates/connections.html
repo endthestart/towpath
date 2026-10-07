@@ -7,11 +7,11 @@
 <section class="mail-list connection-list">
 {% for c in connections %}<a class="mail-row" href="/connections/{{ c.source_id }}/">
   <span class="sender">{{ c.display_name }}</span>
-  <span class="mail-title"><strong>{{ c.address }}</strong>{% if c.indexed is not None %}<span class="row-context">{{ c.indexed }} messages indexed</span>{% endif %}</span>
+  <span class="mail-title"><strong>{{ c.address }}</strong>{% if c.indexed is not None %}<span class="row-context">{{ c.indexed_text }} messages indexed</span>{% endif %}</span>
   <span class="status {{ c.status.tone }}">{{ c.status.text }}</span><span class="row-arrow" aria-hidden="true">↗</span>
 </a>{% endfor %}
 {% for s in configured %}<div class="mail-row"><span class="sender">{% if s.adapter == 'gmail' %}Gmail{% else %}{{ s.adapter }}{% endif %}</span>
-  <span class="mail-title"><strong>{{ s.source_id }}</strong><span class="row-context">Set up from the configuration file; it moves to this page in a later update.</span></span>
+  <span class="mail-title"><strong>{{ s.source_id }}</strong><span class="row-context">Set up from the configuration file.</span></span>
   <span class="status ok">Connected</span><span></span></div>{% endfor %}
 {% if not connections and not configured %}<div class="empty"><p>No accounts yet.</p></div>{% endif %}
 </section>
@@ -19,6 +19,5 @@
   <div class="provider-choices">
   {% for key, p in providers.items %}<a class="button {% if not forloop.first %}secondary{% endif %}" href="/connections/add/{{ key }}">{{ p.label }}</a>{% endfor %}
   </div>
-  <p class="footnote">Gmail moves here in a later update; the current Gmail connection keeps working.</p>
 </section>
 {% endblock %}

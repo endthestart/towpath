@@ -131,8 +131,11 @@ def serve_setup(config: Path = ConfigOpt, credentials_dir: Path = CredentialsDir
 
     typer.echo(f"Towpath connection setup is ready at {public_url or f'http://{host}:{port}'}/connections/")
     try:
+        from towpath import connections
+
+        connections.import_configured(cfg, credentials_dir)
         launch(cfg.store_dir, port, cfg, host, public_url, urlconf="towpath.web.connection_urls",
-               TOWPATH_CREDENTIALS_DIR=credentials_dir.resolve())
+               TOWPATH_CREDENTIALS_DIR=credentials_dir.resolve(), TOWPATH_PUBLIC_URL=public_url)
     except KeyboardInterrupt:
         typer.echo("Connection setup stopped.")
 

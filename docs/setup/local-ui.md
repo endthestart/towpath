@@ -88,3 +88,10 @@ worker in short resumable slices, shows progress on the account's page, and can 
 password* tests a new password before storing it; *Disconnect* deletes the stored password and keeps
 what was indexed. New mail is read when you choose *Check for new mail*. See the
 [specification](../specs/connections-in-the-ui.md).
+
+**Gmail.** A Gmail source in the configuration file appears on the page automatically, with its index, token,
+quota history and pacing unchanged. *Add an account → Gmail* first guides you through creating your own Google
+OAuth *Web application* client (Google requires one per self-hoster) and shows the exact redirect URI to paste;
+after that, *Connect Gmail* goes to Google's consent screen for `gmail.readonly` only, and a broader grant is
+refused. *Reconnect Gmail* must sign in as the same account. The account page also sets the speed limit from
+the verified per-user quota in Google Cloud Console (30% of it, at most 1,800 units a minute).

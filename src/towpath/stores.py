@@ -155,6 +155,7 @@ CREATE TABLE IF NOT EXISTS connections (
 CREATE TABLE IF NOT EXISTS connection_events (
   seq INTEGER PRIMARY KEY AUTOINCREMENT, source_id TEXT NOT NULL, at TEXT NOT NULL, event TEXT NOT NULL,
   detail TEXT);
+CREATE TABLE IF NOT EXISTS instance_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL);
 """,
     "quota": """
 CREATE TABLE IF NOT EXISTS attempts (

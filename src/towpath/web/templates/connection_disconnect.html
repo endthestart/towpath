@@ -3,8 +3,8 @@
 {% block content %}
 <header class="page-head compact"><p class="eyebrow"><a href="/connections/">CONNECTIONS</a> · {{ c.display_name }}</p><h1>Disconnect {{ c.address }}?</h1></header>
 <section class="detail-card">
-<p>Towpath deletes its stored password and stops reading this account. What it has already indexed stays searchable, marked as disconnected. Nothing changes in your mailbox.</p>
-<p>To be sure the password can't be used anywhere, also revoke it with your provider{% if c.provider == 'fastmail' %} (Fastmail: Settings → Privacy &amp; Security → app passwords){% endif %}.</p>
+<p>Towpath deletes its stored {% if c.adapter == 'gmail' %}sign-in{% else %}password{% endif %} and stops reading this account. What it has already indexed stays searchable, marked as disconnected. Nothing changes in your mailbox.</p>
+<p>To be sure it can't be used anywhere, also revoke it with your provider{% if c.provider == 'fastmail' %} (Fastmail: Settings → Privacy &amp; Security → app passwords){% elif c.provider == 'gmail' %}: <a href="https://myaccount.google.com/connections" target="_blank" rel="noopener noreferrer">your Google account's third-party connections</a>{% endif %}.</p>
 <form method="post" class="form-actions">{% csrf_token %}<button class="button" type="submit">Disconnect</button><a class="button secondary" href="/connections/{{ c.source_id }}/">Cancel</a></form>
 </section>
 {% endblock %}

@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}{% if reconnect %}Reconnect{% else %}Add{% endif %} Gmail · Towpath{% endblock %}
+{% block content %}
+<header class="page-head compact"><p class="eyebrow"><a href="/connections/">CONNECTIONS</a></p><h1>{% if reconnect %}Reconnect Gmail{% else %}Add Gmail{% endif %}</h1>
+{% if reconnecting %}<p class="lead">Sign in again as {{ reconnecting.address }}. The index and its history stay as they are.</p>{% endif %}</header>
+{% if error %}<div class="notice warn" role="alert">{{ error }}</div>{% endif %}
+{% if not client %}
+<section class="detail-card steps"><h2 class="card-title">One-time setup in Google Cloud</h2>
+<p>Google requires each self-hosted app to use its owner's own sign-in client. Do this once; every Gmail account you add afterwards just signs in.</p>
+<ol>
+  <li>Open <a href="https://console.cloud.google.com/auth/clients" target="_blank" rel="noopener noreferrer">Google Cloud → Google Auth Platform → Clients</a> in the project you use for Towpath (the one with the Gmail API enabled).</li>
+  <li>Choose <strong>Create client</strong>. Application type: <strong>Web application</strong>. Name: <strong>Towpath</strong>.</li>
+  <li>Under <strong>Authorized redirect URIs</strong>, choose <strong>Add URI</strong> and paste exactly:<br><code class="copyable">{{ redirect_uri }}</code></li>
+  <li>Choose <strong>Create</strong>, then copy the <strong>Client ID</strong> and <strong>Client secret</strong> into the form below.</li>
+  <li>Under <strong>Audience</strong>, check the publishing status is <strong>In production</strong>. In “Testing”, Google ends the sign-in after 7 days.</li>
+</ol>
+<p class="footnote">Towpath asks Google only for permission to read mail (<code>gmail.readonly</code>) and refuses a broader grant. Because the client is yours and unverified, Google shows an “unverified app” warning at sign-in; choose <em>Advanced</em>, then continue to your app.</p>
+</section>
+<section class="detail-card"><form method="post" action="/connections/google/client" class="auth-form" autocomplete="off">{% csrf_token %}
+  {% if reconnect %}<input type="hidden" name="reconnect" value="{{ reconnect }}">{% endif %}
+  <label>Client ID <input name="client_id" required placeholder="….apps.googleusercontent.com"></label>
+  <label>Client secret <input type="password" name="client_secret" required autocomplete="new-password"></label>
+  <button class="button" type="submit">Save client</button>
+</form></section>
+{% else %}
+<section class="detail-card"><h2 class="card-title">Sign in with Google</h2>
+<p>You'll go to Google, choose the account and allow Towpath to <strong>read</strong> your mail. Google then sends you back here.</p>
+<form method="post" action="/connections/google/start">{% csrf_token %}{% if reconnect %}<input type="hidden" name="reconnect" value="{{ reconnect }}">{% endif %}
+  <button class="button" type="submit">{% if reconnect %}Reconnect with Google{% else %}Connect Gmail{% endif %}</button></form>
+<p class="footnote">Google shows an “unverified app” warning because the sign-in client is your own: choose <em>Advanced</em>, then continue. Towpath refuses any permission beyond reading. Using client {{ client.client_id|truncatechars:24 }}; if Google reports a redirect error, the client needs this redirect URI: <code>{{ redirect_uri }}</code>.</p>
+</section>
+{% endif %}
+{% endblock %}
