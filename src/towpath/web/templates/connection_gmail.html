@@ -14,7 +14,7 @@
   <li>Choose <strong>Create</strong>, then copy the <strong>Client ID</strong> and <strong>Client secret</strong> into the form below.</li>
   <li>Under <strong>Audience</strong>, check the publishing status is <strong>In production</strong>. In “Testing”, Google ends the sign-in after 7 days.</li>
 </ol>
-<p class="footnote">Towpath asks Google only for permission to read mail (<code>gmail.readonly</code>) and refuses a broader grant. Because the client is yours and unverified, Google shows an “unverified app” warning at sign-in; choose <em>Advanced</em>, then continue to your app.</p>
+<p class="footnote">Towpath only asks to read your mail, and turns down anything more. Because this sign-in client is your own and not reviewed by Google, Google shows an “unverified app” warning when you sign in: choose <em>Advanced</em>, then continue.</p>
 </section>
 <section class="detail-card"><form method="post" action="/connections/google/client" class="auth-form" autocomplete="off">{% csrf_token %}
   {% if reconnect %}<input type="hidden" name="reconnect" value="{{ reconnect }}">{% endif %}
@@ -27,7 +27,10 @@
 <p>You'll go to Google, choose the account and allow Towpath to <strong>read</strong> your mail. Google then sends you back here.</p>
 <form method="post" action="/connections/google/start">{% csrf_token %}{% if reconnect %}<input type="hidden" name="reconnect" value="{{ reconnect }}">{% endif %}
   <button class="button" type="submit">{% if reconnect %}Reconnect with Google{% else %}Connect Gmail{% endif %}</button></form>
-<p class="footnote">Google shows an “unverified app” warning because the sign-in client is your own: choose <em>Advanced</em>, then continue. Towpath refuses any permission beyond reading. Using client {{ client.client_id|truncatechars:24 }}; if Google reports a redirect error, the client needs this redirect URI: <code>{{ redirect_uri }}</code>.</p>
+<p class="footnote">Google will warn that the app is unverified, because the sign-in client is your own: choose <em>Advanced</em>, then continue. Towpath only asks to read your mail.</p>
+<details class="save"><summary>Trouble signing in?</summary>
+<p>If Google says the redirect doesn't match, open your client in Google Cloud and make sure this is listed under <strong>Authorized redirect URIs</strong>: <code class="copyable">{{ redirect_uri }}</code></p>
+<p>If you're signed out again after a week, set the app's publishing status to <strong>In production</strong> under <strong>Audience</strong> in Google Cloud.</p></details>
 </section>
 {% endif %}
 {% endblock %}

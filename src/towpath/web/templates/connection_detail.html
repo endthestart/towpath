@@ -26,13 +26,16 @@
   <a class="button secondary" href="/connections/{{ c.source_id }}/disconnect">Disconnect</a>
   {% else %}<a class="button" href="/connections/{{ c.source_id }}/password">Reconnect with a password</a>{% endif %}
 </section>
-{% if pacing %}<section class="detail-card"><h2 class="card-title">Gmail speed limit</h2>
-<p>{% if pacing.verified %}Using {{ pacing.units }} quota units a minute: 30% of your project's verified {{ pacing.verified_text }} per user, capped at 1,800.{% else %}Using Google's safe default of {{ pacing.units }} quota units a minute.{% endif %} Daily cap {{ pacing.daily }} units. Every Gmail request counts against one shared budget, so searches, sign-in checks and indexing never exceed it together.</p>
+{% if pacing %}<section class="detail-card"><h2 class="card-title">How fast Towpath reads Gmail</h2>
+<p>Google limits how much any app can read from a Gmail account each minute. Towpath stays well under your limit, so your phone, mail apps and other tools keep working normally.</p>
+<p><strong>Right now:</strong> up to about {{ pacing.per_minute }} messages a minute (about {{ pacing.per_hour }} an hour){% if not pacing.verified %}, Google's standard pace{% endif %}.</p>
 {% if pacing_error %}<div class="notice warn" role="alert">{{ pacing_error }}</div>{% endif %}
+<details class="save" {% if pacing_error %}open{% endif %}><summary>Change the speed</summary>
+<p>If you've raised the Gmail limit for your Google Cloud project, Towpath can read faster. In Google Cloud, open <strong>Gmail API → Quotas</strong> and copy the <em>per minute per user</em> figure here. Towpath uses under a third of it. Leave it empty to go back to Google's standard pace.</p>
 <form method="post" action="/connections/{{ c.source_id }}/pacing" class="inline-form">{% csrf_token %}
-  <label>Verified per-user quota (units a minute) <input name="verified" inputmode="numeric" value="{{ pacing.verified|default:'' }}" placeholder="from Google Cloud → Gmail API → Quotas"></label>
+  <label>Your Gmail limit per minute <input name="verified" inputmode="numeric" value="{{ pacing.verified|default:'' }}"></label>
   <button class="button secondary" type="submit">Save</button></form>
-<p class="footnote">Copy the “per minute per user” figure from Google Cloud Console's Gmail API quotas. Leave it empty to use Google's default. Towpath uses 30% of it so other apps on your account keep their share.</p>
+</details>
 </section>{% endif %}
 <p class="footnote">{% if c.status.busy %}This page refreshes by itself. Indexing continues if you leave; pausing keeps everything indexed so far.{% else %}New mail is picked up when you check for it; Towpath never indexes on its own.{% endif %}</p>
 {% endblock %}

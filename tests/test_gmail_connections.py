@@ -149,7 +149,7 @@ def test_listing_imports_the_configured_gmail_and_shows_its_pacing(pages):
     html = client.get("/connections/").content.decode()
     assert "5 messages indexed" in html and "Set up from the configuration file" not in html
     detail = client.get("/connections/mail/").content.decode()
-    assert "All mail" in detail and "30% of your project's verified 6,000" in detail and "Reconnect Gmail" in detail
+    assert "All mail" in detail and "up to about 90 messages a minute" in detail and "Reconnect Gmail" in detail
     assert client.post("/connections/mail/pacing", {"verified": "abc"}).status_code == 400
     assert client.post("/connections/mail/pacing", {"verified": "3,000"}).status_code == 302
     assert connections.gmail_pacing(config).units_per_minute == 900

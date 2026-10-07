@@ -160,10 +160,13 @@ def _detail_context(sid: str) -> dict:
     c = _view(_get(sid))
     context = {"nav": "connections", "c": c, "now": datetime.now(timezone.utc)}
     if c["adapter"] == "gmail" and getattr(settings, "TOWPATH_CONFIG", None) is not None:
+        from towpath.quota import METHOD_COSTS
+
         p = connections.gmail_pacing(settings.TOWPATH_CONFIG)
-        verified = p.verified_units_per_minute
-        context["pacing"] = {"verified": verified, "verified_text": f"{verified:,}" if verified else None,
-                             "units": f"{p.units_per_minute:,}", "daily": f"{p.daily_units:,}"}
+        per_message = METHOD_COSTS["users.messages.get"]  # reading one message is the costliest common request
+        per_minute = p.units_per_minute // per_message
+        context["pacing"] = {"verified": p.verified_units_per_minute, "per_minute": f"{per_minute:,}",
+                             "per_hour": f"{per_minute * 60:,}", "per_day": f"{p.daily_units // per_message:,}"}
     return context
 
 
