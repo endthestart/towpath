@@ -4,9 +4,11 @@ Status: **accepted 2026-10-06**. Phase 1 (Fastmail/IMAP from the UI) accepted 20
 entirely in the browser indexed every message in its chosen folders (counts matched the server's per folder),
 in resumable slices; a later check read only new mail; full-text search ran through the worker; unread
 counts were unchanged, and the provider-side app password was IMAP-only and read-only. Phase 2 (Gmail)
-implemented, awaiting owner acceptance. Implements [R3](../decisions.md#recommendations-in-this-design)
-and [components](../components.md#services) as designed, replacing the interim file-and-shell setup used for the
-first Hub deployment.
+accepted 2026-10-07: the configured connection was imported unchanged and an incremental check ran from the
+page within its pacing. Phase 3 (shell-free install) implemented, awaiting owner acceptance.
+
+Implements [R3](../decisions.md#recommendations-in-this-design) and [components](../components.md#services) as
+designed, replacing the interim file-and-shell setup used for the first Hub deployment.
 
 ## Goal
 
@@ -71,9 +73,11 @@ the person also chooses *Delete index*). It links to the provider's page for rev
 
 ## Installing without a shell
 
-- One data folder per instance (for example a TrueNAS dataset), owned by the service user 10001, which the
-  TrueNAS permissions editor can set. The containers create `state/`, `secrets/`, `tokens/` and `index/`
-  inside it on first start, with correct modes. No hand-made subfolders, configuration files or ownership fixes.
+- One data folder per instance (for example a TrueNAS dataset created with the Apps preset). The containers
+  run as `TOWPATH_USER`, by default TrueNAS's `apps` user (568), the owner's choice on 2026-10-07 over a
+  dedicated user: simpler setup, at the cost that other apps running as 568 can read Towpath's stored
+  credentials. They create `state/`, `credentials/`, `index/` and `scratch/` inside it on first start, with
+  correct modes. No hand-made subfolders, configuration files or ownership fixes ([install guide](../setup/install.md)).
 - Compose and an example env file in the repository; the only values a person sets are the data folder, the
   public URL and the proxy network. Everything else has a default or a page.
 - First run: the site shows account setup (with the code from the container log), then an empty Connections

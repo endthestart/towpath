@@ -198,14 +198,15 @@ def _endpoint(eid: str, raw: dict, root: Path) -> Endpoint:
                     float(raw.get("timeout_seconds", 60)))
 
 
-def load(path: Path) -> Config:
+def load(path: Path, store_dir: Path | None = None) -> Config:
+    """Load a configuration file. ``store_dir`` (from a data folder) takes precedence over its [stores] dir."""
     path = Path(path).resolve()
     data = tomllib.loads(path.read_text())
     _check_keys(data, TOP_KEYS, "configuration")
     root = path.parent
     stores = data.get("stores", {})
     _check_keys(stores, STORE_KEYS, "[stores]")
-    store_dir = (root / stores.get("dir", "state")).resolve()
+    store_dir = Path(store_dir).resolve() if store_dir is not None else (root / stores.get("dir", "state")).resolve()
 
     sources = {s.id: s for s in (_source(raw, root) for raw in data.get("sources", []))}
 
@@ -253,3 +254,13 @@ def load(path: Path) -> Config:
     return Config(root=root, store_dir=store_dir, sources=sources, selectors=selectors, endpoints=endpoints,
                   tasks=tasks, providers=providers, bundled_hosts=tuple(data.get("bundled_hosts", ())),
                   gmail_pacing=pacing, files=files)
+
+
+def for_data(layout, explicit: Path | None = None) -> Config:
+    """The configuration for a data folder: its optional settings file (or ``explicit``), always with the
+    folder's own stores. Without a settings file every setting has its default and accounts come from the
+    Connections page."""
+    path = explicit or layout.config
+    if path is not None:
+        return load(path, store_dir=layout.state)
+    return Config(root=layout.data.resolve(), store_dir=layout.state.resolve())

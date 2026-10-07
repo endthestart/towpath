@@ -59,19 +59,40 @@ def _load(path: Path):
 
 CredentialsDirOpt = typer.Option(None, "--credentials-dir", envvar="TOWPATH_CREDENTIALS_DIR",
                                  help="The connector's private folder for passwords added in the UI.")
+DataDirOpt = typer.Option(None, "--data-dir", envvar="TOWPATH_DATA_DIR",
+                          help="The instance's data folder; its layout is created on first start (see install guide).")
+OptionalConfigOpt = typer.Option(None, "--config", "-c", help="Configuration file (optional with --data-dir).")
+
+
+def _connector_setup(data_dir: Path | None, config: Path | None, credentials_dir: Path | None):
+    """The configuration and credentials folder for a connector command, from a data folder or explicit paths."""
+    if data_dir is not None:
+        from towpath import layout as layout_mod
+
+        try:
+            layout = layout_mod.prepare(data_dir)
+            cfg = config_mod.for_data(layout, config)
+        except layout_mod.LayoutError as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(2) from None
+        except config_mod.ConfigError as exc:
+            raise typer.BadParameter(str(exc)) from exc
+        return cfg, credentials_dir or layout.credentials
+    return _load(config or Path("towpath.toml")), credentials_dir
 
 
 @connect_app.command("run-worker")
-def request_worker(config: Path = ConfigOpt,
+def request_worker(config: Path = OptionalConfigOpt,
                    poll_seconds: int = typer.Option(10, min=2, max=3600),
                    once: bool = typer.Option(False, "--once"),
-                   credentials_dir: Path = CredentialsDirOpt):
+                   credentials_dir: Path = CredentialsDirOpt, data_dir: Path = DataDirOpt):
     """Process explicitly queued searches and content requests, and indexing the owner started in the UI.
     No automatic sync or model calls."""
     from towpath import request_worker as worker
 
+    cfg, credentials_dir = _connector_setup(data_dir, config, credentials_dir)
     try:
-        worker.run(_load(config), poll_seconds=poll_seconds, once=once, credentials_dir=credentials_dir)
+        worker.run(cfg, poll_seconds=poll_seconds, once=once, credentials_dir=credentials_dir)
     except Exception as exc:  # noqa: BLE001 - never log account data from an exception message
         typer.echo(f"request worker stopped ({type(exc).__name__})", err=True)
         raise typer.Exit(1) from None
@@ -114,16 +135,17 @@ def _run_guarded(fn):
 
 
 @connect_app.command("serve-setup")
-def serve_setup(config: Path = ConfigOpt, credentials_dir: Path = CredentialsDirOpt,
+def serve_setup(config: Path = OptionalConfigOpt, credentials_dir: Path = CredentialsDirOpt,
+                data_dir: Path = DataDirOpt,
                 port: int = typer.Option(8791, min=1024, max=65535),
                 host: str = typer.Option("127.0.0.1", "--host"),
                 public_url: str = typer.Option(None, "--public-url",
                                                help="Address the reverse proxy serves, e.g. https://towpath.example.org.")):
     """Serve the connection setup pages (/connections/). Runs in towpath-connect, the only service that
     receives passwords; the reverse proxy sends /connections/ here and everything else to the web service."""
+    cfg, credentials_dir = _connector_setup(data_dir, config, credentials_dir)
     if credentials_dir is None:
-        raise typer.BadParameter("set --credentials-dir (or TOWPATH_CREDENTIALS_DIR) to the connector's private folder")
-    cfg = _load(config)
+        raise typer.BadParameter("set --data-dir, or --credentials-dir, to the connector's private folder")
     credentials_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     if public_url is not None and not public_url.startswith(("https://", "http://")):
         raise typer.BadParameter("--public-url must start with https:// or http://")

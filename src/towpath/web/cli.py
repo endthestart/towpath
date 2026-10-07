@@ -8,7 +8,9 @@ app = typer.Typer(no_args_is_help=True, help="Read-only interface to existing in
 
 
 @app.command()
-def serve(store_dir: Path = typer.Option(..., "--store-dir", help="Folder containing source.db; no credentials."),
+def serve(store_dir: Path = typer.Option(None, "--store-dir", help="Folder holding the stores; no credentials."),
+          data_dir: Path = typer.Option(None, "--data-dir", envvar="TOWPATH_DATA_DIR",
+                                        help="The instance's data folder (the web service sees only its state/)."),
           port: int = typer.Option(8790, min=1024, max=65535),
           host: str = typer.Option("127.0.0.1", "--host",
                                    help="Listening address. Anything but loopback belongs behind a TLS reverse proxy."),
@@ -21,8 +23,22 @@ def serve(store_dir: Path = typer.Option(..., "--store-dir", help="Folder contai
 
     Every page requires the instance's one account. On first run the server prints a setup code to its log;
     open /setup and enter it to create the account."""
-    if not (store_dir / "source.db").is_file():
-        raise typer.BadParameter("source.db is missing; create the email index first.")
+    from towpath import config as config_mod
+
+    layout = None
+    if data_dir is not None:
+        from towpath import layout as layout_mod
+
+        try:
+            layout = layout_mod.state_only(data_dir)
+        except layout_mod.LayoutError as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(2) from None
+        store_dir = layout.state
+    elif store_dir is None:
+        raise typer.BadParameter("set --data-dir, or --store-dir to the folder holding the stores")
+    if not store_dir.is_dir():
+        raise typer.BadParameter(f"{store_dir} is not a folder")
     from towpath import stores
 
     try:  # the UI never migrates a store; it refuses to start until an explicit upgrade has run
@@ -30,13 +46,13 @@ def serve(store_dir: Path = typer.Option(..., "--store-dir", help="Folder contai
     except stores.SchemaOutdated as exc:
         raise typer.BadParameter(str(exc)) from None
     loaded = None
-    if config is not None:
-        from towpath import config as config_mod
-
-        try:
-            loaded = config_mod.load(config)
-        except (config_mod.ConfigError, OSError) as exc:
-            raise typer.BadParameter(str(exc)) from None
+    try:
+        if config is not None:
+            loaded = config_mod.load(config, store_dir=store_dir if layout is not None else None)
+        elif layout is not None:  # no settings file is visible here; accounts come from the Connections page
+            loaded = config_mod.for_data(layout)
+    except (config_mod.ConfigError, OSError) as exc:
+        raise typer.BadParameter(str(exc)) from None
     try:
         from towpath.web.application import launch
     except ModuleNotFoundError as exc:

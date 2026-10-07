@@ -330,10 +330,18 @@ def set_verified_quota(config, verified: int | None) -> None:
 
 
 def import_configured(config, credentials_dir: Path) -> list[str]:
-    """Bring Gmail sources from the configuration file onto the Connections page, once. The index, source ID,
-    quota history and token stay as they are: no re-consent and no re-indexing."""
+    """Bring Gmail sources and Gmail pacing from the configuration file onto the Connections page, once. The
+    index, source ID, quota history and token stay as they are: no re-consent and no re-indexing."""
     import shutil
 
+    from towpath.quota import PacingSettings
+
+    if _setting(config.store_dir, "gmail_pacing") is None and config.gmail_pacing != PacingSettings():
+        table = {k: v for k, v in dataclasses.asdict(config.gmail_pacing).items() if v is not None}
+        with closing(open_store(config.store_dir, "connections", ROLE)) as db:
+            db.execute("INSERT OR IGNORE INTO instance_settings (key, value, updated_at) VALUES ('gmail_pacing', ?, ?)",
+                       (json.dumps(table), _now()))
+            db.commit()
     imported = []
     known = {c["source_id"] for c in all_connections(config.store_dir)}
     for sid, source in config.sources.items():

@@ -103,3 +103,17 @@ def test_deployment_examples_hold_no_private_values():
             assert address == "0.0.0.0", (path, address)
         assert "/home/" not in text and "/Users/" not in text and "/volume1/" not in text, path
         assert not re.search(r"(?i)(token|password|secret)\s*=", text), path
+
+
+def test_hub_example_keeps_credentials_away_from_the_web_service():
+    compose = (DEPLOY / "compose.hub.example.yml").read_text()
+    web = compose.split("\n  web:\n", 1)[1].split("\nnetworks:", 1)[0]
+    mounts = re.findall(r"^\s+- (\S+):(\S+)$", web, re.M)
+    assert mounts == [("${TOWPATH_DATA_DIR}/state", "/data/state")]  # never the whole folder or credentials/
+    assert "connect-setup: {condition: service_healthy}" in web  # state/ exists before Docker could create it
+    assert compose.count("<<: *runtime") == 3 and 'user: "${TOWPATH_USER:-568:568}"' in compose
+    assert "build:" not in compose and "ports:" not in compose
+    env = (DEPLOY / "env.hub.example").read_text()
+    assert set(re.findall(r"^(TOWPATH_\w+)=", env, re.M)) == {
+        "TOWPATH_IMAGE", "TOWPATH_RECOLL_IMAGE", "TOWPATH_DATA_DIR", "TOWPATH_PUBLIC_URL", "TOWPATH_PROXY_NETWORK",
+        "TOWPATH_USER"}

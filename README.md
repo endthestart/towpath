@@ -37,6 +37,10 @@ towpath proposals list
 
 Proposals cannot be executed; there is no write path. See [first slice](docs/first-slice.md) for what it tests and what it taught, and `towpath --help` for every command.
 
+## Install on a home server
+
+One data folder, a Compose file pasted into Arcane (or any Compose host), and the rest in the browser: see the [install guide](docs/setup/install.md).
+
 ## Local email UI
 
 Install the optional interface, then point it at the folder containing your existing `source.db`:

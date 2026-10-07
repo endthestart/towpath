@@ -128,8 +128,11 @@ def test_browsing_does_not_modify_database_or_open_credentials(client, mail_inde
             db.execute("DELETE FROM items")
 
 
-def test_cli_requires_an_existing_store(tmp_path):
+def test_cli_starts_on_an_empty_store_folder_but_not_a_missing_one(tmp_path, monkeypatch):
+    launched = []
+    monkeypatch.setattr("towpath.web.application.launch", lambda *a, **k: launched.append(a))
     result = CliRunner().invoke(app, ["web", "serve", "--store-dir", str(tmp_path)])
-    assert result.exit_code == 2
-    assert "source.db is missing" in result.output
-    assert list(tmp_path.iterdir()) == []
+    assert result.exit_code == 0 and launched  # a fresh install: setup first, accounts later
+    assert list(tmp_path.iterdir()) == []  # the UI creates no store of its own
+    missing = CliRunner().invoke(app, ["web", "serve", "--store-dir", str(tmp_path / "absent")])
+    assert missing.exit_code == 2 and "is not a folder" in missing.output and not (tmp_path / "absent").exists()

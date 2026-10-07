@@ -73,47 +73,26 @@ verified digests. Neither Arcane nor the deployment host builds source.
 
 ## Services and private state
 
-Start with [the Hub Compose example](../../deploy/compose.hub.example.yml). Set both image
-references to the tested, published digests from the release records, not moving tags.
-The verified Recoll image includes the same UI and mail clients and can serve both roles:
-set both image variables to that published digest when the core image is not yet qualified.
-The services retain their separate commands and mounts; only the connector receives tokens.
+Installation and the data-folder layout are in the [install guide](install.md), with
+[the Compose example](../../deploy/compose.hub.example.yml) and [its environment](../../deploy/env.hub.example).
+Images are referenced by tested, published digest, never by moving tag. All three services run as
+`TOWPATH_USER` (568, TrueNAS's `apps`, on this host by the owner's choice), read-only, with no capabilities.
 
-- `web`: core image on the reverse proxy's Docker network (alias `towpath-web`), listening on port
-  8790 inside the container with `--public-url` set to the proxy's https address; no published
-  port. On first start its log shows the setup code for creating the account at `/setup`.
-  Mount the state folder (which also holds the login hash and session key)
-  and a separate configuration folder with no actual secrets. Source credential references
-  may name unavailable files: the UI never resolves them. No secret or OAuth token directory is mounted.
-- `connect`: Recoll image with Gmail, IMAP and UI dependencies. Runs `connect run-worker`,
-  processes explicit provider-search and selected-content requests, and writes receipts in
-  the existing stores. Idle polls contact no provider. Search receipts and fetch receipts
-  prevent completed requests from being repeated after restart. A filesystem lock excludes
-  a second worker on the same stores. Graceful stop waits for current work; clean quota/auth/
-  server stops wait at least five minutes before another poll. Unexpected errors log only
-  their type and stop; the container has a bounded restart policy. It never schedules sync,
-  models, source mutations or NAS crawling. Current grants and scope still govern results.
-- `connect-setup`: the Connections pages (`/connections/`), served by the connector image on the
-  proxy's network (alias `towpath-connect-setup`). The only service that receives passwords: an account
-  added there is tested, its password written to the connector's credentials folder (`/run/tokens`,
-  mode 0600), and its settings to the connections store. `connect` reads new connections at each poll
-  and indexes only when the owner presses *Start indexing* ([spec](../specs/connections-in-the-ui.md)).
-- `mail-sync`: manual profile for metadata sync using existing Gmail pacing and checkpoints.
-- `recoll-index`: manual profile with no network, NAS input mounted read-only, and separate
-  writable index and on-disk scratch folders. Begin with a qualified small folder before
-  expanding the declared scope. The ordinary deployment starts neither manual profile.
+- `connect-setup`: the Connections pages (`/connections/`) on the proxy's network (alias
+  `towpath-connect-setup`). It starts first and creates the data folder's layout. It is the only service that
+  receives passwords: an account added there is tested, its password or token written to `credentials/`
+  (mode 0600), and its settings to the connections store ([spec](../specs/connections-in-the-ui.md)).
+- `connect`: runs `connect run-worker`. It processes explicit provider searches and selected-content requests,
+  and indexes an account only after the owner presses *Start indexing* or *Check for new mail*, in bounded,
+  pausable, resumable slices. Idle polls contact no provider; receipts prevent repeats after restart; a
+  filesystem lock excludes a second worker; quota, auth and server stops wait at least five minutes before the
+  next poll. It never schedules syncs, models, source changes or NAS crawling on its own.
+- `web`: the UI on the proxy's network (alias `towpath-web`), port 8790 inside the container, no published
+  port. It mounts only `state/`, so it can't read `credentials/`; it never resolves a credential. On first start
+  its log shows the setup code for the single account.
 
-Private environment values name `TOWPATH_IMAGE`, `TOWPATH_RECOLL_IMAGE`, `TOWPATH_STATE_DIR`,
-`TOWPATH_CONFIG_DIR`, `TOWPATH_WEB_CONFIG_DIR`, `TOWPATH_SECRETS_DIR`, `TOWPATH_TOKEN_DIR`, `TOWPATH_SOURCE_DIR`,
-`TOWPATH_INDEX_DIR`, `TOWPATH_SCRATCH_DIR`, `TOWPATH_PUBLIC_URL` (the proxy's https address) and
-`TOWPATH_PROXY_NETWORK` (the proxy's existing Docker network). Set `TOWPATH_MAIL_SOURCE` when invoking the
-manual sync profile. Folders must allow the container's UID/GID 10001 access; keep secrets
-and private state restricted to the owner and that service identity. Use local filesystem
-storage for SQLite, not an SMB/NFS mount. App passwords and OAuth material go in private
-mounted files, not public Compose, Git, logs or command arguments. Static app passwords and
-OAuth client configuration are mounted read-only under `/run/secrets`. The separate
-`/run/tokens` directory is writable only by the connector service identity so Gmail can
-atomically save refreshed access tokens. Neither directory is mounted into the web service.
+Use local storage for the data folder, not an SMB or NFS mount, because SQLite needs reliable locking.
+NAS indexing (Recoll) will get its own read-only source mounts and a page when that work starts.
 
 ## Move the existing index without starting over
 

@@ -1,11 +1,13 @@
-# Single-owner deployment. CI builds; Arcane pulls these immutable image references.
-# The UI publishes no port: it joins the reverse proxy's network and every page needs the one account
-# (first-run setup code in the web container's log). See docs/setup/hub.md.
+# Towpath for one owner, behind an existing reverse proxy. Paste into Arcane (or any Compose host) with
+# env.hub.example filled in. CI builds the images; this file only pulls them by digest.
+#
+# One data folder holds everything; the containers create its layout on first start. The web service sees
+# only state/; passwords and tokens in credentials/ are visible only to the two connector services.
+# Install guide: docs/setup/install.md.
 name: towpath
 
 x-runtime: &runtime
-  image: ${TOWPATH_IMAGE:?set a published core image digest}
-  user: "10001:10001"
+  user: "${TOWPATH_USER:-568:568}"
   read_only: true
   cap_drop: [ALL]
   security_opt: ["no-new-privileges:true"]
@@ -14,89 +16,55 @@ x-runtime: &runtime
   stop_grace_period: 60s
 
 services:
-  web:
-    <<: *runtime
-    command: ["web", "serve", "--store-dir", "/state", "--config", "/config/towpath.toml", "--port", "8790",
-              "--host", "0.0.0.0", "--public-url", "${TOWPATH_PUBLIC_URL:?set the proxy's https URL}"]
-    networks:
-      proxy:
-        aliases: [towpath-web]
-    restart: unless-stopped
-    volumes:
-      - ${TOWPATH_STATE_DIR:?set private state directory}:/state
-      - ${TOWPATH_WEB_CONFIG_DIR:?set credential-free UI configuration directory}:/config:ro
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8790/', timeout=5).close()"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  connect:
-    <<: *runtime
-    image: ${TOWPATH_RECOLL_IMAGE:?set a published Recoll image digest}
-    command: ["connect", "run-worker", "--config", "/config/towpath.toml"]
-    restart: "on-failure:3"
-    environment:
-      TOWPATH_CREDENTIALS_DIR: /run/tokens  # passwords added on the Connections page
-    volumes:
-      - ${TOWPATH_STATE_DIR}:/state
-      - ${TOWPATH_CONFIG_DIR:?set private connector configuration directory}:/config:ro
-      - ${TOWPATH_SECRETS_DIR:?set private credential directory}:/run/secrets:ro
-      - ${TOWPATH_TOKEN_DIR:?set private refreshable OAuth token directory}:/run/tokens
-      - ${TOWPATH_SOURCE_DIR:?set read-only NAS root}:/data/roots/archive:ro
-      - ${TOWPATH_INDEX_DIR:?set separate index directory}:/index:ro
-
-  # Connection setup pages (/connections/): the only service that receives passwords. The proxy sends
-  # /connections/ here and everything else to web. It writes only the connections store and the
-  # credentials folder; indexing itself runs in connect.
+  # Connections pages (/connections/): the only service that receives passwords. Starts first and creates
+  # the data folder's layout.
   connect-setup:
     <<: *runtime
-    image: ${TOWPATH_RECOLL_IMAGE}
-    command: ["connect", "serve-setup", "--config", "/config/towpath.toml", "--host", "0.0.0.0", "--port", "8791",
-              "--public-url", "${TOWPATH_PUBLIC_URL}"]
+    image: ${TOWPATH_RECOLL_IMAGE:?set the published towpath-recoll image digest}
+    command: ["connect", "serve-setup", "--data-dir", "/data", "--host", "0.0.0.0", "--port", "8791",
+              "--public-url", "${TOWPATH_PUBLIC_URL:?set the address the proxy serves}"]
     restart: unless-stopped
-    environment:
-      TOWPATH_CREDENTIALS_DIR: /run/tokens
     networks:
       default: {}
       proxy:
         aliases: [towpath-connect-setup]
     volumes:
-      - ${TOWPATH_STATE_DIR}:/state
-      - ${TOWPATH_CONFIG_DIR}:/config:ro
-      - ${TOWPATH_TOKEN_DIR}:/run/tokens
+      - ${TOWPATH_DATA_DIR:?set the data folder}:/data
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8791/assets/app.css', timeout=5).close()"]
       interval: 30s
       timeout: 10s
       retries: 3
 
-  # Manual metadata sync, not started by normal deployment. Existing shared quota accounting applies.
-  mail-sync:
+  # Runs searches, content requests and the indexing you start on the Connections page. Never on its own.
+  connect:
     <<: *runtime
-    profiles: ["mail-sync"]
-    command: ["connect", "sync", "${TOWPATH_MAIL_SOURCE:-gmail}", "--config", "/config/towpath.toml"]
-    restart: "no"
+    image: ${TOWPATH_RECOLL_IMAGE}
+    command: ["connect", "run-worker", "--data-dir", "/data"]
+    restart: unless-stopped
+    depends_on:
+      connect-setup: {condition: service_healthy}
     volumes:
-      - ${TOWPATH_STATE_DIR}:/state
-      - ${TOWPATH_CONFIG_DIR}:/config:ro
-      - ${TOWPATH_SECRETS_DIR}:/run/secrets:ro
-      - ${TOWPATH_TOKEN_DIR}:/run/tokens
+      - ${TOWPATH_DATA_DIR}:/data
 
-  # Manual only. Supply the qualified NAS root, separate on-disk index and scratch directories.
-  recoll-index:
+  web:
     <<: *runtime
-    image: ${TOWPATH_RECOLL_IMAGE:?set a published Recoll image digest}
-    profiles: ["index"]
-    network_mode: none
-    entrypoint: ["recollindex"]
-    command: ["-c", "/index/recoll"]
-    restart: "no"
-    tmpfs: []
+    image: ${TOWPATH_IMAGE:?set the published towpath image digest}
+    command: ["web", "serve", "--data-dir", "/data", "--host", "0.0.0.0", "--port", "8790",
+              "--public-url", "${TOWPATH_PUBLIC_URL}"]
+    restart: unless-stopped
+    depends_on:
+      connect-setup: {condition: service_healthy}  # state/ exists, owned by the right user, before it is mounted
+    networks:
+      proxy:
+        aliases: [towpath-web]
     volumes:
-      - ${TOWPATH_SOURCE_DIR:?set read-only NAS root}:/data/roots/archive:ro
-      - ${TOWPATH_INDEX_DIR:?set separate index directory}:/index
-      - ${TOWPATH_SCRATCH_DIR:?set on-disk scratch directory}:/tmp
+      - ${TOWPATH_DATA_DIR}/state:/data/state
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8790/', timeout=5).close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 networks:
   proxy:
