@@ -140,7 +140,9 @@ def test_indexing_runs_in_the_background_then_files_become_searchable(inst, monk
                       "photos/2003/raw/DSC_0001.NEF", duration=1)
     connections.start_indexing(inst.config.store_dir, inst.layout.credentials, folders.SID)
     assert request_worker.run_once(inst.config, inst.layout.credentials)["indexing"][0]["step"] == "started"
-    time.sleep(0.3)
+    deadline = time.monotonic() + 10
+    while "filesdone" not in folders.read_status(inst.conf) and time.monotonic() < deadline:
+        time.sleep(0.05)
     request_worker.run_once(inst.config, inst.layout.credentials)  # while Recoll runs: its counts, not its files
     progress = connections.get(inst.config.store_dir, folders.SID)["progress"]
     assert (progress["phase"], progress["files"], progress["total"]) == ("reading", 3, 4)
