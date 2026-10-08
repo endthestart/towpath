@@ -374,6 +374,7 @@ print(json.dumps({"by_id": by_id, "query": [row["rcludi"] for row in rows], "pag
     out = json.loads(box.run("-c", code, entrypoint="python3").stdout)
     assert sorted(out["by_id"]) == sorted(out["query"]) and len(set(out["by_id"])) == len(out["by_id"])
     assert out["pages"] > 2 and any(len(udi) == 150 for udi in out["by_id"])  # the long path's hashed ID
+    box.grant("search")
     report = box.json("files", "import", "--provider", "recoll", "--root", "archive")[0]
     assert report["complete"]
 
