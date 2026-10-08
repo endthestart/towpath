@@ -118,9 +118,10 @@ def connection_list(request):
     configured = [{"source_id": sid, "adapter": s.adapter} for sid, s in (config.sources.items() if config else ())
                   if s.kind == "mail-provider" and sid not in listed]
     views = [_view(c) for c in connections.all_connections(_store())]
-    return render(request, "connections.html", {
-        "nav": "connections", "connections": views, "any_busy": any(v["status"]["busy"] for v in views),
-        "configured": configured, "providers": connections.PROVIDERS})
+    busy = any(v["status"]["busy"] for v in views)
+    template = "_connections_live.html" if request.path.endswith("/list-live") else "connections.html"
+    return render(request, template, {"nav": "connections", "connections": views, "any_busy": busy, "live": busy,
+                                      "configured": configured, "providers": connections.PROVIDERS})
 
 
 @sensitive_post_parameters("password")
@@ -188,7 +189,7 @@ def folders(request, sid):
 def _detail_context(sid: str, indexing: dict | None = None) -> dict:
     raw = _get(sid)
     c = _view(raw)
-    context = {"nav": "connections", "c": c, "now": datetime.now(timezone.utc)}
+    context = {"nav": "connections", "c": c, "now": datetime.now(timezone.utc), "live": c["status"]["busy"]}
     if c["adapter"] == "recoll":
         from towpath import folders as folder_index
 
@@ -202,6 +203,12 @@ def _detail_context(sid: str, indexing: dict | None = None) -> dict:
         context["pacing"] = {"verified": p.verified_units_per_minute, "per_minute": f"{per_minute:,}",
                              "per_hour": f"{per_minute * 60:,}", "per_day": f"{p.daily_units // per_message:,}"}
     return context
+
+
+@require_GET
+def live(request, sid):
+    """The connection page's progress panel alone, polled while it indexes."""
+    return render(request, "_connection_live.html", _detail_context(sid))
 
 
 @require_GET

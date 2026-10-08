@@ -1,20 +1,10 @@
 {% extends 'base.html' %}
 {% block title %}Connections · Towpath{% endblock %}
-{% block head %}{% if any_busy %}{% include '_live.html' %}{% endif %}{% endblock %}
+{% block head %}{% endblock %}
 {% block content %}
 <header class="page-head compact"><h1>Connections</h1>
 <p class="lead">The accounts Towpath reads. Access is read-only: Towpath never changes, moves, deletes or marks mail as read.</p></header>
-<section class="mail-list connection-list">
-{% for c in connections %}<a class="mail-row" href="/connections/{{ c.source_id }}/">
-  <span class="sender">{{ c.display_name }}</span>
-  <span class="mail-title"><strong>{{ c.address }}</strong>{% if c.indexed is not None %}<span class="row-context">{{ c.indexed_text }} {% if c.adapter == 'recoll' %}files in search{% else %}messages indexed{% endif %}</span>{% endif %}</span>
-  <span class="status {{ c.status.tone }}">{{ c.status.text }}</span><span class="row-arrow" aria-hidden="true">↗</span>
-</a>{% endfor %}
-{% for s in configured %}<div class="mail-row"><span class="sender">{% if s.adapter == 'gmail' %}Gmail{% else %}{{ s.adapter }}{% endif %}</span>
-  <span class="mail-title"><strong>{{ s.source_id }}</strong><span class="row-context">Set up from the configuration file.</span></span>
-  <span class="status ok">Connected</span><span></span></div>{% endfor %}
-{% if not connections and not configured %}<div class="empty"><p>No accounts yet.</p></div>{% endif %}
-</section>
+{% include '_connections_live.html' %}
 <section class="detail-card"><h2 class="card-title">Add an account</h2>
   <div class="provider-choices">
   {% for key, p in providers.items %}<a class="button {% if not forloop.first %}secondary{% endif %}" href="/connections/add/{{ key }}">{{ p.label }}</a>{% endfor %}

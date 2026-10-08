@@ -17,7 +17,7 @@ are from the live services.
 | Catalog search, broad word (100–300 k matches) | 240–490 ms; 0.5–4 s for the sorted `IN` form | ~1 ms; 40 ms at offset 20,000 | Trigram index drives the join in catalog order, no sort of every match |
 | Files status (twice per Search page) | 1.9 s per 1 M rows (≈13 s at Hub scale) | one row per root | Counts by status kept after each import (`catalog_counts`) |
 | Mail status on Hub (IMAP 115 k messages) | 0.72 s | index-only count | `items (source_id, absent_since_run)` index, one query |
-| Folders page while indexing | full reload every 5 s (763/h); Safari reset the tab | in-place update | One same-origin script; CSP `script-src 'self'` |
+| Folders page while indexing | full reload every 5 s (763/h); Safari reset the tab, and the settings form couldn't be used | only the progress panel updates | htmx 2.0.9 (vendored, pinned, as in senex-trader) polls a fragment; CSP `script-src 'self'` |
 
 Catalog size: about 880 MB per million rows with the trigram index (≈6 GB at Hub scale). Inserts run at about
 12,800 rows/s on SSD. Measuring space for the same million rows takes 57 s and 450 MB; the synthetic paths are

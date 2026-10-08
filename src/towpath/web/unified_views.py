@@ -101,6 +101,10 @@ def search(request):
                     stored["reasons"] = present.reasons(stored["response"], labels)
                     stored["ago"] = present.ago(stored["ran_at"])
                 context.update(provider=stored, waiting=requests.search_waiting(_store(), filters))
+                context["live"] = context["waiting"]
+                context["deep_url"] = _search_url(query, chosen) + "&part=deep"
+    if request.GET.get("part") == "deep":  # the "Inside messages" panel alone, polled while its search runs
+        return render(request, "_deep_search.html", context)
     context["set_collections"] = [c for c in collections.list_all(_store()) if c["kind"] == "set"]
     return render(request, "search.html", context)
 

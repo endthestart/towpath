@@ -93,6 +93,14 @@ def test_sign_in_sign_out_and_redirect_targets(store):
     assert client.get("/")["Location"].startswith("/login")
 
 
+def test_a_live_panel_without_a_session_sends_the_page_to_sign_in(store):
+    response = Client().get("/search/", HTTP_HX_REQUEST="true")
+    assert (response.status_code, response["HX-Redirect"]) == (401, "/setup")  # never a form swapped into a panel
+    set_up(Client(), store)
+    response = Client().get("/search/?q=x&part=deep", HTTP_HX_REQUEST="true")
+    assert (response.status_code, response["HX-Redirect"], response.content) == (401, "/login", b"")
+
+
 def test_forms_still_need_csrf_tokens(store):
     set_up(Client(), store)
     strict = Client(enforce_csrf_checks=True)

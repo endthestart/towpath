@@ -5,6 +5,7 @@ import hashlib
 import json
 import re
 import sqlite3
+from pathlib import Path
 
 from django.test import Client, override_settings
 import pytest
@@ -110,7 +111,7 @@ def test_routes_escape_mail_and_never_show_bodies(client):
 
 
 def test_no_write_routes_or_untrusted_host(client):
-    for path in ("/", "/email/", "/email/demo-0/", "/assets/app.css", "/assets/live.js"):
+    for path in ("/", "/email/", "/email/demo-0/", "/assets/app.css", "/assets/htmx.min.js"):
         assert client.post(path).status_code == 405
         response = client.get(path)
         assert response["Cache-Control"] == "no-store"
@@ -152,3 +153,12 @@ def test_cli_starts_on_an_empty_store_folder_but_not_a_missing_one(tmp_path, mon
     missing = CliRunner().invoke(app, ["web", "serve", "--store-dir", str(tmp_path / "absent")])
     plain = re.sub(r"[\s│╭╮╰╯─]+", " ", re.sub(r"\x1b\[[0-9;]*m", "", missing.output))  # however the terminal wraps it
     assert missing.exit_code == 2 and "is not a folder" in plain and not (tmp_path / "absent").exists()
+
+
+def test_htmx_is_the_pinned_vendored_release():
+    import hashlib
+
+    assets = Path(index.__file__).parent / "assets"
+    digest = hashlib.sha256((assets / "htmx.min.js").read_bytes()).hexdigest()
+    assert digest == "57d9191515339922bd1356d7b2d80b1ee3b29f1b3a2c65a078bb8b2e8fd9ae5f"  # htmx 2.0.9
+    assert "Zero-Clause BSD" in (assets / "htmx.LICENSE").read_text()

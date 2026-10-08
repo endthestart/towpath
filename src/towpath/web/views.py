@@ -83,9 +83,10 @@ def stylesheet(request):
 
 
 @require_GET
-def live_script(request):
-    """The only script: keeps progress pages current without reloading them (see the file)."""
-    return HttpResponse((Path(__file__).parent / "assets" / "live.js").read_text(), content_type="text/javascript")
+def htmx_script(request):
+    """htmx, vendored and pinned (see htmx.LICENSE): parts of a page that track background work fetch their own
+    fragment every few seconds, and nothing else on the page changes."""
+    return HttpResponse((Path(__file__).parent / "assets" / "htmx.min.js").read_text(), content_type="text/javascript")
 
 
 @require_GET

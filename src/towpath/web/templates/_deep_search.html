@@ -1,0 +1,16 @@
+<section class="deep-search" id="full-text"{% if waiting %} hx-get="{{ deep_url }}" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+  {% if provider %}
+  <div class="result-heading"><h2>Inside messages</h2>
+    <form method="post" action="{% url 'search-request' %}">{% csrf_token %}<input type="hidden" name="q" value="{{ query }}">{% for s in chosen %}<input type="hidden" name="source" value="{{ s }}">{% endfor %}<button class="button secondary" type="submit" {% if waiting %}disabled{% endif %}>{% if waiting %}Searching…{% else %}Search again{% endif %}</button></form></div>
+  <p class="footnote">Full message text, searched by {{ deep_names }} {{ provider.ago }}{% if provider.groups|length == 1 %} · {{ provider.groups.0.summary }}{% endif %}{% if waiting %}. A new search is running; results appear here{% endif %}.</p>
+  {% include '_groups.html' with groups=provider.groups empty_text='No messages contain these words.' %}
+  {% if provider.reasons %}<details class="why"><summary>About these results</summary><ul>{% for reason in provider.reasons %}<li>{{ reason }}</li>{% endfor %}</ul></details>{% endif %}
+  {% elif waiting %}
+  <div class="deep-cta"><div><h2>Searching inside messages…</h2>
+    <p>{{ deep_names }} {{ deep_verb }} searching full message text. Results appear here in a few seconds.</p></div></div>
+  {% else %}
+  <div class="deep-cta"><div><h2>Search inside messages too?</h2>
+    <p>The results below match subjects, senders and attachment names. {{ deep_names }} can search the full text of every message; results appear here in a few seconds.</p></div>
+    <form method="post" action="{% url 'search-request' %}">{% csrf_token %}<input type="hidden" name="q" value="{{ query }}">{% for s in chosen %}<input type="hidden" name="source" value="{{ s }}">{% endfor %}<button class="button" type="submit">Search inside messages</button></form></div>
+  {% endif %}
+</section>

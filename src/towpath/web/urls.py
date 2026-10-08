@@ -23,5 +23,5 @@ urlpatterns = [
     path("collections/<str:cid>/remove", unified_views.collection_remove, name="collection-remove"),
     path("collections/<str:cid>/accept", unified_views.collection_accept, name="collection-accept"),
     path("assets/app.css", views.stylesheet, name="stylesheet"),
-    path("assets/live.js", views.live_script, name="live-script"),
+    path("assets/htmx.min.js", views.htmx_script, name="htmx"),
 ]

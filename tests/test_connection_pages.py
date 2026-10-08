@@ -74,12 +74,15 @@ def test_add_choose_folders_index_and_watch_progress(pages):
     response = client.post(f"/connections/{sid}/folders", {"folder": ["INBOX"], "start": "1"})
     assert response["Location"] == f"/connections/{sid}/"
     html = client.get(f"/connections/{sid}/").content.decode()
-    assert "Starting to index" in html and 'name="towpath-live"' in html and ">Pause<" in html
+    assert "Starting to index" in html and ">Pause<" in html
+    assert 'hx-get="/connections/%s/live"' % sid in html and "/assets/htmx.min.js" in html  # the panel polls
+    panel = client.get(f"/connections/{sid}/live").content.decode()
+    assert panel.startswith('<div id="connection-live"') and "<html" not in panel and "Starting to index" in panel
     request_worker.run_once(env.config, env.credentials)
     html = client.get(f"/connections/{sid}/").content.decode()
-    assert ">7<" in html and "Check for new mail" in html and "towpath-live" not in html
+    assert ">7<" in html and "Check for new mail" in html and "hx-get" not in html and "htmx" not in html
     listing = client.get("/connections/").content.decode()
-    assert "towpath-live" not in listing
+    assert "hx-get" not in listing  # nothing busy, nothing polls
     assert "7 messages indexed" in listing and "Indexed" in listing
     for page in (html, listing):
         assert PASSWORD not in page

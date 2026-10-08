@@ -1,0 +1,34 @@
+<div id="connection-live" class="live-region"{% if c.status.busy %} hx-get="/connections/{{ c.source_id }}/live" hx-trigger="every 5s" hx-swap="outerHTML"{% endif %}>
+<p class="lead">{{ c.address }} · <span class="status {{ c.status.tone }}">{{ c.status.text }}</span></p>
+{% if c.last_error and not c.status.busy %}<div class="notice warn" role="alert">{{ c.last_error }}</div>{% endif %}
+{% if c.adapter == 'recoll' %}
+<section class="metrics">
+  <div class="metric"><p>Files in search</p><strong>{{ c.indexed_text|default:"0" }}</strong><span>{% if c.updated %}as of {{ c.updated }}{% else %}not indexed yet{% endif %}</span></div>
+  <div class="metric"><p>Folders</p><strong>{{ c.folders_chosen|length }}</strong><span>{{ c.folders_chosen|join:", " }}</span></div>
+  <div class="metric"><p>Files read</p><strong>{{ c.files_text|default:"–" }}</strong><span>{% if c.status.busy and c.total_text %}of about {{ c.total_text }}; {% endif %}{% if c.errors %}{{ c.errors }} couldn't be read{% else %}no read errors{% endif %}</span></div>
+</section>
+{% else %}
+<section class="metrics">
+  <div class="metric"><p>Messages indexed</p><strong>{{ c.indexed_text|default:"0" }}</strong><span>{% if c.updated %}as of {{ c.updated }}{% else %}not indexed yet{% endif %}</span></div>
+  {% if c.adapter == 'gmail' %}<div class="metric"><p>Scope</p><strong>All mail</strong><span>except spam and trash</span></div>
+  {% else %}<div class="metric"><p>Folders</p><strong>{{ c.folders_chosen|length }}</strong><span>{{ c.folders_chosen|join:", "|default:"none chosen yet" }}</span></div>{% endif %}
+  <div class="metric"><p>Speed</p><strong>{% if c.status.busy and c.rate %}{{ c.rate }}{% else %}–{% endif %}</strong><span>{% if c.status.busy and c.rate %}messages a minute, measured{% else %}shown while indexing{% endif %}</span></div>
+</section>
+{% endif %}
+<section class="detail-card connection-actions">
+  {% if c.state == 'choose-folders' %}<a class="button" href="/connections/{{ c.source_id }}/folders">Choose folders</a>
+  {% elif c.state == 'ready' %}
+    {% if c.status.busy %}<form method="post" action="/connections/{{ c.source_id }}/pause">{% csrf_token %}<button class="button" type="submit">Pause</button></form>
+    {% else %}<form method="post" action="/connections/{{ c.source_id }}/start">{% csrf_token %}<button class="button" type="submit">{% if c.indexing == 'paused' %}Resume indexing{% elif c.indexed and c.adapter == 'recoll' %}Index again{% elif c.indexed %}Check for new mail{% else %}Start indexing{% endif %}</button></form>{% endif %}
+    {% if c.adapter != 'gmail' %}<a class="button secondary" href="/connections/{{ c.source_id }}/folders">Change folders</a>{% endif %}
+  {% endif %}
+  {% if c.adapter == 'recoll' %}{% if c.indexed and not c.status.busy %}<a class="button secondary" href="/space/">See where the space goes</a>{% endif %}
+  {% elif c.adapter == 'gmail' %}
+    <a class="button {% if c.state == 'disconnected' %}{% else %}secondary{% endif %}" href="/connections/add/gmail?reconnect={{ c.source_id }}">Reconnect Gmail</a>
+    {% if c.state != 'disconnected' %}<a class="button secondary" href="/connections/{{ c.source_id }}/disconnect">Disconnect</a>{% endif %}
+  {% elif c.state != 'disconnected' %}<a class="button secondary" href="/connections/{{ c.source_id }}/password">Replace password</a>
+  <a class="button secondary" href="/connections/{{ c.source_id }}/disconnect">Disconnect</a>
+  {% else %}<a class="button" href="/connections/{{ c.source_id }}/password">Reconnect with a password</a>{% endif %}
+</section>
+<p class="footnote">{% if c.status.busy %}Progress here updates by itself. Indexing continues if you leave; pausing keeps everything indexed so far.{% elif c.adapter == 'recoll' %}Changes in these folders are picked up when you index again; Towpath never indexes on its own.{% else %}New mail is picked up when you check for it; Towpath never indexes on its own.{% endif %}</p>
+</div>

@@ -19,6 +19,7 @@ from urllib.parse import urlencode
 from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
 from django.core import signing
+from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods, require_POST
@@ -140,6 +141,12 @@ class LoginRequiredMiddleware:
         if not getattr(settings, "TOWPATH_LOGIN_REQUIRED", True) or request.path in OPEN_PATHS:
             return self.get_response(request)
         record = account(settings.TOWPATH_STORE_DIR)
+        fragment = request.headers.get("HX-Request") == "true"
+        if record is None or not signed_in(request, record):
+            if fragment:  # a live panel: send the whole page to sign-in, never swap the login form into the panel
+                response = HttpResponse(status=401)
+                response["HX-Redirect"] = "/setup" if record is None else "/login"
+                return response
         if record is None:
             return redirect("/setup")
         if not signed_in(request, record):

@@ -7,11 +7,13 @@ from towpath.web import auth, connection_views as v, views
 
 urlpatterns = [
     path("connections/", v.connection_list, name="connections"),
+    path("connections/list-live", v.connection_list, name="connections-live"),
     path("connections/add/<str:provider>", v.add, name="connection-add"),
     path("connections/google/client", v.google_client, name="google-client"),
     path("connections/google/start", v.google_start, name="google-start"),
     path("connections/google/callback", v.google_callback, name="google-callback"),
     path("connections/<str:sid>/", v.detail, name="connection"),
+    path("connections/<str:sid>/live", v.live, name="connection-live"),
     path("connections/<str:sid>/folders", v.folders, name="connection-folders"),
     path("connections/<str:sid>/start", v.start, name="connection-start"),
     path("connections/<str:sid>/pause", v.pause, name="connection-pause"),
@@ -23,5 +25,5 @@ urlpatterns = [
     path("login", auth.login, name="login"),
     path("logout", auth.logout, name="logout"),
     path("assets/app.css", views.stylesheet, name="stylesheet"),
-    path("assets/live.js", views.live_script, name="live-script"),
+    path("assets/htmx.min.js", views.htmx_script, name="htmx"),
 ]

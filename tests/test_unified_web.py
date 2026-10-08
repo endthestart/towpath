@@ -98,8 +98,10 @@ def test_keyword_query_is_catalog_only_and_offers_a_queued_provider_search(web, 
     response = web.post("/search/request", {"q": "fundraiser"})
     assert response.status_code == 302
     waiting = web.get("/search/", {"q": "fundraiser"}).content.decode()
-    assert "Searching inside messages…" in waiting and 'name="towpath-live"' in waiting
-    assert '<script src="/assets/live.js" defer></script>' in waiting and "<noscript>" in waiting
+    assert "Searching inside messages…" in waiting and '<script src="/assets/htmx.min.js" defer></script>' in waiting
+    assert 'hx-get="/search/?q=fundraiser&amp;part=deep"' in waiting and 'hx-trigger="every 3s"' in waiting
+    panel = web.get("/search/", {"q": "fundraiser", "part": "deep"}).content.decode()
+    assert panel.lstrip().startswith('<section class="deep-search"') and "<html" not in panel
     with closing(open_store(uni.config.store_dir, "queue", "connect")) as q:
         assert [json.loads(r["filters"])["text"] for r in q.execute("SELECT filters FROM search_requests")] == [
             "fundraiser"]
