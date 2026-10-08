@@ -23,7 +23,7 @@ from towpath.connections import ConnectionProblem, _now, _update, get
 from towpath.stores import open_store
 
 SID = "folders"
-PAGE = 5000
+PAGE = 20000  # rows per Recoll call while adding to search; each call starts the bridge afresh
 LIBRARY_ENV = "TOWPATH_LIBRARY"
 # Files Recoll should index by name only: photos, video, audio, disk images and binaries have no useful text,
 # and reading them all would only add load on the pool. Types Recoll doesn't recognise are listed by name too.

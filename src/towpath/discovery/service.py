@@ -465,6 +465,8 @@ def import_catalog(config, provider_id: str | None = None, root: str | None = No
     reports = []
     for alias in targets:
         db = fstore.connect_rw(config)
+        if page_size:  # a large catalog: keep its indexes' pages in memory while rows go in by ID, not in order
+            db.execute("PRAGMA cache_size = -262144")
         run = fstore.begin_run(db, prov.id, "import")
         statuses, refused, seen, changed = Counter(), 0, 0, 0
         complete, reason, termination = True, None, "complete"
