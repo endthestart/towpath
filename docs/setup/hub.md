@@ -13,7 +13,10 @@ after the same registry check failed once):
 - `web`: `ghcr.io/endthestart/towpath@sha256:6074e2466fdb3fbe6a637e57442ec8243aaecb224934d4adf0d66f6d741a66ba`
 - `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:01eebb4d3f749c6fbe260fe6d896a773f35e847f849bf47a7de3bb76dd19d306`
 
-The personal datasets are mounted read-only under `/library` in the connectors only, which join a read-only
+Towpath's data folder (stores, sign-ins and the Recoll index) lives on a mirrored SSD pool since 2026-10-08,
+with hourly snapshots replicated to the main pool: Recoll's index writes had saturated the spinning disks. The
+earlier copy on the main pool is kept for rollback. The personal datasets are mounted read-only under `/library`
+in the connectors only, which join a read-only
 group set in the TrueNAS GUI (Read with Inherit, applied recursively per dataset, not to child datasets). The
 first folder index was running across those datasets when this release was deployed; Recoll resumed after each
 restart. Measurements behind these releases are in the
