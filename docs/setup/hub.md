@@ -6,11 +6,12 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `339f3b3` (live panels update with htmx; the rest of each page stays put), publishing run
-[37768336736](https://github.com/endthestart/towpath/actions/runs/37768336736):
+Revision `c615cc5` (the Folders page shows files actually in search and the reading pace), publishing run
+[37777561404](https://github.com/endthestart/towpath/actions/runs/37777561404) (the Recoll publish job rerun
+after the same registry check failed once):
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:7b3acc350db3a963c9a8a96b8b8c6700ddcf769bed2dfeb59022acfa3063bca9`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:4e19ce4ae79f3e9b88036677a98a04770b1ee7c584c055864e239fde7cd79df1`
+- `web`: `ghcr.io/endthestart/towpath@sha256:6074e2466fdb3fbe6a637e57442ec8243aaecb224934d4adf0d66f6d741a66ba`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:01eebb4d3f749c6fbe260fe6d896a773f35e847f849bf47a7de3bb76dd19d306`
 
 The personal datasets are mounted read-only under `/library` in the connectors only, which join a read-only
 group set in the TrueNAS GUI (Read with Inherit, applied recursively per dataset, not to child datasets). The
@@ -22,6 +23,7 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `339f3b3` | Live panels with htmx | `towpath@sha256:7b3acc35…`, `towpath-recoll@sha256:4e19ce4a…` |
 | `c8f1284` | Index batches of 512 MB by default (a setting) | `towpath@sha256:9d59c584…`, `towpath-recoll@sha256:eb418795…` |
 | `e47692a` | Probable duplicates on Space; the web service later on `858ea5c` (largest files per folder) | `towpath@sha256:f3d4eeeb…` (web `9e257e1d…`), `towpath-recoll@sha256:fbb9ba8d…` |
 | `97e6e24` | Adding to search beside the worker loop; Overview counts kept; plain file pages (web first, connectors after Recoll left a large archive) | `towpath@sha256:35418ebf…`, `towpath-recoll@sha256:89344115…` |
