@@ -40,6 +40,11 @@ unique at every level, so they make 5 million folders, far more than real trees.
   into the whole index, so Recoll spent hours flushing at about 1.5 documents/s and had written 418 GB in total.
   Batches are now 512 MB by default (a setting on the Folders page), and putting the index folder on SSD
   storage would help most.
+- Moved to an NVMe mirror, the index still took 7+ minutes per batch: with a 128K record size the pool wrote
+  113–145 MB/s (both drives together) for Recoll's 13 MB/s. Rewritten at 16K, two batches took 6.3 and 3.6
+  minutes with the pool writing 84 and 145 MB/s for Recoll's 32 and 42 MB/s (1.3–1.7× per drive). The rest of
+  each batch is Xapian's own work: merging 512 MB of new text rewrote 9–12 GB of a 44 GB index. Larger batches
+  are the remaining lever (fewer merges), at the cost of memory.
 - ZFS counts objects, not files: `df -i` gave 7.1 M for the four datasets, Recoll walked 3.03 M files.
 - Files that Recoll couldn't read (149 of the first 1.5 M) are mostly CHM help files with no pages, RAR archives,
   and damaged or cloud-placeholder Office files.

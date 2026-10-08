@@ -72,6 +72,21 @@ documents. It reads them only, through a read-only mount, and never changes, mov
    and clutter that is usually safe to clean up (package folders, caches, recycle bins, system copies, old
    backup sets). It only reads the index; deleting is up to you.
 
+## Storage
+
+Towpath's data folder holds SQLite stores and, with folders indexed, Recoll's index, which grows to tens of GB
+for millions of files. Both are written in small pages (4 KB for SQLite, 8 KB for Recoll's Xapian index), so:
+
+- **Put the data folder on SSD.** On spinning disks a large index spends hours on each batch write.
+- **Set the dataset's record size to 16K** (**Datasets → Edit → Advanced Options → Record Size**). With the
+  default 128K, ZFS rewrites a whole 128 KB block for every small page, several times the real writes. The
+  setting applies to files written afterwards: copy existing files once (with Towpath stopped) to rewrite them.
+- Media and backups are the opposite: written once and read straight through, they are best left at 128K or
+  set to 1M. Small files gain nothing from a smaller record size; they are already stored in one small block.
+
+Even tuned, Recoll's first pass over millions of files takes many hours: each batch of new text is merged into
+the whole index. Later passes only touch what changed.
+
 ## Updating, rolling back and backing up
 
 - **Update:** put the new release's two digests in the environment and redeploy.
