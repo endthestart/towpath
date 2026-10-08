@@ -203,6 +203,8 @@ def test_the_folders_page_picks_and_starts(inst, monkeypatch):
         response = client.post("/connections/add/folders", {"folder": [str(inst.library / "documents")],
                                                             "start": "1"})
         assert response["Location"] == "/connections/folders/"
+        connections._update(inst.config.store_dir, folders.SID, progress={"phase": "done", "indexed": 1234})
+        assert "1,234 files in search" in client.get("/connections/").content.decode()
         detail = client.get("/connections/folders/").content.decode()
         assert "Files in search" in detail and "documents" in detail and ">Pause<" in detail
         assert client.post("/connections/add/folders", {"folder": ["/etc"]}).status_code == 400
