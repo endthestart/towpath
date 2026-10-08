@@ -61,6 +61,8 @@ CREATE TABLE IF NOT EXISTS items (
   size_estimate INTEGER, first_seen_run TEXT NOT NULL, last_seen_run TEXT NOT NULL, absent_since_run TEXT,
   structure_truncated INTEGER NOT NULL DEFAULT 0, inline_data_discarded INTEGER NOT NULL DEFAULT 0,
   problems TEXT NOT NULL DEFAULT '[]', UNIQUE (source_id, native_id));
+-- Present and absent message counts for status pages without reading every row.
+CREATE INDEX IF NOT EXISTS items_presence ON items (source_id, absent_since_run);
 CREATE TABLE IF NOT EXISTS parts (
   item_id TEXT NOT NULL, part_id TEXT NOT NULL, depth INTEGER NOT NULL, mime_type TEXT, charset TEXT,
   filename TEXT, disposition TEXT, size INTEGER, attachment_id TEXT,
@@ -190,6 +192,11 @@ END;
 CREATE TRIGGER IF NOT EXISTS occurrences_text_delete AFTER DELETE ON occurrences BEGIN
   DELETE FROM occurrences_text WHERE rowid = old.rowid;
 END;
+-- Each root's present occurrences counted by extraction status, as [[status, count], ...]: rebuilt after every
+-- import so that status pages never count millions of rows.
+CREATE TABLE IF NOT EXISTS catalog_counts (
+  provider_id TEXT NOT NULL, root_alias TEXT NOT NULL, counts TEXT NOT NULL, updated_at TEXT NOT NULL,
+  PRIMARY KEY (provider_id, root_alias));
 CREATE TABLE IF NOT EXISTS occurrence_versions (
   occurrence_id TEXT NOT NULL, version TEXT NOT NULL, first_seen_run TEXT NOT NULL,
   PRIMARY KEY (occurrence_id, version));
@@ -245,6 +252,10 @@ def open_store(store_dir: Path, store: str, role: str) -> sqlite3.Connection:
     return conn
 
 
+CATALOG_COUNTS = ("SELECT provider_id, root_alias, json_extract(extraction, '$.status') AS status, count(*) AS n "
+                  "FROM occurrences WHERE missing_since_run IS NULL")
+
+
 def _add_columns(conn: sqlite3.Connection, store: str) -> None:
     for table, columns in ADDED_COLUMNS.get(store, {}).items():
         present = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
@@ -255,6 +266,12 @@ def _add_columns(conn: sqlite3.Connection, store: str) -> None:
         # A catalog written before the search index existed: index what it already holds, once.
         conn.execute("INSERT INTO occurrences_text (rowid, text) SELECT rowid, rel_path || ' ' || members "
                      "FROM occurrences")
+    if store == "files" and not conn.execute("SELECT 1 FROM catalog_counts LIMIT 1").fetchone():
+        # A catalog written before the counts existed: count what it already holds, once.
+        conn.execute(f"INSERT INTO catalog_counts (provider_id, root_alias, counts, updated_at) "
+                     f"SELECT provider_id, root_alias, json_group_array(json_array(status, n)), "
+                     f"strftime('%Y-%m-%dT%H:%M:%SZ', 'now') FROM ({CATALOG_COUNTS} GROUP BY provider_id, root_alias, "
+                     f"status) GROUP BY provider_id, root_alias")
     conn.commit()
 
 

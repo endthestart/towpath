@@ -72,13 +72,18 @@ def _expansion_cursor(cursor: str | None) -> dict:
     return state
 
 
-def _text_match(column: str, pattern_word: str, exact: str) -> tuple[str, list]:
-    """A substring condition on a files catalog row: the trigram index narrows (it can't take ESCAPE), the exact
-    escaped LIKE decides. Patterns under three characters use the exact LIKE alone."""
-    if len(pattern_word) >= 3:
-        return (f"rowid IN (SELECT rowid FROM occurrences_text WHERE text LIKE ?) AND {column} LIKE ? ESCAPE '\\'",
-                [f"%{pattern_word}%", exact])
-    return f"{column} LIKE ? ESCAPE '\\'", [exact]
+def _fts_query(words, extensions) -> str | None:
+    """A trigram-index query for the files catalog: rows holding every word and, when extensions are asked for,
+    one of them. A quoted phrase matches as a substring, case-insensitively. Terms under three characters can't
+    be looked up in a trigram index; they are left to the exact match, and None means nothing narrows."""
+    def phrase(term: str) -> str:
+        return '"' + term.replace('"', '""') + '"'
+
+    parts = [phrase(w) for w in words if len(w) >= 3]
+    suffixes = [f".{e}" for e in extensions]
+    if suffixes and all(len(x) >= 3 for x in suffixes):
+        parts.append("(" + " OR ".join(phrase(x) for x in suffixes) + ")")
+    return " AND ".join(parts) or None
 
 
 def _any(clause: str, n: int) -> str:
@@ -129,10 +134,8 @@ class MailAdapter(SourceAdapter):
         try:
             runs = db.execute("SELECT * FROM runs WHERE source_id = ? AND kind != 'fetch' ORDER BY seq DESC",
                               (self.source_id,)).fetchall()
-            present = db.execute("SELECT COUNT(*) FROM items WHERE source_id = ? AND absent_since_run IS NULL",
-                                 (self.source_id,)).fetchone()[0]
-            absent = db.execute("SELECT COUNT(*) FROM items WHERE source_id = ? AND absent_since_run IS NOT NULL",
-                                (self.source_id,)).fetchone()[0]
+            present, absent = db.execute("SELECT count(*) - count(absent_since_run), count(absent_since_run) "
+                                         "FROM items WHERE source_id = ?", (self.source_id,)).fetchone()
         finally:
             db.close()
         latest = runs[0] if runs else None
@@ -393,6 +396,8 @@ class FilesAdapter(SourceAdapter):
         return open_store(self.config.store_dir, "files", READ_ROLE)
 
     def status(self) -> SourceStatus:
+        from towpath.discovery import store as fstore
+
         files = self.config.files
         state, reason = "ready", None
         if files is None or not files.enabled:
@@ -403,11 +408,9 @@ class FilesAdapter(SourceAdapter):
         db = self._db()
         try:
             for alias in granted:
-                for row in db.execute("SELECT extraction FROM occurrences WHERE provider_id = ? AND root_alias = ? "
-                                      "AND missing_since_run IS NULL", (self.provider_id, alias)):
-                    status = json.loads(row["extraction"]).get("status")
+                for status, n in fstore.counts(db, self.provider_id, alias):
                     key = envelopes.FILE_COVERAGE.get(status, "unknown")
-                    counts[key] = counts.get(key, 0) + 1
+                    counts[key] = counts.get(key, 0) + n
                 latest = db.execute("SELECT complete FROM coverage WHERE provider_id = ? AND root_alias = ? "
                                     "ORDER BY rowid DESC LIMIT 1", (self.provider_id, alias)).fetchone()
                 complete.append(None if latest is None else bool(latest["complete"]))
@@ -452,23 +455,28 @@ class FilesAdapter(SourceAdapter):
         if not granted:
             raise SourceDenied(f"no root of files provider {self.provider_id} has a search grant")
         roots = self.config.files.roots
-        where = ["provider_id = ?", "missing_since_run IS NULL",
-                 f"root_alias IN ({','.join('?' for _ in granted)})"]
+        where = ["o.provider_id = ?", "o.missing_since_run IS NULL",
+                 f"o.root_alias IN ({','.join('?' for _ in granted)})"]
         args: list = [self.provider_id, *granted]
-        text = "lower(rel_path || ' ' || members)"
+        text = "lower(o.rel_path || ' ' || o.members)"
         for w in filters.words:
-            clause, values = _text_match(text, w, _like(w))
-            where.append(clause)
-            args += values
+            where.append(f"{text} LIKE ? ESCAPE '\\'")
+            args.append(_like(w))
         if filters.extensions:
-            parts = [_text_match(text, f".{e}", _like(f".{e}")) for e in filters.extensions]
-            where.append("(" + " OR ".join(f"({c})" for c, _ in parts) + ")")
-            args += [v for _, values in parts for v in values]
+            where.append(_any(f"{text} LIKE ? ESCAPE '\\'", len(filters.extensions)))
+            args += [_like(f".{e}") for e in filters.extensions]
         if filters.media_types:
-            where.append(_any("lower(coalesce(media_type, '')) LIKE ?", len(filters.media_types)))
+            where.append(_any("lower(coalesce(o.media_type, '')) LIKE ?", len(filters.media_types)))
             args += [f"{m}%" for m in filters.media_types]
-        sql = (f"SELECT * FROM occurrences WHERE {' AND '.join(where)} "
-               "ORDER BY root_alias, rel_path, occurrence_id LIMIT ? OFFSET ?")
+        # Catalog order (the import's, which is path order for a first import). With a query the trigram index
+        # drives: it yields rows in that order, so a page stops after its rows instead of sorting every match.
+        match = _fts_query(filters.words, filters.extensions)
+        if match is not None:
+            sql = ("SELECT o.* FROM occurrences_text t JOIN occurrences o ON o.rowid = t.rowid "
+                   f"WHERE t.text MATCH ? AND {' AND '.join(where)} ORDER BY t.rowid LIMIT ? OFFSET ?")
+            args.insert(0, match)
+        else:
+            sql = f"SELECT o.* FROM occurrences o WHERE {' AND '.join(where)} ORDER BY o.rowid LIMIT ? OFFSET ?"
         db = self._db()
         try:
             def fetch(offset, n):

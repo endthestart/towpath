@@ -67,7 +67,7 @@ OptionalConfigOpt = typer.Option(None, "--config", "-c", help="Configuration fil
 def _connector_setup(data_dir: Path | None, config: Path | None, credentials_dir: Path | None):
     """The configuration and credentials folder for a connector command, from a data folder or explicit paths."""
     if data_dir is not None:
-        from towpath import layout as layout_mod
+        from towpath import layout as layout_mod, stores
 
         try:
             layout = layout_mod.prepare(data_dir)
@@ -77,6 +77,11 @@ def _connector_setup(data_dir: Path | None, config: Path | None, credentials_dir
             raise typer.Exit(2) from None
         except config_mod.ConfigError as exc:
             raise typer.BadParameter(str(exc)) from exc
+        # The stores the connectors write gain this version's tables and indexes before the web service, which
+        # starts after them and only reads, checks for them. Stores that don't exist yet are left to their writer.
+        for name, roles in stores.WRITERS.items():
+            if "connect" in roles and stores.store_path(cfg.store_dir, name).exists():
+                stores.open_store(cfg.store_dir, name, "connect").close()
         return cfg, credentials_dir or layout.credentials
     return _load(config or Path("towpath.toml")), credentials_dir
 

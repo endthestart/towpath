@@ -86,6 +86,21 @@ def test_the_connector_prepares_a_fresh_folder_and_explains_a_bad_one(tmp_path):
     assert missing.exit_code == 2 and "Create it and restart" in missing.output
 
 
+def test_the_connector_brings_its_stores_up_to_date_before_the_web_service_reads_them(tmp_path):
+    import sqlite3
+
+    from towpath import stores
+
+    layout = layout_mod.prepare(tmp_path)
+    old = sqlite3.connect(layout.state / "files.db")  # a catalog from before the counts table
+    old.executescript(stores.SCHEMAS["files"].replace("CREATE TABLE IF NOT EXISTS catalog_counts", "CREATE TABLE x"))
+    old.close()
+    assert not stores.schema_status(layout.state, ["files"])[0]["current"]
+    result = CliRunner().invoke(app, ["connect", "run-worker", "--data-dir", str(tmp_path), "--once"])
+    assert result.exit_code == 0, result.output
+    assert stores.schema_status(layout.state, ["files"])[0]["current"]
+
+
 def test_the_web_service_starts_on_a_fresh_install(tmp_path, monkeypatch):
     layout = layout_mod.prepare(tmp_path)
     launched = {}

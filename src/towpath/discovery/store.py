@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 from towpath.canonical import canonical_json, short_id
 from towpath.discovery.records import Occurrence
-from towpath.stores import open_store
+from towpath.stores import CATALOG_COUNTS, open_store
 
 WRITER = "connect"
 
@@ -74,6 +74,25 @@ def observe(db, occ: Occurrence, run_id: str) -> str:
         db.execute("INSERT OR IGNORE INTO occurrence_versions (occurrence_id, version, first_seen_run) VALUES (?,?,?)",
                    (occ.occurrence_id, occ.version, run_id))
     return state
+
+
+def refresh_counts(db, provider_id: str, root: str) -> None:
+    """Recount one root's present occurrences by extraction status (see ``catalog_counts``)."""
+    rows = db.execute(f"{CATALOG_COUNTS} AND provider_id = ? AND root_alias = ? GROUP BY status ORDER BY status",
+                      (provider_id, root)).fetchall()
+    db.execute("INSERT OR REPLACE INTO catalog_counts (provider_id, root_alias, counts, updated_at) VALUES (?,?,?,?)",
+               (provider_id, root, canonical_json([[r["status"], r["n"]] for r in rows]), now()))
+    db.commit()
+
+
+def counts(db, provider_id: str, root: str) -> list:
+    """[[status, count], ...] for one root: kept by ``refresh_counts``, or counted now for a root never imported."""
+    row = db.execute("SELECT counts FROM catalog_counts WHERE provider_id = ? AND root_alias = ?",
+                     (provider_id, root)).fetchone()
+    if row is not None:
+        return json.loads(row["counts"])
+    return [[r["status"], r["n"]] for r in db.execute(f"{CATALOG_COUNTS} AND provider_id = ? AND root_alias = ? "
+                                                      "GROUP BY status", (provider_id, root))]
 
 
 def mark_missing(db, provider_id: str, root: str, run_id: str) -> int:

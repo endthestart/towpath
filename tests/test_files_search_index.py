@@ -2,6 +2,7 @@
 backfilled for older catalogs, and actually used. Invented paths only."""
 
 from contextlib import closing
+import json
 import random
 import sqlite3
 import string
@@ -9,9 +10,18 @@ import string
 import pytest
 
 from towpath.stores import SCHEMAS, open_store
-from towpath.unified.sources import _like, _text_match
+from towpath.unified.sources import _fts_query, _like
 
-TEXT = "lower(rel_path || ' ' || members)"
+TEXT = "lower(o.rel_path || ' ' || o.members)"
+
+
+def query(word: str) -> tuple[str, list]:
+    """The catalog query's shape: the trigram index drives when it can, the exact escaped LIKE decides."""
+    match = _fts_query([word], [])
+    if match is None:
+        return f"SELECT o.rel_path FROM occurrences o WHERE {TEXT} LIKE ? ESCAPE '\\' ORDER BY o.rowid", [_like(word)]
+    return ("SELECT o.rel_path FROM occurrences_text t JOIN occurrences o ON o.rowid = t.rowid "
+            f"WHERE t.text MATCH ? AND {TEXT} LIKE ? ESCAPE '\\' ORDER BY t.rowid", [match, _like(word)])
 
 
 def add(db, n: int, rel: str, members: str = "[]"):
@@ -22,12 +32,12 @@ def add(db, n: int, rel: str, members: str = "[]"):
 
 
 def search(db, word: str) -> set[str]:
-    clause, args = _text_match(TEXT, word, _like(word))
-    return {r[0] for r in db.execute(f"SELECT rel_path FROM occurrences WHERE {clause}", args)}
+    sql, args = query(word)
+    return {r[0] for r in db.execute(sql, args)}
 
 
 def plain(db, word: str) -> set[str]:
-    return {r[0] for r in db.execute(f"SELECT rel_path FROM occurrences WHERE {TEXT} LIKE ? ESCAPE '\\'",
+    return {r[0] for r in db.execute(f"SELECT o.rel_path FROM occurrences o WHERE {TEXT} LIKE ? ESCAPE '\\'",
                                      (_like(word),))}
 
 
@@ -46,7 +56,7 @@ def test_answers_match_a_plain_substring_search(db):
         add(db, n, rel, '["mail/backup.mbox:1:paper.docx"]' if n % 50 == 0 else "[]")
     db.commit()
     for word in ("dsc_0001", "dsc", "100%", "nef", ".nef", "lock keeper", "a_b", "ab", "x", "paper.docx",
-                 "canal-walk", "nothing-like-this"):
+                 "canal-walk", "nothing-like-this", 'say "hi"'):
         assert search(db, word.lower()) == plain(db, word.lower()), word
 
 
@@ -80,7 +90,34 @@ def test_a_catalog_written_before_the_index_is_backfilled_once(tmp_path):
         assert db.execute("SELECT count(*) FROM occurrences_text").fetchone()[0] == 1
 
 
-def test_searches_use_the_index(db):
-    clause, args = _text_match(TEXT, "keeper", _like("keeper"))
-    plan = " ".join(r[-1] for r in db.execute(f"EXPLAIN QUERY PLAN SELECT * FROM occurrences WHERE {clause}", args))
-    assert "VIRTUAL TABLE INDEX" in plan and "occurrences_text" in plan
+def test_searches_use_the_index_and_never_sort_every_match(db):
+    sql, args = query("keeper")
+    plan = " ".join(r[-1] for r in db.execute(f"EXPLAIN QUERY PLAN {sql}", args))
+    assert "VIRTUAL TABLE INDEX" in plan and "TEMP B-TREE" not in plan
+
+
+def test_extensions_narrow_as_alternatives():
+    assert _fts_query(["canal"], ["jpg", "nef"]) == '"canal" AND (".jpg" OR ".nef")'
+    assert _fts_query(["ab"], ["c"]) is None  # nothing long enough for the trigram index
+
+
+def test_counts_by_status_are_kept_per_root_not_counted_on_every_read(tmp_path):
+    from towpath.discovery import store as fstore
+
+    with closing(open_store(tmp_path, "files", "connect")) as db:
+        add(db, 1, "letters/a.txt")
+        add(db, 2, "letters/b.txt")
+        db.execute("UPDATE occurrences SET extraction = '{\"status\": \"indexed\"}' WHERE occurrence_id = 'o1'")
+        db.commit()
+        expected = sorted([[None, 1], ["indexed", 1]], key=str)
+        assert sorted(fstore.counts(db, "p", "r"), key=str) == expected  # never imported: counted now
+        fstore.refresh_counts(db, "p", "r")
+        db.execute("UPDATE occurrences SET missing_since_run = 'run2' WHERE occurrence_id = 'o2'")
+        db.commit()
+        assert len(fstore.counts(db, "p", "r")) == 2  # the kept counts until the next import recounts
+        fstore.refresh_counts(db, "p", "r")
+        assert fstore.counts(db, "p", "r") == [["indexed", 1]]
+        db.execute("DELETE FROM catalog_counts")
+        db.commit()
+    with closing(open_store(tmp_path, "files", "connect")) as db:  # a catalog from before the counts: counted once
+        assert json.loads(db.execute("SELECT counts FROM catalog_counts").fetchone()[0]) == [["indexed", 1]]

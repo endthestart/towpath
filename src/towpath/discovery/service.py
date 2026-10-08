@@ -526,6 +526,7 @@ def import_catalog(config, provider_id: str | None = None, root: str | None = No
             termination = "partial"
         missing = fstore.mark_missing(db, prov.id, alias, run) if complete else 0
         db.commit()
+        fstore.refresh_counts(db, prov.id, alias)
         fstore.record_coverage(db, run, prov.id, alias, complete, seen, dict(statuses), reason)
         fstore.finish_run(db, run, termination, seen, reason)
         db.close()
