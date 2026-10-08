@@ -24,7 +24,9 @@ The historical milestone table is a dependency inventory, not the current delive
 
 Recorded for planning; none is scheduled yet.
 
-- **Apple data.** iCloud Mail works today through the IMAP connection (Apple app-specific password). Contacts and
+- **Apple data** (owner direction: ancillary, not built into Towpath). Personal backups are wanted anyway, so
+  these become documented how-tos, with small standalone tools written only where nothing suitable exists;
+  Towpath then indexes the copies like any other folder. iCloud Mail works today through the IMAP connection (Apple app-specific password). Contacts and
   calendars would use CardDAV/CalDAV the same way. iCloud Photos and Drive have no supported third-party API:
   the practical route is an existing open-source tool that copies them to the NAS (for example icloudpd for
   photos, which needs "Access iCloud Data on the Web" and periodic re-sign-in), then indexing the copy as
