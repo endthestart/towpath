@@ -6,20 +6,22 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `522ca49` (folders on the server from the Connections page), publishing run
-[37698184333](https://github.com/endthestart/towpath/actions/runs/37698184333):
+Revision `a23c572` (folder picker shows included subfolders; Recoll image adds `file`, audio tags and image
+metadata), publishing run [37708934450](https://github.com/endthestart/towpath/actions/runs/37708934450):
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:724e5780119d54ba3521483e96568976c8ab9a717500d4573e641a7ad1f69592`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:7b26805ccfa5f2c246d5d125aa0e58021907e0d76dd101af2748146f352e138d`
+- `web`: `ghcr.io/endthestart/towpath@sha256:e81fc48fc7514913655005d15a5f174a50f2509cec1bc801f80437d4cf9418d4`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:1a2a5967a8daf7f52316dbb68f529272c1962534fc9238e38787ef44297ddc5b`
 
-The four personal datasets are mounted read-only under `/library` in the two connector services only. The
-containers' user can read the media dataset; the others wait for a read-only group set in the TrueNAS GUI.
-Before deploying, `recollindex` ran in the hardened container under `nice` and idle I/O priority.
+The personal datasets are mounted read-only under `/library` in the connectors only, which join a read-only
+group set in the TrueNAS GUI (Read with Inherit, applied recursively per dataset, not to child datasets). The
+first folder index was running across those datasets when this release was deployed; Recoll resumed after the
+restart.
 
 Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `522ca49` | Folders on the server from the Connections page | `towpath@sha256:724e5780…`, `towpath-recoll@sha256:7b26805c…` |
 | `6205160` | Single data folder, shell-free install, user 568; bounded source downloads | `towpath@sha256:9880ac3f…`, `towpath-recoll@sha256:b4de7395…` |
 | `8f5f0c8` | Plain-language Gmail pages; separate folders, user 10001 | `towpath@sha256:293a4011…`, `towpath-recoll@sha256:fc83ae31…` |
 | `c9ff8e7` | Gmail on the Connections page (configured connection imported, no Google call) | `towpath@sha256:02dbfba0…`, `towpath-recoll@sha256:b56beb7f…` |
