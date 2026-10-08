@@ -185,9 +185,14 @@ def folders(request, sid):
     return response
 
 
-def _detail_context(sid: str) -> dict:
-    c = _view(_get(sid))
+def _detail_context(sid: str, indexing: dict | None = None) -> dict:
+    raw = _get(sid)
+    c = _view(raw)
     context = {"nav": "connections", "c": c, "now": datetime.now(timezone.utc)}
+    if c["adapter"] == "recoll":
+        from towpath import folders as folder_index
+
+        context["indexing"] = indexing or folder_index.options(raw)
     if c["adapter"] == "gmail" and getattr(settings, "TOWPATH_CONFIG", None) is not None:
         from towpath.quota import METHOD_COSTS
 
@@ -201,7 +206,7 @@ def _detail_context(sid: str) -> dict:
 
 @require_GET
 def detail(request, sid):
-    return render(request, "connection_detail.html", _detail_context(sid))
+    return render(request, "connection_detail.html", {**_detail_context(sid), "saved": request.GET.get("saved")})
 
 
 @require_POST
@@ -327,6 +332,23 @@ def google_callback(request):
     response = redirect(f"/connections/{sid}/")
     response.delete_cookie(OAUTH_COOKIE, path="/connections/google/", samesite="Lax")
     return response
+
+
+@require_POST
+def indexing_settings(request, sid):
+    from towpath import folders as folder_index
+
+    if _get(sid)["adapter"] != "recoll":
+        raise Http404
+    defaults = folder_index.DEFAULTS
+    form = {k: v for k, v in defaults.items() if v is not False} if request.POST.get("reset") else request.POST
+    try:
+        folder_index.set_options(settings.TOWPATH_CONFIG, form)
+    except ConnectionProblem as exc:
+        typed = {k: request.POST.get(k, "") for k in defaults} | {"sniff": bool(request.POST.get("sniff"))}
+        return render(request, "connection_detail.html",
+                      {**_detail_context(sid, typed), "indexing_error": str(exc)}, status=400)
+    return redirect(f"/connections/{sid}/?saved=indexing")
 
 
 @require_POST

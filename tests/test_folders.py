@@ -127,6 +127,47 @@ def test_recoll_configuration_lists_everything_and_reads_media_by_name_only(inst
     assert "usesystemfilecommand = 0" in text and "thrTCounts = 2 1 1" in text
 
 
+def test_indexing_settings_are_validated_saved_and_written_to_recolls_configuration(inst, tmp_path):
+    folders.choose(inst.config, [str(inst.library / "documents")])
+    assert folders.options(connections.get(inst.config.store_dir, folders.SID)) == folders.DEFAULTS
+    form = {**folders.DEFAULTS, "threads": "6", "name_only": ".ISO .vmdk", "sniff": "on", "compressed_limit_mb": "0"}
+    folders.set_options(inst.config, form)
+    c = connections.get(inst.config.store_dir, folders.SID)
+    assert c["settings"]["indexing"] == {"threads": 6, "name_only": ".iso .vmdk", "sniff": True,
+                                         "compressed_limit_mb": 0}  # only what differs from the defaults
+    folders.choose(inst.config, [str(inst.library / "documents"), str(inst.library / "photos")])
+    o = folders.options(connections.get(inst.config.store_dir, folders.SID))  # choosing again keeps them
+    assert (o["threads"], o["sniff"]) == (6, True)
+    text = folders.write_conf(tmp_path / "conf", [{"path": "/library/docs"}], tmp_path / "s", o).read_text()
+    assert "thrTCounts = 6 3 1" in text and "usesystemfilecommand = 1" in text and "compressedfilemaxkbs = 0\n" in text
+    assert "noContentSuffixes+ = .iso .vmdk\n" in text
+    for bad in ({"threads": "0"}, {"threads": "many"}, {"name_only": "iso"}, {"skip": 'a"b'},
+                {"skip": "x\nloglevel = 6"}, {"skip": "a=b"}, {"text_limit_mb": "-1"}):
+        with pytest.raises(connections.ConnectionProblem):
+            folders.set_options(inst.config, {**folders.DEFAULTS, **bad})
+    assert folders.options(connections.get(inst.config.store_dir, folders.SID))["threads"] == 6  # unchanged
+
+
+def test_the_folders_page_changes_indexing_settings(inst, monkeypatch):
+    folders.choose(inst.config, [str(inst.library / "documents")])
+    configure(inst.config.store_dir)
+    with override_settings(TOWPATH_STORE_DIR=inst.config.store_dir, TOWPATH_CONFIG=inst.config,
+                           ALLOWED_HOSTS=["testserver"], ROOT_URLCONF="towpath.web.connection_urls",
+                           TOWPATH_LOGIN_REQUIRED=False, TOWPATH_CREDENTIALS_DIR=inst.layout.credentials):
+        client = Client()
+        page = client.get("/connections/folders/").content.decode()
+        assert "Files read at once" in page and 'value="2"' in page and "Skip these names" in page
+        form = {**{k: v for k, v in folders.DEFAULTS.items() if v is not False}, "threads": "3"}
+        response = client.post("/connections/folders/indexing", form)
+        assert response.status_code == 302 and response["Location"] == "/connections/folders/?saved=indexing"
+        assert "Saved." in client.get(response["Location"]).content.decode()
+        refused = client.post("/connections/folders/indexing", {**form, "threads": "40"})
+        assert refused.status_code == 400 and "between 1 and 16" in refused.content.decode()
+        assert 'value="40"' in refused.content.decode()  # what was typed stays in the form
+        client.post("/connections/folders/indexing", {"reset": "1"})
+    assert folders.options(connections.get(inst.config.store_dir, folders.SID)) == folders.DEFAULTS
+
+
 def test_status_keeps_counts_but_never_the_current_file_name(tmp_path):
     (tmp_path / "idxstatus.txt").write_text("phase = 1\nfn = /secret/name.txt\nfilesdone = 12\ndbtotdocs = 9\n")
     assert folders.read_status(tmp_path) == {"phase": 1, "filesdone": 12, "dbtotdocs": 9}

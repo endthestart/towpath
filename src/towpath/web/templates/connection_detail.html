@@ -35,6 +35,26 @@
   <a class="button secondary" href="/connections/{{ c.source_id }}/disconnect">Disconnect</a>
   {% else %}<a class="button" href="/connections/{{ c.source_id }}/password">Reconnect with a password</a>{% endif %}
 </section>
+{% if indexing %}<section class="detail-card"><h2 class="card-title">How Towpath indexes these folders</h2>
+<p>Every file is listed by name, size and date. Towpath reads the text of documents, and leaves out only what you list under <em>Skip</em>. These settings take effect the next time indexing starts; to apply them now, pause and resume. Files already indexed aren't read again until they change.</p>
+{% if saved == 'indexing' %}<div class="notice" role="status">Saved.</div>{% endif %}
+{% if indexing_error %}<div class="notice warn" role="alert">{{ indexing_error }}</div>{% endif %}
+<details class="save" {% if indexing_error %}open{% endif %}><summary>Change indexing settings</summary>
+<form method="post" action="/connections/{{ c.source_id }}/indexing" class="settings-form">{% csrf_token %}
+  <label>Files read at once <input name="threads" inputmode="numeric" value="{{ indexing.threads }}" required>
+    <span>Fewer is gentler on spinning disks and leaves them free for other apps; more is faster on SSDs. 1 to 16.</span></label>
+  <label>Index by name only <textarea name="name_only" rows="4">{{ indexing.name_only }}</textarea>
+    <span>File types whose contents aren't read, such as photos, video, music, disk images and programs. Separate them with spaces.</span></label>
+  <label class="check"><input type="checkbox" name="sniff" {% if indexing.sniff %}checked{% endif %}> Open unrecognised files to find their type
+    <span>Off: a file whose name Towpath doesn't recognise is listed by name without being opened. On: each one is opened to check, which finds a few more documents but reads much more from disk.</span></label>
+  <label>Skip these names <input name="skip" value="{{ indexing.skip }}">
+    <span>Folders and files left out entirely. By default only ZFS snapshot folders, which would list every file a second time.</span></label>
+  <label>Largest text file to read (MB) <input name="text_limit_mb" inputmode="numeric" value="{{ indexing.text_limit_mb }}" required></label>
+  <label>Largest compressed file to open (MB) <input name="compressed_limit_mb" inputmode="numeric" value="{{ indexing.compressed_limit_mb }}" required>
+    <span>Single compressed files such as .gz are unpacked to read them; 0 lists them by name only.</span></label>
+  <div class="form-actions"><button class="button" type="submit">Save</button><button class="button secondary" type="submit" name="reset" value="1" formnovalidate>Restore defaults</button></div>
+</form></details>
+</section>{% endif %}
 {% if pacing %}<section class="detail-card"><h2 class="card-title">How fast Towpath reads Gmail</h2>
 <p>Google limits how much any app can read from a Gmail account each minute. Towpath stays well under your limit, so your phone, mail apps and other tools keep working normally.</p>
 <p><strong>Right now:</strong> up to about {{ pacing.per_minute }} messages a minute (about {{ pacing.per_hour }} an hour){% if not pacing.verified %}, Google's standard pace{% endif %}.</p>

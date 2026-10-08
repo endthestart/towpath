@@ -34,6 +34,17 @@ NAME_ONLY = (".jpg .jpeg .png .gif .heic .heif .webp .bmp .tif .tiff .nef .cr2 .
 # Everything is listed, including caches, recycle bins and system folders, because finding what can be deleted
 # is part of the point. Only snapshot views are skipped: they repeat every file under another path.
 SKIPPED_NAMES = ".zfs .snapshot"
+# Indexing settings the owner can change on the Folders page. The defaults suit a NAS of spinning disks that
+# also serves other apps: gentle on random reads, every file listed, contents read only for documents.
+DEFAULTS = {
+    "threads": 2,  # files Recoll reads at once (Recoll's own default is 4)
+    "name_only": NAME_ONLY,
+    "skip": SKIPPED_NAMES,
+    "sniff": False,  # open files with unrecognised names to guess their type
+    "text_limit_mb": 20,
+    "compressed_limit_mb": 100,
+}
+_TOKEN = re.compile(r'[^\s"\\=]{1,100}')
 _running: dict[str, subprocess.Popen] = {}
 
 
@@ -78,6 +89,52 @@ def _alias(rel: str, taken: set[str]) -> str:
     return alias
 
 
+def options(c: dict | None) -> dict:
+    """The indexing settings in force: the defaults, overridden by what the owner saved."""
+    saved = ((c or {}).get("settings") or {}).get("indexing") or {}
+    return {**DEFAULTS, **{k: v for k, v in saved.items() if k in DEFAULTS}}
+
+
+def _number(raw, low: int, high: int, what: str) -> int:
+    try:
+        value = int(str(raw).strip())
+    except ValueError:
+        raise ConnectionProblem(f"{what} must be a whole number.") from None
+    if not low <= value <= high:
+        raise ConnectionProblem(f"{what} must be between {low} and {high}.")
+    return value
+
+
+def _names(raw: str, what: str, suffixes: bool = False) -> str:
+    tokens = str(raw).split()
+    if len(tokens) > 500:
+        raise ConnectionProblem(f"{what}: at most 500 entries.")
+    for token in tokens:
+        if not _TOKEN.fullmatch(token) or (suffixes and not (token.startswith(".") and len(token) > 1)):
+            hint = " Each starts with a dot, like .iso." if suffixes else " Names can't contain spaces or quotes."
+            raise ConnectionProblem(f"{what}: {token[:40]!r} isn't valid.{hint}")
+    return " ".join(t.lower() for t in tokens) if suffixes else " ".join(tokens)
+
+
+def set_options(config, form: dict) -> dict:
+    """Validate and save indexing settings from the Folders page; they apply when indexing next starts."""
+    c = get(config.store_dir, SID)
+    if c is None:
+        raise ConnectionProblem("Choose folders first.")
+    values = {
+        "threads": _number(form.get("threads", ""), 1, 16, "Files read at once"),
+        "name_only": _names(form.get("name_only", ""), "Index by name only", suffixes=True),
+        "skip": _names(form.get("skip", ""), "Skip these names"),
+        "sniff": bool(form.get("sniff")),
+        "text_limit_mb": _number(form.get("text_limit_mb", ""), 1, 2000, "Largest text file"),
+        "compressed_limit_mb": _number(form.get("compressed_limit_mb", ""), 0, 10000, "Largest compressed file"),
+    }
+    changed = {k: v for k, v in values.items() if v != options(c)[k]}
+    _update(config.store_dir, SID, "settings-changed", {"changed": sorted(changed)},
+            settings={**c["settings"], "indexing": {k: v for k, v in values.items() if v != DEFAULTS[k]}})
+    return values
+
+
 def choose(config, picks: list[str], base: Path | None = None) -> str:
     """Record the folders to index (replacing the previous choice) and grant them for search. A folder
     inside another chosen folder is dropped, since the parent already covers it."""
@@ -102,7 +159,9 @@ def choose(config, picks: list[str], base: Path | None = None) -> str:
         alias = previous.get(str(path)) or _alias(os.path.relpath(path, base), taken | set(previous.values()))
         taken.add(alias)
         roots.append({"alias": alias, "path": str(path), "rel": os.path.relpath(path, base)})
-    settings = {"roots": roots, "username": None}
+    settings = {"roots": roots, "username": None,
+                **({"indexing": existing["settings"]["indexing"]} if existing and existing["settings"].get("indexing")
+                   else {})}
     if existing is None:
         now = _now()
         with closing(open_store(config.store_dir, "connections", connections.ROLE)) as db:
@@ -143,23 +202,22 @@ def with_files(config, index_dir: Path, role: str = connections.ROLE):
     return dataclasses.replace(config, files=parse(files_table(c, index_dir), config.root, config.store_dir))
 
 
-def write_conf(confdir: Path, roots: list[dict], scratch: Path) -> Path:
+def write_conf(confdir: Path, roots: list[dict], scratch: Path, settings: dict | None = None) -> Path:
+    o = {**DEFAULTS, **(settings or {})}
     confdir.mkdir(parents=True, exist_ok=True)
     topdirs = " ".join(json.dumps(r["path"]) for r in roots)  # Recoll accepts double-quoted paths
     conf = confdir / "recoll.conf"
-    conf.write_text(f"""# Written by Towpath from the folders chosen on the Connections page; edits are replaced.
+    conf.write_text(f"""# Written by Towpath from the Folders page (folders and indexing settings); edits are replaced.
 topdirs = {topdirs}
-skippedNames = {SKIPPED_NAMES}
-noContentSuffixes+ = {NAME_ONLY}
-usesystemfilecommand = 0
-# Two file threads instead of four: on a pool of spinning disks each one waits on a random read, and fewer keep
-# more of the disks free for everything else. The first scan takes longer; later ones touch only changes.
+skippedNames = {o["skip"]}
+noContentSuffixes+ = {o["name_only"]}
+usesystemfilecommand = {int(bool(o["sniff"]))}
 thrQSizes = 2 2 2
-thrTCounts = 2 1 1
+thrTCounts = {o["threads"]} {max(1, o["threads"] // 2)} 1
 followLinks = 0
 indexallfilenames = 1
-textfilemaxmbs = 20
-compressedfilemaxkbs = 100000
+textfilemaxmbs = {o["text_limit_mb"]}
+compressedfilemaxkbs = {o["compressed_limit_mb"] * 1000}
 idxflushmb = 50
 pdfocr = 0
 loglevel = 2
@@ -190,7 +248,7 @@ def _command(confdir: Path) -> list[str]:
 def _start(c: dict, data_dir: Path) -> subprocess.Popen:
     confdir, scratch = data_dir / "index" / "recoll", data_dir / "scratch" / "recoll"
     scratch.mkdir(parents=True, exist_ok=True)
-    write_conf(confdir, c["settings"]["roots"], scratch)
+    write_conf(confdir, c["settings"]["roots"], scratch, options(c))
     env = {**os.environ, "HOME": str(confdir), "TMPDIR": str(scratch), "RECOLL_TMPDIR": str(scratch)}
     log = open(confdir / "recollindex.log", "w")
     return subprocess.Popen(_command(confdir), stdout=log, stderr=subprocess.STDOUT, env=env,

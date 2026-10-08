@@ -63,8 +63,14 @@ documents. It reads them only, through a read-only mount, and never changes, mov
    (**Credentials → Groups → Add**), give it **Read** with **Inherit** on each dataset (**Edit Permissions**),
    and set `TOWPATH_READ_GROUP` to its ID. Only Towpath's connector services join that group.
 3. Redeploy, open **Connections → Folders on this server**, tick folders and choose **Save and start indexing**.
-   Photos, video and music are indexed by name; documents by their text too. Indexing runs at low priority,
-   shows its progress, can be paused, and picks up changes when you index again.
+   Every file is listed, including caches, recycle bins and system folders. Photos, video, music and files
+   Towpath doesn't recognise are indexed by name; documents by their text too. Indexing shows its progress, can
+   be paused, and picks up changes when you index again. **How Towpath indexes these folders** on the same page
+   sets how many files are read at once (2 by default, gentle on spinning disks; raise it for SSDs), which types
+   are indexed by name only, what to skip, and size limits.
+4. When indexing finishes, **Space** shows where the room goes: folder sizes, space by type, the largest files,
+   and clutter that is usually safe to clean up (package folders, caches, recycle bins, system copies, old
+   backup sets). It only reads the index; deleting is up to you.
 
 ## Updating, rolling back and backing up
 

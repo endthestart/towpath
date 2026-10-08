@@ -18,6 +18,7 @@ urlpatterns = [
     path("connections/<str:sid>/password", v.password, name="connection-password"),
     path("connections/<str:sid>/disconnect", v.disconnect, name="connection-disconnect"),
     path("connections/<str:sid>/pacing", v.pacing, name="connection-pacing"),
+    path("connections/<str:sid>/indexing", v.indexing_settings, name="connection-indexing"),
     path("setup", auth.setup, name="setup"),
     path("login", auth.login, name="login"),
     path("logout", auth.logout, name="logout"),
