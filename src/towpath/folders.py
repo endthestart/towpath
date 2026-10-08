@@ -26,13 +26,14 @@ SID = "folders"
 PAGE = 5000
 LIBRARY_ENV = "TOWPATH_LIBRARY"
 # Files Recoll should index by name only: photos, video, audio, disk images and binaries have no useful text,
-# and reading them all would only add load on the pool.
+# and reading them all would only add load on the pool. Types Recoll doesn't recognise are listed by name too.
 NAME_ONLY = (".jpg .jpeg .png .gif .heic .heif .webp .bmp .tif .tiff .nef .cr2 .cr3 .arw .dng .raf .orf .rw2 .psd "
              ".mp4 .mov .avi .mkv .m4v .wmv .mpg .mpeg .3gp .mts .m2ts .mp3 .flac .wav .m4a .aac .ogg .opus .aiff "
              ".iso .img .dmg .vmdk .qcow2 .vdi .vhd .vhdx .bin .exe .dll .so .dylib .o .a .class .jar .pyc .db "
              ".sqlite .sparsebundle .band")
-SKIPPED_NAMES = ("@eaDir #recycle .zfs .snapshot .Trash* .DS_Store Thumbs.db desktop.ini node_modules .git "
-                 "__pycache__ .cache *.tmp *~")
+# Everything is listed, including caches, recycle bins and system folders, because finding what can be deleted
+# is part of the point. Only snapshot views are skipped: they repeat every file under another path.
+SKIPPED_NAMES = ".zfs .snapshot"
 _running: dict[str, subprocess.Popen] = {}
 
 
@@ -148,8 +149,9 @@ def write_conf(confdir: Path, roots: list[dict], scratch: Path) -> Path:
     conf = confdir / "recoll.conf"
     conf.write_text(f"""# Written by Towpath from the folders chosen on the Connections page; edits are replaced.
 topdirs = {topdirs}
-skippedNames+ = {SKIPPED_NAMES}
+skippedNames = {SKIPPED_NAMES}
 noContentSuffixes+ = {NAME_ONLY}
+usesystemfilecommand = 0
 followLinks = 0
 indexallfilenames = 1
 textfilemaxmbs = 20
