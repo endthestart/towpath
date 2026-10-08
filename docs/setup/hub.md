@@ -7,9 +7,11 @@ a time; there is no Friday deadline.
 ## Current deployment
 
 Revision `e47692a` (probable duplicates on the Space page), publishing run
-[37731134113](https://github.com/endthestart/towpath/actions/runs/37731134113):
+[37731134113](https://github.com/endthestart/towpath/actions/runs/37731134113), with the web service on `858ea5c`
+(largest files listed on each Space folder page; templates and a read query only), run
+[37733819950](https://github.com/endthestart/towpath/actions/runs/37733819950):
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:f3d4eeeb686a525103710ad5770b8f22c9b7ef3927d77360381ada511639965c`
+- `web`: `ghcr.io/endthestart/towpath@sha256:9e257e1d605cb41838c9a9ab72e450dee4d4ae9f04aedb0ea703aac43b976178`
 - `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:fbb9ba8d0a14b4a87f60c206db7325be82de2a9c31cfabd4e5019f1cf47e10ad`
 
 The personal datasets are mounted read-only under `/library` in the connectors only, which join a read-only
