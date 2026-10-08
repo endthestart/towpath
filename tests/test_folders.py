@@ -266,6 +266,20 @@ def test_adding_to_search_runs_beside_the_worker_loop(inst, monkeypatch):
     assert c["progress"]["indexed"] == 1 and c["progress"]["phase"] == "done"
 
 
+def test_a_restart_while_adding_carries_on_adding_without_reading_again(inst, monkeypatch):
+    folders.choose(inst.config, [str(inst.library / "documents")])
+    inst.recoll_holds("documents/letters/lock-keeper.txt")
+    connections.start_indexing(inst.config.store_dir, inst.layout.credentials, folders.SID)
+    inst.poll_until_idle()
+    connections._update(inst.config.store_dir, folders.SID, indexing="running",  # as a restart leaves it
+                        progress=folders._progress(folders.read_status(inst.conf), "adding", 0))
+    monkeypatch.setattr(folders, "_start", lambda *a: pytest.fail("Recoll started again"))
+    assert request_worker.run_once(inst.config, inst.layout.credentials)["indexing"][0]["step"] == "adding"
+    inst.poll_until_idle()
+    c = connections.get(inst.config.store_dir, folders.SID)
+    assert c["indexing"] == "idle" and c["progress"]["phase"] == "done" and c["progress"]["indexed"] == 1
+
+
 def test_a_failure_while_adding_is_reported(inst, monkeypatch):
     folders.choose(inst.config, [str(inst.library / "documents")])
     inst.recoll_holds("documents/letters/lock-keeper.txt")

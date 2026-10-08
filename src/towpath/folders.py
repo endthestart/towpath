@@ -423,6 +423,12 @@ def index_pending(config, data_dir: Path) -> list[dict]:
             _in_background("measure", lambda: _measure(config, c))
             return [{"source_id": SID, "step": "measuring"}]
         return []
+    was = (c.get("progress") or {}).get("phase")
+    if proc is None and c["indexing"] == "running" and was in ("adding", "measuring"):
+        # The worker restarted after Recoll had finished: carry on adding rather than walk every folder again.
+        status = read_status(confdir)
+        _in_background("add", lambda: _add_and_measure(config, c, Path(data_dir), status))
+        return [{"source_id": SID, "step": "adding"}]
     if proc is None:
         _running[SID] = _start(c, Path(data_dir))
         _update(config.store_dir, SID, "indexing-started" if c["indexing"] == "requested" else "indexing-resumed",

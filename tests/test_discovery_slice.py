@@ -212,6 +212,23 @@ def test_malicious_references_are_refused(fx):
         service.describe(fx.config, "../../etc/passwd")
 
 
+def test_listing_resolves_each_folder_once_and_still_refuses_links_out(fx, monkeypatch):
+    roots = fx.config.files.roots
+    archive = Path(roots["archive"].path)
+    (archive / "linked").symlink_to(fx.root / "outside")
+    (archive / "notes" / "inside-link").symlink_to(archive / "notes" / "injection.md")
+    resolved, real = [], refs._real
+    monkeypatch.setattr(refs, "_real", lambda p: (resolved.append(Path(p).name), real(p))[1])
+    folders = refs.Folders()
+    for rel in ("notes/injection.md", "notes/inside-link", "long/thesis-notes.txt"):
+        assert refs.locate(f"file://{archive}/{rel}", roots, folders) == ("archive", rel)
+    for escaping in ("escape-link", "linked", "linked/secret.txt"):
+        with pytest.raises(refs.BadReference):
+            refs.locate(f"file://{archive}/{escaping}", roots, folders)
+    assert "inside-link" in resolved and "escape-link" in resolved  # links are followed one by one
+    assert not {"injection.md", "thesis-notes.txt"} & set(resolved)  # ordinary files: only their folder
+
+
 def test_hostile_provider_rows_are_dropped(fx, monkeypatch):
     fx.grant("archive", "search")
     base = str(fx.config.files.roots["archive"].path)

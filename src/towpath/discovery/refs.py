@@ -7,6 +7,7 @@ containers are labels only and are never used as filesystem paths.
 """
 
 import fnmatch
+import functools
 import os
 import re
 from pathlib import Path, PurePosixPath
@@ -22,6 +23,30 @@ class BadReference(ValueError):
 
 def _real(path: Path) -> Path:
     return Path(os.path.realpath(path))
+
+
+class Folders:
+    """Real paths for many files at once, for listing a large tree. Each folder is resolved and listed once and
+    only symbolic links are followed one by one, so files' own metadata is never read. Reads still resolve
+    each path in full first."""
+
+    def __init__(self, size: int = 4096):
+        self._folder = functools.lru_cache(maxsize=size)(self._resolve_folder)
+
+    @staticmethod
+    def _resolve_folder(folder: str) -> tuple[Path, frozenset] | None:
+        try:
+            with os.scandir(folder) as entries:
+                links = frozenset(e.name for e in entries if e.is_symlink())
+        except OSError:
+            return None
+        return _real(Path(folder)), links
+
+    def real(self, path: Path) -> Path:
+        found = self._folder(str(path.parent))
+        if found is None or path.name in found[1]:
+            return _real(path)
+        return found[0] / path.name
 
 
 def _within(child: Path, parent: Path) -> bool:
@@ -43,17 +68,17 @@ def check_relative(rel_path: str) -> str:
     return str(pure)
 
 
-def resolve_in_root(root, rel_path: str) -> Path:
+def resolve_in_root(root, rel_path: str, folders: Folders | None = None) -> Path:
     """The real filesystem path of ``rel_path`` under ``root``, refusing anything that escapes it."""
     rel_path = check_relative(rel_path)
     base = _real(root.path)
-    target = _real(base / rel_path)
+    target = _real(base / rel_path) if folders is None else folders.real(base / rel_path)
     if not _within(target, base):
         raise BadReference("reference escapes its root")
     return target
 
 
-def locate(reference: str, roots: dict) -> tuple[str, str]:
+def locate(reference: str, roots: dict, folders: Folders | None = None) -> tuple[str, str]:
     """Map a provider's ``file:`` URL (or absolute path) to ``(root alias, relative path)``.
 
     The lexical path picks the root; the real path (symlinks followed) must stay inside it.
@@ -74,12 +99,12 @@ def locate(reference: str, roots: dict) -> tuple[str, str]:
         base = Path(os.path.normpath(root.path))
         if _within(lexical, base) and lexical != base:
             rel = lexical.relative_to(base).as_posix()
-            resolve_in_root(root, rel)
+            resolve_in_root(root, rel, folders)
             return alias, rel
         real_base = _real(root.path)
         if _within(lexical, real_base) and lexical != real_base:
             rel = lexical.relative_to(real_base).as_posix()
-            resolve_in_root(root, rel)
+            resolve_in_root(root, rel, folders)
             return alias, rel
     raise BadReference("reference is outside every configured root")
 

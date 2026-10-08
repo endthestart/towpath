@@ -86,10 +86,10 @@ def _limit(fc, name: str, requested: int | None) -> int:
     return min(requested, ceiling)
 
 
-def _accept(hit, prov, roots: set[str]) -> Occurrence | None:
+def _accept(hit, prov, roots: set[str], folders: refs.Folders | None = None) -> Occurrence | None:
     """Turn an untrusted provider row into an occurrence, or None if it must not be shown."""
     try:
-        alias, rel = refs.locate(hit.url, prov.roots)
+        alias, rel = refs.locate(hit.url, prov.roots, folders)
     except refs.BadReference:
         return None
     if alias not in roots or refs.excluded(prov.roots[alias], rel):
@@ -473,6 +473,7 @@ def import_catalog(config, provider_id: str | None = None, root: str | None = No
         limit = deadline_seconds if page_size else fc.limits["timeout_seconds"]
         deadline = time.monotonic() + limit if limit is not None else None
         offset, cursor = 0, None
+        folders = refs.Folders()
         try:
             while True:
                 page = min(page_size, max_items - offset) if page_size else max_items
@@ -484,13 +485,13 @@ def import_catalog(config, provider_id: str | None = None, root: str | None = No
                         complete, reason = False, "time limit reached"
                         break
                     try:
-                        located, rel = refs.locate(hit.url, prov.roots)
+                        located, rel = refs.locate(hit.url, prov.roots, folders)
                     except refs.BadReference:
                         refused += 1
                         continue
                     if located == alias and refs.excluded(prov.roots[alias], rel):
                         continue
-                    occ = _accept(hit, prov, {alias})
+                    occ = _accept(hit, prov, {alias}, folders)
                     if occ is None:
                         refused += 1
                         continue
