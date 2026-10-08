@@ -6,14 +6,11 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `97e6e24` (adding to search runs beside the worker loop; Overview counts kept between syncs; plain
-file pages), publishing run [37728503900](https://github.com/endthestart/towpath/actions/runs/37728503900):
+Revision `e47692a` (probable duplicates on the Space page), publishing run
+[37731134113](https://github.com/endthestart/towpath/actions/runs/37731134113):
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:35418ebf33a6cdb196a7632a19ba7c625af13f8c4828308bd27fb540a9f01900`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:89344115d4ef47df9fa70a4780c07f6dab660f66739f51bd2480ea5375c3eb07`
-
-The web image went first and the connectors five minutes later, once Recoll had finished a large archive, so it
-didn't start that archive over; the release has no store changes.
+- `web`: `ghcr.io/endthestart/towpath@sha256:f3d4eeeb686a525103710ad5770b8f22c9b7ef3927d77360381ada511639965c`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:fbb9ba8d0a14b4a87f60c206db7325be82de2a9c31cfabd4e5019f1cf47e10ad`
 
 The personal datasets are mounted read-only under `/library` in the connectors only, which join a read-only
 group set in the TrueNAS GUI (Read with Inherit, applied recursively per dataset, not to child datasets). The
@@ -25,6 +22,7 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `97e6e24` | Adding to search beside the worker loop; Overview counts kept; plain file pages (web first, connectors after Recoll left a large archive) | `towpath@sha256:35418ebf…`, `towpath-recoll@sha256:89344115…` |
 | `75a4fbb` | Indexing settings on the Folders page | `towpath@sha256:db8a9974…`, `towpath-recoll@sha256:11e49cea…` |
 | `7596b0c` | Space page, fast catalog search and status, record-ID import, Recoll at two threads | `towpath@sha256:776d334f…`, `towpath-recoll@sha256:72a0211c…` |
 | `2172138` | Every file indexed; unrecognised types by name only; catalog trigram index | `towpath@sha256:40fb276e…`, `towpath-recoll@sha256:1257e952…` |
