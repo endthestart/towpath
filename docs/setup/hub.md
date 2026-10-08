@@ -6,12 +6,14 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `75a4fbb` (indexing settings on the Folders page; Space page; catalog search and status at
-millions of rows; import listing by Recoll record ID; every file indexed, unrecognised types by name only),
-publishing run [37725635789](https://github.com/endthestart/towpath/actions/runs/37725635789):
+Revision `97e6e24` (adding to search runs beside the worker loop; Overview counts kept between syncs; plain
+file pages), publishing run [37728503900](https://github.com/endthestart/towpath/actions/runs/37728503900):
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:db8a9974348ecdc8c68394c92e91a6c409c4de2862fc0456cb31482785e23691`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:11e49ceaa8564dc0895a2897b9d1a362315bd012c039bf5e03c5b28dd37eee89`
+- `web`: `ghcr.io/endthestart/towpath@sha256:35418ebf33a6cdb196a7632a19ba7c625af13f8c4828308bd27fb540a9f01900`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:89344115d4ef47df9fa70a4780c07f6dab660f66739f51bd2480ea5375c3eb07`
+
+The web image went first and the connectors five minutes later, once Recoll had finished a large archive, so it
+didn't start that archive over; the release has no store changes.
 
 The personal datasets are mounted read-only under `/library` in the connectors only, which join a read-only
 group set in the TrueNAS GUI (Read with Inherit, applied recursively per dataset, not to child datasets). The
@@ -23,6 +25,7 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `75a4fbb` | Indexing settings on the Folders page | `towpath@sha256:db8a9974…`, `towpath-recoll@sha256:11e49cea…` |
 | `7596b0c` | Space page, fast catalog search and status, record-ID import, Recoll at two threads | `towpath@sha256:776d334f…`, `towpath-recoll@sha256:72a0211c…` |
 | `2172138` | Every file indexed; unrecognised types by name only; catalog trigram index | `towpath@sha256:40fb276e…`, `towpath-recoll@sha256:1257e952…` |
 | `a23c572` | Folder picker shows included subfolders; `file`, audio tags and image metadata in the Recoll image | `towpath@sha256:e81fc48f…`, `towpath-recoll@sha256:1a2a5967…` |
