@@ -62,3 +62,10 @@ code.copyable{display:inline-block;margin-top:6px;padding:6px 10px;background:va
 .inline-form label{display:flex;flex-direction:column;gap:6px;font-size:13px;min-width:260px}
 .steps a{text-decoration:underline}
 .folder-tree .child{padding-left:56px}.folder-row.unreadable{opacity:.6}
+.folder-group+.folder-group{border-top:1px solid var(--line)}
+.folder-row .included{display:none;font-size:12px;color:var(--green);margin-top:2px}
+.folder-group:has(> .parent input:checked) .child{pointer-events:none;background:#f6f8f4}
+.folder-row.child{position:relative}.folder-row .tick{display:none;position:absolute;left:56px;width:18px;text-align:center;color:var(--green);font-weight:700}
+.folder-group:has(> .parent input:checked) .child input{visibility:hidden}
+.folder-group:has(> .parent input:checked) .child .tick{display:block}
+.folder-group:has(> .parent input:checked) .child .included{display:block}
