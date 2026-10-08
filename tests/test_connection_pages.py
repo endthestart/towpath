@@ -74,11 +74,12 @@ def test_add_choose_folders_index_and_watch_progress(pages):
     response = client.post(f"/connections/{sid}/folders", {"folder": ["INBOX"], "start": "1"})
     assert response["Location"] == f"/connections/{sid}/"
     html = client.get(f"/connections/{sid}/").content.decode()
-    assert "Starting to index" in html and 'http-equiv="refresh"' in html and ">Pause<" in html
+    assert "Starting to index" in html and 'name="towpath-live"' in html and ">Pause<" in html
     request_worker.run_once(env.config, env.credentials)
     html = client.get(f"/connections/{sid}/").content.decode()
-    assert ">7<" in html and "Check for new mail" in html and 'http-equiv="refresh"' not in html
+    assert ">7<" in html and "Check for new mail" in html and "towpath-live" not in html
     listing = client.get("/connections/").content.decode()
+    assert "towpath-live" not in listing
     assert "7 messages indexed" in listing and "Indexed" in listing
     for page in (html, listing):
         assert PASSWORD not in page

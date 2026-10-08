@@ -116,8 +116,9 @@ def connection_list(request):
     listed = {c["source_id"] for c in connections.all_connections(_store())}
     configured = [{"source_id": sid, "adapter": s.adapter} for sid, s in (config.sources.items() if config else ())
                   if s.kind == "mail-provider" and sid not in listed]
+    views = [_view(c) for c in connections.all_connections(_store())]
     return render(request, "connections.html", {
-        "nav": "connections", "connections": [_view(c) for c in connections.all_connections(_store())],
+        "nav": "connections", "connections": views, "any_busy": any(v["status"]["busy"] for v in views),
         "configured": configured, "providers": connections.PROVIDERS})
 
 

@@ -98,13 +98,15 @@ def test_routes_escape_mail_and_never_show_bodies(client):
 
 
 def test_no_write_routes_or_untrusted_host(client):
-    for path in ("/", "/email/", "/email/demo-0/", "/assets/app.css"):
+    for path in ("/", "/email/", "/email/demo-0/", "/assets/app.css", "/assets/live.js"):
         assert client.post(path).status_code == 405
         response = client.get(path)
         assert response["Cache-Control"] == "no-store"
         assert response["Referrer-Policy"] == "same-origin"
         assert response["X-Frame-Options"] == "DENY"
-        assert "script-src 'none'" in response["Content-Security-Policy"]
+        # Only the app's own script file runs: no inline script, no eval.
+        assert "script-src 'self';" in response["Content-Security-Policy"]
+        assert "unsafe" not in response["Content-Security-Policy"]
     assert client.get("/", HTTP_HOST="untrusted.example.com").status_code == 400
 
 

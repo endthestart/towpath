@@ -24,7 +24,7 @@ class LocalPrivacyMiddleware:
         # "same-origin" still sends nothing, not even the origin, to other sites.
         response["Referrer-Policy"] = "same-origin"
         response["Content-Security-Policy"] = (
-            "default-src 'self'; style-src 'self'; script-src 'none'; img-src 'self'; "
+            "default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self'; "
             "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
         )
         return response
@@ -80,6 +80,12 @@ def email(request, item_id):
 @require_GET
 def stylesheet(request):
     return HttpResponse((Path(__file__).parent / "assets" / "app.css").read_text(), content_type="text/css")
+
+
+@require_GET
+def live_script(request):
+    """The only script: keeps progress pages current without reloading them (see the file)."""
+    return HttpResponse((Path(__file__).parent / "assets" / "live.js").read_text(), content_type="text/javascript")
 
 
 @require_GET

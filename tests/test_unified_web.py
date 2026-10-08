@@ -98,7 +98,8 @@ def test_keyword_query_is_catalog_only_and_offers_a_queued_provider_search(web, 
     response = web.post("/search/request", {"q": "fundraiser"})
     assert response.status_code == 302
     waiting = web.get("/search/", {"q": "fundraiser"}).content.decode()
-    assert "Searching inside messages…" in waiting and '<meta http-equiv="refresh" content="5">' in waiting
+    assert "Searching inside messages…" in waiting and 'name="towpath-live"' in waiting
+    assert '<script src="/assets/live.js" defer></script>' in waiting and "<noscript>" in waiting
     with closing(open_store(uni.config.store_dir, "queue", "connect")) as q:
         assert [json.loads(r["filters"])["text"] for r in q.execute("SELECT filters FROM search_requests")] == [
             "fundraiser"]
@@ -238,7 +239,8 @@ def test_new_routes_refuse_the_wrong_method_and_keep_security_headers(web):
     for path in ("/search/", "/ref/?r=gmail-fixture:x", "/collections/"):
         response = web.get(path)
         assert response.status_code in {200, 404}
-        assert "script-src 'none'" in response["Content-Security-Policy"]
+        assert "script-src 'self';" in response["Content-Security-Policy"]
+        assert "unsafe" not in response["Content-Security-Policy"]
         assert web.post(path).status_code == 405
     for path in ("/search/request", "/ref/request", "/collections/new"):
         assert web.get(path).status_code == 405

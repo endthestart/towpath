@@ -22,4 +22,5 @@ urlpatterns = [
     path("login", auth.login, name="login"),
     path("logout", auth.logout, name="logout"),
     path("assets/app.css", views.stylesheet, name="stylesheet"),
+    path("assets/live.js", views.live_script, name="live-script"),
 ]

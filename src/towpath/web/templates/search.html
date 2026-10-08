@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block title %}Search · Towpath{% endblock %}
-{% block head %}{% if waiting %}<meta http-equiv="refresh" content="5">{% endif %}{% endblock %}
+{% block head %}{% if waiting %}{% include '_live.html' %}{% endif %}{% endblock %}
 {% block content %}
 <header class="page-head compact"><h1>Search</h1></header>
 <form class="search" method="get" action="{% url 'search' %}">
