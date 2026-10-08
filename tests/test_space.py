@@ -68,3 +68,25 @@ def test_each_import_is_measured_once(tmp_path):
         assert top["subfolders"][0][0] == "photos" and top["here_files"] == 1  # README sits at the top
         assert space.folder(db, "folders", "docs", "nowhere") is None
         assert space.summaries(db, "folders", ["docs"])["docs"]["clutter"]
+
+
+def test_probable_duplicates_share_a_name_and_size_across_roots(tmp_path):
+    mb = 1024 * 1024
+    rows = [("docs", "2003/taxes.pdf", 3 * mb), ("backup", "old-pc/Documents/2003/TAXES.pdf", 3 * mb),
+            ("backup", "old-pc/copy/taxes.pdf", 3 * mb), ("docs", "2004/taxes.pdf", 4 * mb),  # another size
+            ("docs", "video/canal.mov", 900 * mb), ("backup", "video/canal.mov", 900 * mb),
+            ("docs", "notes/a.txt", 10), ("backup", "notes/a.txt", 10),  # too small to matter
+            ("backup", "nas.hbk/Pool/0/1.bucket", 50 * mb), ("backup", "nas.hbk/Pool/1/1.bucket", 50 * mb)]
+    with closing(open_store(tmp_path, "files", "connect")) as db:
+        for n, (root, rel, size) in enumerate(rows):
+            db.execute("""INSERT INTO occurrences (occurrence_id, provider_id, native_id, root_alias, rel_path, members,
+                          size, dates, hashes, extraction, first_seen_run, last_seen_run, updated_at)
+                          VALUES (?, 'folders', ?, ?, ?, '[]', ?, '[]', '{}', '{}', 'r1', 'r1', 'now')""",
+                       (f"o{n}", f"n{n}", root, rel, size))
+        db.commit()
+        found = space.find_duplicates(db, "folders")
+        assert (found["groups"], found["files"], found["wasted"]) == (2, 5, 900 * mb + 2 * 3 * mb)
+        movie, taxes = found["top"]
+        assert (movie["name"], movie["copies"]) == ("canal.mov", 2)
+        assert taxes["copies"] == 3 and ["backup", "old-pc/Documents/2003/TAXES.pdf"] in taxes["places"]
+        assert space.duplicates(db, "folders")["groups"] == 2

@@ -318,9 +318,12 @@ def _measure(config, c: dict) -> list[dict]:
     roots = [r["alias"] for r in c["settings"].get("roots") or []]
     db = open_store(config.store_dir, "files", "connect")
     try:
-        return [{"source_id": SID, "step": "measured", "root": root,
+        done = [{"source_id": SID, "step": "measured", "root": root,
                  "files": space.rebuild(db, SID, root, run)["files"]}
                 for root, run in space.stale(db, SID, roots).items()]
+        if done:
+            space.find_duplicates(db, SID)
+        return done
     finally:
         db.close()
 

@@ -27,6 +27,13 @@
   <table class="space-table"><tbody>{% for t in k.top %}<tr><td class="path"><a href="{{ t.url }}">{{ t.root }}/{{ t.path }}</a></td><td class="num">{{ t.files }}</td><td class="num">{{ t.bytes|filesizeformat }}</td></tr>{% endfor %}</tbody></table>
 </details>{% empty %}<p class="empty-line">Nothing that looks like clutter.</p>{% endfor %}
 
+{% if duplicates %}<h2 class="space-section">Probably duplicates</h2>
+<p class="footnote">{{ duplicates.files_text }} files of 1 MB or more share a name and size with another file, in {{ duplicates.groups_text }} groups. Keeping one of each would free about {{ duplicates.wasted|filesizeformat }}. A shared name and size is a strong hint, not proof: compare before deleting. Files inside backup sets aren't compared, since their chunks repeat by design.</p>
+{% for g in duplicates.top %}<details class="clutter">
+  <summary><span class="clutter-name"><strong>{{ g.name }}</strong><span>{{ g.size|filesizeformat }} each</span></span><span class="num">{{ g.wasted|filesizeformat }}</span><span class="num muted">{{ g.copies_text }} copies</span></summary>
+  <table class="space-table"><tbody>{% for p in g.places %}<tr><td class="path"><a href="{{ p.url }}">{{ p.where }}</a></td></tr>{% endfor %}</tbody></table>
+</details>{% endfor %}{% endif %}
+
 <h2 class="space-section">By type</h2>
 <table class="space-table"><thead><tr><th>Type</th><th class="num">Files</th><th class="num">Size</th><th class="bar-cell"><span class="sr-only">Share</span></th></tr></thead><tbody>
 {% for t in types %}<tr><td>{% if t.url %}<a href="{{ t.url }}">.{{ t.ext }}</a>{% else %}{{ t.ext }}{% endif %}</td><td class="num">{{ t.files }}</td><td class="num">{{ t.bytes|filesizeformat }}</td><td class="bar-cell"><meter min="0" max="1" value="{{ t.share }}"></meter></td></tr>{% endfor %}

@@ -206,6 +206,9 @@ CREATE INDEX IF NOT EXISTS space_folders_children ON space_folders (provider_id,
 CREATE TABLE IF NOT EXISTS space_summary (
   provider_id TEXT NOT NULL, root_alias TEXT NOT NULL, run_id TEXT NOT NULL, body TEXT NOT NULL,
   updated_at TEXT NOT NULL, PRIMARY KEY (provider_id, root_alias));
+-- Files that are probably copies of each other (same name and size, across all roots), measured with the space.
+CREATE TABLE IF NOT EXISTS space_duplicates (
+  provider_id TEXT PRIMARY KEY, body TEXT NOT NULL, updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS occurrence_versions (
   occurrence_id TEXT NOT NULL, version TEXT NOT NULL, first_seen_run TEXT NOT NULL,
   PRIMARY KEY (occurrence_id, version));

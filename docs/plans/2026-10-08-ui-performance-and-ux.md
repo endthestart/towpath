@@ -53,6 +53,7 @@ unique at every level, so they make 5 million folders, far more than real trees.
 3. **File filters.** `in:<folder>`, `size:>100MB`, and modified-date ranges; type chips for common kinds.
 4. **Import resumable after a restart** from the cursor (it runs in the background now, but starts over).
 5. **Mail subjects and senders through a trigram index**, as for files.
-6. **Duplicates.** By name and size first (from the catalog). By content hash later: that needs a read-only
-   hashing pass that is scheduled and throttled.
+6. **Duplicates.** By name and size (built: files of 1 MB or more, across all folders, backup-set chunks left
+   out; about 5 s per million rows). By content hash later: that needs a read-only hashing pass that is
+   scheduled and throttled.
 7. Static assets cached under versioned URLs (minor).

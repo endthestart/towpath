@@ -295,11 +295,15 @@ def test_the_folders_page_picks_and_starts(inst, monkeypatch):
         assert client.post("/connections/add/folders", {"folder": ["/etc"]}).status_code == 400
 
 
-def test_space_is_measured_after_indexing_and_shown_for_searchable_folders(inst):
+def test_space_is_measured_after_indexing_and_shown_for_searchable_folders(inst, monkeypatch):
+    from towpath import space
+
+    monkeypatch.setattr(space, "DUPLICATE_MIN_BYTES", 1)
     lib = inst.library
+    (lib / "documents/letters/canal.jpg").write_bytes(b"jpeg")  # the same name and size as a photo
     folders.choose(inst.config, [str(lib / "documents"), str(lib / "photos")])
     inst.recoll_holds("documents/letters/lock-keeper.txt", "documents/taxes/2003.pdf", "photos/2003/canal.jpg",
-                      "photos/2003/raw/DSC_0001.NEF")
+                      "photos/2003/raw/DSC_0001.NEF", "documents/letters/canal.jpg")
     configure(inst.config.store_dir)
     settings = dict(TOWPATH_STORE_DIR=inst.config.store_dir, TOWPATH_CONFIG=inst.config, ALLOWED_HOSTS=["testserver"],
                     TOWPATH_LOGIN_REQUIRED=False)
@@ -312,6 +316,8 @@ def test_space_is_measured_after_indexing_and_shown_for_searchable_folders(inst)
         page = client.get("/space/").content.decode()
         assert "Your folders" in page and "photos" in page and "documents" in page and ".nef" in page
         assert "DSC_0001.NEF" in page  # among the largest files
+        assert "Probably duplicates" in page and "photos/2003/canal.jpg" in page
+        assert "documents/letters/canal.jpg" in page
         folder = client.get("/space/folder", {"root": "photos", "path": "2003"}).content.decode()
         assert ">raw<" in folder and "Search for files here" in folder
         assert client.get("/space/folder", {"root": "photos", "path": "elsewhere"}).status_code == 404

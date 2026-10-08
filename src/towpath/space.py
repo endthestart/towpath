@@ -230,6 +230,43 @@ def stale(db, provider_id: str, roots: list[str]) -> dict[str, str]:
     return {root: latest[root] for root in roots if root in latest and measured.get(root) != latest[root]}
 
 
+DUPLICATE_MIN_BYTES = 1024 * 1024  # smaller copies rarely matter for space
+TOP_DUPLICATES, COPIES_SHOWN = 100, 8
+_NAME = "lower(substr(rel_path, length(rtrim(rel_path, replace(rel_path, '/', ''))) + 1))"
+
+
+def find_duplicates(db, provider_id: str) -> dict:
+    """Files with the same name and size in more than one place, across all roots, largest waste first. A shared
+    name and size is a strong hint, not proof: the page says to compare before deleting."""
+    db.execute("PRAGMA temp_store = MEMORY")  # the grouping must not need a writable temp folder
+    # Backup sets store fixed-size chunks with repeating numbered names; comparing those would bury real copies.
+    inside_sets = " OR ".join(f"rel_path LIKE '%{s}/%'" for s in FOLDER_SUFFIXES["backups"])
+    present = (f"provider_id = ? AND missing_since_run IS NULL AND members = '[]' AND size >= ? "
+               f"AND NOT ({inside_sets})", (provider_id, DUPLICATE_MIN_BYTES))
+    groups = db.execute(f"SELECT {_NAME} AS name, size, count(*) AS n FROM occurrences WHERE {present[0]} "
+                        "GROUP BY size, name HAVING n > 1", present[1]).fetchall()
+    wasted = sum((n - 1) * size for _, size, n in groups)
+    top = sorted(groups, key=lambda g: (-(g[2] - 1) * g[1], g[0]))[:TOP_DUPLICATES]
+    wanted = {(name, size) for name, size, _ in top}
+    copies: dict[tuple[str, int], list] = {}
+    sizes = sorted({size for _, size in wanted})
+    for start in range(0, len(sizes), 500):  # one pass per 500 sizes, never one per group
+        chunk = sizes[start:start + 500]
+        for root, rel, name, size in db.execute(
+                f"SELECT root_alias, rel_path, {_NAME}, size FROM occurrences WHERE {present[0]} "
+                f"AND size IN ({','.join('?' * len(chunk))})", (*present[1], *chunk)):
+            if (name, size) in wanted:
+                copies.setdefault((name, size), []).append([root, rel])
+    body = {"groups": len(groups), "files": sum(n for _, _, n in groups), "wasted": wasted,
+            "top": [{"name": next((p[1].rpartition("/")[2] for p in copies.get((name, size), [])), name),
+                     "size": size, "copies": n, "wasted": (n - 1) * size,
+                     "places": sorted(copies.get((name, size), []))[:COPIES_SHOWN]} for name, size, n in top]}
+    db.execute("INSERT OR REPLACE INTO space_duplicates (provider_id, body, updated_at) VALUES (?,?,?)",
+               (provider_id, json.dumps(body, separators=(",", ":")), _now()))
+    db.commit()
+    return body
+
+
 # -- reading, for the web service ------------------------------------------------------------------------------
 
 
@@ -241,6 +278,11 @@ def summaries(db, provider_id: str, roots: list[str]) -> dict[str, dict]:
         if row is not None:
             out[root] = {**json.loads(row[0]), "updated_at": row[1]}
     return out
+
+
+def duplicates(db, provider_id: str) -> dict | None:
+    row = db.execute("SELECT body, updated_at FROM space_duplicates WHERE provider_id = ?", (provider_id,)).fetchone()
+    return {**json.loads(row[0]), "updated_at": row[1]} if row else None
 
 
 def folder(db, provider_id: str, root: str, path: str, limit: int = 200) -> dict | None:

@@ -55,8 +55,17 @@ def overview(request):
     db = _db()
     try:
         measured = space.summaries(db, folders.SID, [r["alias"] for r in roots])
+        dupes = space.duplicates(db, folders.SID) if roots else None
     finally:
         db.close()
+    names = {r["alias"]: r["rel"] for r in roots}
+    if dupes:
+        for g in dupes["top"]:
+            g["places"] = [{"where": f"{names[root]}/{rel}", "url": _folder_url(root, rel.rpartition("/")[0])}
+                           for root, rel in g["places"] if root in names]
+            g["copies_text"] = f"{g['copies']:,}"
+        dupes["top"] = [g for g in dupes["top"] if g["places"]][:SHOWN * 2]
+        dupes.update(groups_text=f"{dupes['groups']:,}", files_text=f"{dupes['files']:,}")
     shown = sorted(((r, measured[r["alias"]]) for r in roots if r["alias"] in measured), key=lambda rm: -rm[1]["bytes"])
     total = sum(m["bytes"] for _, m in shown)
     clutter: dict[str, dict] = {}
@@ -92,6 +101,7 @@ def overview(request):
         "types": [{"ext": ext or "no extension", "files": f"{n:,}", "bytes": b, "share": _share(b, total),
                    "url": _search_url(f"extension:{ext}") if ext else None} for ext, n, b in type_rows],
         "largest": sorted(largest, key=lambda f: -f["bytes"])[:50],
+        "duplicates": dupes if dupes and dupes["top"] else None,
     })
 
 
