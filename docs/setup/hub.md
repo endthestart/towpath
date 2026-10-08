@@ -6,12 +6,11 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `c8f1284` (index batches of 512 MB by default, a setting on the Folders page), publishing run
-[37763462220](https://github.com/endthestart/towpath/actions/runs/37763462220) (the Recoll publish job was rerun
-after a registry check failed once):
+Revision `339f3b3` (live panels update with htmx; the rest of each page stays put), publishing run
+[37768336736](https://github.com/endthestart/towpath/actions/runs/37768336736):
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:9d59c584de83123b207af4d97e8c4f40919bf57d2185a1dcd28e98e93885256a`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:eb4187952034c164012c9996c4e3000636cb02c047a077c398429e26e1d0c4b7`
+- `web`: `ghcr.io/endthestart/towpath@sha256:7b3acc350db3a963c9a8a96b8b8c6700ddcf769bed2dfeb59022acfa3063bca9`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:4e19ce4ae79f3e9b88036677a98a04770b1ee7c584c055864e239fde7cd79df1`
 
 The personal datasets are mounted read-only under `/library` in the connectors only, which join a read-only
 group set in the TrueNAS GUI (Read with Inherit, applied recursively per dataset, not to child datasets). The
@@ -23,6 +22,7 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `c8f1284` | Index batches of 512 MB by default (a setting) | `towpath@sha256:9d59c584…`, `towpath-recoll@sha256:eb418795…` |
 | `e47692a` | Probable duplicates on Space; the web service later on `858ea5c` (largest files per folder) | `towpath@sha256:f3d4eeeb…` (web `9e257e1d…`), `towpath-recoll@sha256:fbb9ba8d…` |
 | `97e6e24` | Adding to search beside the worker loop; Overview counts kept; plain file pages (web first, connectors after Recoll left a large archive) | `towpath@sha256:35418ebf…`, `towpath-recoll@sha256:89344115…` |
 | `75a4fbb` | Indexing settings on the Folders page | `towpath@sha256:db8a9974…`, `towpath-recoll@sha256:11e49cea…` |
