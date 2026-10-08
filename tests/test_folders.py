@@ -130,22 +130,24 @@ def test_recoll_configuration_lists_everything_and_reads_media_by_name_only(inst
     assert "skippedNames = .zfs .snapshot\n" in text and "skippedNames+" not in text
     # Without this, Recoll opens every unrecognised file to guess its type, then lists it by name anyway.
     assert "usesystemfilecommand = 0" in text and "thrTCounts = 2 1 1" in text
+    assert "idxflushmb = 512\n" in text  # large batches: far fewer merges into a big index
 
 
 def test_indexing_settings_are_validated_saved_and_written_to_recolls_configuration(inst, tmp_path):
     folders.choose(inst.config, [str(inst.library / "documents")])
     assert folders.options(connections.get(inst.config.store_dir, folders.SID)) == folders.DEFAULTS
-    form = {**folders.DEFAULTS, "threads": "6", "name_only": ".ISO .vmdk", "sniff": "on", "compressed_limit_mb": "0"}
+    form = {**folders.DEFAULTS, "threads": "6", "name_only": ".ISO .vmdk", "sniff": "on", "compressed_limit_mb": "0",
+            "batch_mb": "1024"}
     folders.set_options(inst.config, form)
     c = connections.get(inst.config.store_dir, folders.SID)
     assert c["settings"]["indexing"] == {"threads": 6, "name_only": ".iso .vmdk", "sniff": True,
-                                         "compressed_limit_mb": 0}  # only what differs from the defaults
+                                         "compressed_limit_mb": 0, "batch_mb": 1024}  # only what differs
     folders.choose(inst.config, [str(inst.library / "documents"), str(inst.library / "photos")])
     o = folders.options(connections.get(inst.config.store_dir, folders.SID))  # choosing again keeps them
     assert (o["threads"], o["sniff"]) == (6, True)
     text = folders.write_conf(tmp_path / "conf", [{"path": "/library/docs"}], tmp_path / "s", o).read_text()
     assert "thrTCounts = 6 3 1" in text and "usesystemfilecommand = 1" in text and "compressedfilemaxkbs = 0\n" in text
-    assert "noContentSuffixes+ = .iso .vmdk\n" in text
+    assert "noContentSuffixes+ = .iso .vmdk\n" in text and "idxflushmb = 1024\n" in text
     for bad in ({"threads": "0"}, {"threads": "many"}, {"name_only": "iso"}, {"skip": 'a"b'},
                 {"skip": "x\nloglevel = 6"}, {"skip": "a=b"}, {"text_limit_mb": "-1"}):
         with pytest.raises(connections.ConnectionProblem):

@@ -44,6 +44,9 @@ DEFAULTS = {
     "sniff": False,  # open files with unrecognised names to guess their type
     "text_limit_mb": 20,
     "compressed_limit_mb": 100,
+    # Text gathered in memory before Recoll writes it to its index. Each write merges into the whole index, so on
+    # a large index on spinning disks small batches spend most of the time rewriting it (Recoll's default is 50).
+    "batch_mb": 512,
 }
 _TOKEN = re.compile(r'[^\s"\\=]{1,100}')
 _running: dict[str, subprocess.Popen] = {}
@@ -133,6 +136,7 @@ def set_options(config, form: dict) -> dict:
         "sniff": bool(form.get("sniff")),
         "text_limit_mb": _number(form.get("text_limit_mb", ""), 1, 2000, "Largest text file"),
         "compressed_limit_mb": _number(form.get("compressed_limit_mb", ""), 0, 10000, "Largest compressed file"),
+        "batch_mb": _number(form.get("batch_mb", ""), 16, 8192, "Indexing batch"),
     }
     changed = {k: v for k, v in values.items() if v != options(c)[k]}
     _update(config.store_dir, SID, "settings-changed", {"changed": sorted(changed)},
@@ -223,7 +227,7 @@ followLinks = 0
 indexallfilenames = 1
 textfilemaxmbs = {o["text_limit_mb"]}
 compressedfilemaxkbs = {o["compressed_limit_mb"] * 1000}
-idxflushmb = 50
+idxflushmb = {o["batch_mb"]}
 pdfocr = 0
 loglevel = 2
 """)

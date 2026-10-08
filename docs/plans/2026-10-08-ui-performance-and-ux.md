@@ -36,6 +36,11 @@ unique at every level, so they make 5 million folders, far more than real trees.
   The counts are now kept until the mail store changes.
 - Mail catalog search scans subjects and senders with `LIKE` (about 0.3 s per source on Hub). The trigram
   approach used for files applies here too once mail grows.
+- Recoll's index outgrew memory on spinning disks: at 41 GB (24 GB of word positions) each 50 MB batch merged
+  into the whole index, so Recoll spent hours flushing at about 1.5 documents/s and had written 418 GB in total.
+  Batches are now 512 MB by default (a setting on the Folders page), and putting the index folder on SSD
+  storage would help most.
+- ZFS counts objects, not files: `df -i` gave 7.1 M for the four datasets, Recoll walked 3.03 M files.
 - Files that Recoll couldn't read (149 of the first 1.5 M) are mostly CHM help files with no pages, RAR archives,
   and damaged or cloud-placeholder Office files.
 

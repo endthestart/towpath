@@ -52,6 +52,8 @@
   <label>Largest text file to read (MB) <input name="text_limit_mb" inputmode="numeric" value="{{ indexing.text_limit_mb }}" required></label>
   <label>Largest compressed file to open (MB) <input name="compressed_limit_mb" inputmode="numeric" value="{{ indexing.compressed_limit_mb }}" required>
     <span>Single compressed files such as .gz are unpacked to read them; 0 lists them by name only.</span></label>
+  <label>Indexing batch (MB) <input name="batch_mb" inputmode="numeric" value="{{ indexing.batch_mb }}" required>
+    <span>Text gathered in memory before it is written to the index. Larger batches write far less to disk once the index is big, and use more memory while indexing. 16 to 8192.</span></label>
   <div class="form-actions"><button class="button" type="submit">Save</button><button class="button secondary" type="submit" name="reset" value="1" formnovalidate>Restore defaults</button></div>
 </form></details>
 </section>{% endif %}
