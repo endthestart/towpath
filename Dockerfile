@@ -98,7 +98,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
  && apt-get upgrade -y --no-install-recommends \
  && apt-get install -y --no-install-recommends \
-      recollcmd python3-recoll python3-lxml python3-venv python3-chardet \
+      recollcmd python3-recoll python3-xapian python3-lxml python3-venv python3-chardet \
       poppler-utils antiword unrtf pff-tools file python3-mutagen libimage-exiftool-perl \
       python3-rarfile libarchive-tools ghostscript python3-chm zstd xz-utils bzip2 \
  && rm -rf /var/lib/apt/lists/*

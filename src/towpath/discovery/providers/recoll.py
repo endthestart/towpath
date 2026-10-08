@@ -174,16 +174,18 @@ class Provider(BaseProvider):
         rows = data["rows"]
         exhausted = data.get("exhausted")
         hits = [hit for hit in (self._hit(row) for row in rows) if hit is not None]
-        return Listing(hits, exhausted if isinstance(exhausted, bool) else None, len(rows))
+        return Listing(hits, exhausted if isinstance(exhausted, bool) else None, len(rows), data.get("cursor"))
 
     def search(self, query: str, roots: list, max_rows: int, timeout: float) -> Listing:
         dirs = [os.path.realpath(r.path) for r in roots]
         return self._listing(self._call({"op": "search", "query": query, "dirs": dirs, "max_rows": max_rows},
                                         timeout))
 
-    def enumerate(self, root, max_rows: int, timeout: float, offset: int = 0) -> Listing:
-        return self._listing(self._call({"op": "enumerate", "dir": os.path.realpath(root.path),
-                                         "max_rows": max_rows, "offset": offset}, timeout))
+    def enumerate(self, root, max_rows: int, timeout: float, offset: int = 0, cursor: str | None = None) -> Listing:
+        request = {"op": "enumerate", "dir": os.path.realpath(root.path), "max_rows": max_rows, "offset": offset}
+        if cursor is not None:
+            request["after"] = cursor
+        return self._listing(self._call(request, timeout))
 
     def describe(self, native_id: str, timeout: float) -> Hit:
         hit = self._hit(self._call({"op": "describe", "udi": native_id}, timeout)["row"])

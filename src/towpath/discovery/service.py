@@ -470,13 +470,13 @@ def import_catalog(config, provider_id: str | None = None, root: str | None = No
         complete, reason, termination = True, None, "complete"
         limit = deadline_seconds if page_size else fc.limits["timeout_seconds"]
         deadline = time.monotonic() + limit if limit is not None else None
-        offset = 0
+        offset, cursor = 0, None
         try:
             while True:
                 page = min(page_size, max_items - offset) if page_size else max_items
+                position = {"cursor": cursor} if cursor is not None else {"offset": offset} if offset else {}
                 # Completeness comes from the provider's raw rows, never from how many hits survive filtering.
-                listing = (prov.enumerate(prov.roots[alias], page, fc.limits["timeout_seconds"], offset=offset)
-                           if offset else prov.enumerate(prov.roots[alias], page, fc.limits["timeout_seconds"]))
+                listing = prov.enumerate(prov.roots[alias], page, fc.limits["timeout_seconds"], **position)
                 for hit in listing.hits:
                     if deadline is not None and time.monotonic() > deadline:
                         complete, reason = False, "time limit reached"
@@ -496,6 +496,7 @@ def import_catalog(config, provider_id: str | None = None, root: str | None = No
                     statuses[occ.extraction.status] += 1
                     changed += fstore.observe(db, occ, run) == "changed"
                 offset += listing.raw_rows
+                cursor = listing.cursor
                 if not complete:
                     break
                 if listing.exhausted is None:

@@ -79,6 +79,58 @@ class Db:
 def connect(confdir=None, extra_dbs=None, writable=False):
     return Db(confdir)
 ''',
+    # The Xapian binding's term iteration, as the bridge uses it to list records by ID: ``Database(path)``,
+    # ``allterms(prefix)`` and ``TermIter.skip_to`` (which returns the term it lands on; iteration continues
+    # after it). Each record's ID term is "Q" + rcludi, as observed from Recoll 1.36.1.
+    "xapian.py": '''
+import json, os
+
+class Error(Exception):
+    pass
+
+class DatabaseOpeningError(Error):
+    pass
+
+class DatabaseModifiedError(Error):
+    pass
+
+class _Item:
+    def __init__(self, term):
+        self.term = term
+
+class TermIter:
+    def __init__(self, terms, modified):
+        self._terms, self._i, self._modified = terms, 0, modified
+    def __iter__(self):
+        return self
+    def __next__(self):
+        if self._modified():
+            raise DatabaseModifiedError("the index changed")
+        if self._i >= len(self._terms):
+            raise StopIteration
+        self._i += 1
+        return _Item(self._terms[self._i - 1])
+    def skip_to(self, term):
+        while self._i < len(self._terms) and self._terms[self._i] < term:
+            self._i += 1
+        return next(self)
+
+class Database:
+    def __init__(self, path):
+        self._conf = os.path.dirname(path)
+        if os.path.exists(os.path.join(self._conf, "fake-no-xapian")):
+            raise DatabaseOpeningError("cannot open")
+        with open(os.path.join(self._conf, "fake-index.json")) as f:
+            self._terms = sorted(("Q" + d["rcludi"]).encode() for d in json.load(f) if d.get("rcludi"))
+    def _modified(self):
+        marker = os.path.join(self._conf, "fake-modified-once")
+        if os.path.exists(marker):
+            os.remove(marker)
+            return True
+        return False
+    def allterms(self, prefix=b""):
+        return TermIter([t for t in self._terms if t.startswith(prefix)], self._modified)
+''',
     "recoll/rclextract.py": '''
 import base64
 
@@ -220,6 +272,7 @@ def test_recoll_rows_become_full_lineage_records(rw):
 def test_broad_recoll_index_cannot_leak(rw):
     rw.grant("archive", "search")
     (rw.conf / "fake-ignore-dir").write_text("")
+    (rw.conf / "fake-no-xapian").write_text("")  # listing by record ID never leaves the folder; query paging can
     result = service.search(rw.config, "zebrafinch")
     assert result["results"]
     blob = json.dumps(result)
@@ -360,6 +413,52 @@ def test_unconfirmed_listing_establishes_no_absence(rw, monkeypatch):
     assert report["complete"] is False and report["marked_missing"] == 0
     assert "did not confirm" in report["reason"]
     assert service.search(rw.config, "zebrafinch")["more_may_exist"] is True
+
+
+def _list_all(prov, root, size: int) -> tuple[list[str], int]:
+    ids, listing, position, calls = [], None, {}, 0
+    while listing is None or not listing.exhausted:
+        listing = prov.enumerate(root, size, 60, **position)
+        calls += 1
+        ids += [hit.native_id for hit in listing.hits]
+        position = {"cursor": listing.cursor} if listing.cursor else {"offset": position.get("offset", 0)
+                                                                                + listing.raw_rows}
+    return ids, calls
+
+
+def test_enumeration_pages_by_record_id_and_lists_what_query_paging_lists(rw):
+    prov = service.provider(rw.config, "recoll")
+    root = prov.roots["archive"]
+    by_id, calls = _list_all(prov, root, 2)
+    assert prov.enumerate(root, 2, 60).cursor is not None and calls > 2
+    assert len(by_id) == len(set(by_id)) and by_id  # every record once, across pages
+    (rw.conf / "fake-no-xapian").write_text("")  # no Xapian binding or index: query paging, no cursor
+    assert prov.enumerate(root, 2, 60).cursor is None
+    by_query, _ = _list_all(prov, root, 2)
+    assert sorted(by_query) == sorted(by_id)
+
+
+def test_a_page_read_while_recoll_commits_is_read_again(rw):
+    prov = service.provider(rw.config, "recoll")
+    whole = prov.enumerate(prov.roots["archive"], 100, 60)
+    (rw.conf / "fake-modified-once").write_text("")
+    again = prov.enumerate(prov.roots["archive"], 100, 60)
+    assert not (rw.conf / "fake-modified-once").exists()
+    assert [h.native_id for h in again.hits] == [h.native_id for h in whole.hits] and again.exhausted
+
+
+def test_import_follows_the_cursor(rw, monkeypatch):
+    rw.grant("archive", "search")
+    seen, original = [], recoll_provider.Provider.enumerate
+
+    def spy(self, root, max_rows, timeout, **position):
+        seen.append(position)
+        return original(self, root, max_rows, timeout, **position)
+
+    monkeypatch.setattr(recoll_provider.Provider, "enumerate", spy)
+    report = service.import_catalog(rw.config, root="archive", page_size=2)[0]
+    assert report["complete"] and report["occurrences_seen"] == 7
+    assert seen[0] == {} and all(set(p) == {"cursor"} for p in seen[1:]) and len(seen) > 2
 
 
 def test_search_capped_by_filtered_rows_still_says_more(rw):

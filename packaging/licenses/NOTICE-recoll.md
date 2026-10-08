@@ -7,7 +7,7 @@ These unmodified Ubuntu 24.04 packages are added to the base system:
 | Software | Purpose | License (see the package's copyright file) |
 | --- | --- | --- |
 | Recoll (`recollcmd`, `python3-recoll`) | Full-text index, query, and extraction used by Towpath's Recoll adapter | GPL-2.0-or-later |
-| Xapian (`libxapian30`) | Recoll's index library | GPL-2.0-or-later |
+| Xapian (`libxapian30`, `python3-xapian`) | Recoll's index library; its binding lists a large index by record ID | GPL-2.0-or-later |
 | lxml (`python3-lxml`) | Recoll's DOCX and ODT filters | BSD-3-Clause |
 | Poppler utilities (`poppler-utils`) | PDF text extraction | GPL-2.0 or GPL-3.0 |
 | Antiword (`antiword`) | Legacy Word (.doc) text extraction | GPL-2.0-or-later |

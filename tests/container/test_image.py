@@ -309,7 +309,7 @@ def test_core_cpython_links_no_source_obliging_library(box):
 def test_recoll_binding_helpers_and_license_notices(box):
     tools = "recollindex antiword pdftotext unrtf pffexport file exiftool bsdtar ps2pdf zstd unxz bunzip2"
     out = box.run("-c", f"for c in {tools}; do command -v $c; done; "
-                  "python3 -c 'import recoll.recoll, recoll.rclextract, lxml, mutagen, rarfile, chm; "
+                  "python3 -c 'import recoll.recoll, recoll.rclextract, xapian, lxml, mutagen, rarfile, chm; "
                   "print(\"imports ok\")'",
                   entrypoint="sh").stdout
     for tool in ("recollindex", "antiword", "pdftotext", "unrtf", "pffexport", "/file", "exiftool", "bsdtar", "ps2pdf",
@@ -317,9 +317,9 @@ def test_recoll_binding_helpers_and_license_notices(box):
         assert tool in out
     listing = box.run("-c", "cat /usr/share/licenses/bundled/packages.tsv; ls /usr/share/licenses/bundled; "
                       "cat /usr/share/licenses/NOTICE.md", entrypoint="sh").stdout
-    for pkg in ("recollcmd", "python3-recoll", "antiword", "poppler-utils", "unrtf", "pff-tools", "python3-lxml",
-                "file", "python3-mutagen", "libimage-exiftool-perl", "python3-rarfile", "libarchive-tools",
-                "ghostscript", "python3-chm", "zstd", "xz-utils", "bzip2"):
+    for pkg in ("recollcmd", "python3-recoll", "python3-xapian", "antiword", "poppler-utils", "unrtf", "pff-tools",
+                "python3-lxml", "file", "python3-mutagen", "libimage-exiftool-perl", "python3-rarfile",
+                "libarchive-tools", "ghostscript", "python3-chm", "zstd", "xz-utils", "bzip2"):
         assert f"\n{pkg}\t" in "\n" + listing
     assert "GPL-2.0-or-later" in listing and "towpath-sources:sha256-" in listing
     for pkg in ("recollcmd", "antiword", "pff-tools"):
@@ -348,6 +348,34 @@ def test_recoll_index_search_recover_in_container(box):
     report = box.json("files", "import", "--provider", "recoll", "--root", "archive")[0]
     assert report["complete"] and report["marked_missing"] == 0
     assert tree_digest(box.data) == before
+
+
+@recoll_only
+def test_listing_by_record_id_matches_query_paging(box):
+    deep = box.data / "roots" / "archive" / ("d" * 70) / ("e" * 70)
+    deep.mkdir(parents=True)
+    (deep / "long-path.txt").write_text("a file whose Recoll ID is shortened and hashed\n")
+    box.run("-c", "/index/recoll", entrypoint="recollindex")
+    code = """
+import json
+from recoll import recoll
+from towpath.discovery.bridges import recoll_bridge as bridge
+req = {"op": "enumerate", "confdir": "/index/recoll", "dir": "/data/roots/archive", "max_rows": 2}
+by_id, after, pages = [], None, 0
+while True:
+    page = bridge.handle({**req, **({"after": after} if after is not None else {})})
+    by_id += [row["rcludi"] for row in page["rows"]]
+    after, pages = page["cursor"], pages + 1
+    if page["exhausted"]:
+        break
+rows, _ = bridge._query(recoll.connect(confdir="/index/recoll"), 'dir:"/data/roots/archive"', 10000)
+print(json.dumps({"by_id": by_id, "query": [row["rcludi"] for row in rows], "pages": pages}))
+"""
+    out = json.loads(box.run("-c", code, entrypoint="python3").stdout)
+    assert sorted(out["by_id"]) == sorted(out["query"]) and len(set(out["by_id"])) == len(out["by_id"])
+    assert out["pages"] > 2 and any(len(udi) == 150 for udi in out["by_id"])  # the long path's hashed ID
+    report = box.json("files", "import", "--provider", "recoll", "--root", "archive")[0]
+    assert report["complete"]
 
 
 @recoll_only

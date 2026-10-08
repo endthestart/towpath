@@ -46,11 +46,15 @@ class Listing:
     confirmed nothing lay beyond the rows it examined (it asked for one more than the cap and got
     none); False when the cap was reached; None when the provider cannot say. Filtering (folders,
     unusable rows) shortens ``hits`` but never makes a capped listing look exhausted.
+
+    ``cursor``, when a provider pages an enumeration by position rather than by offset, is where the next
+    page starts; the caller passes it back instead of an offset.
     """
 
     hits: list
     exhausted: bool | None
     raw_rows: int = 0
+    cursor: str | None = None
 
 
 @dataclass(frozen=True)
@@ -84,7 +88,8 @@ class BaseProvider:
         raise Unavailable("search is not implemented")
 
     def enumerate(self, root, max_rows: int, timeout: float, offset: int = 0) -> Listing:
-        """Every item under ``root``, from at most ``max_rows`` raw rows after the first ``offset``."""
+        """Every item under ``root``, from at most ``max_rows`` raw rows after the first ``offset``. A provider
+        whose listings carry a ``cursor`` also accepts ``cursor=`` in place of the offset."""
         raise Unavailable("enumerate is not implemented")
 
     def describe(self, native_id: str, timeout: float) -> Hit:
