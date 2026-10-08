@@ -14,13 +14,14 @@ import re
 import shutil
 import signal
 import subprocess
+import threading
 import time
 from contextlib import closing
 from pathlib import Path
 
 from towpath import connections
 from towpath.connections import ConnectionProblem, _now, _update, get
-from towpath.stores import open_store
+from towpath.stores import open_store, store_path
 
 SID = "folders"
 PAGE = 20000  # rows per Recoll call while adding to search; each call starts the bridge afresh
@@ -46,6 +47,10 @@ DEFAULTS = {
 }
 _TOKEN = re.compile(r'[^\s"\\=]{1,100}')
 _running: dict[str, subprocess.Popen] = {}
+# Adding to search and measuring space run beside the worker's loop, so mail checks and searches never wait the
+# hour a large import takes. Each job's outcome waits here until the next poll reports it.
+_jobs: dict[str, threading.Thread] = {}
+_outcomes: dict[str, dict] = {}
 
 
 def library() -> Path:
@@ -294,6 +299,18 @@ def _import(config, c: dict, data_dir: Path, status: dict) -> dict:
     return {"reports": reports, "seen": totals["seen"]}
 
 
+def _unmeasured(config, c: dict) -> bool:
+    from towpath import space
+
+    if not store_path(config.store_dir, "files").exists():
+        return False
+    db = open_store(config.store_dir, "files", "connect")
+    try:
+        return bool(space.stale(db, SID, [r["alias"] for r in c["settings"].get("roots") or []]))
+    finally:
+        db.close()
+
+
 def _measure(config, c: dict) -> list[dict]:
     """Measure space for every root whose newest import isn't measured yet (see towpath.space)."""
     from towpath import space
@@ -308,12 +325,57 @@ def _measure(config, c: dict) -> list[dict]:
         db.close()
 
 
+def _in_background(name: str, work) -> None:
+    def run():
+        try:
+            _outcomes[name] = {"result": work()}
+        except Exception as exc:  # noqa: BLE001 - reported by the next poll; never log file names from a message
+            _outcomes[name] = {"error": type(exc).__name__}
+
+    _outcomes.pop(name, None)
+    _jobs[name] = threading.Thread(target=run, name=f"towpath-{name}", daemon=True)
+    _jobs[name].start()
+
+
+def _add_and_measure(config, c: dict, data_dir: Path, status: dict) -> dict:
+    started = time.monotonic()
+    result = _import(config, c, data_dir, status)
+    if (get(config.store_dir, SID) or {}).get("indexing") == "paused":
+        return {"paused": True}
+    _update(config.store_dir, SID, progress=_progress(status, "measuring", result["seen"]))
+    _measure(config, c)
+    return {"seen": result["seen"], "seconds": round(time.monotonic() - started), "status": status}
+
+
+def _finished(config, job: str) -> list[dict]:
+    """Report a background job that has ended."""
+    _jobs.pop(job, None)
+    outcome = _outcomes.pop(job, {})
+    if job == "measure":
+        return [{"source_id": SID, "step": "measured"}] if "result" in outcome else []
+    if "error" in outcome:
+        _update(config.store_dir, SID, "indexing-stopped", {"error": outcome["error"]}, indexing="idle",
+                last_error="Adding files to search stopped with an error. Start again to resume.")
+        return [{"source_id": SID, "step": "failed", "error": outcome["error"]}]
+    result = outcome["result"]
+    if result.get("paused"):
+        return [{"source_id": SID, "step": "paused-while-adding"}]
+    _update(config.store_dir, SID, "indexed", {"files": result["seen"], "seconds": result["seconds"]},
+            indexing="idle", progress=_progress(result["status"], "done", result["seen"]))
+    return [{"source_id": SID, "step": "indexed", "files": result["seen"]}]
+
+
 def index_pending(config, data_dir: Path) -> list[dict]:
     """One step of Folders indexing per poll: start Recoll, report its progress, stop it on Pause, and when it
-    finishes add the index to search. Never starts anything the owner didn't ask for."""
+    finishes add the index to search in the background. Never starts anything the owner didn't ask for."""
     c = get(config.store_dir, SID)
     if c is None or c["state"] != "ready":
         return []
+    for job in ("add", "measure"):
+        if job in _jobs:
+            if _jobs[job].is_alive():
+                return [{"source_id": SID, "step": "adding" if job == "add" else "measuring"}]
+            return _finished(config, job)
     confdir = Path(data_dir) / "index" / "recoll"
     proc = _running.get(SID)
     if c["indexing"] == "paused":
@@ -323,7 +385,10 @@ def index_pending(config, data_dir: Path) -> list[dict]:
             return [{"source_id": SID, "step": "paused"}]
         return []
     if c["indexing"] not in ("requested", "running"):
-        return _measure(config, c) if c["indexing"] == "idle" and c.get("progress") else []
+        if c["indexing"] == "idle" and c.get("progress") and _unmeasured(config, c):
+            _in_background("measure", lambda: _measure(config, c))
+            return [{"source_id": SID, "step": "measuring"}]
+        return []
     if proc is None:
         _running[SID] = _start(c, Path(data_dir))
         _update(config.store_dir, SID, "indexing-started" if c["indexing"] == "requested" else "indexing-resumed",
@@ -340,12 +405,5 @@ def index_pending(config, data_dir: Path) -> list[dict]:
                            "Start again to resume.")
         return [{"source_id": SID, "step": "failed", "exit": proc.returncode}]
     _update(config.store_dir, SID, progress=_progress(status, "adding", 0))
-    started = time.monotonic()
-    result = _import(config, c, Path(data_dir), status)
-    if (get(config.store_dir, SID) or {}).get("indexing") == "paused":
-        return [{"source_id": SID, "step": "paused-while-adding"}]
-    _update(config.store_dir, SID, progress=_progress(status, "measuring", result["seen"]))
-    _measure(config, c)
-    _update(config.store_dir, SID, "indexed", {"files": result["seen"], "seconds": round(time.monotonic() - started)},
-            indexing="idle", progress=_progress(status, "done", result["seen"]))
-    return [{"source_id": SID, "step": "indexed", "files": result["seen"]}]
+    _in_background("add", lambda: _add_and_measure(config, c, Path(data_dir), status))
+    return [{"source_id": SID, "step": "adding"}]

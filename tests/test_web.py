@@ -71,6 +71,18 @@ def test_bounded_pages_and_query(mail_index):
     assert len(index.emails(mail_index, query="x" * 1000)["query"]) == 200
 
 
+def test_overview_counts_are_kept_until_the_store_changes(mail_index):
+    import sqlite3
+
+    first = index.overview(mail_index)
+    assert index.overview(mail_index) is first  # the same answer, not counted again
+    db = sqlite3.connect(mail_index / "source.db")
+    db.execute("UPDATE items SET absent_since_run = 'r9' WHERE item_id = 'demo-0'")
+    db.commit()
+    db.close()
+    assert index.overview(mail_index)["total"] == first["total"] - 1
+
+
 def test_overview_excludes_personal_rows(client):
     response = client.get("/")
     assert response.status_code == 200

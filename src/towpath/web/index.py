@@ -6,7 +6,7 @@ import json
 import math
 from pathlib import Path
 
-from towpath.stores import open_store
+from towpath.stores import open_store, store_path
 
 PAGE_SIZE = 25
 VIEWS = {"all": "All mail", "inbox": "Inbox", "sent": "Sent", "attachments": "Attachments"}
@@ -16,7 +16,28 @@ def connection(store_dir: Path):
     return open_store(store_dir, "source", "web")
 
 
+_overviews: dict = {}
+
+
 def overview(store_dir: Path) -> dict:
+    """Mail totals for the Overview page. Counting labels reads every message's record (about two seconds for a
+    quarter of a million), so the answer is kept until the store file changes, which only a sync does."""
+    path = store_path(store_dir, "source")
+    try:
+        st = path.stat()
+        key = (str(path), st.st_mtime_ns, st.st_size)
+    except OSError:
+        key = None
+    if key is not None and key in _overviews:
+        return _overviews[key]
+    result = _overview(store_dir)
+    if key is not None:
+        _overviews.clear()
+        _overviews[key] = result
+    return result
+
+
+def _overview(store_dir: Path) -> dict:
     with closing(connection(store_dir)) as db:
         total = db.execute("SELECT count(*) FROM items WHERE absent_since_run IS NULL").fetchone()[0]
         labels = dict(db.execute("""

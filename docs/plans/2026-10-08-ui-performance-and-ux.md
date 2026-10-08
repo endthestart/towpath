@@ -30,8 +30,10 @@ unique at every level, so they make 5 million folders, far more than real trees.
   scan. `ionice` has no effect on ZFS, so Recoll's reads compete equally with other apps; the queue depth comes
   from Recoll's thread counts. If load matters, use one worker thread, or index backup-set folders
   (`*.hbk`, `*.sparsebundle`, `Backups.backupdb`) by name only through per-folder sections in `recoll.conf`.
-- The import runs inside the worker's poll, so mail checks wait for it (about an hour at Hub scale). It should
-  run in slices that resume from the cursor.
+- The import used to run inside the worker's poll, so mail checks waited for it (about an hour at Hub scale).
+  Adding to search and measuring space now run in a background thread beside the loop.
+- The Overview page counted mail labels on every load (1.8 s of its 2.2 s on Hub, a join over every message).
+  The counts are now kept until the mail store changes.
 - Mail catalog search scans subjects and senders with `LIKE` (about 0.3 s per source on Hub). The trigram
   approach used for files applies here too once mail grows.
 - Files that Recoll couldn't read (149 of the first 1.5 M) are mostly CHM help files with no pages, RAR archives,
@@ -49,7 +51,7 @@ unique at every level, so they make 5 million folders, far more than real trees.
 2. **File rows and details.** Show each file's size (done) and folder in results. A file page with path, size, dates and
    type, and a link to its folder in Space.
 3. **File filters.** `in:<folder>`, `size:>100MB`, and modified-date ranges; type chips for common kinds.
-4. **Import in slices** that resume from the cursor, so mail checks never wait for a large import.
+4. **Import resumable after a restart** from the cursor (it runs in the background now, but starts over).
 5. **Mail subjects and senders through a trigram index**, as for files.
 6. **Duplicates.** By name and size first (from the catalog). By content hash later: that needs a read-only
    hashing pass that is scheduled and throttled.

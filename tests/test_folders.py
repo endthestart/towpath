@@ -88,6 +88,10 @@ def inst(tmp_path, monkeypatch):
     for proc in folders._running.values():
         folders._stop(proc)
     folders._running.clear()
+    for job in folders._jobs.values():
+        job.join(10)
+    folders._jobs.clear()
+    folders._outcomes.clear()
 
 
 def test_the_picker_shows_two_levels_and_marks_unreadable_folders(inst):
@@ -218,6 +222,39 @@ def test_pause_stops_recoll_and_resume_continues(inst):
     connections.start_indexing(inst.config.store_dir, inst.layout.credentials, folders.SID)
     inst.poll_until_idle()
     assert connections.get(inst.config.store_dir, folders.SID)["progress"]["indexed"] == 1
+
+
+def test_adding_to_search_runs_beside_the_worker_loop(inst, monkeypatch):
+    import threading
+
+    folders.choose(inst.config, [str(inst.library / "documents")])
+    inst.recoll_holds("documents/letters/lock-keeper.txt")
+    release, real = threading.Event(), folders._import
+    monkeypatch.setattr(folders, "_import", lambda *a: (release.wait(10), real(*a))[1])
+    connections.start_indexing(inst.config.store_dir, inst.layout.credentials, folders.SID)
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        steps = request_worker.run_once(inst.config, inst.layout.credentials)["indexing"]
+        if steps and steps[0]["step"] == "adding":
+            break
+        time.sleep(0.05)
+    started = time.monotonic()
+    assert request_worker.run_once(inst.config, inst.layout.credentials)["indexing"][0]["step"] == "adding"
+    assert time.monotonic() - started < 2  # the poll returns while the import waits
+    release.set()
+    inst.poll_until_idle()
+    c = connections.get(inst.config.store_dir, folders.SID)
+    assert c["progress"]["indexed"] == 1 and c["progress"]["phase"] == "done"
+
+
+def test_a_failure_while_adding_is_reported(inst, monkeypatch):
+    folders.choose(inst.config, [str(inst.library / "documents")])
+    inst.recoll_holds("documents/letters/lock-keeper.txt")
+    monkeypatch.setattr(folders, "_import", lambda *a: 1 / 0)
+    connections.start_indexing(inst.config.store_dir, inst.layout.credentials, folders.SID)
+    inst.poll_until_idle()
+    c = connections.get(inst.config.store_dir, folders.SID)
+    assert c["indexing"] == "idle" and "Adding files to search stopped" in c["last_error"]
 
 
 def test_a_recoll_failure_is_reported_and_can_be_retried(inst):
