@@ -61,8 +61,8 @@ jobs:
       - run: towpath fixtures check-domains src tests docs examples deploy packaging README.md CONTRIBUTING.md
       - run: python -m pytest -q
 
+  # Images are built and container-tested alongside the unit tests; publishing waits for both.
   image:
-    needs: test
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     strategy:
@@ -140,7 +140,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    needs: image
+    needs: [test, image]
     if: (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))) || (github.event_name == 'workflow_dispatch' && inputs.publish)
     runs-on: ubuntu-24.04
     timeout-minutes: 45

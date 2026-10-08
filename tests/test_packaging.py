@@ -39,7 +39,7 @@ def test_publishing_is_limited_to_trusted_refs_and_tested_images():
     condition = ("(github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, "
                  "'refs/tags/v'))) || (github.event_name == 'workflow_dispatch' && inputs.publish)")
     assert condition in _job("publish") and condition in _job("image")
-    assert "needs: image" in _job("publish") and "needs: test" in _job("image")
+    assert "needs: [test, image]" in _job("publish")  # nothing is published unless the unit tests pass too
     image = _job("image")
     assert image.index("Test the candidate image") < image.index("Save the tested image")
     assert image.index("Save the tested image") < image.index("Collect and verify the corresponding source")
