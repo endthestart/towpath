@@ -152,6 +152,10 @@ topdirs = {topdirs}
 skippedNames = {SKIPPED_NAMES}
 noContentSuffixes+ = {NAME_ONLY}
 usesystemfilecommand = 0
+# Two file threads instead of four: on a pool of spinning disks each one waits on a random read, and fewer keep
+# more of the disks free for everything else. The first scan takes longer; later ones touch only changes.
+thrQSizes = 2 2 2
+thrTCounts = 2 1 1
 followLinks = 0
 indexallfilenames = 1
 textfilemaxmbs = 20
@@ -179,7 +183,7 @@ def read_status(confdir: Path) -> dict:
 def _command(confdir: Path) -> list[str]:
     cmd = ["recollindex", "-c", str(confdir), "-k"]  # -k: retry files that failed before (a helper may now exist)
     if shutil.which("ionice"):
-        cmd = ["ionice", "-c", "3"] + cmd  # idle I/O class: Recoll reads only when the pool is otherwise quiet
+        cmd = ["ionice", "-c", "3"] + cmd  # idle I/O class where the kernel schedules I/O; ZFS ignores it
     return ["nice", "-n", "10"] + cmd if shutil.which("nice") else cmd
 
 

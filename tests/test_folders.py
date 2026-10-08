@@ -124,7 +124,7 @@ def test_recoll_configuration_lists_everything_and_reads_media_by_name_only(inst
     # Recoll's own defaults skip caches, .git and tmp folders; replacing them keeps those findable.
     assert "skippedNames = .zfs .snapshot\n" in text and "skippedNames+" not in text
     # Without this, Recoll opens every unrecognised file to guess its type, then lists it by name anyway.
-    assert "usesystemfilecommand = 0" in text
+    assert "usesystemfilecommand = 0" in text and "thrTCounts = 2 1 1" in text
 
 
 def test_status_keeps_counts_but_never_the_current_file_name(tmp_path):
