@@ -6,21 +6,26 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `a23c572` (folder picker shows included subfolders; Recoll image adds `file`, audio tags and image
-metadata), publishing run [37708934450](https://github.com/endthestart/towpath/actions/runs/37708934450):
+Revision `75a4fbb` (indexing settings on the Folders page; Space page; catalog search and status at
+millions of rows; import listing by Recoll record ID; every file indexed, unrecognised types by name only),
+publishing run [37725635789](https://github.com/endthestart/towpath/actions/runs/37725635789):
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:e81fc48fc7514913655005d15a5f174a50f2509cec1bc801f80437d4cf9418d4`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:1a2a5967a8daf7f52316dbb68f529272c1962534fc9238e38787ef44297ddc5b`
+- `web`: `ghcr.io/endthestart/towpath@sha256:db8a9974348ecdc8c68394c92e91a6c409c4de2862fc0456cb31482785e23691`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:11e49ceaa8564dc0895a2897b9d1a362315bd012c039bf5e03c5b28dd37eee89`
 
 The personal datasets are mounted read-only under `/library` in the connectors only, which join a read-only
 group set in the TrueNAS GUI (Read with Inherit, applied recursively per dataset, not to child datasets). The
-first folder index was running across those datasets when this release was deployed; Recoll resumed after the
-restart.
+first folder index was running across those datasets when this release was deployed; Recoll resumed after each
+restart. Measurements behind these releases are in the
+[UI performance plan](../plans/2026-10-08-ui-performance-and-ux.md).
 
 Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `7596b0c` | Space page, fast catalog search and status, record-ID import, Recoll at two threads | `towpath@sha256:776d334f…`, `towpath-recoll@sha256:72a0211c…` |
+| `2172138` | Every file indexed; unrecognised types by name only; catalog trigram index | `towpath@sha256:40fb276e…`, `towpath-recoll@sha256:1257e952…` |
+| `a23c572` | Folder picker shows included subfolders; `file`, audio tags and image metadata in the Recoll image | `towpath@sha256:e81fc48f…`, `towpath-recoll@sha256:1a2a5967…` |
 | `522ca49` | Folders on the server from the Connections page | `towpath@sha256:724e5780…`, `towpath-recoll@sha256:7b26805c…` |
 | `6205160` | Single data folder, shell-free install, user 568; bounded source downloads | `towpath@sha256:9880ac3f…`, `towpath-recoll@sha256:b4de7395…` |
 | `8f5f0c8` | Plain-language Gmail pages; separate folders, user 10001 | `towpath@sha256:293a4011…`, `towpath-recoll@sha256:fc83ae31…` |
@@ -57,7 +62,9 @@ Verified before and after deployment (private evidence is kept with the operator
 and configuration is retired read-only; the owner moves its OAuth token out of use. A Mac UI, worker or
 sync must not run against the same account or stores; returning to the Mac requires stopping Hub first.
 
-**Rollback.** To return to `8f5f0c8`: restore its compose and environment, rename `credentials/` back to
+**Rollback.** Any release since `6205160` rolls back by putting its two digests from the table above into the
+environment and redeploying; tables and indexes added later (catalog counts, Space) are ignored by older code.
+To return to `8f5f0c8`: restore its compose and environment, rename `credentials/` back to
 `tokens/` and give the folder back to user 10001. Before that, `c9ff8e7` by digest with the same compose as `8f5f0c8`. Before that, `0d9f36f` (same compose); the
 configured Gmail entry then applies again and the imported row is ignored. Before that, `b82450f` with its compose (no `connect-setup` service, no
 `/connections/` route); accounts added on the Connections page then stay stored but are not indexed. Do not roll back
