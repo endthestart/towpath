@@ -4,6 +4,7 @@ in for Recoll; the folders themselves are invented and only ever read."""
 
 import json
 import os
+import re
 import stat
 import sys
 import textwrap
@@ -315,6 +316,11 @@ def test_space_is_measured_after_indexing_and_shown_for_searchable_folders(inst)
         assert ">raw<" in folder and "Search for files here" in folder
         assert client.get("/space/folder", {"root": "photos", "path": "elsewhere"}).status_code == 404
         assert client.get("/space/folder", {"root": "private", "path": ""}).status_code == 404
+        found = client.get("/search/", {"q": "canal", "source": "files-folders"}).content.decode()
+        ref = re.search(r'href="(/ref/\?r=[^"]+)"', found).group(1).replace("&amp;", "&")
+        detail = client.get(ref).content.decode()
+        assert ">FILE<" in detail and "photos/2003" in detail and "Technical details" in detail
+        assert "/space/folder?root=photos&amp;path=2003" in detail and "Search this folder" in detail
     assert request_worker.run_once(inst.config, inst.layout.credentials)["indexing"] == []  # measured once
 
 

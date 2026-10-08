@@ -117,6 +117,29 @@ def search_request(request):
     return HttpResponseRedirect(_search_url(query, chosen))
 
 
+STATES = {"current": "Unchanged since it was indexed", "changed": "Changed since it was indexed; index again to update",
+          "missing": "No longer in this folder", "unverifiable": "Couldn't be checked against the file"}
+
+
+def _file_view(result: dict) -> dict:
+    """A file as people read it: name, folder, size, dates and type, with links to its folder."""
+    from towpath import folders
+
+    loc = result.get("locator") or {}
+    folder = (loc.get("path") or "").rpartition("/")[0]
+    modified = next((d["value"][:10] for d in result.get("dates", ()) if d.get("meaning") == "file-modified"), None)
+    members = loc.get("members") or []
+    view = {"folder": f"{loc.get('root')}/{folder}" if folder else loc.get("root"), "modified": modified,
+            "size": present.size_text(result.get("size")), "type": result.get("media_type") or None,
+            "inside": " > ".join(m.get("name") or m.get("kind", "") for m in members[:-1]) if members else None,
+            "space_url": None, "search_url": None}
+    if loc.get("provider") == folders.SID and loc.get("root"):
+        view["space_url"] = "/space/folder?" + urlencode({"root": loc["root"], "path": folder})
+        if folder:
+            view["search_url"] = _search_url(folder, [f"files-{folders.SID}"])
+    return view
+
+
 @require_GET
 def reference(request):
     ref = request.GET.get("r", "")
@@ -142,6 +165,8 @@ def reference(request):
     parts = [dict(p, url=_ref_url(p["ref"])) for p in described.get("parts", [])]
     return render(request, "reference.html", {
         "nav": "search", "ref": ref, "described": described, "result": result, "parts": parts, "content": content,
+        "file": _file_view(result) if result["source_type"] == "files" else None,
+        "file_state": STATES.get(described.get("state")),
         "part_id": part_id, "in_collections": in_collections,
         "set_collections": [c for c in all_collections if c["kind"] == "set"],
         "described_json": described})

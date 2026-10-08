@@ -2,9 +2,22 @@
 {% block title %}Reference · Towpath{% endblock %}
 {% block content %}
 <a class="back-link" href="{% url 'search' %}">← Search</a>
-<header class="page-head"><p class="eyebrow">REFERENCE</p><h1 class="message-subject">{{ result.title|default:'(untitled)' }}</h1>
-<p class="lead reference">{{ ref }}</p></header>
+{% if file %}<header class="page-head"><p class="eyebrow">FILE</p><h1 class="message-subject">{{ result.title|default:'(untitled)' }}</h1>
+<p class="lead">{{ file.folder }}</p></header>
+{% else %}<header class="page-head"><p class="eyebrow">REFERENCE</p><h1 class="message-subject">{{ result.title|default:'(untitled)' }}</h1>
+<p class="lead reference">{{ ref }}</p></header>{% endif %}
 {% if error %}<div class="notice warn"><strong>{{ error.code }}</strong> {{ error.message }}</div>{% else %}
+{% if file %}<section class="detail-card"><dl>
+<div><dt>Folder</dt><dd>{{ file.folder }}</dd></div>
+{% if file.inside %}<div><dt>Inside</dt><dd>{{ file.inside }}</dd></div>{% endif %}
+<div><dt>Size</dt><dd>{{ file.size|default:'not recorded' }}</dd></div>
+<div><dt>Modified</dt><dd>{{ file.modified|default:'not recorded' }}</dd></div>
+{% if file.type %}<div><dt>Type</dt><dd>{{ file.type }}</dd></div>{% endif %}
+{% if described.state %}<div><dt>On disk</dt><dd>{{ file_state|default:described.state }}</dd></div>{% endif %}
+</dl>
+{% if file.space_url or file.search_url %}<div class="form-actions">{% if file.space_url %}<a class="button secondary" href="{{ file.space_url }}">Show folder in Space</a>{% endif %}{% if file.search_url %}<a class="button secondary" href="{{ file.search_url }}">Search this folder</a>{% endif %}</div>{% endif %}
+</section>
+<details class="save"><summary>Technical details</summary>{% endif %}
 <section class="detail-card"><dl>
 <div><dt>Source</dt><dd>{{ result.source_id }} ({{ result.source_type }})</dd></div>
 <div><dt>Kind</dt><dd>{{ result.kind }}{% if result.media_type %} · {{ result.media_type }}{% endif %}{% if result.size %} · {{ result.size|filesizeformat }}{% endif %}</dd></div>
@@ -15,6 +28,7 @@
 <div><dt>Location</dt><dd class="reference">{% if result.locator.display %}{{ result.locator.display }}{% else %}{% for k, v in result.locator.items %}{% if v is not None %}{{ k }}={{ v }} {% endif %}{% endfor %}{% endif %}</dd></div>
 <div><dt>Hashes</dt><dd class="reference">{% for k, v in result.hashes.items %}{{ k }}:{{ v }} {% empty %}none computed{% endfor %}</dd></div>
 </dl><p class="body-note">{{ described.content }}</p></section>
+{% if file %}<p class="footnote reference">{{ ref }}</p></details>{% endif %}
 
 {% if parts %}<section class="detail-card"><p class="eyebrow">PARTS</p>
 {% for p in parts %}<div class="attachment"><a href="{{ p.url }}"><strong>{% if p.selected %}▸ {% endif %}{{ p.filename|default:p.mime_type }}</strong></a><span>part {{ p.part_id }} · {{ p.mime_type }}{% if p.size %} · {{ p.size|filesizeformat }}{% endif %}{% if p.fetch %} · fetch {{ p.fetch }}{% endif %}{% if p.sha256 %} · sha256 {{ p.sha256|slice:':12' }}…{% endif %}</span></div>{% endfor %}
