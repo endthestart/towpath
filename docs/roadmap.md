@@ -19,3 +19,24 @@ This is a dependency map, not a calendar or a claim of completed capabilities.
 | 8. Later | Other mail providers, alternative mail-management providers or Towpath-built replacements, more sources, curated family edition, export packages | 7 | Per-source grants, audience enforced in shared editions, portable export and restore |
 
 The historical milestone table is a dependency inventory, not the current delivery order. D20 puts cross-source discovery, collection and evidence interfaces first; mail management and AI enrichment are independent later/stretch work. The life stream must work with any single source. D19 adds a later ownership direction: selected durable copies, source independence and physical organization. Their operational workflows and implementation plans remain separate decisions.
+
+## Owner ideas to plan for (2026-10-07)
+
+Recorded for planning; none is scheduled yet.
+
+- **Apple data.** iCloud Mail works today through the IMAP connection (Apple app-specific password). Contacts and
+  calendars would use CardDAV/CalDAV the same way. iCloud Photos and Drive have no supported third-party API:
+  the practical route is an existing open-source tool that copies them to the NAS (for example icloudpd for
+  photos, which needs "Access iCloud Data on the Web" and periodic re-sign-in), then indexing the copy as
+  folders. Messages have no API at all: export them on a Mac (from its Messages database) or from a local iPhone
+  backup with an existing exporter, write the export to the NAS, and import it as a source. Each needs a
+  verification step before adoption.
+- **Photo metadata (EXIF) search.** Today photos are indexed by name only, to keep load low. Searching by
+  camera, lens, date taken or place needs structured fields, not just text: read image headers (ExifTool,
+  read-only, headers only) into typed fields in the files store, with filters such as `camera:` and `taken:`.
+  sist2 already extracts EXIF and makes thumbnails and is the first candidate to evaluate for media; contribute
+  upstream to Recoll or sist2 where that is cleaner than doing it in Towpath.
+- **Natural-language search with local models.** A question such as "all pictures taken with a given camera"
+  is translated by a local model into Towpath's typed query (`kind:image camera:"..."`), which Towpath runs
+  under the usual grants; the model never touches the data directly, and the result can be saved as a
+  collection. Builds on structured metadata above, the model gateway and grants, and the agent context interface.
