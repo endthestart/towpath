@@ -320,6 +320,8 @@ def test_space_is_measured_after_indexing_and_shown_for_searchable_folders(inst,
         assert "documents/letters/canal.jpg" in page
         folder = client.get("/space/folder", {"root": "photos", "path": "2003"}).content.decode()
         assert ">raw<" in folder and "Search for files here" in folder
+        assert "Largest files in this folder" in folder and ">canal.jpg<" in folder
+        assert "/ref/?r=files-folders" in folder
         assert client.get("/space/folder", {"root": "photos", "path": "elsewhere"}).status_code == 404
         assert client.get("/space/folder", {"root": "private", "path": ""}).status_code == 404
         found = client.get("/search/", {"q": "canal", "source": "files-folders"}).content.decode()

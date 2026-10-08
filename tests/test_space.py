@@ -67,6 +67,10 @@ def test_each_import_is_measured_once(tmp_path):
         top = space.folder(db, "folders", "docs", "")
         assert top["subfolders"][0][0] == "photos" and top["here_files"] == 1  # README sits at the top
         assert space.folder(db, "folders", "docs", "nowhere") is None
+        here = space.files_here(db, "folders", "docs", "photos/2003")
+        assert [(name, size) for _, name, size in here] == [("canal.jpg", 4_000_000), ("Thumbs.db", 20_000)]
+        assert [name for _, name, _ in space.files_here(db, "folders", "docs", "")] == ["README"]
+        assert space.files_here(db, "folders", "docs", "pho") == []  # a prefix of a name isn't the folder
         assert space.summaries(db, "folders", ["docs"])["docs"]["clutter"]
 
 

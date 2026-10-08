@@ -115,6 +115,8 @@ def folder_page(request):
     db = _db()
     try:
         found = space.folder(db, folders.SID, alias, path)
+        listed = (found is not None and 0 < found["here_files"] and found["files"] <= space.FILES_LISTED_UP_TO)
+        files = space.files_here(db, folders.SID, alias, path) if listed else []
     finally:
         db.close()
     if found is None:
@@ -132,4 +134,7 @@ def folder_page(request):
         "here_files_text": f"{found['here_files']:,}",
         "more": found["subfolder_count"] - len(found["subfolders"]),
         "search_url": _search_url(path) if path else None,  # catalog paths are relative to the folder chosen
+        "files": [{"name": name, "bytes": size, "url": "/ref/?" + urlencode({"r": f"files-{folders.SID}:{occ}"})}
+                  for occ, name, size in files],
+        "files_unlisted": found["here_files"] > 0 and not files,
     })

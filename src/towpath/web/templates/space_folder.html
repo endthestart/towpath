@@ -13,4 +13,8 @@
 {% if folder.here_files %}<tr class="muted"><td>Files directly in this folder</td><td class="num">{{ here_files_text }}</td><td class="num">{{ folder.here_bytes|filesizeformat }}</td><td class="bar-cell"><meter min="0" max="1" value="{{ here_share }}"></meter></td></tr>{% endif %}
 </tbody></table>
 {% if more > 0 %}<p class="footnote">{{ more }} smaller subfolder{{ more|pluralize }} not shown.</p>{% endif %}
+{% if files %}<h2 class="space-section">Largest files in this folder</h2>
+<table class="space-table"><tbody>{% for f in files %}<tr><td class="path"><a href="{{ f.url }}">{{ f.name }}</a></td><td class="num">{{ f.bytes|filesizeformat }}</td></tr>{% endfor %}</tbody></table>
+{% if folder.here_files > files|length %}<p class="footnote">The {{ files|length }} largest of {{ here_files_text }}.</p>{% endif %}
+{% elif files_unlisted %}<p class="footnote">This folder holds too many files to list them here; open a subfolder{% if search_url %} or <a href="{{ search_url }}">search for files here</a>{% endif %}.</p>{% endif %}
 {% endblock %}
