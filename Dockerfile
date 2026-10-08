@@ -91,13 +91,16 @@ LABEL org.opencontainers.image.title="towpath-recoll" \
       org.opencontainers.image.documentation="Third-party software and its licenses: /usr/share/licenses/NOTICE.md"
 # Recoll (GPL-2.0-or-later) and helpers come unmodified from Ubuntu's archive. Helpers:
 # python3-lxml (DOCX, ODT), poppler-utils (PDF), antiword (legacy DOC), unrtf (RTF), pff-tools (PST),
-# file (type of files without an extension), python3-mutagen (audio tags), libimage-exiftool-perl (image metadata).
+# file (type of files without an extension), python3-mutagen (audio tags), libimage-exiftool-perl (image metadata),
+# python3-rarfile with libarchive-tools (RAR, read through bsdtar), ghostscript (PostScript), python3-chm (CHM),
+# zstd, xz-utils and bzip2 (compressed files).
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
  && apt-get upgrade -y --no-install-recommends \
  && apt-get install -y --no-install-recommends \
       recollcmd python3-recoll python3-lxml python3-venv python3-chardet \
       poppler-utils antiword unrtf pff-tools file python3-mutagen libimage-exiftool-perl \
+      python3-rarfile libarchive-tools ghostscript python3-chm zstd xz-utils bzip2 \
  && rm -rf /var/lib/apt/lists/*
 # Towpath in a virtualenv that can see the system's Recoll binding (built for this Python only).
 COPY --from=wheel /wheels /tmp/wheels

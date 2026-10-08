@@ -307,16 +307,19 @@ def test_core_cpython_links_no_source_obliging_library(box):
 
 @recoll_only
 def test_recoll_binding_helpers_and_license_notices(box):
-    tools = "recollindex antiword pdftotext unrtf pffexport file exiftool"
+    tools = "recollindex antiword pdftotext unrtf pffexport file exiftool bsdtar ps2pdf zstd unxz bunzip2"
     out = box.run("-c", f"for c in {tools}; do command -v $c; done; "
-                  "python3 -c 'import recoll.recoll, recoll.rclextract, lxml, mutagen; print(\"imports ok\")'",
+                  "python3 -c 'import recoll.recoll, recoll.rclextract, lxml, mutagen, rarfile, chm; "
+                  "print(\"imports ok\")'",
                   entrypoint="sh").stdout
-    for tool in ("recollindex", "antiword", "pdftotext", "unrtf", "pffexport", "/file", "exiftool", "imports ok"):
+    for tool in ("recollindex", "antiword", "pdftotext", "unrtf", "pffexport", "/file", "exiftool", "bsdtar", "ps2pdf",
+                 "zstd", "unxz", "bunzip2", "imports ok"):
         assert tool in out
     listing = box.run("-c", "cat /usr/share/licenses/bundled/packages.tsv; ls /usr/share/licenses/bundled; "
                       "cat /usr/share/licenses/NOTICE.md", entrypoint="sh").stdout
     for pkg in ("recollcmd", "python3-recoll", "antiword", "poppler-utils", "unrtf", "pff-tools", "python3-lxml",
-                "file", "python3-mutagen", "libimage-exiftool-perl"):
+                "file", "python3-mutagen", "libimage-exiftool-perl", "python3-rarfile", "libarchive-tools",
+                "ghostscript", "python3-chm", "zstd", "xz-utils", "bzip2"):
         assert f"\n{pkg}\t" in "\n" + listing
     assert "GPL-2.0-or-later" in listing and "towpath-sources:sha256-" in listing
     for pkg in ("recollcmd", "antiword", "pff-tools"):

@@ -16,6 +16,10 @@ These unmodified Ubuntu 24.04 packages are added to the base system:
 | file (`file`, `libmagic1t64`) | Type of files without a known extension | BSD-2-Clause |
 | Mutagen (`python3-mutagen`) | Audio tags (title, artist, album) | GPL-2.0-or-later |
 | ExifTool (`libimage-exiftool-perl`) | Image and media metadata | Artistic-1.0-Perl or GPL-1.0-or-later |
+| rarfile (`python3-rarfile`) and libarchive (`libarchive-tools`) | RAR archives, read through `bsdtar` | ISC; BSD-2-Clause |
+| Ghostscript (`ghostscript`) | PostScript to PDF for text extraction | AGPL-3.0-or-later |
+| PyCHM (`python3-chm`) | Compiled HTML Help (.chm) | GPL-2.0-or-later |
+| zstd, XZ Utils, bzip2 (`zstd`, `xz-utils`, `bzip2`) | Compressed single files | BSD-3-Clause or GPL-2.0; 0BSD and others; bzip2-1.0.6 |
 | Python 3.12 and the rest of the base system (about 170 packages in total) | Runtime | Various, per package |
 
 Where each license is recorded:

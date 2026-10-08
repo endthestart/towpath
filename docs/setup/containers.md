@@ -7,7 +7,7 @@ GitHub Actions tests Towpath, builds its container images, tests the built image
 | Image | Contents | Use |
 | --- | --- | --- |
 | `ghcr.io/<owner>/towpath` | Towpath CLI on `python:3.12-slim`, with the local UI, Gmail and IMAP clients; no model client libraries | UI, explicitly queued requests, metadata sync, fixture file discovery and tooling |
-| `ghcr.io/<owner>/towpath-recoll` | Towpath CLI on Ubuntu 24.04 with Recoll 1.36.1, its Python binding, and document helpers (`python3-lxml` for DOCX and ODT, `poppler-utils` for PDF, `antiword` for legacy DOC, `unrtf` for RTF, `pff-tools` for PST, `file` for files without an extension, `python3-mutagen` for audio tags, `libimage-exiftool-perl` for image metadata) | File discovery through Recoll: index, search, excerpt, recover |
+| `ghcr.io/<owner>/towpath-recoll` | Towpath CLI on Ubuntu 24.04 with Recoll 1.36.1, its Python binding, and document helpers (`python3-lxml` for DOCX and ODT, `poppler-utils` for PDF, `antiword` for legacy DOC, `unrtf` for RTF, `pff-tools` for PST, `file` for files without an extension, `python3-mutagen` for audio tags, `libimage-exiftool-perl` for image metadata, `python3-rarfile` with `libarchive-tools` for RAR, `ghostscript` for PostScript, `python3-chm` for CHM, and `zstd`, `xz-utils` and `bzip2` for compressed files) | File discovery through Recoll: index, search, excerpt, recover |
 
 Both images:
 
