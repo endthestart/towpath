@@ -16,6 +16,7 @@ import signal
 import subprocess
 import threading
 import time
+from datetime import datetime
 from contextlib import closing
 from pathlib import Path
 
@@ -274,10 +275,36 @@ def _stop(proc: subprocess.Popen) -> None:
             proc.wait()
 
 
-def _progress(status: dict, phase: str, imported: int | None = None) -> dict:
-    return {"phase": phase, "files": status.get("filesdone"), "docs": status.get("docsdone"),
-            "errors": status.get("fileerrors"), "total": status.get("totfiles"),
-            "indexed": imported if imported is not None else status.get("dbtotdocs"), "rate": None, "at": _now()}
+RATE_WINDOW_SECONDS = 60
+
+
+def _carried(c: dict) -> dict:
+    """From the last progress, only what a new reading pass keeps: the count Search holds."""
+    return {"in_search": (c.get("progress") or {}).get("in_search")}
+
+
+def _progress(status: dict, phase: str, imported: int | None = None, previous: dict | None = None) -> dict:
+    """What the Folders page shows. ``indexed`` is what Search holds: the rows added by an import, carried through
+    later reading; Recoll's own count of entries (folders and archive members included) isn't shown as files. While
+    Recoll reads, ``rate`` is files a minute, measured over at least a minute and smoothed."""
+    previous = previous or {}
+    files, now = status.get("filesdone"), _now()
+    in_search = imported if imported is not None else previous.get("in_search")
+    progress = {"phase": phase, "files": files, "docs": status.get("docsdone"), "errors": status.get("fileerrors"),
+                "total": status.get("totfiles"), "indexed": in_search, "in_search": in_search, "rate": None,
+                "at": now}
+    if phase != "reading" or not isinstance(files, int):
+        return progress
+    since = previous.get("since") if previous.get("phase") == "reading" else None
+    if not since or not isinstance(since.get("files"), int) or files < since["files"]:
+        return {**progress, "since": {"files": files, "at": now}}
+    seconds = (datetime.fromisoformat(now) - datetime.fromisoformat(since["at"])).total_seconds()
+    if seconds < RATE_WINDOW_SECONDS:
+        return {**progress, "rate": previous.get("rate"), "since": since}
+    current = (files - since["files"]) * 60 / seconds
+    last = (previous.get("rate") or {}).get("per_minute")
+    smoothed = current if last is None else 0.5 * current + 0.5 * last
+    return {**progress, "rate": {"per_minute": round(smoothed)}, "since": {"files": files, "at": now}}
 
 
 def _import(config, c: dict, data_dir: Path, status: dict) -> dict:
@@ -399,10 +426,11 @@ def index_pending(config, data_dir: Path) -> list[dict]:
     if proc is None:
         _running[SID] = _start(c, Path(data_dir))
         _update(config.store_dir, SID, "indexing-started" if c["indexing"] == "requested" else "indexing-resumed",
-                indexing="running", last_error=None, progress=_progress(read_status(confdir), "reading"))
+                indexing="running", last_error=None,
+                progress=_progress(read_status(confdir), "reading", previous=_carried(c)))
         return [{"source_id": SID, "step": "started"}]
     if proc.poll() is None:
-        _update(config.store_dir, SID, progress=_progress(read_status(confdir), "reading"))
+        _update(config.store_dir, SID, progress=_progress(read_status(confdir), "reading", previous=c["progress"]))
         return [{"source_id": SID, "step": "reading"}]
     _running.pop(SID, None)
     status = read_status(confdir)

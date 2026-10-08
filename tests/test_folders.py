@@ -175,6 +175,22 @@ def test_the_folders_page_changes_indexing_settings(inst, monkeypatch):
     assert folders.options(connections.get(inst.config.store_dir, folders.SID)) == folders.DEFAULTS
 
 
+def test_progress_shows_what_search_holds_and_a_measured_pace(monkeypatch):
+    clock = iter(["2026-10-08T12:00:00+00:00", "2026-10-08T12:00:10+00:00", "2026-10-08T12:01:00+00:00",
+                  "2026-10-08T12:02:00+00:00", "2026-10-08T12:03:00+00:00"])
+    monkeypatch.setattr(folders, "_now", lambda: next(clock))
+    status = {"filesdone": 1000, "dbtotdocs": 4_000_000}  # Recoll's entries, folders and members included
+    first = folders._progress(status, "reading", previous=folders._carried({"progress": {"in_search": 250}}))
+    assert (first["indexed"], first["rate"]) == (250, None)  # never Recoll's own count
+    early = folders._progress({**status, "filesdone": 1100}, "reading", previous=first)
+    assert early["rate"] is None and early["since"] == first["since"]  # too soon to measure
+    measured = folders._progress({**status, "filesdone": 1600}, "reading", previous=early)
+    assert measured["rate"] == {"per_minute": 600} and measured["indexed"] == 250
+    smoothed = folders._progress({**status, "filesdone": 1800}, "reading", previous=measured)
+    assert smoothed["rate"] == {"per_minute": 400}  # half the new minute's 200, half the last 600
+    assert folders._progress(status, "reading")["indexed"] is None  # nothing added yet
+
+
 def test_status_keeps_counts_but_never_the_current_file_name(tmp_path):
     (tmp_path / "idxstatus.txt").write_text("phase = 1\nfn = /secret/name.txt\nfilesdone = 12\ndbtotdocs = 9\n")
     assert folders.read_status(tmp_path) == {"phase": 1, "filesdone": 12, "dbtotdocs": 9}
@@ -290,7 +306,8 @@ def test_the_folders_page_picks_and_starts(inst, monkeypatch):
         response = client.post("/connections/add/folders", {"folder": [str(inst.library / "documents")],
                                                             "start": "1"})
         assert response["Location"] == "/connections/folders/"
-        connections._update(inst.config.store_dir, folders.SID, progress={"phase": "done", "indexed": 1234})
+        connections._update(inst.config.store_dir, folders.SID, progress={"phase": "done", "indexed": 1234,
+                                                                             "in_search": 1234})
         assert "1,234 files in search" in client.get("/connections/").content.decode()
         detail = client.get("/connections/folders/").content.decode()
         assert "Files in search" in detail and "documents" in detail and ">Pause<" in detail

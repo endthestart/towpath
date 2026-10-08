@@ -3,9 +3,9 @@
 {% if c.last_error and not c.status.busy %}<div class="notice warn" role="alert">{{ c.last_error }}</div>{% endif %}
 {% if c.adapter == 'recoll' %}
 <section class="metrics">
-  <div class="metric"><p>Files in search</p><strong>{{ c.indexed_text|default:"0" }}</strong><span>{% if c.updated %}as of {{ c.updated }}{% else %}not indexed yet{% endif %}</span></div>
+  <div class="metric"><p>Files in search</p><strong>{{ c.indexed_text|default:"0" }}</strong><span>{% if c.phase == 'reading' and not c.indexed %}added once reading finishes{% elif c.updated %}as of {{ c.updated }}{% else %}not indexed yet{% endif %}</span></div>
   <div class="metric"><p>Folders</p><strong>{{ c.folders_chosen|length }}</strong><span>{{ c.folders_chosen|join:", " }}</span></div>
-  <div class="metric"><p>Files read</p><strong>{{ c.files_text|default:"–" }}</strong><span>{% if c.status.busy and c.total_text %}of about {{ c.total_text }}; {% endif %}{% if c.errors %}{{ c.errors }} couldn't be read{% else %}no read errors{% endif %}</span></div>
+  <div class="metric"><p>Files read</p><strong>{{ c.files_text|default:"–" }}</strong><span>{% if c.status.busy and c.rate %}about {{ c.rate }} a minute; {% endif %}{% if c.status.busy and c.total_text %}of about {{ c.total_text }}; {% endif %}{% if c.errors %}{{ c.errors }} couldn't be read{% else %}no read errors{% endif %}</span></div>
 </section>
 {% else %}
 <section class="metrics">
