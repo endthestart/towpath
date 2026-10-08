@@ -216,6 +216,30 @@ def test_the_folders_page_picks_and_starts(inst, monkeypatch):
         assert client.post("/connections/add/folders", {"folder": ["/etc"]}).status_code == 400
 
 
+def test_space_is_measured_after_indexing_and_shown_for_searchable_folders(inst):
+    lib = inst.library
+    folders.choose(inst.config, [str(lib / "documents"), str(lib / "photos")])
+    inst.recoll_holds("documents/letters/lock-keeper.txt", "documents/taxes/2003.pdf", "photos/2003/canal.jpg",
+                      "photos/2003/raw/DSC_0001.NEF")
+    configure(inst.config.store_dir)
+    settings = dict(TOWPATH_STORE_DIR=inst.config.store_dir, TOWPATH_CONFIG=inst.config, ALLOWED_HOSTS=["testserver"],
+                    TOWPATH_LOGIN_REQUIRED=False)
+    with override_settings(**settings):
+        assert "Space is measured when folder indexing finishes" in Client().get("/space/").content.decode()
+    connections.start_indexing(inst.config.store_dir, inst.layout.credentials, folders.SID)
+    inst.poll_until_idle()
+    with override_settings(**settings):
+        client = Client()
+        page = client.get("/space/").content.decode()
+        assert "Your folders" in page and "photos" in page and "documents" in page and ".nef" in page
+        assert "DSC_0001.NEF" in page  # among the largest files
+        folder = client.get("/space/folder", {"root": "photos", "path": "2003"}).content.decode()
+        assert ">raw<" in folder and "Search for files here" in folder
+        assert client.get("/space/folder", {"root": "photos", "path": "elsewhere"}).status_code == 404
+        assert client.get("/space/folder", {"root": "private", "path": ""}).status_code == 404
+    assert request_worker.run_once(inst.config, inst.layout.credentials)["indexing"] == []  # measured once
+
+
 def test_mail_only_instances_never_load_file_discovery(tmp_path):
     import subprocess
     code = ("import sys; from pathlib import Path; from towpath import config, connections, layout; "

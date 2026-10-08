@@ -39,6 +39,9 @@ def test_rows_lead_with_sender_or_attachment_and_drop_internal_jargon():
             "dates": [], "locator": {"path": "DCIM/DSC_0001.NEF"}}
     row = present.row(file, "/ref/?r=z")
     assert (row["lead"], row["title"], row["context"]) == ("NEF file", "(untitled)", "DCIM/DSC_0001.NEF")
+    assert present.row({**file, "size": 25_400_000}, "/ref/?r=z")["lead"] == "NEF file · 24.2 MB"
+    assert [present.size_text(n) for n in (0, 1023, 1024, 5 * 1024 ** 4, None)] == [
+        "0 bytes", "1,023 bytes", "1.0 KB", "5.0 TB", None]
 
 
 def test_groups_summarise_counts_scope_and_paging():

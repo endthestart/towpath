@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block title %}Space · Towpath{% endblock %}
+{% block head %}{% if busy and not measured %}{% include '_live.html' %}{% endif %}{% endblock %}
+{% block content %}
+<header class="page-head compact"><h1>Space</h1>
+<p class="lead">What takes up room in your indexed folders, measured from the index after each import. Nothing here opens, changes or deletes a file.</p></header>
+{% if not connection %}
+<div class="notice">No folders are indexed yet. <a href="/connections/add/folders">Choose folders to index</a>, and Towpath measures them when indexing finishes.</div>
+{% elif not measured %}
+<div class="notice">{% if busy %}Indexing is still running; Towpath measures space when it finishes. <a href="/connections/{{ connection.source_id }}/">See progress</a>.{% else %}Space is measured when folder indexing finishes. <a href="/connections/{{ connection.source_id }}/">Index your folders</a>.{% endif %}</div>
+{% else %}
+<section class="metrics">
+  <div class="metric"><p>Size</p><strong>{{ total_bytes|filesizeformat }}</strong><span>as of {{ updated }}</span></div>
+  <div class="metric"><p>Files</p><strong>{{ total_files }}</strong><span>in {{ total_folders }} folders</span></div>
+  <div class="metric"><p>Folders indexed</p><strong>{{ roots|length }}</strong><span>{% if unmeasured %}not measured yet: {{ unmeasured|join:", " }}{% else %}all measured{% endif %}</span></div>
+</section>
+
+<h2 class="space-section">Your folders</h2>
+<table class="space-table"><thead><tr><th>Folder</th><th class="num">Files</th><th class="num">Size</th><th class="bar-cell"><span class="sr-only">Share</span></th></tr></thead><tbody>
+{% for r in roots %}<tr><td><a href="{{ r.url }}">{{ r.name }}</a></td><td class="num">{{ r.files }}</td><td class="num">{{ r.bytes|filesizeformat }}</td><td class="bar-cell"><meter min="0" max="1" value="{{ r.share }}"></meter></td></tr>{% endfor %}
+</tbody></table>
+
+<h2 class="space-section">Usually safe to clean up</h2>
+<p class="footnote">Found by folder and file names. Check before deleting anything: a name is a hint, not a guarantee.</p>
+{% for k in clutter %}<details class="clutter">
+  <summary><span class="clutter-name"><strong>{{ k.label }}</strong><span>{{ k.about }}</span></span><span class="num">{{ k.bytes|filesizeformat }}</span><span class="num muted">{{ k.files }} files in {{ k.places }} place{{ k.places|pluralize }}</span></summary>
+  <table class="space-table"><tbody>{% for t in k.top %}<tr><td class="path"><a href="{{ t.url }}">{{ t.root }}/{{ t.path }}</a></td><td class="num">{{ t.files }}</td><td class="num">{{ t.bytes|filesizeformat }}</td></tr>{% endfor %}</tbody></table>
+</details>{% empty %}<p class="empty-line">Nothing that looks like clutter.</p>{% endfor %}
+
+<h2 class="space-section">By type</h2>
+<table class="space-table"><thead><tr><th>Type</th><th class="num">Files</th><th class="num">Size</th><th class="bar-cell"><span class="sr-only">Share</span></th></tr></thead><tbody>
+{% for t in types %}<tr><td>{% if t.url %}<a href="{{ t.url }}">.{{ t.ext }}</a>{% else %}{{ t.ext }}{% endif %}</td><td class="num">{{ t.files }}</td><td class="num">{{ t.bytes|filesizeformat }}</td><td class="bar-cell"><meter min="0" max="1" value="{{ t.share }}"></meter></td></tr>{% endfor %}
+</tbody></table>
+
+<h2 class="space-section">Largest files</h2>
+<table class="space-table"><tbody>
+{% for f in largest %}<tr><td class="path"><a href="{{ f.folder_url }}">{{ f.root }}/{{ f.path }}</a></td><td class="num">{{ f.bytes|filesizeformat }}</td></tr>{% endfor %}
+</tbody></table>
+{% endif %}
+{% endblock %}

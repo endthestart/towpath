@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block title %}{{ name }} · Space · Towpath{% endblock %}
+{% block content %}
+<header class="page-head compact"><p class="eyebrow"><a href="/space/">SPACE</a></p><h1>{{ name }}</h1>
+<nav class="crumbs" aria-label="Folder path">{% for c in crumbs %}{% if not forloop.last %}<a href="{{ c.url }}">{{ c.name }}</a> / {% else %}<span>{{ c.name }}</span>{% endif %}{% endfor %}</nav></header>
+<section class="metrics">
+  <div class="metric"><p>Size</p><strong>{{ folder.bytes|filesizeformat }}</strong><span>including subfolders</span></div>
+  <div class="metric"><p>Files</p><strong>{{ files_text }}</strong><span>{{ here_files_text }} directly in this folder</span></div>
+  <div class="metric"><p>Subfolders</p><strong>{{ folder.subfolder_count }}</strong><span>{% if search_url %}<a href="{{ search_url }}">Search for files here</a>{% else %}largest first{% endif %}</span></div>
+</section>
+<table class="space-table"><thead><tr><th>Folder</th><th class="num">Files</th><th class="num">Size</th><th class="bar-cell"><span class="sr-only">Share</span></th></tr></thead><tbody>
+{% for s in subfolders %}<tr><td class="path"><a href="{{ s.url }}">{{ s.name }}</a></td><td class="num">{{ s.files }}</td><td class="num">{{ s.bytes|filesizeformat }}</td><td class="bar-cell"><meter min="0" max="1" value="{{ s.share }}"></meter></td></tr>{% endfor %}
+{% if folder.here_files %}<tr class="muted"><td>Files directly in this folder</td><td class="num">{{ here_files_text }}</td><td class="num">{{ folder.here_bytes|filesizeformat }}</td><td class="bar-cell"><meter min="0" max="1" value="{{ here_share }}"></meter></td></tr>{% endif %}
+</tbody></table>
+{% if more > 0 %}<p class="footnote">{{ more }} smaller subfolder{{ more|pluralize }} not shown.</p>{% endif %}
+{% endblock %}

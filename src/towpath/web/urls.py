@@ -1,6 +1,6 @@
 from django.urls import path
 
-from towpath.web import auth, unified_views, views
+from towpath.web import auth, space_views, unified_views, views
 
 urlpatterns = [
     path("", views.overview, name="overview"),
@@ -13,6 +13,8 @@ urlpatterns = [
     path("search/request", unified_views.search_request, name="search-request"),
     path("ref/", unified_views.reference, name="reference"),
     path("ref/request", unified_views.reference_request, name="reference-request"),
+    path("space/", space_views.overview, name="space"),
+    path("space/folder", space_views.folder_page, name="space-folder"),
     path("collections/", unified_views.collection_list, name="collections"),
     path("connections/", views.connections_elsewhere, name="connections-elsewhere"),
     path("collections/new", unified_views.collection_create, name="collection-create"),

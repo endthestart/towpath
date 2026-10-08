@@ -27,7 +27,7 @@
     {% else %}<form method="post" action="/connections/{{ c.source_id }}/start">{% csrf_token %}<button class="button" type="submit">{% if c.indexing == 'paused' %}Resume indexing{% elif c.indexed and c.adapter == 'recoll' %}Index again{% elif c.indexed %}Check for new mail{% else %}Start indexing{% endif %}</button></form>{% endif %}
     {% if c.adapter != 'gmail' %}<a class="button secondary" href="/connections/{{ c.source_id }}/folders">Change folders</a>{% endif %}
   {% endif %}
-  {% if c.adapter == 'recoll' %}
+  {% if c.adapter == 'recoll' %}{% if c.indexed and not c.status.busy %}<a class="button secondary" href="/space/">See where the space goes</a>{% endif %}
   {% elif c.adapter == 'gmail' %}
     <a class="button {% if c.state == 'disconnected' %}{% else %}secondary{% endif %}" href="/connections/add/gmail?reconnect={{ c.source_id }}">Reconnect Gmail</a>
     {% if c.state != 'disconnected' %}<a class="button secondary" href="/connections/{{ c.source_id }}/disconnect">Disconnect</a>{% endif %}

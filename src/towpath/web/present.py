@@ -54,6 +54,18 @@ def _name_only(address: str | None) -> str:
     return name or email or "(no sender)"
 
 
+def size_text(size) -> str | None:
+    """A file size as people read it (1,024-based, as Windows and TrueNAS count)."""
+    if not isinstance(size, int) or size < 0:
+        return None
+    value = float(size)
+    for unit in ("bytes", "KB", "MB", "GB", "TB"):
+        if value < 1024 or unit == "TB":
+            return f"{size:,} bytes" if unit == "bytes" else f"{value:.1f} {unit}"
+        value /= 1024
+    return None
+
+
 def row(result: dict, url: str) -> dict:
     """One result row: who or what, the title, a short context line and only meaningful tags."""
     kind, legacy = result["kind"], result.get("legacy") or {}
@@ -65,7 +77,7 @@ def row(result: dict, url: str) -> dict:
         context = f"In “{item.get('subject') or '(no subject)'}” from {_name_only(item.get('from_addr'))}"
     else:
         ext = result.get("extension")
-        lead = f"{ext.upper()} file" if ext else "File"
+        lead = " · ".join(x for x in (f"{ext.upper()} file" if ext else "File", size_text(result.get("size"))) if x)
         context = result["locator"].get("path") if isinstance(result.get("locator"), dict) else None
     tags = [f"matched {FIELD_NAMES[f]}" for f in result["match"].get("fields", ()) if f in FIELD_NAMES]
     if result.get("availability") == "absent":

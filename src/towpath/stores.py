@@ -197,6 +197,15 @@ END;
 CREATE TABLE IF NOT EXISTS catalog_counts (
   provider_id TEXT NOT NULL, root_alias TEXT NOT NULL, counts TEXT NOT NULL, updated_at TEXT NOT NULL,
   PRIMARY KEY (provider_id, root_alias));
+-- Space used under each folder of each root (top-level files only), measured from the catalog after each import.
+CREATE TABLE IF NOT EXISTS space_folders (
+  provider_id TEXT NOT NULL, root_alias TEXT NOT NULL, path TEXT NOT NULL, parent TEXT, files INTEGER NOT NULL,
+  bytes INTEGER NOT NULL, PRIMARY KEY (provider_id, root_alias, path));
+CREATE INDEX IF NOT EXISTS space_folders_children ON space_folders (provider_id, root_alias, parent, bytes);
+-- Per root: totals, space by type, largest files and clutter (JSON), and the import run they describe.
+CREATE TABLE IF NOT EXISTS space_summary (
+  provider_id TEXT NOT NULL, root_alias TEXT NOT NULL, run_id TEXT NOT NULL, body TEXT NOT NULL,
+  updated_at TEXT NOT NULL, PRIMARY KEY (provider_id, root_alias));
 CREATE TABLE IF NOT EXISTS occurrence_versions (
   occurrence_id TEXT NOT NULL, version TEXT NOT NULL, first_seen_run TEXT NOT NULL,
   PRIMARY KEY (occurrence_id, version));

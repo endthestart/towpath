@@ -232,6 +232,20 @@ def _import(config, c: dict, data_dir: Path, status: dict) -> dict:
     return {"reports": reports, "seen": totals["seen"]}
 
 
+def _measure(config, c: dict) -> list[dict]:
+    """Measure space for every root whose newest import isn't measured yet (see towpath.space)."""
+    from towpath import space
+
+    roots = [r["alias"] for r in c["settings"].get("roots") or []]
+    db = open_store(config.store_dir, "files", "connect")
+    try:
+        return [{"source_id": SID, "step": "measured", "root": root,
+                 "files": space.rebuild(db, SID, root, run)["files"]}
+                for root, run in space.stale(db, SID, roots).items()]
+    finally:
+        db.close()
+
+
 def index_pending(config, data_dir: Path) -> list[dict]:
     """One step of Folders indexing per poll: start Recoll, report its progress, stop it on Pause, and when it
     finishes add the index to search. Never starts anything the owner didn't ask for."""
@@ -247,7 +261,7 @@ def index_pending(config, data_dir: Path) -> list[dict]:
             return [{"source_id": SID, "step": "paused"}]
         return []
     if c["indexing"] not in ("requested", "running"):
-        return []
+        return _measure(config, c) if c["indexing"] == "idle" and c.get("progress") else []
     if proc is None:
         _running[SID] = _start(c, Path(data_dir))
         _update(config.store_dir, SID, "indexing-started" if c["indexing"] == "requested" else "indexing-resumed",
@@ -268,6 +282,8 @@ def index_pending(config, data_dir: Path) -> list[dict]:
     result = _import(config, c, Path(data_dir), status)
     if (get(config.store_dir, SID) or {}).get("indexing") == "paused":
         return [{"source_id": SID, "step": "paused-while-adding"}]
+    _update(config.store_dir, SID, progress=_progress(status, "measuring", result["seen"]))
+    _measure(config, c)
     _update(config.store_dir, SID, "indexed", {"files": result["seen"], "seconds": round(time.monotonic() - started)},
             indexing="idle", progress=_progress(status, "done", result["seen"]))
     return [{"source_id": SID, "step": "indexed", "files": result["seen"]}]

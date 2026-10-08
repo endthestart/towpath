@@ -72,7 +72,8 @@ def _folders_view(c: dict) -> dict:
     roots = c["settings"].get("roots") or []
     busy = c["indexing"] in ("requested", "running")
     phase = progress.get("phase")
-    text = {"reading": "Reading files…", "adding": "Adding to search…"}.get(phase, "Starting…") if busy else None
+    text = {"reading": "Reading files…", "adding": "Adding to search…",
+            "measuring": "Measuring space…"}.get(phase, "Starting…") if busy else None
     count = lambda key: f"{progress[key]:,}" if isinstance(progress.get(key), int) and progress[key] else None  # noqa: E731
     view = {**c, "status": {**status(c), **({"text": text} if text else {})},
             "address": f"{len(roots)} folder{'s' if len(roots) != 1 else ''}",

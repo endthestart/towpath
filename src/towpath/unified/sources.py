@@ -373,6 +373,15 @@ class MailAdapter(SourceAdapter):
 # -- files --------------------------------------------------------------------------------------------------
 
 
+def searchable_roots(config) -> set[str]:
+    """Files roots with a search grant: the roots whose catalog any page may show."""
+    if config.files is None:
+        return set()
+    from towpath.discovery import policy
+
+    return {root for root, features in policy.granted(config).items() if "search" in features}
+
+
 class FilesAdapter(SourceAdapter):
     """One configured files provider: its catalog in the files store, plus its content index in connect mode."""
 
