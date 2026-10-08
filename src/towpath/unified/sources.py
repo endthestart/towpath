@@ -72,6 +72,15 @@ def _expansion_cursor(cursor: str | None) -> dict:
     return state
 
 
+def _text_match(column: str, pattern_word: str, exact: str) -> tuple[str, list]:
+    """A substring condition on a files catalog row: the trigram index narrows (it can't take ESCAPE), the exact
+    escaped LIKE decides. Patterns under three characters use the exact LIKE alone."""
+    if len(pattern_word) >= 3:
+        return (f"rowid IN (SELECT rowid FROM occurrences_text WHERE text LIKE ?) AND {column} LIKE ? ESCAPE '\\'",
+                [f"%{pattern_word}%", exact])
+    return f"{column} LIKE ? ESCAPE '\\'", [exact]
+
+
 def _any(clause: str, n: int) -> str:
     return "(" + " OR ".join([clause] * n) + ")"
 
@@ -446,12 +455,15 @@ class FilesAdapter(SourceAdapter):
         where = ["provider_id = ?", "missing_since_run IS NULL",
                  f"root_alias IN ({','.join('?' for _ in granted)})"]
         args: list = [self.provider_id, *granted]
+        text = "lower(rel_path || ' ' || members)"
         for w in filters.words:
-            where.append("lower(rel_path || ' ' || members) LIKE ? ESCAPE '\\'")
-            args.append(_like(w))
+            clause, values = _text_match(text, w, _like(w))
+            where.append(clause)
+            args += values
         if filters.extensions:
-            where.append(_any("lower(rel_path || ' ' || members) LIKE ?", len(filters.extensions)))
-            args += [f"%.{e}%" for e in filters.extensions]
+            parts = [_text_match(text, f".{e}", _like(f".{e}")) for e in filters.extensions]
+            where.append("(" + " OR ".join(f"({c})" for c, _ in parts) + ")")
+            args += [v for _, values in parts for v in values]
         if filters.media_types:
             where.append(_any("lower(coalesce(media_type, '')) LIKE ?", len(filters.media_types)))
             args += [f"{m}%" for m in filters.media_types]

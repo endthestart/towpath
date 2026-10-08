@@ -178,6 +178,18 @@ CREATE TABLE IF NOT EXISTS occurrences (
   hashes TEXT NOT NULL, extraction TEXT NOT NULL, version TEXT, first_seen_run TEXT NOT NULL,
   last_seen_run TEXT NOT NULL, missing_since_run TEXT, updated_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS occurrences_root ON occurrences (provider_id, root_alias);
+-- Substring search over paths and member names at catalog scale (millions of files): a trigram index kept in
+-- step with occurrences by triggers. Queries narrow with it, then apply the exact match to the candidates.
+CREATE VIRTUAL TABLE IF NOT EXISTS occurrences_text USING fts5(text, tokenize='trigram');
+CREATE TRIGGER IF NOT EXISTS occurrences_text_insert AFTER INSERT ON occurrences BEGIN
+  INSERT INTO occurrences_text (rowid, text) VALUES (new.rowid, new.rel_path || ' ' || new.members);
+END;
+CREATE TRIGGER IF NOT EXISTS occurrences_text_update AFTER UPDATE OF rel_path, members ON occurrences BEGIN
+  UPDATE occurrences_text SET text = new.rel_path || ' ' || new.members WHERE rowid = new.rowid;
+END;
+CREATE TRIGGER IF NOT EXISTS occurrences_text_delete AFTER DELETE ON occurrences BEGIN
+  DELETE FROM occurrences_text WHERE rowid = old.rowid;
+END;
 CREATE TABLE IF NOT EXISTS occurrence_versions (
   occurrence_id TEXT NOT NULL, version TEXT NOT NULL, first_seen_run TEXT NOT NULL,
   PRIMARY KEY (occurrence_id, version));
@@ -239,6 +251,10 @@ def _add_columns(conn: sqlite3.Connection, store: str) -> None:
         for name, kind in columns.items():
             if name not in present:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {kind}")
+    if store == "files" and not conn.execute("SELECT 1 FROM occurrences_text LIMIT 1").fetchone():
+        # A catalog written before the search index existed: index what it already holds, once.
+        conn.execute("INSERT INTO occurrences_text (rowid, text) SELECT rowid, rel_path || ' ' || members "
+                     "FROM occurrences")
     conn.commit()
 
 
