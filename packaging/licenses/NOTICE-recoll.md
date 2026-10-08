@@ -13,6 +13,9 @@ These unmodified Ubuntu 24.04 packages are added to the base system:
 | Antiword (`antiword`) | Legacy Word (.doc) text extraction | GPL-2.0-or-later |
 | UnRTF (`unrtf`) | RTF text extraction | GPL-3.0-or-later |
 | libpff tools (`pff-tools`) | Outlook PST export (`pffexport`) | LGPL-3.0-or-later |
+| file (`file`, `libmagic1t64`) | Type of files without a known extension | BSD-2-Clause |
+| Mutagen (`python3-mutagen`) | Audio tags (title, artist, album) | GPL-2.0-or-later |
+| ExifTool (`libimage-exiftool-perl`) | Image and media metadata | Artistic-1.0-Perl or GPL-1.0-or-later |
 | Python 3.12 and the rest of the base system (about 170 packages in total) | Runtime | Various, per package |
 
 Where each license is recorded:
