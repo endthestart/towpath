@@ -78,7 +78,10 @@ def _folders_view(c: dict) -> dict:
             "address": f"{len(roots)} folder{'s' if len(roots) != 1 else ''}",
             "folders_chosen": [r["rel"] for r in roots], "indexed": progress.get("indexed"), "rate": None,
             "indexed_text": f"{progress['indexed']:,}" if progress.get("indexed") is not None else None,
-            "files_text": count("files"), "total_text": count("total"), "errors": progress.get("errors") or 0,
+            # Recoll's total grows while it walks; it is an estimate only when it runs ahead of the files read.
+            "files_text": count("files"),
+            "total_text": count("total") if (progress.get("total") or 0) > (progress.get("files") or 0) else None,
+            "errors": progress.get("errors") or 0,
             "phase": phase}
     when = progress.get("at")
     view["updated"] = when[:16].replace("T", " ") + " UTC" if when else None
