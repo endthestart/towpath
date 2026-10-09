@@ -15,6 +15,7 @@ Three things are kept apart:
 
 import re
 from dataclasses import asdict, dataclass, field
+from functools import cached_property
 
 from towpath.canonical import canonical_json, short_id
 
@@ -67,7 +68,7 @@ class Locator:
         if self.path.startswith("/") or ".." in self.path.split("/") or "\x00" in self.path:
             raise RecordError("locator path must be relative to its root, without '..'")
 
-    @property
+    @cached_property
     def occurrence_id(self) -> str:
         chain = canonical_json([[m.kind, m.name, m.index] for m in self.members])
         return short_id("occ", self.provider_id, self.root, self.path, chain)

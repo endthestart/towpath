@@ -32,6 +32,7 @@ class Folders:
 
     def __init__(self, size: int = 4096):
         self._folder = functools.lru_cache(maxsize=size)(self._resolve_folder)
+        self.base = functools.lru_cache(maxsize=64)(_real)  # each root's own real path
 
     @staticmethod
     def _resolve_folder(folder: str) -> tuple[Path, frozenset] | None:
@@ -50,7 +51,14 @@ class Folders:
 
 
 def _within(child: Path, parent: Path) -> bool:
-    return child == parent or parent in child.parents
+    """For normalised paths: compared as text, as ``parent in child.parents`` would, without building each parent."""
+    child, parent = str(child), str(parent)
+    return child == parent or child.startswith(parent if parent.endswith("/") else parent + "/")
+
+
+def _relative(child: str, parent: str) -> str:
+    """``child`` below ``parent``, both normalised and ``_within`` each other."""
+    return child[len(parent):] if parent.endswith("/") else child[len(parent) + 1:]
 
 
 def excluded(root, rel_path: str) -> bool:
@@ -71,7 +79,7 @@ def check_relative(rel_path: str) -> str:
 def resolve_in_root(root, rel_path: str, folders: Folders | None = None) -> Path:
     """The real filesystem path of ``rel_path`` under ``root``, refusing anything that escapes it."""
     rel_path = check_relative(rel_path)
-    base = _real(root.path)
+    base = _real(root.path) if folders is None else folders.base(root.path)
     target = _real(base / rel_path) if folders is None else folders.real(base / rel_path)
     if not _within(target, base):
         raise BadReference("reference escapes its root")
@@ -94,16 +102,16 @@ def locate(reference: str, roots: dict, folders: Folders | None = None) -> tuple
         path = reference
     if "\x00" in path or not os.path.isabs(path):
         raise BadReference("reference must be an absolute file path")
-    lexical = Path(os.path.normpath(path))
+    lexical = os.path.normpath(path)
     for alias, root in roots.items():
-        base = Path(os.path.normpath(root.path))
-        if _within(lexical, base) and lexical != base:
-            rel = lexical.relative_to(base).as_posix()
+        base = os.path.normpath(root.path)
+        if lexical != base and _within(lexical, base):
+            rel = _relative(lexical, base)
             resolve_in_root(root, rel, folders)
             return alias, rel
-        real_base = _real(root.path)
-        if _within(lexical, real_base) and lexical != real_base:
-            rel = lexical.relative_to(real_base).as_posix()
+        real_base = str(_real(root.path) if folders is None else folders.base(root.path))
+        if lexical != real_base and _within(lexical, real_base):
+            rel = _relative(lexical, real_base)
             resolve_in_root(root, rel, folders)
             return alias, rel
     raise BadReference("reference is outside every configured root")

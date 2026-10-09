@@ -86,10 +86,12 @@ def _limit(fc, name: str, requested: int | None) -> int:
     return min(requested, ceiling)
 
 
-def _accept(hit, prov, roots: set[str], folders: refs.Folders | None = None) -> Occurrence | None:
-    """Turn an untrusted provider row into an occurrence, or None if it must not be shown."""
+def _accept(hit, prov, roots: set[str], folders: refs.Folders | None = None,
+            located: tuple[str, str] | None = None) -> Occurrence | None:
+    """Turn an untrusted provider row into an occurrence, or None if it must not be shown. ``located`` is
+    ``refs.locate``'s answer for this row when the caller already has it."""
     try:
-        alias, rel = refs.locate(hit.url, prov.roots, folders)
+        alias, rel = located or refs.locate(hit.url, prov.roots, folders)
     except refs.BadReference:
         return None
     if alias not in roots or refs.excluded(prov.roots[alias], rel):
@@ -491,7 +493,7 @@ def import_catalog(config, provider_id: str | None = None, root: str | None = No
                         continue
                     if located == alias and refs.excluded(prov.roots[alias], rel):
                         continue
-                    occ = _accept(hit, prov, {alias}, folders)
+                    occ = _accept(hit, prov, {alias}, located=(located, rel))
                     if occ is None:
                         refused += 1
                         continue
