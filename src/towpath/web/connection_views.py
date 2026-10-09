@@ -72,7 +72,8 @@ def _folders_view(c: dict) -> dict:
     roots = c["settings"].get("roots") or []
     busy = c["indexing"] in ("requested", "running")
     phase = progress.get("phase")
-    text = {"reading": "Reading files…", "adding": "Adding to search…",
+    again = phase == "reading" and bool(progress.get("in_search"))  # files already in search are read only if changed
+    text = {"reading": "Checking for changes…" if again else "Reading files…", "adding": "Adding to search…",
             "measuring": "Measuring space…"}.get(phase, "Starting…") if busy else None
     count = lambda key: f"{progress[key]:,}" if isinstance(progress.get(key), int) and progress[key] else None  # noqa: E731
     view = {**c, "status": {**status(c), **({"text": text} if text else {})},
@@ -85,6 +86,7 @@ def _folders_view(c: dict) -> dict:
             "files_text": count("files"),
             "total_text": count("total") if (progress.get("total") or 0) > (progress.get("files") or 0) else None,
             "errors": progress.get("errors") or 0,
+            "again": again, "changed_text": count("docs") or "none",
             "phase": phase}
     when = progress.get("at")
     view["updated"] = when[:16].replace("T", " ") + " UTC" if when else None

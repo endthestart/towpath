@@ -176,6 +176,20 @@ def test_the_folders_page_changes_indexing_settings(inst, monkeypatch):
     assert folders.options(connections.get(inst.config.store_dir, folders.SID)) == folders.DEFAULTS
 
 
+def test_indexing_again_says_it_checks_for_changes(inst):
+    folders.choose(inst.config, [str(inst.library / "documents")])
+    configure(inst.config.store_dir)
+    status = {"phase": 1, "filesdone": 179_065, "docsdone": 30, "totfiles": 6_954_981}
+    connections._update(inst.config.store_dir, folders.SID, indexing="running", progress=folders._progress(
+        status, "reading", previous=folders._carried({"progress": {"in_search": 951_326}})))
+    with override_settings(TOWPATH_STORE_DIR=inst.config.store_dir, TOWPATH_CONFIG=inst.config,
+                           ALLOWED_HOSTS=["testserver"], ROOT_URLCONF="towpath.web.connection_urls",
+                           TOWPATH_LOGIN_REQUIRED=False, TOWPATH_CREDENTIALS_DIR=inst.layout.credentials):
+        panel = Client().get("/connections/folders/live").content.decode()
+    assert "Checking for changes" in panel and "Files checked" in panel and "951,326" in panel
+    assert "of about 6,954,981" in panel and "30 new or changed" in panel
+
+
 def test_progress_shows_what_search_holds_and_a_measured_pace(monkeypatch):
     clock = iter(["2026-10-08T12:00:00+00:00", "2026-10-08T12:00:10+00:00", "2026-10-08T12:01:00+00:00",
                   "2026-10-08T12:02:00+00:00", "2026-10-08T12:03:00+00:00"])
