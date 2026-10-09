@@ -78,7 +78,9 @@ def members_from(row: dict) -> tuple[Member, ...]:
     if not ipath:
         return ()
     parts = ipath.split(":")
-    types = list(row.get("ancestors") or []) + [row.get("mtype")]
+    # One type per enclosing record. Recoll shortens long IDs, and then those records can't be looked up.
+    known = list(row.get("ancestors") or [])[-(len(parts) - 1):] if len(parts) > 1 else []
+    types = [None] * (len(parts) - 1 - len(known)) + known + [row.get("mtype")]
     outer_is_archive = row.get("url", "").lower().endswith(ARCHIVE_SUFFIXES)
     members = []
     for n, part in enumerate(parts):

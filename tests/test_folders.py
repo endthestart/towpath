@@ -5,6 +5,7 @@ in for Recoll; the folders themselves are invented and only ever read."""
 import json
 import os
 import re
+import sqlite3
 import stat
 import sys
 import textwrap
@@ -288,6 +289,10 @@ def test_a_failure_while_adding_is_reported(inst, monkeypatch):
     inst.poll_until_idle()
     c = connections.get(inst.config.store_dir, folders.SID)
     assert c["indexing"] == "idle" and "Adding files to search stopped" in c["last_error"]
+    with closing(sqlite3.connect(inst.config.store_dir / "connections.db")) as db:
+        detail = json.loads(db.execute("SELECT detail FROM connection_events WHERE event = 'indexing-stopped'")
+                            .fetchone()[0])
+    assert detail["error"] == "ZeroDivisionError" and detail["at"].startswith("test_folders.py:")  # code, not files
 
 
 def test_a_recoll_failure_is_reported_and_can_be_retried(inst):

@@ -632,6 +632,10 @@ def test_member_kinds_follow_recoll_records():
         ("archive-member", "mail/backup.mbox", None), ("mail-message", None, 3), ("attachment", "scan.pdf", 1)]
     plain = {"url": "file:///r/notes.odt", "ipath": "Pictures/1.png", "mtype": "image/png", "ancestors": []}
     assert [(m.kind, m.name) for m in recoll_provider.members_from(plain)] == [("embedded", "Pictures/1.png")]
+    nested = {"url": "file:///r/a.zip", "ipath": "inner.zip:deeper.zip:notes.txt", "mtype": "text/plain",
+              "ancestors": []}  # a shortened ID: the enclosing records' types are unknown
+    assert [(m.kind, m.name) for m in recoll_provider.members_from(nested)] == [
+        ("archive-member", "inner.zip"), ("embedded", "deeper.zip"), ("embedded", "notes.txt")]
 
 
 def test_sist2_slot_probes_and_refuses_the_rest(tmp_path):

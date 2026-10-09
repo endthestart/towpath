@@ -16,6 +16,7 @@ import signal
 import subprocess
 import threading
 import time
+import traceback
 from datetime import datetime
 from contextlib import closing
 from pathlib import Path
@@ -364,7 +365,8 @@ def _in_background(name: str, work) -> None:
         try:
             _outcomes[name] = {"result": work()}
         except Exception as exc:  # noqa: BLE001 - reported by the next poll; never log file names from a message
-            _outcomes[name] = {"error": type(exc).__name__}
+            where = traceback.extract_tb(exc.__traceback__)[-1]
+            _outcomes[name] = {"error": type(exc).__name__, "at": f"{Path(where.filename).name}:{where.lineno}"}
 
     _outcomes.pop(name, None)
     _jobs[name] = threading.Thread(target=run, name=f"towpath-{name}", daemon=True)
@@ -388,9 +390,10 @@ def _finished(config, job: str) -> list[dict]:
     if job == "measure":
         return [{"source_id": SID, "step": "measured"}] if "result" in outcome else []
     if "error" in outcome:
-        _update(config.store_dir, SID, "indexing-stopped", {"error": outcome["error"]}, indexing="idle",
+        failure = {"error": outcome["error"], "at": outcome.get("at")}
+        _update(config.store_dir, SID, "indexing-stopped", failure, indexing="idle",
                 last_error="Adding files to search stopped with an error. Start again to resume.")
-        return [{"source_id": SID, "step": "failed", "error": outcome["error"]}]
+        return [{"source_id": SID, "step": "failed", **failure}]
     result = outcome["result"]
     if result.get("paused"):
         return [{"source_id": SID, "step": "paused-while-adding"}]
