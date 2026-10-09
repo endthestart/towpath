@@ -19,7 +19,7 @@
   {% if c.state == 'choose-folders' %}<a class="button" href="/connections/{{ c.source_id }}/folders">Choose folders</a>
   {% elif c.state == 'ready' %}
     {% if c.status.busy %}<form method="post" action="/connections/{{ c.source_id }}/pause">{% csrf_token %}<button class="button" type="submit">Pause</button></form>
-    {% else %}<form method="post" action="/connections/{{ c.source_id }}/start">{% csrf_token %}<button class="button" type="submit">{% if c.indexing == 'paused' %}Resume indexing{% elif c.indexed and c.adapter == 'recoll' %}Index again{% elif c.indexed %}Check for new mail{% else %}Start indexing{% endif %}</button></form>{% endif %}
+    {% else %}<form method="post" action="/connections/{{ c.source_id }}/start">{% csrf_token %}<button class="button" type="submit">{% if c.indexing == 'paused' %}Resume indexing{% elif c.phase == 'adding' or c.phase == 'measuring' %}Continue adding to search{% elif c.indexed and c.adapter == 'recoll' %}Index again{% elif c.indexed %}Check for new mail{% else %}Start indexing{% endif %}</button></form>{% endif %}
     {% if c.adapter != 'gmail' %}<a class="button secondary" href="/connections/{{ c.source_id }}/folders">Change folders</a>{% endif %}
   {% endif %}
   {% if c.adapter == 'recoll' %}{% if c.indexed and not c.status.busy %}<a class="button secondary" href="/space/">See where the space goes</a>{% endif %}

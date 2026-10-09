@@ -7,11 +7,12 @@ failed, or interrupted run records what it saw and establishes no absence.
 
 import json
 import uuid
+from collections import Counter
 from datetime import datetime, timezone
 
 from towpath.canonical import canonical_json, short_id
 from towpath.discovery.records import Occurrence
-from towpath.stores import CATALOG_COUNTS, open_store
+from towpath.stores import open_store
 
 WRITER = "connect"
 
@@ -76,12 +77,19 @@ def observe(db, occ: Occurrence, run_id: str) -> str:
     return state
 
 
+def _tally(db, provider_id: str, root: str) -> list:
+    """[[status, count], ...] for one root's present occurrences, counted as the rows stream past: grouping
+    millions of rows in SQL sorts them all, which needs more than a container's small temporary folder."""
+    tally = Counter(status for (status,) in db.execute(
+        "SELECT json_extract(extraction, '$.status') FROM occurrences "
+        "WHERE missing_since_run IS NULL AND provider_id = ? AND root_alias = ?", (provider_id, root)))
+    return [[status, n] for status, n in sorted(tally.items(), key=lambda t: (t[0] is not None, t[0] or ""))]
+
+
 def refresh_counts(db, provider_id: str, root: str) -> None:
     """Recount one root's present occurrences by extraction status (see ``catalog_counts``)."""
-    rows = db.execute(f"{CATALOG_COUNTS} AND provider_id = ? AND root_alias = ? GROUP BY status ORDER BY status",
-                      (provider_id, root)).fetchall()
     db.execute("INSERT OR REPLACE INTO catalog_counts (provider_id, root_alias, counts, updated_at) VALUES (?,?,?,?)",
-               (provider_id, root, canonical_json([[r["status"], r["n"]] for r in rows]), now()))
+               (provider_id, root, canonical_json(_tally(db, provider_id, root)), now()))
     db.commit()
 
 
@@ -91,8 +99,7 @@ def counts(db, provider_id: str, root: str) -> list:
                      (provider_id, root)).fetchone()
     if row is not None:
         return json.loads(row["counts"])
-    return [[r["status"], r["n"]] for r in db.execute(f"{CATALOG_COUNTS} AND provider_id = ? AND root_alias = ? "
-                                                      "GROUP BY status", (provider_id, root))]
+    return _tally(db, provider_id, root)
 
 
 def mark_missing(db, provider_id: str, root: str, run_id: str) -> int:

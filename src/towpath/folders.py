@@ -392,7 +392,7 @@ def _finished(config, job: str) -> list[dict]:
     if "error" in outcome:
         failure = {"error": outcome["error"], "at": outcome.get("at")}
         _update(config.store_dir, SID, "indexing-stopped", failure, indexing="idle",
-                last_error="Adding files to search stopped with an error. Start again to resume.")
+                last_error="Adding files to search stopped with an error. Continue to try again.")
         return [{"source_id": SID, "step": "failed", **failure}]
     result = outcome["result"]
     if result.get("paused"):
@@ -426,9 +426,11 @@ def index_pending(config, data_dir: Path) -> list[dict]:
             _in_background("measure", lambda: _measure(config, c))
             return [{"source_id": SID, "step": "measuring"}]
         return []
-    was = (c.get("progress") or {}).get("phase")
-    if proc is None and c["indexing"] == "running" and was in ("adding", "measuring"):
-        # The worker restarted after Recoll had finished: carry on adding rather than walk every folder again.
+    if proc is None and (c.get("progress") or {}).get("phase") in ("adding", "measuring"):
+        # Recoll had finished; adding stopped (a failure, Pause, or a worker restart). Carry on adding rather
+        # than walk every folder again. "Index again" after a finished run starts with Recoll as usual.
+        if c["indexing"] == "requested":
+            _update(config.store_dir, SID, "indexing-resumed", indexing="running", last_error=None)
         status = read_status(confdir)
         _in_background("add", lambda: _add_and_measure(config, c, Path(data_dir), status))
         return [{"source_id": SID, "step": "adding"}]

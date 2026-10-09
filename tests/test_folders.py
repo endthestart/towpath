@@ -309,6 +309,24 @@ def test_a_failure_while_adding_is_reported(inst, monkeypatch):
     assert detail["error"] == "ZeroDivisionError" and detail["at"].startswith("test_folders.py:")  # code, not files
 
 
+def test_continuing_after_a_failure_while_adding_skips_reading_again(inst, monkeypatch):
+    folders.choose(inst.config, [str(inst.library / "documents")])
+    inst.recoll_holds("documents/letters/lock-keeper.txt")
+    real = folders._import
+    monkeypatch.setattr(folders, "_import", lambda *a: 1 / 0)
+    connections.start_indexing(inst.config.store_dir, inst.layout.credentials, folders.SID)
+    inst.poll_until_idle()
+    assert "Continue to try again" in connections.get(inst.config.store_dir, folders.SID)["last_error"]
+    monkeypatch.setattr(folders, "_import", real)
+    monkeypatch.setattr(folders, "_start", lambda *a: pytest.fail("Recoll started again"))
+    connections.start_indexing(inst.config.store_dir, inst.layout.credentials, folders.SID)
+    assert request_worker.run_once(inst.config, inst.layout.credentials)["indexing"][0]["step"] == "adding"
+    inst.poll_until_idle()
+    c = connections.get(inst.config.store_dir, folders.SID)
+    assert (c["indexing"], c["last_error"], c["progress"]["phase"]) == ("idle", None, "done")
+    assert c["progress"]["indexed"] == 1
+
+
 def test_a_recoll_failure_is_reported_and_can_be_retried(inst):
     folders.choose(inst.config, [str(inst.library / "documents")])
     inst.recoll_holds("documents/letters/lock-keeper.txt", exit_code=3)

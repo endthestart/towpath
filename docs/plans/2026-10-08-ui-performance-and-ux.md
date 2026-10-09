@@ -51,6 +51,14 @@ unique at every level, so they make 5 million folders, far more than real trees.
   folder once (directory entries carry their type, so files' own metadata isn't read) and follows only
   symbolic links; reads still resolve each path in full. A worker restart while adding used to start Recoll's
   whole walk again; it now carries on adding.
+- With that fixed, the import ran CPU-bound at about 880 files/s on one core. Profiling (synthetic rows) put
+  70% of the time in the reference check's `pathlib` work, done twice per row with the root resolved each
+  time; as string operations on normalised paths it runs about 2.4 times faster (`bc0670b`).
+- After 6.2 M rows of the first root, recounting the root by status failed: `GROUP BY` over every row sorts
+  them, and SQLite's temporary files live in the connector's 64 MB `/tmp`. The counts now stream through a
+  counter. Queries over the whole catalog must not sort it (duplicates use `temp_store = MEMORY` on a smaller
+  set). After a failure or a pause while adding, Continue now carries on adding instead of re-running Recoll's
+  check (about 70 minutes of metadata reads on Hub).
 - ZFS counts objects, not files: `df -i` gave 7.1 M for the four datasets, Recoll walked 3.03 M files.
 - Files that Recoll couldn't read (149 of the first 1.5 M) are mostly CHM help files with no pages, RAR archives,
   and damaged or cloud-placeholder Office files.
