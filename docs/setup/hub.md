@@ -6,13 +6,12 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `48aade4` (pages read only stored catalog counts; with `80870d2`'s faster import path check,
-sort-free status counts, Continue resuming adding, and "Checking for changes" on the Folders page), publishing
-run [37891163242](https://github.com/endthestart/towpath/actions/runs/37891163242) (the core image job rerun
-after a registry pull failed once):
+Revision `44b16a1` (an import that sees a file again leaves its search entry alone; "items in search";
+`towpath connect indexing <source> start|pause`), publishing run
+[37937858666](https://github.com/endthestart/towpath/actions/runs/37937858666):
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:5d7e9e723a4dd9f5b801a9e777a0066df480941fc1312add2eafabbe3de10cbe`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:104af73416655c7716efd000aa31ec8bb53257ed6fe4cddd2dae370cc771de9b`
+- `web`: `ghcr.io/endthestart/towpath@sha256:1c51a380d411d5dc0063a252ac985062468d5ec9f36c518ca1d863af82c128ed`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:162a7ebb44e2d9e0f99c1f0e1e0f745b8b9a1ceb2a5284b747731b40512c15d2`
 
 Towpath's data folder (stores, sign-ins and the Recoll index) lives on a mirrored SSD pool since 2026-10-08,
 with hourly snapshots replicated to the main pool: Recoll's index writes had saturated the spinning disks. The
@@ -27,6 +26,7 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `48aade4` | Pages read only stored catalog counts | `towpath@sha256:5d7e9e72…`, `towpath-recoll@sha256:104af734…` |
 | `80870d2` | Faster import path check; status counts without a sort; Continue resumes adding | `towpath@sha256:14c422f3…`, `towpath-recoll@sha256:7c119a5b…` |
 | `fd30d80` | Each folder resolved once while adding; nested members with shortened IDs | `towpath@sha256:a975b5bf…`, `towpath-recoll@sha256:6e5f5a2c…` |
 | `c615cc5` | Folders page shows files in search and the reading pace | `towpath@sha256:6074e246…`, `towpath-recoll@sha256:01eebb4d…` |
