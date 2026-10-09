@@ -6,12 +6,12 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `c615cc5` (the Folders page shows files actually in search and the reading pace), publishing run
-[37777561404](https://github.com/endthestart/towpath/actions/runs/37777561404) (the Recoll publish job rerun
-after the same registry check failed once):
+Revision `fd30d80` (adding files to search resolves each folder once; nested members with shortened Recoll
+IDs no longer stop it), publishing run
+[37864902888](https://github.com/endthestart/towpath/actions/runs/37864902888):
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:6074e2466fdb3fbe6a637e57442ec8243aaecb224934d4adf0d66f6d741a66ba`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:01eebb4d3f749c6fbe260fe6d896a773f35e847f849bf47a7de3bb76dd19d306`
+- `web`: `ghcr.io/endthestart/towpath@sha256:a975b5bf83a2dc80936239ce080c0523b83c9475b692d6ddbdb666dcc46c19a9`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:6e5f5a2c3621059cdc798f3105d6996d16bb1641a00133947d164d05a23eee3f`
 
 Towpath's data folder (stores, sign-ins and the Recoll index) lives on a mirrored SSD pool since 2026-10-08,
 with hourly snapshots replicated to the main pool: Recoll's index writes had saturated the spinning disks. The
@@ -26,6 +26,7 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `c615cc5` | Folders page shows files in search and the reading pace | `towpath@sha256:6074e246…`, `towpath-recoll@sha256:01eebb4d…` |
 | `339f3b3` | Live panels with htmx | `towpath@sha256:7b3acc35…`, `towpath-recoll@sha256:4e19ce4a…` |
 | `c8f1284` | Index batches of 512 MB by default (a setting) | `towpath@sha256:9d59c584…`, `towpath-recoll@sha256:eb418795…` |
 | `e47692a` | Probable duplicates on Space; the web service later on `858ea5c` (largest files per folder) | `towpath@sha256:f3d4eeeb…` (web `9e257e1d…`), `towpath-recoll@sha256:fbb9ba8d…` |
