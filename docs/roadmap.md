@@ -38,6 +38,15 @@ Recorded for planning; none is scheduled yet.
   read-only, headers only) into typed fields in the files store, with filters such as `camera:` and `taken:`.
   sist2 already extracts EXIF and makes thumbnails and is the first candidate to evaluate for media; contribute
   upstream to Recoll or sist2 where that is cleaner than doing it in Towpath.
+- **Rust for hot paths** (owner direction, 2026-10-09). Python stays for the web app, orchestration and
+  integrations. Work that doesn't need Python and has to be fast should be written in Rust (or a native tool)
+  where possible. This is a note, not a rewrite: move a piece when measurement shows it is a bottleneck, behind
+  the boundary it already has (the bridges' JSON over stdin and stdout, or the catalog tables). Candidates
+  measured on Hub's 7 M files:
+  - Adding Recoll's records to the catalog: one core at 100%, about 880 files/s before `bc0670b`, so each
+    "Index again" spends hours re-adding unchanged files.
+  - Space measurement and duplicates over the whole catalog.
+  - A later content-hashing pass for exact duplicates.
 - **Natural-language search with local models.** A question such as "all pictures taken with a given camera"
   is translated by a local model into Towpath's typed query (`kind:image camera:"..."`), which Towpath runs
   under the usual grants; the model never touches the data directly, and the result can be saved as a
