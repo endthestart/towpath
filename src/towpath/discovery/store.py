@@ -68,9 +68,11 @@ def observe(db, occ: Occurrence, run_id: str) -> str:
         state = "new"
     else:
         state = "same" if row["version"] == occ.version else "changed"
-        db.execute("UPDATE occurrences SET native_id = ?, members = ?, media_type = ?, size = ?, dates = ?, "
-                   "hashes = ?, extraction = ?, version = ?, last_seen_run = ?, missing_since_run = NULL, "
-                   "updated_at = ? WHERE occurrence_id = ?", (*values, run_id, now(), occ.occurrence_id))
+        # Path and members make up the occurrence ID, so they can't differ here. Leaving them out of SET keeps
+        # the search index's trigger from rewriting the row's trigram entries on every import.
+        db.execute("UPDATE occurrences SET native_id = ?, media_type = ?, size = ?, dates = ?, hashes = ?, "
+                   "extraction = ?, version = ?, last_seen_run = ?, missing_since_run = NULL, updated_at = ? "
+                   "WHERE occurrence_id = ?", (values[0], *values[2:], run_id, now(), occ.occurrence_id))
     if occ.version is not None:
         db.execute("INSERT OR IGNORE INTO occurrence_versions (occurrence_id, version, first_seen_run) VALUES (?,?,?)",
                    (occ.occurrence_id, occ.version, run_id))

@@ -121,3 +121,20 @@ def test_counts_by_status_are_kept_per_root_not_counted_on_every_read(tmp_path):
         db.commit()
     with closing(open_store(tmp_path, "files", "connect")) as db:  # a catalog from before the counts: counted once
         assert json.loads(db.execute("SELECT counts FROM catalog_counts").fetchone()[0]) == [["indexed", 1]]
+
+
+def test_seeing_a_file_again_leaves_its_search_entry_alone(tmp_path):
+    from towpath.discovery import store as fstore
+    from towpath.discovery.records import Extraction, Locator, Member, Occurrence
+
+    occ = Occurrence(Locator("p", "r", "mail/box.mbox", (Member("mail-message", None, 3),), "n1"),
+                     Extraction("indexed"), "message/rfc822", None, (), {}, "v1")
+    with closing(open_store(tmp_path, "files", "connect")) as db:
+        assert fstore.observe(db, occ, "run1") == "new"
+        statements = []
+        db.set_trace_callback(statements.append)
+        assert fstore.observe(db, occ, "run2") == "same"
+        db.set_trace_callback(None)
+        db.commit()
+        assert not [s for s in statements if "occurrences_text" in s]  # no trigram entries rewritten
+        assert db.execute("SELECT rowid FROM occurrences_text WHERE text MATCH '\"box.mbox\"'").fetchone()
