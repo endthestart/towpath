@@ -63,6 +63,13 @@ unique at every level, so they make 5 million folders, far more than real trees.
   `AFTER UPDATE OF rel_path, members` trigger fires whenever a column is named in `SET`, changed or not, so
   every unchanged file's trigram entry was deleted and rewritten in a 10 GB index. Path and members are part of
   the occurrence ID, so the update now leaves them out (`09ad510`).
+- First full index, finished 2026-10-09 13:48 UTC: Recoll walked 6.96 M entries (files and folders); search
+  holds 8.60 M items (6.09 M files plus mail messages and archive members); adding them took 105 minutes
+  after Continue, then Space measured four roots (6.09 M files, 38.9 TB) and probable duplicates (68,779
+  groups, 5.7 TB in extra copies) in under two minutes. Search pages answer in 0.06–0.08 s; a two-letter
+  query, which can't use the trigram index, takes 1.9 s.
+- Space labels `backup/temp` (5.3 TB) as temporary files because of its name; it is the owner's own staging
+  folder. Folder-name clutter rules need a way to mark a folder as not clutter.
 - ZFS counts objects, not files: `df -i` gave 7.1 M for the four datasets, Recoll walked 3.03 M files.
 - Files that Recoll couldn't read (149 of the first 1.5 M) are mostly CHM help files with no pages, RAR archives,
   and damaged or cloud-placeholder Office files.
