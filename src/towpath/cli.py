@@ -103,6 +103,28 @@ def request_worker(config: Path = OptionalConfigOpt,
         raise typer.Exit(1) from None
 
 
+@connect_app.command("indexing")
+def connect_indexing(source: str, action: str = typer.Argument(..., help="start (also continues) or pause"),
+                     config: Path = OptionalConfigOpt, credentials_dir: Path = CredentialsDirOpt,
+                     data_dir: Path = DataDirOpt):
+    """Start, continue or pause a connection's indexing, as the Connections page's buttons do. The worker picks
+    it up on its next poll."""
+    from towpath import connections
+
+    if action not in ("start", "pause"):
+        raise typer.BadParameter("the action is start or pause")
+    cfg, credentials_dir = _connector_setup(data_dir, config, credentials_dir)
+    try:
+        if action == "start":
+            connections.start_indexing(cfg.store_dir, credentials_dir, source)
+        else:
+            connections.pause_indexing(cfg.store_dir, source)
+    except connections.ConnectionProblem as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from None
+    typer.echo(f"{source}: {connections.get(cfg.store_dir, source)['indexing']}")
+
+
 def _emit(data, as_json: bool) -> None:
     if as_json:
         typer.echo(json.dumps(data, indent=2, sort_keys=True))

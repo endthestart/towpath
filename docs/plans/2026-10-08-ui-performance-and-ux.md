@@ -59,6 +59,10 @@ unique at every level, so they make 5 million folders, far more than real trees.
   counter. Queries over the whole catalog must not sort it (duplicates use `temp_store = MEMORY` on a smaller
   set). After a failure or a pause while adding, Continue now carries on adding instead of re-running Recoll's
   check (about 70 minutes of metadata reads on Hub).
+- Re-adding after Continue ran at only about 570 files/s: re-observing a file set its `members` column, and an
+  `AFTER UPDATE OF rel_path, members` trigger fires whenever a column is named in `SET`, changed or not, so
+  every unchanged file's trigram entry was deleted and rewritten in a 10 GB index. Path and members are part of
+  the occurrence ID, so the update now leaves them out (`09ad510`).
 - ZFS counts objects, not files: `df -i` gave 7.1 M for the four datasets, Recoll walked 3.03 M files.
 - Files that Recoll couldn't read (149 of the first 1.5 M) are mostly CHM help files with no pages, RAR archives,
   and damaged or cloud-placeholder Office files.

@@ -187,6 +187,7 @@ def test_indexing_again_says_it_checks_for_changes(inst):
                            TOWPATH_LOGIN_REQUIRED=False, TOWPATH_CREDENTIALS_DIR=inst.layout.credentials):
         panel = Client().get("/connections/folders/live").content.decode()
     assert "Checking for changes" in panel and "Files checked" in panel and "951,326" in panel
+    assert "each file inside an archive" in panel  # search holds members too, so it can pass the files read
     assert "of about 6,954,981" in panel and "30 new or changed" in panel
 
 
@@ -336,6 +337,18 @@ def test_a_recoll_failure_is_reported_and_can_be_retried(inst):
     assert c["indexing"] == "idle" and "exit 3" in c["last_error"]
 
 
+def test_indexing_can_be_started_and_paused_from_the_command_line(inst):
+    from typer.testing import CliRunner
+
+    from towpath.cli import app
+
+    folders.choose(inst.config, [str(inst.library / "documents")])
+    run = lambda *a: CliRunner().invoke(app, ["connect", "indexing", *a, "--data-dir", str(inst.data)])  # noqa: E731
+    assert run("folders", "start").output.strip() == "folders: requested"
+    assert run("folders", "pause").output.strip() == "folders: paused"
+    assert run("folders", "stop").exit_code != 0 and run("nothing", "start").exit_code == 1
+
+
 def test_nothing_runs_until_the_owner_starts_it(inst):
     folders.choose(inst.config, [str(inst.library / "documents")])
     assert request_worker.run_once(inst.config, inst.layout.credentials)["indexing"] == []
@@ -359,9 +372,9 @@ def test_the_folders_page_picks_and_starts(inst, monkeypatch):
         assert response["Location"] == "/connections/folders/"
         connections._update(inst.config.store_dir, folders.SID, progress={"phase": "done", "indexed": 1234,
                                                                              "in_search": 1234})
-        assert "1,234 files in search" in client.get("/connections/").content.decode()
+        assert "1,234 items in search" in client.get("/connections/").content.decode()
         detail = client.get("/connections/folders/").content.decode()
-        assert "Files in search" in detail and "documents" in detail and ">Pause<" in detail
+        assert "In search" in detail and "documents" in detail and ">Pause<" in detail
         assert client.post("/connections/add/folders", {"folder": ["/etc"]}).status_code == 400
 
 
