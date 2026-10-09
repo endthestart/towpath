@@ -109,9 +109,9 @@ def test_counts_by_status_are_kept_per_root_not_counted_on_every_read(tmp_path):
         add(db, 2, "letters/b.txt")
         db.execute("UPDATE occurrences SET extraction = '{\"status\": \"indexed\"}' WHERE occurrence_id = 'o1'")
         db.commit()
-        expected = sorted([[None, 1], ["indexed", 1]], key=str)
-        assert sorted(fstore.counts(db, "p", "r"), key=str) == expected  # never imported: counted now
+        assert fstore.counts(db, "p", "r") == []  # an import that hasn't finished: not counted on a page
         fstore.refresh_counts(db, "p", "r")
+        assert fstore.counts(db, "p", "r") == [[None, 1], ["indexed", 1]]
         db.execute("UPDATE occurrences SET missing_since_run = 'run2' WHERE occurrence_id = 'o2'")
         db.commit()
         assert len(fstore.counts(db, "p", "r")) == 2  # the kept counts until the next import recounts

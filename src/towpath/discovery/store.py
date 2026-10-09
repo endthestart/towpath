@@ -94,12 +94,11 @@ def refresh_counts(db, provider_id: str, root: str) -> None:
 
 
 def counts(db, provider_id: str, root: str) -> list:
-    """[[status, count], ...] for one root: kept by ``refresh_counts``, or counted now for a root never imported."""
+    """[[status, count], ...] for one root as ``refresh_counts`` last kept them; none before an import of the root
+    has finished. Never counted here: pages that show status read this, and a root can hold millions of rows."""
     row = db.execute("SELECT counts FROM catalog_counts WHERE provider_id = ? AND root_alias = ?",
                      (provider_id, root)).fetchone()
-    if row is not None:
-        return json.loads(row["counts"])
-    return _tally(db, provider_id, root)
+    return json.loads(row["counts"]) if row is not None else []
 
 
 def mark_missing(db, provider_id: str, root: str, run_id: str) -> int:
