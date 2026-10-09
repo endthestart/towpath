@@ -45,6 +45,12 @@ unique at every level, so they make 5 million folders, far more than real trees.
   minutes with the pool writing 84 and 145 MB/s for Recoll's 32 and 42 MB/s (1.3–1.7× per drive). The rest of
   each batch is Xapian's own work: merging 512 MB of new text rewrote 9–12 GB of a 44 GB index. Larger batches
   are the remaining lever (fewer merges), at the cost of memory.
+- Recoll finished its first pass at 6.95 M files (4.12 M documents). Adding them to search then ran at about 430
+  files/s: the safety check that a reference stays inside its root followed every path to its real location,
+  one metadata read per file on the spinning pool, at queue depth one. The import now resolves and lists each
+  folder once (directory entries carry their type, so files' own metadata isn't read) and follows only
+  symbolic links; reads still resolve each path in full. A worker restart while adding used to start Recoll's
+  whole walk again; it now carries on adding.
 - ZFS counts objects, not files: `df -i` gave 7.1 M for the four datasets, Recoll walked 3.03 M files.
 - Files that Recoll couldn't read (149 of the first 1.5 M) are mostly CHM help files with no pages, RAR archives,
   and damaged or cloud-placeholder Office files.
