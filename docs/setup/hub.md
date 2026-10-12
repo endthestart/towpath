@@ -6,12 +6,12 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `44b16a1` (an import that sees a file again leaves its search entry alone; "items in search";
-`towpath connect indexing <source> start|pause`), publishing run
-[37937858666](https://github.com/endthestart/towpath/actions/runs/37937858666):
+Revision `277261c` (Space: keep a folder off the clutter list, archives and mailboxes, files per month; SQLite's
+temporary files on the data folder in the connector image), publishing run
+[38308365521](https://github.com/endthestart/towpath/actions/runs/38308365521):
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:1c51a380d411d5dc0063a252ac985062468d5ec9f36c518ca1d863af82c128ed`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:162a7ebb44e2d9e0f99c1f0e1e0f745b8b9a1ceb2a5284b747731b40512c15d2`
+- `web`: `ghcr.io/endthestart/towpath@sha256:0bf3b5538ac68c5f442fd5235b4d714085a48a967b1c5ab47956461af3b39949`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:6381d07db5954221a96ef80b0ee645d8eae3093cb4524c40bb5dbe03b0598a63`
 
 Towpath's data folder (stores, sign-ins and the Recoll index) lives on a mirrored SSD pool since 2026-10-08,
 with hourly snapshots replicated to the main pool: Recoll's index writes had saturated the spinning disks. The
@@ -26,6 +26,7 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `44b16a1` | Re-observing leaves search entries alone; "items in search"; indexing from the command line | `towpath@sha256:1c51a380…`, `towpath-recoll@sha256:162a7ebb…` |
 | `48aade4` | Pages read only stored catalog counts | `towpath@sha256:5d7e9e72…`, `towpath-recoll@sha256:104af734…` |
 | `80870d2` | Faster import path check; status counts without a sort; Continue resumes adding | `towpath@sha256:14c422f3…`, `towpath-recoll@sha256:7c119a5b…` |
 | `fd30d80` | Each folder resolved once while adding; nested members with shortened IDs | `towpath@sha256:a975b5bf…`, `towpath-recoll@sha256:6e5f5a2c…` |
