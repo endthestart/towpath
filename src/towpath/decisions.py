@@ -50,6 +50,27 @@ def set_item(config, item_id: str, author: str = "local-user", **values: str | N
     return changed
 
 
+def mark_folder(store_dir, provider_id: str, root: str, path: str, keep: bool, author: str = "local-user") -> None:
+    """Keep a folder off Space's clutter list (``keep``), or undo that. Clutter inside it is still shown. The
+    connector measures that root again on its next poll."""
+    from towpath import space
+
+    target = space.keep_target(provider_id, root, path)
+    db = open_store(store_dir, "decisions", ROLE)
+    try:
+        if keep:
+            db.execute("INSERT OR REPLACE INTO settings (target_id, key, value, author, at) VALUES (?,?,?,?,?)",
+                       (target, space.KEEP_KEY, space.KEEP_VALUE, author, now()))
+        else:
+            db.execute("DELETE FROM settings WHERE target_id = ? AND key = ?", (target, space.KEEP_KEY))
+        db.execute("INSERT INTO decision_log (kind, target_id, detail, author, at) VALUES (?, ?, ?, ?, ?)",
+                   ("space-keep" if keep else "space-unkeep", target,
+                    json.dumps({"provider": provider_id, "root": root, "path": path}), author, now()))
+        db.commit()
+    finally:
+        db.close()
+
+
 def grant_model(config, endpoint_id: str, data_class: str, author: str = "local-user") -> str:
     """Allow a data class on one endpoint, tied to its current fingerprint."""
     from towpath.config import DATA_CLASSES

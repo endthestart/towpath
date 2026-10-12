@@ -331,6 +331,19 @@ def _import(config, c: dict, data_dir: Path, status: dict) -> dict:
     return {"reports": reports, "seen": totals["seen"]}
 
 
+def _kept(config) -> dict[str, list[str]]:
+    """The folders the owner keeps off Space's clutter list, read-only from the decisions store."""
+    from towpath import space
+
+    if not store_path(config.store_dir, "decisions").exists():
+        return {}
+    db = open_store(config.store_dir, "decisions", "connect")
+    try:
+        return space.marks(db, SID)
+    finally:
+        db.close()
+
+
 def _unmeasured(config, c: dict) -> bool:
     from towpath import space
 
@@ -338,23 +351,30 @@ def _unmeasured(config, c: dict) -> bool:
         return False
     db = open_store(config.store_dir, "files", "connect")
     try:
-        return bool(space.stale(db, SID, [r["alias"] for r in c["settings"].get("roots") or []]))
+        return bool(space.stale(db, SID, [r["alias"] for r in c["settings"].get("roots") or []], _kept(config)))
     finally:
         db.close()
 
 
 def _measure(config, c: dict) -> list[dict]:
-    """Measure space for every root whose newest import isn't measured yet (see towpath.space)."""
+    """Measure space for every root whose newest import, kept folders or measurement version changed (see
+    towpath.space), then duplicate candidates across roots."""
     from towpath import space
 
     roots = [r["alias"] for r in c["settings"].get("roots") or []]
+    kept = _kept(config)
     db = open_store(config.store_dir, "files", "connect")
     try:
-        done = [{"source_id": SID, "step": "measured", "root": root,
-                 "files": space.rebuild(db, SID, root, run)["files"]}
-                for root, run in space.stale(db, SID, roots).items()]
+        done = []
+        for root, run in space.stale(db, SID, roots, kept).items():
+            started = time.monotonic()
+            files = space.rebuild(db, SID, root, run, kept.get(root, ()))["files"]
+            done.append({"source_id": SID, "step": "measured", "root": root, "files": files,
+                         "seconds": round(time.monotonic() - started, 1)})
         if done:
+            started = time.monotonic()
             space.find_duplicates(db, SID)
+            done.append({"source_id": SID, "step": "duplicates", "seconds": round(time.monotonic() - started, 1)})
         return done
     finally:
         db.close()
@@ -388,7 +408,9 @@ def _finished(config, job: str) -> list[dict]:
     _jobs.pop(job, None)
     outcome = _outcomes.pop(job, {})
     if job == "measure":
-        return [{"source_id": SID, "step": "measured"}] if "result" in outcome else []
+        if "error" in outcome:
+            return [{"source_id": SID, "step": "measure-failed", "error": outcome["error"], "at": outcome.get("at")}]
+        return outcome.get("result") or []  # per root, with seconds, for the worker's log
     if "error" in outcome:
         failure = {"error": outcome["error"], "at": outcome.get("at")}
         _update(config.store_dir, SID, "indexing-stopped", failure, indexing="idle",

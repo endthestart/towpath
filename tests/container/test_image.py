@@ -305,6 +305,34 @@ def test_core_cpython_links_no_source_obliging_library(box):
     assert "modules []" in out and "links []" in out and "cpython license True" in out
 
 
+SORT_CHECK = """
+import sqlite3
+db = sqlite3.connect("/data/scratch/sort-check.db")
+assert db.execute("pragma temp_store").fetchone()[0] == 0  # the build's default: temporary files on disk
+assert ("TEMP_STORE=1",) in db.execute("pragma compile_options").fetchall()
+db.execute("pragma cache_size = -1000")
+db.execute("create table t (v text)")
+db.executemany("insert into t values (?)", ((f"{i * 7919 % 100003:08d}" * 8,) for i in range(100000)))
+db.commit()
+print(sum(1 for _ in db.execute("select v from t order by v")))
+"""
+
+
+@recoll_only
+def test_large_sorts_use_the_data_folder_not_the_small_tmp(tmp_path):
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    scratch.chmod(0o777)
+    base = ["docker", "run", "--rm", "--network", "none", "--read-only", "--cap-drop", "ALL",
+            "--tmpfs", "/tmp:size=2m,mode=1777", "-v", f"{scratch}:/data/scratch", "--entrypoint", "python3"]
+    ok = subprocess.run([*base, IMAGE, "-c", SORT_CHECK], capture_output=True, text=True, timeout=300)
+    assert ok.returncode == 0 and ok.stdout.strip() == "100000", ok.stderr[-1000:]
+    (scratch / "sort-check.db").unlink()
+    small = subprocess.run([*base, "-e", "SQLITE_TMPDIR=", IMAGE, "-c", SORT_CHECK], capture_output=True, text=True,
+                           timeout=300)
+    assert small.returncode != 0 and "full" in small.stderr  # without it, the sort spills into the 2 MB /tmp
+
+
 @recoll_only
 def test_recoll_binding_helpers_and_license_notices(box):
     tools = "recollindex antiword pdftotext unrtf pffexport file exiftool bsdtar ps2pdf zstd unxz bunzip2"

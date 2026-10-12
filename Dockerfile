@@ -123,7 +123,10 @@ RUN groupadd --system --gid 10001 towpath \
  && mkdir -p /usr/share/towpath \
  && printf '{"image": "recoll", "revision": "%s", "version": "%s", "created": "%s", "source": "%s"}\n' \
       "${REVISION}" "${VERSION}" "${CREATED}" "${SOURCE}" > /usr/share/towpath/build-info.json
-ENV PATH=/opt/towpath/bin:$PATH PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 HOME=/state
+# SQLite's temporary files (large sorts) go to the data folder's scratch/, not the small /tmp; SQLite reads this
+# once at start-up and falls back to /tmp when the folder is missing.
+ENV PATH=/opt/towpath/bin:$PATH PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 HOME=/state \
+    SQLITE_TMPDIR=/data/scratch
 USER 10001:10001
 WORKDIR /state
 ENTRYPOINT ["towpath"]

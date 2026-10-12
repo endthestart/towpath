@@ -3,7 +3,7 @@
     <data>/state         SQLite stores, the login hash and session key (the web service mounts only this)
     <data>/credentials   passwords and OAuth tokens added on the Connections page (connector only)
     <data>/index         rebuildable search indexes
-    <data>/scratch       temporary files for long jobs
+    <data>/scratch       temporary files for long jobs, and SQLite's for large sorts (SQLITE_TMPDIR in the image)
     <data>/towpath.toml  optional: settings not yet on a page (for example file discovery)
 
 A person creates the data folder (on TrueNAS, a dataset) and makes the containers' user its owner; nothing

@@ -49,6 +49,89 @@ def test_clutter_is_found_by_name_counting_only_the_outermost_place():
     assert "house/Windows" not in str(kinds)
 
 
+def test_a_kept_folder_leaves_the_clutter_list_but_clutter_inside_it_stays():
+    rows = [("staging/temp/draft.txt", 10), ("staging/temp/site/node_modules/x.js", 5),
+            ("staging/temp/old/temp/scratch.bin", 7), ("work/temp/a.tmp", 3)]
+    before = {c["kind"]: [t[0] for t in c["top"]] for c in space.measure(rows)["clutter"]}
+    assert set(before["temp"]) == {"staging/temp", "work/temp"}  # the inner temp folder is inside the outer one
+    assert before["packages"] == ["staging/temp/site/node_modules"]  # kinds are found separately
+    kept = {c["kind"]: [t[0] for t in c["top"]] for c in space.measure(rows, keep={"staging/temp"})["clutter"]}
+    assert set(kept["temp"]) == {"staging/temp/old/temp", "work/temp"}  # only the folder itself is kept
+    assert kept["packages"] == ["staging/temp/site/node_modules"]
+
+
+def test_files_are_counted_by_the_month_they_were_last_modified():
+    m = space.measure([("a.txt", 10, "2003-05"), ("b.txt", 5, "2003-05"), ("c.txt", 1, "2019-12"), ("d", 2, None)])
+    assert m["months"] == [["2003-05", 2, 15], ["2019-12", 1, 1]] and m["undated"] == [1, 2]
+
+
+def test_the_month_comes_from_the_file_modified_date_whatever_its_place(tmp_path):
+    dates = ('[{"basis":"b","meaning":"document-modified","value":"1999-01-01T00:00:00Z"},'
+             '{"basis":"b","meaning":"file-modified","value":"2003-05-31T23:00:00Z"}]')
+    with closing(open_store(tmp_path, "files", "connect")) as db:
+        month = db.execute(f"SELECT {space.MODIFIED_MONTH} FROM (SELECT ? AS dates)", (dates,)).fetchone()[0]
+        assert month == "2003-05"
+        assert db.execute(f"SELECT {space.MODIFIED_MONTH} FROM (SELECT '[]' AS dates)").fetchone()[0] is None
+
+
+def test_kept_folders_and_a_new_version_measure_a_root_again(tmp_path):
+    with closing(open_store(tmp_path, "files", "connect")) as db:
+        for n, (rel, size) in enumerate(ROWS):
+            db.execute("""INSERT INTO occurrences (occurrence_id, provider_id, native_id, root_alias, rel_path, members,
+                          size, dates, hashes, extraction, first_seen_run, last_seen_run, updated_at)
+                          VALUES (?, 'folders', ?, 'docs', ?, '[]', ?, '[]', '{}', '{}', 'r1', 'r1', 'now')""",
+                       (f"o{n}", f"n{n}", rel, size))
+        db.execute("INSERT INTO runs (run_id, provider_id, kind, started_at, finished_at) "
+                   "VALUES ('r1', 'folders', 'import', 'a', 'b')")
+        db.execute("INSERT INTO coverage (run_id, provider_id, root_alias, complete, scanned, by_status) "
+                   "VALUES ('r1', 'folders', 'docs', 1, 18, '{}')")
+        db.commit()
+        summary = space.rebuild(db, "folders", "docs", "r1", keep=["code/app/node_modules"])
+        assert summary["kept"] == [["code/app/node_modules", 2, 1_500]] and summary["v"] == space.VERSION
+        packages = next(c for c in summary["clutter"] if c["kind"] == "packages")
+        assert [t[0] for t in packages["top"]] == ["code/app/node_modules/left-pad/node_modules"]  # inside it
+        assert space.stale(db, "folders", ["docs"], {"docs": ["code/app/node_modules"]}) == {}
+        assert space.stale(db, "folders", ["docs"], {}) == {"docs": "r1"}  # undone
+        assert space.stale(db, "folders", ["docs"], {"docs": ["code", "code/app/node_modules"]}) == {"docs": "r1"}
+        db.execute("UPDATE space_summary SET body = json_set(body, '$.v', 1)")
+        assert space.stale(db, "folders", ["docs"]) == {"docs": "r1"}  # measured by an earlier version
+
+
+def test_marks_are_read_per_root_from_the_decisions_store(tmp_path):
+    from towpath import decisions
+
+    decisions.mark_folder(tmp_path, "folders", "backup", "temp", True)
+    decisions.mark_folder(tmp_path, "folders", "backup", "odd:name/x", True)
+    decisions.mark_folder(tmp_path, "folders", "media", "cache", True)
+    decisions.mark_folder(tmp_path, "folders", "media", "cache", False)
+    with closing(open_store(tmp_path, "decisions", "connect")) as db:
+        assert space.marks(db, "folders") == {"backup": ["odd:name/x", "temp"]}
+        assert space.marks(db, "other") == {}
+        log = db.execute("SELECT kind FROM decision_log ORDER BY seq").fetchall()
+    assert [k for (k,) in log] == ["space-keep", "space-keep", "space-keep", "space-unkeep"]
+
+
+def test_archives_and_mailboxes_are_counted_by_what_is_indexed_inside_them(tmp_path):
+    gb = 1024 ** 3
+    rows = [("mail/old.mbox", 500, "[]"),
+            *[("mail/old.mbox", None, f'[{{"index":{i},"kind":"mail-message","name":null}}]') for i in range(3)],
+            ("photos.zip", 2 * gb, "[]"),
+            *[("photos.zip", None, f'[{{"index":null,"kind":"archive-member","name":"p{i}.jpg"}}]') for i in range(2)],
+            ("report.docx", 900, "[]"), ("report.docx", None, '[{"index":null,"kind":"embedded","name":"i.png"}]'),
+            ("backup.tar.gz", 3 * gb, "[]"), ("empty.zip", 22, "[]"), ("notes.txt", 5, "[]")]
+    with closing(open_store(tmp_path, "files", "connect")) as db:
+        for n, (rel, size, members) in enumerate(rows):
+            db.execute("""INSERT INTO occurrences (occurrence_id, provider_id, native_id, root_alias, rel_path, members,
+                          size, dates, hashes, extraction, first_seen_run, last_seen_run, updated_at)
+                          VALUES (?, 'folders', ?, 'docs', ?, ?, ?, '[]', '{}', '{}', 'r1', 'r1', 'now')""",
+                       (f"o{n}", f"n{n}", rel, members, size))
+        db.commit()
+        boxes = space.rebuild(db, "folders", "docs", "r1")["containers"]
+    assert boxes["held"] == [2, 2 * gb + 500, 5]  # a document's embedded images don't make it a container
+    assert boxes["top"] == [["photos.zip", 2 * gb, 2, "archive"], ["mail/old.mbox", 500, 3, "mailbox"]]
+    assert boxes["unindexed"] == [["under 100 MB", 1, 22], ["100 MB to 1 GB", 0, 0], ["over 1 GB", 1, 3 * gb]]
+
+
 def test_each_import_is_measured_once(tmp_path):
     with closing(open_store(tmp_path, "files", "connect")) as db:
         for n, (rel, size) in enumerate(ROWS):

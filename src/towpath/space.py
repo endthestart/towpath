@@ -9,7 +9,30 @@ import heapq
 import json
 from datetime import datetime, timezone
 
+from towpath.canonical import digest
+
 TOP_FOLDERS, TOP_FILES, TOP_TYPES = 25, 100, 40
+VERSION = 2  # raised when a measurement holds something new, so every root is measured again
+
+# A folder the owner keeps is never shown as clutter itself; clutter inside it still is. Marks live in the
+# decisions store's settings, one row per folder: target ``space:<provider>:<root>:<path>``, key ``clutter``.
+KEEP_KEY, KEEP_VALUE = "clutter", "keep"
+
+# Files whose contents can hold other files or messages. Recoll indexes what it can read inside them as members of
+# the outer file; a container with no indexed members may be empty, unreadable, encrypted, over a size limit or of
+# a kind Recoll doesn't open, so the page says only that nothing inside is indexed.
+CONTAINER_EXTENSIONS = {"zip", "rar", "7z", "tar", "tgz", "gz", "bz2", "tbz2", "xz", "zst", "cab", "iso", "jar",
+                        "mbox", "mbx", "pst", "ost"}
+CONTAINER_KINDS = {"archive-member": "archive", "mail-message": "mailbox"}  # the first member's kind
+TOP_CONTAINERS = 100
+SIZE_BUCKETS = ((100 * 1024 ** 2, "under 100 MB"), (1024 ** 3, "100 MB to 1 GB"), (None, "over 1 GB"))
+
+# The month a file was last modified (UTC), from the catalog's file-modified date: Recoll lists it first, and an
+# archive member's file-modified date is its archive's. Space's files per month and the search filter
+# ``modified:`` both count by this date.
+MODIFIED = ("(SELECT value FROM json_each(dates) WHERE json_extract(value, '$.meaning') = 'file-modified' "
+            "LIMIT 1)")
+MODIFIED_MONTH = f"substr(json_extract({MODIFIED}, '$.value'), 1, 7)"
 
 # Folders that are usually safe to delete or rebuild, by name (compared case-insensitively). Only the outermost
 # match counts, so a node_modules inside another node_modules isn't counted twice.
@@ -101,19 +124,34 @@ def _folder_kind(name: str) -> str | None:
     return None
 
 
-def measure(rows) -> dict:
-    """Space under every folder, by type, the largest files and clutter, from (rel_path, size) rows."""
+def measure(rows, keep=(), containers=None) -> dict:
+    """Space under every folder, by type and by month last modified, the largest files and clutter, from
+    (rel_path, size) or (rel_path, size, month) rows. Folders in ``keep`` are not clutter themselves.
+    ``containers`` maps a file's path to [indexed members, kind] (see ``rebuild``)."""
+    containers = containers or {}
+    holding: list[tuple[int, str, int, str]] = []  # containers with indexed members, largest kept
+    held = [0, 0, 0]  # containers with indexed members: files, bytes, members
+    empty = {label: [0, 0] for _, label in SIZE_BUCKETS}  # container files with no indexed members, by size
     folders: dict[str, list[int]] = {"": [0, 0]}
     types: dict[str, list[int]] = {}
+    months: dict[str, list[int]] = {}
+    undated = [0, 0]
     largest: list[tuple[int, str]] = []
     loose: dict[str, dict[str, list[int]]] = {}  # file clutter by kind, then by the folder holding it
     files = total = unknown = 0
-    for rel_path, size in rows:
+    for row in rows:
+        rel_path, size, month = row[0], row[1], row[2] if len(row) > 2 else None
         if size is None:
             unknown += 1
         size = size or 0
         files += 1
         total += size
+        entry = months.get(month) if month else undated
+        if entry is None:
+            months[month] = [1, size]
+        else:
+            entry[0] += 1
+            entry[1] += size
         root = folders[""]
         root[0] += 1
         root[1] += size
@@ -144,10 +182,28 @@ def measure(rows) -> dict:
             where = loose.setdefault(kind, {}).setdefault(_parent(rel_path) or "", [0, 0])
             where[0] += 1
             where[1] += size
+        inside = containers.get(rel_path)
+        if inside is not None:
+            held[0] += 1
+            held[1] += size
+            held[2] += inside[0]
+            item = (size, rel_path, inside[0], inside[1])
+            if len(holding) < TOP_CONTAINERS:
+                heapq.heappush(holding, item)
+            elif item > holding[0]:
+                heapq.heappushpop(holding, item)
+        elif ext in CONTAINER_EXTENSIONS:
+            bucket = next(label for limit, label in SIZE_BUCKETS if limit is None or size < limit)
+            empty[bucket][0] += 1
+            empty[bucket][1] += size
     return {"folders": folders, "files": files, "bytes": total, "unknown_size": unknown,
             "types": sorted(([ext, n, b] for ext, (n, b) in types.items()), key=lambda t: (-t[2], t[0]))[:TOP_TYPES],
             "largest": [[path, size] for size, path in sorted(largest, key=lambda t: (-t[0], t[1]))],
-            "clutter": _clutter(folders, loose)}
+            "clutter": _clutter(folders, loose, frozenset(keep)),
+            "months": [[m, n, b] for m, (n, b) in sorted(months.items())], "undated": undated,
+            "containers": {"held": held, "top": [[path, size, n, kind] for size, path, n, kind in
+                                                  sorted(holding, key=lambda t: (-t[0], t[1]))],
+                           "unindexed": [[label, *empty[label]] for _, label in SIZE_BUCKETS]}}
 
 
 def _inside(path: str, outer: set[str]) -> bool:
@@ -160,7 +216,8 @@ def _inside(path: str, outer: set[str]) -> bool:
     return "" in outer
 
 
-def _clutter(folders: dict[str, list[int]], loose: dict[str, dict[str, list[int]]]) -> list[dict]:
+def _clutter(folders: dict[str, list[int]], loose: dict[str, dict[str, list[int]]],
+             keep: frozenset[str] = frozenset()) -> list[dict]:
     telling = {name for needs in SYSTEM_COPIES.values() for need in needs for name in need}
     children: dict[str, set[str]] = {}  # only the folder names that identify a system copy
     for path in folders:
@@ -169,7 +226,7 @@ def _clutter(folders: dict[str, list[int]], loose: dict[str, dict[str, list[int]
             children.setdefault(_parent(path), set()).add(low)
     matched: dict[str, set[str]] = {}
     for path in sorted(folders, key=lambda p: (p.count("/"), p)):  # outermost first
-        if not path:
+        if not path or path in keep:
             continue
         name = _name(path)
         kinds = [k for k in (_folder_kind(name),) if k]
@@ -197,17 +254,50 @@ def _clutter(folders: dict[str, list[int]], loose: dict[str, dict[str, list[int]
     return out
 
 
-def rebuild(db, provider_id: str, root: str, run_id: str) -> dict:
+def keep_target(provider_id: str, root: str, path: str) -> str:
+    return f"space:{provider_id}:{root}:{path}"
+
+
+def marks(decisions_db, provider_id: str) -> dict[str, list[str]]:
+    """The folders the owner keeps, by root (from an open decisions store, any role)."""
+    prefix = keep_target(provider_id, "", "")[:-2]
+    out: dict[str, list[str]] = {}
+    for (target,) in decisions_db.execute(
+            "SELECT target_id FROM settings WHERE key = ? AND value = ? AND substr(target_id, 1, ?) = ?",
+            (KEEP_KEY, KEEP_VALUE, len(prefix) + 1, prefix + ":")):
+        root, _, path = target[len(prefix) + 1:].partition(":")
+        out.setdefault(root, []).append(path)
+    return {root: sorted(paths) for root, paths in out.items()}
+
+
+def marks_digest(paths) -> str:
+    return digest(sorted(paths))[:16]
+
+
+def rebuild(db, provider_id: str, root: str, run_id: str, keep=()) -> dict:
     """Measure one root from the catalog and replace what was stored for it. Returns the summary."""
-    rows = db.execute("SELECT rel_path, size FROM occurrences WHERE provider_id = ? AND root_alias = ? "
-                      "AND missing_since_run IS NULL AND members = '[]'", (provider_id, root))
-    measured = measure((r[0], r[1]) for r in rows)
+    containers: dict[str, list] = {}  # outer file -> [indexed members at any depth, kind of the first level]
+    for rel_path, first in db.execute(
+            "SELECT rel_path, json_extract(members, '$[0].kind') FROM occurrences WHERE provider_id = ? "
+            "AND root_alias = ? AND missing_since_run IS NULL AND members != '[]'", (provider_id, root)):
+        entry = containers.get(rel_path)
+        if entry is None:
+            kind = CONTAINER_KINDS.get(first)
+            if kind is None:
+                continue  # parts embedded in a document (images in an office file): not a container
+            containers[rel_path] = [1, kind]
+        else:
+            entry[0] += 1
+    rows = db.execute(f"SELECT rel_path, size, {MODIFIED_MONTH} FROM occurrences WHERE provider_id = ? "
+                      "AND root_alias = ? AND missing_since_run IS NULL AND members = '[]'", (provider_id, root))
+    measured = measure(rows, keep, containers)
     folders = measured.pop("folders")
     db.execute("DELETE FROM space_folders WHERE provider_id = ? AND root_alias = ?", (provider_id, root))
     db.executemany("INSERT INTO space_folders (provider_id, root_alias, path, parent, files, bytes) "
                    "VALUES (?,?,?,?,?,?)",
                    ((provider_id, root, path, _parent(path), n, b) for path, (n, b) in folders.items()))
-    summary = {**measured, "folders": len(folders) - 1}
+    summary = {**measured, "folders": len(folders) - 1, "v": VERSION, "marks": marks_digest(keep),
+               "kept": [[path, *folders.get(path, [0, 0])] for path in sorted(keep)]}
     db.execute("INSERT OR REPLACE INTO space_summary (provider_id, root_alias, run_id, body, updated_at) "
                "VALUES (?,?,?,?,?)", (provider_id, root, run_id, json.dumps(summary, separators=(",", ":")), _now()))
     db.commit()
@@ -222,12 +312,22 @@ def latest_imports(db, provider_id: str) -> dict[str, str]:
     return {root: run for root, run in rows}
 
 
-def stale(db, provider_id: str, roots: list[str]) -> dict[str, str]:
-    """Roots whose newest import isn't measured yet, with that import's run ID."""
-    measured = dict(db.execute("SELECT root_alias, run_id FROM space_summary WHERE provider_id = ?",
-                               (provider_id,)).fetchall())
+def stale(db, provider_id: str, roots: list[str], keep: dict[str, list[str]] | None = None) -> dict[str, str]:
+    """Roots to measure again, with their newest import's run ID: that import isn't measured yet, the measurement
+    is from an earlier version, or (when ``keep`` is given) the owner's kept folders changed since."""
+    measured = {root: (run, v, digest_) for root, run, v, digest_ in db.execute(
+        "SELECT root_alias, run_id, json_extract(body, '$.v'), json_extract(body, '$.marks') FROM space_summary "
+        "WHERE provider_id = ?", (provider_id,))}
     latest = latest_imports(db, provider_id)
-    return {root: latest[root] for root in roots if root in latest and measured.get(root) != latest[root]}
+    out = {}
+    for root in roots:
+        if root not in latest:
+            continue
+        run, version, kept = measured.get(root, (None, None, None))
+        if (run != latest[root] or version != VERSION
+                or (keep is not None and kept != marks_digest(keep.get(root, ())))):
+            out[root] = latest[root]
+    return out
 
 
 DUPLICATE_MIN_BYTES = 1024 * 1024  # smaller copies rarely matter for space

@@ -66,6 +66,12 @@ def test_container_tests_use_disk_scratch():
     assert "tmpfs" not in WORKFLOW
 
 
+def test_the_connector_image_keeps_sqlite_temporary_files_on_the_data_folder():
+    recoll_stage = DOCKERFILE.split(" AS recoll", 1)[1]
+    assert "SQLITE_TMPDIR=/data/scratch" in recoll_stage
+    assert "SQLITE_TMPDIR" not in DOCKERFILE.split(" AS recoll", 1)[0]  # the web service mounts only state/
+
+
 def test_images_record_licenses_and_drop_source_obliging_cpython_modules():
     assert DOCKERFILE.count("collect-licenses.sh") == 2
     assert "NOTICE-core.md" in DOCKERFILE and "NOTICE-recoll.md" in DOCKERFILE

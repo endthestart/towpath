@@ -15,24 +15,34 @@
   <div class="metric"><p>Folders indexed</p><strong>{{ roots|length }}</strong><span>{% if unmeasured %}not measured yet: {{ unmeasured|join:", " }}{% else %}all measured{% endif %}</span></div>
 </section>
 
+{% if remeasuring %}<div class="notice" role="status">Measuring {{ remeasuring|join:", " }} again for your changes; the figures below update when that finishes.</div>{% endif %}
 <h2 class="space-section">Your folders</h2>
 <table class="space-table"><thead><tr><th>Folder</th><th class="num">Files</th><th class="num">Size</th><th class="bar-cell"><span class="sr-only">Share</span></th></tr></thead><tbody>
 {% for r in roots %}<tr><td><a href="{{ r.url }}">{{ r.name }}</a></td><td class="num">{{ r.files }}</td><td class="num">{{ r.bytes|filesizeformat }}</td><td class="bar-cell"><meter min="0" max="1" value="{{ r.share }}"></meter></td></tr>{% endfor %}
 </tbody></table>
 
 <h2 class="space-section">Usually safe to clean up</h2>
-<p class="footnote">Found by folder and file names. Check before deleting anything: a name is a hint, not a guarantee.</p>
+<p class="footnote">Found by folder and file names. Check before deleting anything: a name is a hint, not a guarantee. If a folder here is one you keep on purpose, choose Keep: it leaves this list, while clutter inside it still shows.</p>
 {% for k in clutter %}<details class="clutter">
   <summary><span class="clutter-name"><strong>{{ k.label }}</strong><span>{{ k.about }}</span></span><span class="num">{{ k.bytes|filesizeformat }}</span><span class="num muted">{{ k.files }} files in {{ k.places }} place{{ k.places|pluralize }}</span></summary>
-  <table class="space-table"><tbody>{% for t in k.top %}<tr><td class="path"><a href="{{ t.url }}">{{ t.root }}/{{ t.path }}</a></td><td class="num">{{ t.files }}</td><td class="num">{{ t.bytes|filesizeformat }}</td></tr>{% endfor %}</tbody></table>
+  <table class="space-table"><tbody>{% for t in k.top %}<tr><td class="path"><a href="{{ t.url }}">{{ t.root }}/{{ t.path }}</a></td><td class="num">{{ t.files }}</td><td class="num">{{ t.bytes|filesizeformat }}</td><td class="num">{% if t.path %}<form method="post" action="/space/keep">{% csrf_token %}<input type="hidden" name="root" value="{{ t.alias }}"><input type="hidden" name="path" value="{{ t.path }}"><input type="hidden" name="keep" value="1"><input type="hidden" name="next" value="/space/"><button class="button secondary" type="submit" aria-label="Keep {{ t.root }}/{{ t.path }}: not clutter">Keep</button></form>{% endif %}</td></tr>{% endfor %}</tbody></table>
 </details>{% empty %}<p class="empty-line">Nothing that looks like clutter.</p>{% endfor %}
+{% if kept %}<h3 class="space-section">Kept, not clutter</h3>
+<table class="space-table"><tbody>{% for k in kept %}<tr><td class="path"><a href="{{ k.url }}">{{ k.root }}/{{ k.path }}</a></td><td class="num">{% if k.files %}{{ k.files }}{% else %}<span class="muted">measuring…</span>{% endif %}</td><td class="num">{% if k.files %}{{ k.bytes|filesizeformat }}{% endif %}</td><td class="num"><form method="post" action="/space/keep">{% csrf_token %}<input type="hidden" name="root" value="{{ k.alias }}"><input type="hidden" name="path" value="{{ k.path }}"><input type="hidden" name="keep" value="0"><input type="hidden" name="next" value="/space/"><button class="button secondary" type="submit" aria-label="Undo keeping {{ k.root }}/{{ k.path }}">Undo</button></form></td></tr>{% endfor %}</tbody></table>{% endif %}
 
-{% if duplicates %}<h2 class="space-section">Probably duplicates</h2>
-<p class="footnote">{{ duplicates.files_text }} files of 1 MB or more share a name and size with another file, in {{ duplicates.groups_text }} groups. Keeping one of each would free about {{ duplicates.wasted|filesizeformat }}. A shared name and size is a strong hint, not proof: compare before deleting. Files inside backup sets aren't compared, since their chunks repeat by design.</p>
+{% if duplicates %}<h2 class="space-section">Possible duplicates</h2>
+<p class="footnote">{{ duplicates.files_text }} files of 1 MB or more share a name and size with another file, in {{ duplicates.groups_text }} groups. If they are true copies, keeping one of each would free up to {{ duplicates.wasted|filesizeformat }}. A shared name and size is a hint, not proof: compare the files before deleting. Files inside backup sets aren't compared, since their chunks repeat by design.</p>
 {% for g in duplicates.top %}<details class="clutter">
   <summary><span class="clutter-name"><strong>{{ g.name }}</strong><span>{{ g.size|filesizeformat }} each</span></span><span class="num">{{ g.wasted|filesizeformat }}</span><span class="num muted">{{ g.copies_text }} copies</span></summary>
   <table class="space-table"><tbody>{% for p in g.places %}<tr><td class="path"><a href="{{ p.url }}">{{ p.where }}</a></td></tr>{% endfor %}</tbody></table>
 </details>{% endfor %}{% endif %}
+
+{% if containers %}<h2 class="space-section">Archives and mailboxes</h2>
+<p class="footnote">{{ containers.files }} archive and mailbox files ({{ containers.bytes|filesizeformat }}) have {{ containers.items }} items indexed inside them, so you can search those items without unpacking. Counts are what the index holds, not necessarily everything in the file.</p>
+{% if containers.top %}<table class="space-table"><thead><tr><th>File</th><th>Kind</th><th class="num">Items indexed</th><th class="num">Size</th></tr></thead><tbody>
+{% for c in containers.top %}<tr><td class="path"><a href="{{ c.folder_url }}">{{ c.root }}/{{ c.path }}</a></td><td>{{ c.kind }}</td><td class="num">{{ c.items }}</td><td class="num">{{ c.bytes|filesizeformat }}</td></tr>{% endfor %}
+</tbody></table>{% endif %}
+{% if containers.unindexed %}<p class="footnote">Archive and mailbox files with nothing inside indexed: {% for u in containers.unindexed %}{{ u.files }} {{ u.label }} ({{ u.bytes|filesizeformat }}){% if not forloop.last %}; {% endif %}{% endfor %}. They may be empty, unreadable, encrypted, over a size limit, or a kind the index doesn't open.</p>{% endif %}{% endif %}
 
 <h2 class="space-section">By type</h2>
 <table class="space-table"><thead><tr><th>Type</th><th class="num">Files</th><th class="num">Size</th><th class="bar-cell"><span class="sr-only">Share</span></th></tr></thead><tbody>

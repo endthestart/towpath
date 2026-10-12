@@ -2,7 +2,8 @@
 {% block title %}{{ name }} · Space · Towpath{% endblock %}
 {% block content %}
 <header class="page-head compact"><p class="eyebrow"><a href="/space/">SPACE</a></p><h1>{{ name }}</h1>
-<nav class="crumbs" aria-label="Folder path">{% for c in crumbs %}{% if not forloop.last %}<a href="{{ c.url }}">{{ c.name }}</a> / {% else %}<span>{{ c.name }}</span>{% endif %}{% endfor %}</nav></header>
+<nav class="crumbs" aria-label="Folder path">{% for c in crumbs %}{% if not forloop.last %}<a href="{{ c.url }}">{{ c.name }}</a> / {% else %}<span>{{ c.name }}</span>{% endif %}{% endfor %}</nav>
+{% if path %}<form method="post" action="/space/keep" class="inline-form">{% csrf_token %}<input type="hidden" name="root" value="{{ alias }}"><input type="hidden" name="path" value="{{ path }}"><input type="hidden" name="keep" value="{% if kept %}0{% else %}1{% endif %}"><input type="hidden" name="next" value="{{ back }}">{% if kept %}<span class="muted">You keep this folder: it isn't listed as clutter.</span><button class="button secondary" type="submit">Undo</button>{% else %}<button class="button secondary" type="submit">Keep — not clutter</button>{% endif %}</form>{% endif %}</header>
 <section class="metrics">
   <div class="metric"><p>Size</p><strong>{{ folder.bytes|filesizeformat }}</strong><span>including subfolders</span></div>
   <div class="metric"><p>Files</p><strong>{{ files_text }}</strong><span>{{ here_files_text }} directly in this folder</span></div>

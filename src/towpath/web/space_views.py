@@ -1,16 +1,17 @@
 """The Space page: where the space goes in indexed folders, from what the connector measured after each import.
 
-Read-only, like every page here: it reads the files and connections stores and never touches a file.
+It reads the files and connections stores and never touches a file. Its one write is the owner's decision to
+keep a folder off the clutter list, which goes to the decisions store.
 """
 
 from urllib.parse import urlencode
 
 from django.conf import settings
-from django.http import Http404
+from django.http import Http404, HttpResponseBadRequest, HttpResponseRedirect
 from django.shortcuts import render
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_POST
 
-from towpath import connections, folders, space, stores
+from towpath import connections, decisions, folders, space, stores
 from towpath.unified import sources
 
 SPACE_STORES = ("files", "decisions", "connections")
@@ -32,6 +33,14 @@ def _db():
     return stores.open_store(settings.TOWPATH_STORE_DIR, "files", "web")
 
 
+def _kept() -> dict[str, list[str]]:
+    db = stores.open_store(settings.TOWPATH_STORE_DIR, "decisions", "web")
+    try:
+        return space.marks(db, folders.SID)
+    finally:
+        db.close()
+
+
 def _share(part: int, whole: int) -> float:
     return round(part / whole, 4) if whole else 0.0
 
@@ -45,7 +54,7 @@ def _search_url(text: str) -> str:
 
 
 def _place(root: dict, path: str, files: int, size: int) -> dict:
-    return {"root": root["rel"], "path": path, "files": f"{files:,}", "bytes": size,
+    return {"root": root["rel"], "alias": root["alias"], "path": path, "files": f"{files:,}", "bytes": size,
             "url": _folder_url(root["alias"], path)}
 
 
@@ -59,6 +68,17 @@ def overview(request):
     finally:
         db.close()
     names = {r["alias"]: r["rel"] for r in roots}
+    kept_now = _kept()
+    remeasuring = [r["rel"] for r in roots if r["alias"] in measured and (
+        measured[r["alias"]].get("v") != space.VERSION
+        or measured[r["alias"]].get("marks") != space.marks_digest(kept_now.get(r["alias"], ())))]
+    kept = []
+    for r in roots:
+        sizes = {path: (n, b) for path, n, b in (measured.get(r["alias"]) or {}).get("kept", [])}
+        for path in kept_now.get(r["alias"], ()):
+            n, b = sizes.get(path, (None, None))
+            kept.append({"root": r["rel"], "alias": r["alias"], "path": path, "url": _folder_url(r["alias"], path),
+                         "files": f"{n:,}" if n is not None else None, "bytes": b})
     if dupes:
         for g in dupes["top"]:
             g["places"] = [{"where": f"{names[root]}/{rel}", "url": _folder_url(root, rel.rpartition("/")[0])}
@@ -71,7 +91,18 @@ def overview(request):
     clutter: dict[str, dict] = {}
     types: dict[str, list[int]] = {}
     largest = []
+    held, holding, unindexed = [0, 0, 0], [], {}
     for r, m in shown:
+        boxes = m.get("containers")
+        if boxes:
+            held = [a + b for a, b in zip(held, boxes["held"], strict=True)]
+            holding += [{"root": r["rel"], "path": path, "bytes": size, "items": f"{n:,}", "kind": kind,
+                         "folder_url": _folder_url(r["alias"], path.rpartition("/")[0])}
+                        for path, size, n, kind in boxes["top"]]
+            for label, n, b in boxes["unindexed"]:
+                entry = unindexed.setdefault(label, [0, 0])
+                entry[0] += n
+                entry[1] += b
         for item in m["clutter"]:
             entry = clutter.setdefault(item["kind"], {**item, "places": 0, "files": 0, "bytes": 0, "top": []})
             entry["places"] += item["places"]
@@ -102,6 +133,12 @@ def overview(request):
                    "url": _search_url(f"extension:{ext}") if ext else None} for ext, n, b in type_rows],
         "largest": sorted(largest, key=lambda f: -f["bytes"])[:50],
         "duplicates": dupes if dupes and dupes["top"] else None,
+        "kept": kept, "remeasuring": remeasuring,
+        "containers": {"files": f"{held[0]:,}", "bytes": held[1], "items": f"{held[2]:,}",
+                       "top": sorted(holding, key=lambda c: -c["bytes"])[:SHOWN],
+                       "unindexed": [{"label": label, "files": f"{n:,}", "bytes": b}
+                                     for label, (n, b) in unindexed.items() if n]}
+        if held[0] or any(n for n, _ in unindexed.values()) else None,
     })
 
 
@@ -121,6 +158,7 @@ def folder_page(request):
         db.close()
     if found is None:
         raise Http404
+    kept = path in _kept().get(alias, ())
     crumbs, walked = [{"name": root["rel"], "url": _folder_url(alias, "")}], ""
     for part in [p for p in path.split("/") if p]:
         walked = f"{walked}/{part}" if walked else part
@@ -137,4 +175,24 @@ def folder_page(request):
         "files": [{"name": name, "bytes": size, "url": "/ref/?" + urlencode({"r": f"files-{folders.SID}:{occ}"})}
                   for occ, name, size in files],
         "files_unlisted": found["here_files"] > 0 and not files,
+        "alias": alias, "path": path, "kept": kept, "back": request.get_full_path(),
     })
+
+
+@require_POST
+def keep(request):
+    """Keep a folder off the clutter list, or undo that. The folder must be measured in a searchable root."""
+    _, roots = _roots()
+    alias, path = request.POST.get("root", ""), request.POST.get("path", "").strip("/")
+    if not path or not any(r["alias"] == alias for r in roots):
+        return HttpResponseBadRequest("Choose a folder inside one of your indexed folders.")
+    db = _db()
+    try:
+        exists = space.folder(db, folders.SID, alias, path, limit=0) is not None
+    finally:
+        db.close()
+    if not exists:
+        return HttpResponseBadRequest("That folder isn't in the measured index.")
+    decisions.mark_folder(settings.TOWPATH_STORE_DIR, folders.SID, alias, path, request.POST.get("keep") == "1")
+    back = request.POST.get("next", "")
+    return HttpResponseRedirect(back if back.startswith("/space/") and "//" not in back else "/space/")

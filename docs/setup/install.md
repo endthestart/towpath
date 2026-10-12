@@ -104,5 +104,5 @@ the whole index. Later passes only touch what changed.
 | --- | --- | --- |
 | `state/` | Indexes, collections, requests, quota accounting, the login hash and session key | all services |
 | `credentials/` | Passwords and tokens added on the Connections page, one file each, owner-only | the two connector services |
-| `index/`, `scratch/` | Search indexes and temporary files for long jobs | the connector services |
+| `index/`, `scratch/` | Search indexes, and temporary files for long jobs and for SQLite's large sorts (the connector image sets `SQLITE_TMPDIR=/data/scratch`, so they don't fill the small `/tmp`) | the connector services |
 | `towpath.toml` | Optional settings not yet on a page (such as file discovery) | the connector services |

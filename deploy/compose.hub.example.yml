@@ -13,6 +13,7 @@ x-runtime: &runtime
   cap_drop: [ALL]
   security_opt: ["no-new-privileges:true"]
   init: true
+  # Small on purpose: the connector image points SQLite's temporary files at the data folder (SQLITE_TMPDIR).
   tmpfs: ["/tmp:size=64m,mode=1777"]
   stop_grace_period: 60s
 

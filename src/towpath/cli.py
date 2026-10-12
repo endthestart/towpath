@@ -64,6 +64,20 @@ DataDirOpt = typer.Option(None, "--data-dir", envvar="TOWPATH_DATA_DIR",
 OptionalConfigOpt = typer.Option(None, "--config", "-c", help="Configuration file (optional with --data-dir).")
 
 
+def _check_scratch(scratch: Path) -> None:
+    """SQLite writes the temporary files of large sorts to ``SQLITE_TMPDIR``, which the connector image sets to the
+    data folder's scratch/. If that isn't the folder in use, or can't be written, SQLite falls back to /tmp, which a
+    container keeps small, and large sorts fail later: warn now. Unset (outside the image) means the system default."""
+    import os
+
+    configured = os.environ.get("SQLITE_TMPDIR")
+    if configured is None or (Path(configured).resolve() == scratch.resolve()
+                              and os.access(scratch, os.W_OK | os.X_OK)):
+        return
+    typer.echo(f"warning: SQLite's temporary files will go to /tmp, not {scratch}; large sorts may fail "
+               f"(set SQLITE_TMPDIR={scratch} and make it writable)", err=True)
+
+
 def _connector_setup(data_dir: Path | None, config: Path | None, credentials_dir: Path | None):
     """The configuration and credentials folder for a connector command, from a data folder or explicit paths."""
     if data_dir is not None:
@@ -77,6 +91,7 @@ def _connector_setup(data_dir: Path | None, config: Path | None, credentials_dir
             raise typer.Exit(2) from None
         except config_mod.ConfigError as exc:
             raise typer.BadParameter(str(exc)) from exc
+        _check_scratch(layout.data / "scratch")
         # The stores the connectors write gain this version's tables and indexes before the web service, which
         # starts after them and only reads, checks for them. Stores that don't exist yet are left to their writer.
         for name, roles in stores.WRITERS.items():

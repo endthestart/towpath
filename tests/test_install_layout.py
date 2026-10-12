@@ -86,6 +86,18 @@ def test_the_connector_prepares_a_fresh_folder_and_explains_a_bad_one(tmp_path):
     assert missing.exit_code == 2 and "Create it and restart" in missing.output
 
 
+def test_the_connector_warns_when_sqlite_temporary_files_would_fall_back_to_tmp(tmp_path, monkeypatch):
+    data = tmp_path / "towpath"
+    data.mkdir()
+    run = lambda: CliRunner().invoke(app, ["connect", "run-worker", "--data-dir", str(data), "--once"])  # noqa: E731
+    monkeypatch.delenv("SQLITE_TMPDIR", raising=False)
+    assert "warning" not in run().output  # outside the image: the system default
+    monkeypatch.setenv("SQLITE_TMPDIR", str(data / "scratch"))
+    assert "warning" not in run().output
+    monkeypatch.setenv("SQLITE_TMPDIR", "/data/scratch")  # the image's folder, but this data folder is elsewhere
+    assert "SQLite's temporary files will go to /tmp" in run().output
+
+
 def test_the_connector_brings_its_stores_up_to_date_before_the_web_service_reads_them(tmp_path):
     import sqlite3
 
