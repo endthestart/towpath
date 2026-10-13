@@ -6,12 +6,11 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `277261c` (Space: keep a folder off the clutter list, archives and mailboxes, files per month; SQLite's
-temporary files on the data folder in the connector image), publishing run
-[38308365521](https://github.com/endthestart/towpath/actions/runs/38308365521):
+Revision `2006f84` (Space shows what Keep did; each connection can check by itself on a schedule the owner
+chooses), publishing run [38337835291](https://github.com/endthestart/towpath/actions/runs/38337835291):
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:0bf3b5538ac68c5f442fd5235b4d714085a48a967b1c5ab47956461af3b39949`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:6381d07db5954221a96ef80b0ee645d8eae3093cb4524c40bb5dbe03b0598a63`
+- `web`: `ghcr.io/endthestart/towpath@sha256:0dd4f6d796526b62dc09bd6b7bd322b326f04deac211f7dea79cead8bdbd15d1`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:fa10ee9fbec53805c826e149c85f5d34758e2f2f310389c46c717ff2f18df082`
 
 Towpath's data folder (stores, sign-ins and the Recoll index) lives on a mirrored SSD pool since 2026-10-08,
 with hourly snapshots replicated to the main pool: Recoll's index writes had saturated the spinning disks. The
@@ -26,6 +25,7 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `277261c` | Keep folders off Space's clutter list; archives and mailboxes; SQLite temp files on the data folder | `towpath@sha256:0bf3b553…`, `towpath-recoll@sha256:6381d07d…` |
 | `44b16a1` | Re-observing leaves search entries alone; "items in search"; indexing from the command line | `towpath@sha256:1c51a380…`, `towpath-recoll@sha256:162a7ebb…` |
 | `48aade4` | Pages read only stored catalog counts | `towpath@sha256:5d7e9e72…`, `towpath-recoll@sha256:104af734…` |
 | `80870d2` | Faster import path check; status counts without a sort; Continue resumes adding | `towpath@sha256:14c422f3…`, `towpath-recoll@sha256:7c119a5b…` |
