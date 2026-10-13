@@ -18,7 +18,7 @@ import socket
 import ssl
 import time
 from contextlib import closing
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from towpath.stores import open_store
@@ -247,6 +247,58 @@ def start_indexing(store_dir: Path, credentials_dir: Path, source_id: str) -> No
                                 else "The password is missing; replace it first.")
     if found["indexing"] not in ("requested", "running"):
         _update(store_dir, source_id, "indexing-requested", indexing="requested", last_error=None)
+
+
+# How often a connection checks for changes by itself, once the owner chooses it on its page (off by default).
+SCHEDULES = {"off": ("Off: only when you press the button", None), "15m": ("Every 15 minutes", 15 * 60),
+             "1h": ("Every hour", 3600), "6h": ("Every 6 hours", 6 * 3600), "1d": ("Every day", 86400),
+             "7d": ("Every week", 7 * 86400)}
+MAIL_SCHEDULES = ("off", "15m", "1h", "6h", "1d")
+FOLDER_SCHEDULES = ("off", "1d", "7d")  # reading every folder again takes long; at most daily
+
+
+def schedules_for(c: dict) -> tuple[str, ...]:
+    return FOLDER_SCHEDULES if c["adapter"] == "recoll" else MAIL_SCHEDULES
+
+
+def set_schedule(store_dir: Path, source_id: str, schedule: str) -> None:
+    found = _require(store_dir, source_id)
+    if schedule not in schedules_for(found):
+        raise ConnectionProblem("Choose one of the listed schedules.")
+    _update(store_dir, source_id, "schedule-set", {"schedule": schedule},
+            settings={**found["settings"], "schedule": schedule})
+
+
+def _last_start(db, source_id: str) -> str | None:
+    row = db.execute("SELECT max(at) FROM connection_events WHERE source_id = ? AND event IN "
+                     "('indexing-requested', 'indexing-scheduled')", (source_id,)).fetchone()
+    return row[0] if row else None
+
+
+def next_check(store_dir: Path, c: dict, role: str = ROLE) -> datetime | None:
+    """When the connection's schedule next starts it, or None when it has no schedule."""
+    seconds = SCHEDULES.get((c["settings"] or {}).get("schedule") or "off", (None, None))[1]
+    if not seconds:
+        return None
+    with closing(open_store(store_dir, "connections", role)) as db:
+        last = _last_start(db, c["source_id"])
+    never = datetime.fromtimestamp(0, timezone.utc)  # never started: due at once
+    return datetime.fromisoformat(last) + timedelta(seconds=seconds) if last else never
+
+
+def start_scheduled(store_dir: Path, credentials_dir: Path, now: datetime | None = None) -> list[dict]:
+    """Start each idle, ready connection whose schedule is due. A paused connection stays paused."""
+    now = now or datetime.now(timezone.utc)
+    started = []
+    for c in all_connections(store_dir):
+        if c["state"] != "ready" or c["indexing"] != "idle":
+            continue
+        due = next_check(store_dir, c)
+        if due is None or due > now or not has_credential(credentials_dir, c):
+            continue
+        _update(store_dir, c["source_id"], "indexing-scheduled", indexing="requested", last_error=None)
+        started.append({"source_id": c["source_id"], "step": "scheduled"})
+    return started
 
 
 def pause_indexing(store_dir: Path, source_id: str) -> None:

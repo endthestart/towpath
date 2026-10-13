@@ -194,6 +194,11 @@ def _detail_context(sid: str, indexing: dict | None = None) -> dict:
     raw = _get(sid)
     c = _view(raw)
     context = {"nav": "connections", "c": c, "now": datetime.now(timezone.utc), "live": c["status"]["busy"]}
+    current = (raw["settings"] or {}).get("schedule") or "off"
+    due = connections.next_check(_store(), raw)
+    context["schedule"] = {"current": current, "label": connections.SCHEDULES[current][0],
+                           "choices": [(k, connections.SCHEDULES[k][0]) for k in connections.schedules_for(raw)],
+                           "next": max(due, datetime.now(timezone.utc)).strftime("%Y-%m-%d %H:%M UTC") if due else None}
     if c["adapter"] == "recoll":
         from towpath import folders as folder_index
 
@@ -360,6 +365,17 @@ def indexing_settings(request, sid):
         return render(request, "connection_detail.html",
                       {**_detail_context(sid, typed), "indexing_error": str(exc)}, status=400)
     return redirect(f"/connections/{sid}/?saved=indexing")
+
+
+@require_POST
+def schedule(request, sid):
+    _get(sid)
+    try:
+        connections.set_schedule(_store(), sid, request.POST.get("schedule", ""))
+    except ConnectionProblem as exc:
+        return render(request, "connection_detail.html", {**_detail_context(sid), "schedule_error": str(exc)},
+                      status=400)
+    return redirect(f"/connections/{sid}/?saved=schedule")
 
 
 @require_POST

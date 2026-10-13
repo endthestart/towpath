@@ -31,13 +31,17 @@ def run_once(config, credentials_dir=None):
     """Existing queue receipts survive restart; idle polling makes no provider calls.
 
     Accounts added in the UI are read afresh each poll, so a new connection needs no restart. Indexing runs
-    only for connections the owner started, one bounded slice each, after searches and content requests."""
+    only for connections the owner started or put on a schedule, one bounded slice each, after searches and
+    content requests."""
     if credentials_dir is not None:
         connections.import_configured(config, credentials_dir)
         config = connections.merged(config, credentials_dir)
     search = requests.run_searches(config, limit=20)
     fetched = connect.fetch_requests(config)
-    indexing = connections.index_pending(config, credentials_dir) if credentials_dir is not None else []
+    indexing = []
+    if credentials_dir is not None:  # schedules the owner chose start connections first, then they run as if started
+        indexing += connections.start_scheduled(config.store_dir, credentials_dir)
+        indexing += connections.index_pending(config, credentials_dir)
     if credentials_dir is not None:  # folders, when this connector has a data folder
         indexing += folders.index_pending(config, Path(config.store_dir).parent)
     return {"searches": search["searches_run"], "fetched": fetched["fetched"],

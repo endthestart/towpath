@@ -5,6 +5,14 @@
 <header class="page-head compact"><p class="eyebrow"><a href="/connections/">CONNECTIONS</a></p><h1>{{ c.display_name }}</h1></header>
 {% if error %}<div class="notice warn" role="alert">{{ error }}</div>{% endif %}
 {% include '_connection_live.html' %}
+<section class="detail-card"><h2 class="card-title">Check automatically</h2>
+{% if saved == 'schedule' %}<div class="notice" role="status">Saved.</div>{% endif %}
+{% if schedule_error %}<div class="notice warn" role="alert">{{ schedule_error }}</div>{% endif %}
+<p>{% if schedule.next %}{{ schedule.label }}. Next check: {{ schedule.next }}.{% else %}Towpath checks only when you press the button.{% endif %} {% if c.adapter == 'recoll' %}Indexing again reads every folder's dates, which keeps the disks busy for a while, so it runs at most daily.{% else %}Each check reads only what changed since the last one.{% endif %}</p>
+<form method="post" action="/connections/{{ c.source_id }}/schedule" class="inline-form">{% csrf_token %}
+  <label>How often <select name="schedule">{% for key, label in schedule.choices %}<option value="{{ key }}"{% if key == schedule.current %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <button class="button secondary" type="submit">Save</button></form>
+</section>
 {% if indexing %}<section class="detail-card"><h2 class="card-title">How Towpath indexes these folders</h2>
 <p>Every file is listed by name, size and date. Towpath reads the text of documents, and leaves out only what you list under <em>Skip</em>. These settings take effect the next time indexing starts; to apply them now, pause and resume. Files already indexed aren't read again until they change.</p>
 {% if saved == 'indexing' %}<div class="notice" role="status">Saved.</div>{% endif %}

@@ -127,3 +127,17 @@ def test_only_fastmail_passwords_lose_their_spaces(pages):
     assert client.post("/connections/add/imap", add_form(env, password="pass with spaces")).status_code == 302
     sid = connections.all_connections(env.store)[0]["source_id"]
     assert connections.secret_path(env.credentials, sid).read_text() == "pass with spaces"
+
+
+def test_the_owner_chooses_how_often_a_connection_checks(pages):
+    env, client = pages
+    response = client.post("/connections/add/imap", add_form(env))
+    sid = response["Location"].strip("/").split("/")[1]
+    client.post(f"/connections/{sid}/folders", {"folder": ["INBOX"]})
+    html = client.get(f"/connections/{sid}/").content.decode()
+    assert "Check automatically" in html and "only when you press the button" in html and "Every week" not in html
+    assert client.post(f"/connections/{sid}/schedule", {"schedule": "7d"}).status_code == 400
+    response = client.post(f"/connections/{sid}/schedule", {"schedule": "15m"})
+    assert response["Location"] == f"/connections/{sid}/?saved=schedule"
+    html = client.get(response["Location"]).content.decode()
+    assert "Saved." in html and "Every 15 minutes. Next check:" in html and 'value="15m" selected' in html

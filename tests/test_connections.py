@@ -200,3 +200,27 @@ def test_the_request_worker_runs_requested_indexing(env):
     result = request_worker.run_once(env.config, env.credentials)
     assert result["indexing"] == [{"source_id": sid, "termination": "complete", "slice": None, "indexed_total": 8}]
     assert request_worker.run_once(env.config, env.credentials)["indexing"] == []  # idle polls do nothing
+
+
+def test_a_schedule_the_owner_chooses_starts_checks_by_itself(env):
+    from datetime import datetime, timedelta, timezone
+
+    sid = env.add()
+    assert connections.start_scheduled(env.store, env.credentials) == []  # nothing is scheduled by default
+    with pytest.raises(connections.ConnectionProblem):
+        connections.set_schedule(env.store, sid, "7d")  # weekly is offered for folders only
+    connections.set_schedule(env.store, sid, "1h")
+    assert connections.start_scheduled(env.store, env.credentials) == []  # folders not chosen yet
+    connections.choose_folders(env.store, sid, ["INBOX", "Archive"])
+    result = request_worker.run_once(env.config, env.credentials)  # never checked: due now
+    assert result["indexing"][0] == {"source_id": sid, "step": "scheduled"}
+    assert result["indexing"][1]["termination"] == "complete" and result["indexing"][1]["indexed_total"] == 8
+    assert request_worker.run_once(env.config, env.credentials)["indexing"] == []  # not due for an hour
+    later = datetime.now(timezone.utc) + timedelta(minutes=61)
+    assert connections.start_scheduled(env.store, env.credentials, now=later) == [{"source_id": sid,
+                                                                                    "step": "scheduled"}]
+    connections.pause_indexing(env.store, sid)
+    assert connections.start_scheduled(env.store, env.credentials, now=later + timedelta(hours=2)) == []  # paused
+    connections.set_schedule(env.store, sid, "off")
+    assert connections.next_check(env.store, connections.get(env.store, sid)) is None
+    env.assert_read_only()
