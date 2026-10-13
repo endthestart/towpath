@@ -1,0 +1,1 @@
+<div id="space-status" class="live-region"{% if remeasuring %} hx-get="/space/status" hx-trigger="every 5s" hx-swap="outerHTML"{% endif %}>{% if remeasuring %}<div class="notice" role="status">Measuring {{ remeasuring|join:", " }} again for your change. This page updates by itself when the new figures are ready, usually within a few minutes.</div>{% endif %}</div>

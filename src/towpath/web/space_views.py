@@ -4,7 +4,7 @@ It reads the files and connections stores and never touches a file. Its one writ
 keep a folder off the clutter list, which goes to the decisions store.
 """
 
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 from django.conf import settings
 from django.http import Http404, HttpResponseBadRequest, HttpResponseRedirect
@@ -53,9 +53,28 @@ def _search_url(text: str) -> str:
     return "/search/?" + urlencode({"q": text, "source": f"files-{folders.SID}"})
 
 
-def _place(root: dict, path: str, files: int, size: int) -> dict:
+def _place(root: dict, path: str, files: int, size: int, kept: dict | None = None) -> dict:
     return {"root": root["rel"], "alias": root["alias"], "path": path, "files": f"{files:,}", "bytes": size,
-            "url": _folder_url(root["alias"], path)}
+            "url": _folder_url(root["alias"], path), "kept": path in (kept or {}).get(root["alias"], ())}
+
+
+def _remeasuring(roots: list[dict], measured: dict, kept: dict) -> list[str]:
+    """Roots whose stored measurement predates this version or the owner's kept folders: the worker is measuring
+    them again."""
+    return [r["rel"] for r in roots if r["alias"] in measured and (
+        measured[r["alias"]].get("v") != space.VERSION
+        or measured[r["alias"]].get("marks") != space.marks_digest(kept.get(r["alias"], ())))]
+
+
+def _done(request, roots: list[dict], kept: dict) -> dict | None:
+    """The confirmation after Keep or Undo, shown only while it is still true."""
+    done, alias, path = request.GET.get("done"), request.GET.get("root", ""), request.GET.get("path", "")
+    root = next((r for r in roots if r["alias"] == alias), None)
+    if done not in ("kept", "undone") or root is None or not path:
+        return None
+    if (path in kept.get(alias, ())) != (done == "kept"):
+        return None
+    return {"done": done, "where": f"{root['rel']}/{path}", "alias": alias, "path": path}
 
 
 @require_GET
@@ -69,9 +88,7 @@ def overview(request):
         db.close()
     names = {r["alias"]: r["rel"] for r in roots}
     kept_now = _kept()
-    remeasuring = [r["rel"] for r in roots if r["alias"] in measured and (
-        measured[r["alias"]].get("v") != space.VERSION
-        or measured[r["alias"]].get("marks") != space.marks_digest(kept_now.get(r["alias"], ())))]
+    remeasuring = _remeasuring(roots, measured, kept_now)
     kept = []
     for r in roots:
         sizes = {path: (n, b) for path, n, b in (measured.get(r["alias"]) or {}).get("kept", [])}
@@ -108,7 +125,7 @@ def overview(request):
             entry["places"] += item["places"]
             entry["files"] += item["files"]
             entry["bytes"] += item["bytes"]
-            entry["top"] += [_place(r, path, n, b) for path, n, b in item["top"]]
+            entry["top"] += [_place(r, path, n, b, kept_now) for path, n, b in item["top"]]
         for ext, n, b in m["types"]:
             t = types.setdefault(ext, [0, 0])
             t[0] += n
@@ -133,13 +150,30 @@ def overview(request):
                    "url": _search_url(f"extension:{ext}") if ext else None} for ext, n, b in type_rows],
         "largest": sorted(largest, key=lambda f: -f["bytes"])[:50],
         "duplicates": dupes if dupes and dupes["top"] else None,
-        "kept": kept, "remeasuring": remeasuring,
+        "kept": kept, "remeasuring": remeasuring, "live": bool(remeasuring),
+        "done": _done(request, roots, kept_now),
         "containers": {"files": f"{held[0]:,}", "bytes": held[1], "items": f"{held[2]:,}",
                        "top": sorted(holding, key=lambda c: -c["bytes"])[:SHOWN],
                        "unindexed": [{"label": label, "files": f"{n:,}", "bytes": b}
                                      for label, (n, b) in unindexed.items() if n]}
         if held[0] or any(n for n, _ in unindexed.values()) else None,
     })
+
+
+@require_GET
+def status(request):
+    """The measuring notice alone, polled while a root is measured again; when that finishes, the page reloads."""
+    _, roots = _roots()
+    db = _db()
+    try:
+        measured = space.summaries(db, folders.SID, [r["alias"] for r in roots])
+    finally:
+        db.close()
+    remeasuring = _remeasuring(roots, measured, _kept())
+    response = render(request, "_space_status.html", {"remeasuring": remeasuring})
+    if not remeasuring:
+        response["HX-Refresh"] = "true"
+    return response
 
 
 @require_GET
@@ -154,11 +188,14 @@ def folder_page(request):
         found = space.folder(db, folders.SID, alias, path)
         listed = (found is not None and 0 < found["here_files"] and found["files"] <= space.FILES_LISTED_UP_TO)
         files = space.files_here(db, folders.SID, alias, path) if listed else []
+        measured = space.summaries(db, folders.SID, [alias])
     finally:
         db.close()
     if found is None:
         raise Http404
-    kept = path in _kept().get(alias, ())
+    kept_now = _kept()
+    kept = path in kept_now.get(alias, ())
+    remeasuring = _remeasuring([root], measured, kept_now)
     crumbs, walked = [{"name": root["rel"], "url": _folder_url(alias, "")}], ""
     for part in [p for p in path.split("/") if p]:
         walked = f"{walked}/{part}" if walked else part
@@ -175,7 +212,8 @@ def folder_page(request):
         "files": [{"name": name, "bytes": size, "url": "/ref/?" + urlencode({"r": f"files-{folders.SID}:{occ}"})}
                   for occ, name, size in files],
         "files_unlisted": found["here_files"] > 0 and not files,
-        "alias": alias, "path": path, "kept": kept, "back": request.get_full_path(),
+        "alias": alias, "path": path, "kept": kept, "back": _folder_url(alias, path),
+        "done": _done(request, [root], kept_now), "remeasuring": remeasuring, "live": bool(remeasuring),
     })
 
 
@@ -193,6 +231,11 @@ def keep(request):
         db.close()
     if not exists:
         return HttpResponseBadRequest("That folder isn't in the measured index.")
-    decisions.mark_folder(settings.TOWPATH_STORE_DIR, folders.SID, alias, path, request.POST.get("keep") == "1")
+    keep_it = request.POST.get("keep") == "1"
+    decisions.mark_folder(settings.TOWPATH_STORE_DIR, folders.SID, alias, path, keep_it)
     back = request.POST.get("next", "")
-    return HttpResponseRedirect(back if back.startswith("/space/") and "//" not in back else "/space/")
+    back = back if back.startswith("/space/") and "//" not in back else "/space/"
+    done = "kept" if keep_it else "undone"
+    if urlsplit(back).path == "/space/folder":
+        return HttpResponseRedirect(f"{_folder_url(alias, path)}&{urlencode({'done': done})}")
+    return HttpResponseRedirect("/space/?" + urlencode({"done": done, "root": alias, "path": path}))

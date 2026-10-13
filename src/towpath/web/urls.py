@@ -16,6 +16,7 @@ urlpatterns = [
     path("space/", space_views.overview, name="space"),
     path("space/folder", space_views.folder_page, name="space-folder"),
     path("space/keep", space_views.keep, name="space-keep"),
+    path("space/status", space_views.status, name="space-status"),
     path("collections/", unified_views.collection_list, name="collections"),
     path("connections/", views.connections_elsewhere, name="connections-elsewhere"),
     path("collections/new", unified_views.collection_create, name="collection-create"),

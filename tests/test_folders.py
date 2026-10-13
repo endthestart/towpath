@@ -447,24 +447,33 @@ def test_keeping_a_folder_measures_its_root_again_and_undo_brings_it_back(inst):
     with override_settings(**settings):
         client = Client(enforce_csrf_checks=True)
         page = client.get("/space/").content.decode()
-        assert temp_places(page) == ["temp"]
+        assert temp_places(page) == ["temp"] and "hx-get" not in page  # nothing to poll
         token = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', page).group(1)
         form = {"csrfmiddlewaretoken": token, "root": "documents", "path": "temp", "keep": "1", "next": "/space/"}
         assert client.post("/space/keep", {**form, "csrfmiddlewaretoken": "wrong"}).status_code == 403
         assert client.post("/space/keep", {**form, "root": "nowhere"}).status_code == 400
         assert client.post("/space/keep", {**form, "path": "not/measured"}).status_code == 400
         response = client.post("/space/keep", form)
-        assert response.status_code == 302 and response["Location"] == "/space/"
-        assert "Measuring documents again" in client.get("/space/").content.decode()
+        assert response.status_code == 302 and response["Location"] == "/space/?done=kept&root=documents&path=temp"
+        page = client.get(response["Location"]).content.decode()
+        assert "Kept <strong>documents/temp</strong>" in page  # the confirmation, with Undo
+        assert temp_places(page) == ["temp"] and ">Kept</span>" in page  # the row shows it at once
+        assert 'hx-get="/space/status"' in page and "/assets/htmx.min.js" in page and "Measuring documents" in page
+        polled = client.get("/space/status", HTTP_HX_REQUEST="true")
+        assert "Measuring documents" in polled.content.decode() and "HX-Refresh" not in polled
     inst.poll_until_measured()  # the worker sees the mark and measures that root again
     with override_settings(**settings):
+        polled = client.get("/space/status", HTTP_HX_REQUEST="true")
+        assert polled["HX-Refresh"] == "true"  # done: the page reloads itself
         page = client.get("/space/").content.decode()
-        assert temp_places(page) == [] and "Kept, not clutter" in page and "Measuring" not in page
+        assert temp_places(page) == [] and 'id="kept"' in page and "1 folder you keep" in page
+        assert "Measuring" not in page and "Kept <strong>" not in page  # no message without a fresh change
         assert "documents/temp/site/node_modules" in page  # clutter inside a kept folder still shows
         folder = client.get("/space/folder", {"root": "documents", "path": "temp"}).content.decode()
         assert "You keep this folder" in folder and ">Undo<" in folder
         undo = client.post("/space/keep", {**form, "keep": "0", "next": "/space/folder?root=documents&path=temp"})
-        assert undo["Location"] == "/space/folder?root=documents&path=temp"
+        assert undo["Location"] == "/space/folder?root=documents&path=temp&done=undone"
+        assert "counts as clutter again" in client.get(undo["Location"]).content.decode()
     inst.poll_until_measured()
     with override_settings(**settings):
         page = client.get("/space/").content.decode()
