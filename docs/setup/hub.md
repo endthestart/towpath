@@ -6,11 +6,11 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `458d1c4` (life story foundation: AI model connections, the Life page, proposed events with their
-evidence, and review), publishing run [38589210586](https://github.com/endthestart/towpath/actions/runs/38589210586):
+Revision `0269418` (life story foundation, with the model libraries now in both images), publishing run
+[38609539366](https://github.com/endthestart/towpath/actions/runs/38609539366):
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:0bbc7b49fe84bdbd931f556de9a0c7a6ccef60051ae3f962d3bea71f76a85f43`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:3cf776cc52360078cf1e1a92247aac2f279d746f00788e868d26b3221facb455`
+- `web`: `ghcr.io/endthestart/towpath@sha256:f21b860a835ae4474d657c4a2d1de8778c2395a5228f311aa565a50dae44d900`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:6b1fb565d1f2b28cf0b7a44680a58f59af4dd92e28a243b67b27a7942ddecc7a`
 
 Towpath's data folder (stores, sign-ins and the Recoll index) lives on a mirrored SSD pool since 2026-10-08,
 with hourly snapshots replicated to the main pool: Recoll's index writes had saturated the spinning disks. The
@@ -25,6 +25,7 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `458d1c4` | Life story foundation; adding a model connection failed (model libraries missing from the images) | `towpath@sha256:0bbc7b49…`, `towpath-recoll@sha256:3cf776cc…` |
 | `2006f84` | Space shows what Keep did; schedules per connection | `towpath@sha256:0dd4f6d7…`, `towpath-recoll@sha256:fa10ee9f…` |
 | `277261c` | Keep folders off Space's clutter list; archives and mailboxes; SQLite temp files on the data folder | `towpath@sha256:0bf3b553…`, `towpath-recoll@sha256:6381d07d…` |
 | `44b16a1` | Re-observing leaves search entries alone; "items in search"; indexing from the command line | `towpath@sha256:1c51a380…`, `towpath-recoll@sha256:162a7ebb…` |
