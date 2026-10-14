@@ -166,6 +166,9 @@ def test_google_client_setup_then_sign_in_adds_a_gmail_connection(pages):
     assert "Connect Gmail" in page and "client-secret" not in page
     start = client.post("/connections/google/start")
     assert start.status_code == 302 and start["Location"].startswith("https://accounts.example.com/auth")
+    # Browsers apply form-action to a form's redirect: Google's real sign-in page must be allowed, or nothing happens.
+    policy = client.get("/connections/add/gmail")["Content-Security-Policy"]
+    assert "form-action 'self' https://accounts.google.com" in policy
     assert client.get("/connections/google/callback", {"state": "forged", "code": "c"}).status_code == 400
     assert client.get("/connections/google/callback", {"error": "access_denied", "state": "st4te"}).status_code == 400
     done = client.get("/connections/google/callback", {"state": "st4te", "code": "the-code"})

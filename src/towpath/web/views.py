@@ -23,9 +23,11 @@ class LocalPrivacyMiddleware:
         # Not "no-referrer": browsers then send "Origin: null" with every form post, which the CSRF check rejects.
         # "same-origin" still sends nothing, not even the origin, to other sites.
         response["Referrer-Policy"] = "same-origin"
+        # Connecting Gmail posts a form that redirects to Google's sign-in page; browsers apply form-action to that
+        # redirect, so Google's sign-in address is allowed alongside this site.
         response["Content-Security-Policy"] = (
             "default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self'; "
-            "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+            "frame-ancestors 'none'; base-uri 'none'; form-action 'self' https://accounts.google.com"
         )
         return response
 
