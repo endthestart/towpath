@@ -31,7 +31,12 @@ PROVIDERS = {
                  "help_url": "https://www.fastmail.help/hc/en-us/articles/360058752854-App-passwords"},
     "imap": {"label": "Email (IMAP)", "host": None, "port": 993, "security": "tls", "help_url": None},
     "folders": {"label": "Folders on this server", "host": None, "port": None, "security": None, "help_url": None},
+    "model": {"label": "AI model on your network", "host": None, "port": None, "security": None, "help_url": None},
 }
+# What an AI model connection is used for. Personal content reaches it only after the owner allows it on the Life
+# page (a grant in the decisions store, tied to this endpoint's address, model and token file).
+MODEL_TASKS = ("life.propose",)
+MODEL_TIMEOUT_SECONDS = 300.0  # a model on a sleeping machine can take a minute or two to wake and load
 # Folders left out by default: special use (RFC 6154) first, then common names for servers that omit it.
 SKIP_SPECIAL = {"\\trash", "\\junk", "\\drafts"}
 SKIP_NAMES = {"trash", "deleted items", "deleted messages", "spam", "junk", "junk mail", "junk e-mail", "drafts"}
@@ -331,12 +336,76 @@ def merged(config, credentials_dir: Path | None, role: str = ROLE):
         elif c["adapter"] == "gmail":
             added[sid] = config_mod.Source(sid, "mail-provider", "gmail",
                                            token=token_path(credentials_dir, c) if credentials_dir else None)
+    models = [c for c in all_connections(config.store_dir, role) if c["adapter"] == "model" and c["state"] == "ready"]
+    endpoints = {c["source_id"]: model_endpoint(config.store_dir, c) for c in models}
+    tasks = {task: models[0]["source_id"] for task in MODEL_TASKS if models and task not in config.tasks}
     pacing = gmail_pacing(config, role)
-    if added or pacing is not config.gmail_pacing:
-        config = dataclasses.replace(config, sources={**config.sources, **added}, gmail_pacing=pacing)
+    if added or endpoints or pacing is not config.gmail_pacing:
+        config = dataclasses.replace(config, sources={**config.sources, **added}, gmail_pacing=pacing,
+                                     endpoints={**config.endpoints, **endpoints}, tasks={**config.tasks, **tasks})
     from towpath import folders
 
     return folders.with_files(config, Path(config.store_dir).parent / "index", role)
+
+
+# -- AI models -------------------------------------------------------------------------------------------
+
+
+def model_endpoint(store_dir: Path, c: dict):
+    """The gateway endpoint for an AI model connection. The token reference is the same in every service (the
+    data folder's credentials/), so a grant recorded by the web service matches what the worker checks."""
+    from towpath import config as config_mod
+
+    s = c["settings"]
+    ref = f"file:{secret_path(Path(store_dir).parent / 'credentials', c['source_id'])}"
+    return config_mod.Endpoint(c["source_id"], s["base_url"].rstrip("/"), ref, s["model"], "chat", "self-hosted",
+                               ("synthetic", "metadata", "content"), MODEL_TIMEOUT_SECONDS)
+
+
+def test_model(settings: dict, token: str) -> dict:
+    """Ask the model to answer once, with a synthetic prompt only. Raises ConnectionProblem in plain words."""
+    import openai
+
+    base = settings["base_url"].rstrip("/")
+    if not base.startswith(("http://", "https://")):
+        raise ConnectionProblem("The address starts with http:// or https://, for example http://poundlock:7331/v1.")
+    client = openai.OpenAI(base_url=base, api_key=token or "not-used", timeout=MODEL_TIMEOUT_SECONDS, max_retries=0)
+    started = time.monotonic()
+    try:
+        listed = [m.id for m in client.models.list()]
+        if listed and settings["model"] not in listed:
+            raise ConnectionProblem(f"That token can't use a model named {settings['model']!r}. Check the name, "
+                                    "or allow the model for this token.")
+        reply = client.chat.completions.create(model=settings["model"], max_tokens=8,
+                                               messages=[{"role": "user", "content": "Reply with the word ok."}])
+    except openai.AuthenticationError:
+        raise ConnectionProblem("The model server refused the token.") from None
+    except openai.APIConnectionError:
+        raise ConnectionProblem("Towpath couldn't reach that address.") from None
+    except openai.APITimeoutError:
+        raise ConnectionProblem("The model didn't answer in time; if its machine was asleep, try again.") from None
+    except openai.APIStatusError as exc:
+        raise ConnectionProblem(f"The model server answered with an error ({exc.status_code}).") from None
+    if not reply.choices:
+        raise ConnectionProblem("The model answered with nothing.")
+    return {"seconds": round(time.monotonic() - started, 1), "listed": bool(listed), "at": _now()}
+
+
+def add_model(store_dir: Path, credentials_dir: Path, settings: dict, token: str, tested: dict,
+              taken: set[str] = frozenset()) -> str:
+    """Record a tested AI model connection and keep its token in the credentials folder."""
+    sid = _new_id(store_dir, "model", set(taken))
+    _write_secret(secret_path(credentials_dir, sid), token)
+    settings = {"base_url": settings["base_url"].rstrip("/"), "model": settings["model"], "tested": tested}
+    now = _now()
+    with closing(open_store(store_dir, "connections", ROLE)) as db:
+        db.execute("""INSERT INTO connections (source_id, provider, adapter, display_name, settings, folders,
+                      state, indexing, created_at, updated_at)
+                      VALUES (?, 'model', 'model', ?, ?, NULL, 'ready', 'idle', ?, ?)""",
+                   (sid, settings["model"], json.dumps(settings), now, now))
+        db.execute("INSERT INTO connection_events (source_id, at, event) VALUES (?, ?, 'added')", (sid, now))
+        db.commit()
+    return sid
 
 
 # -- Gmail -----------------------------------------------------------------------------------------------

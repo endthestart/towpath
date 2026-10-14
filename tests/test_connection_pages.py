@@ -141,3 +141,19 @@ def test_the_owner_chooses_how_often_a_connection_checks(pages):
     assert response["Location"] == f"/connections/{sid}/?saved=schedule"
     html = client.get(response["Location"]).content.decode()
     assert "Saved." in html and "Every 15 minutes. Next check:" in html and 'value="15m" selected' in html
+
+
+def test_an_ai_model_is_added_from_the_connections_page(pages, openai_stub):
+    env, client = pages
+    stub = openai_stub(model="local-9b")
+    assert "AI model on your network" in client.get("/connections/").content.decode()
+    form = {"base_url": f"http://127.0.0.1:{stub.port}/v1", "model": "missing", "password": "secret-token"}
+    refused = client.post("/connections/add/model", form)
+    assert refused.status_code == 400 and "use a model named" in refused.content.decode()
+    assert "secret-token" not in refused.content.decode()
+    response = client.post("/connections/add/model", {**form, "model": "local-9b"})
+    sid = response["Location"].strip("/").split("/")[1]
+    html = client.get(response["Location"]).content.decode()
+    assert "local-9b" in html and "Test again" in html and "Check automatically" not in html
+    assert client.post(f"/connections/{sid}/test")["Location"] == f"/connections/{sid}/?saved=test"
+    assert "The model answered." in client.get(f"/connections/{sid}/?saved=test").content.decode()

@@ -224,3 +224,26 @@ def test_a_schedule_the_owner_chooses_starts_checks_by_itself(env):
     connections.set_schedule(env.store, sid, "off")
     assert connections.next_check(env.store, connections.get(env.store, sid)) is None
     env.assert_read_only()
+
+
+def test_an_ai_model_connection_is_tested_saved_and_handed_to_the_gateway(env, openai_stub):
+    from towpath.models.profiles import fingerprint
+
+    stub = openai_stub(model="local-9b")
+    form = {"base_url": f"http://127.0.0.1:{stub.port}/v1", "model": "local-9b"}
+    with pytest.raises(connections.ConnectionProblem, match="can't use a model named"):
+        connections.test_model({**form, "model": "other"}, "token-1")
+    with pytest.raises(connections.ConnectionProblem, match="http://"):
+        connections.test_model({**form, "base_url": "poundlock:7331"}, "token-1")
+    tested = connections.test_model(form, "token-1")
+    assert [r["path"] for r in stub.requests] == ["/v1/models", "/v1/models", "/v1/chat/completions"]
+    assert stub.chat_requests()[0]["body"]["messages"][0]["content"] == "Reply with the word ok."  # synthetic only
+    sid = connections.add_model(env.store, env.credentials, form, "token-1", tested)
+    assert (env.credentials / f"{sid}.password").read_text() == "token-1"
+    assert "token-1" not in everything_written(env)
+    worker = connections.merged(env.config, env.credentials)
+    web = connections.merged(env.config, None, role="web")
+    assert worker.tasks["life.propose"] == sid and worker.endpoints[sid].model == "local-9b"
+    assert worker.endpoints[sid].destination == "self-hosted"  # personal data needs the owner's grant
+    assert fingerprint(worker.endpoints[sid]) == fingerprint(web.endpoints[sid])  # a web grant matches the worker
+    assert connections.start_scheduled(env.store, env.credentials) == []  # a model is never indexed

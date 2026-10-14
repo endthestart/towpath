@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block title %}Add an AI model · Towpath{% endblock %}
+{% block content %}
+<header class="page-head compact"><p class="eyebrow"><a href="/connections/">CONNECTIONS</a></p><h1>Add an AI model on your network</h1>
+<p class="lead">An OpenAI-compatible model server you run, such as Poundlock, LiteLLM, llama.cpp or Ollama. Towpath sends it nothing personal until you allow that on the Life page.</p></header>
+{% if error %}<div class="notice warn" role="alert">{{ error }}</div>{% endif %}
+<section class="detail-card">
+<form method="post" class="settings-form">{% csrf_token %}
+  <label>Address <input name="base_url" value="{{ form.base_url }}" placeholder="http://poundlock:7331/v1" required>
+    <span>The server's OpenAI-compatible address, usually ending in /v1, as Towpath's connector reaches it.</span></label>
+  <label>Model <input name="model" value="{{ form.model }}" placeholder="carbonio-qwen3.5-9b-q8_0-64k" required>
+    <span>The model's name exactly as the server lists it.</span></label>
+  <label>Token <input name="password" type="password" autocomplete="off">
+    <span>The access token the server gave you for Towpath. Leave it empty if the server needs none. It is kept in Towpath's private credentials folder.</span></label>
+  <div class="form-actions"><button class="button" type="submit">Test and save</button></div>
+  <p class="footnote">Testing sends one short made-up question. A model on a sleeping machine can take a minute or two to answer the first time.</p>
+</form></section>
+{% endblock %}

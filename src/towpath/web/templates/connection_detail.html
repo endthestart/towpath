@@ -4,7 +4,7 @@
 {% block content %}
 <header class="page-head compact"><p class="eyebrow"><a href="/connections/">CONNECTIONS</a></p><h1>{{ c.display_name }}</h1></header>
 {% if error %}<div class="notice warn" role="alert">{{ error }}</div>{% endif %}
-{% include '_connection_live.html' %}
+{% if c.adapter == 'model' %}{% include '_connection_model.html' %}{% else %}{% include '_connection_live.html' %}
 <section class="detail-card"><h2 class="card-title">Check automatically</h2>
 {% if saved == 'schedule' %}<div class="notice" role="status">Saved.</div>{% endif %}
 {% if schedule_error %}<div class="notice warn" role="alert">{{ schedule_error }}</div>{% endif %}
@@ -12,7 +12,7 @@
 <form method="post" action="/connections/{{ c.source_id }}/schedule" class="inline-form">{% csrf_token %}
   <label>How often <select name="schedule">{% for key, label in schedule.choices %}<option value="{{ key }}"{% if key == schedule.current %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
   <button class="button secondary" type="submit">Save</button></form>
-</section>
+</section>{% endif %}
 {% if indexing %}<section class="detail-card"><h2 class="card-title">How Towpath indexes these folders</h2>
 <p>Every file is listed by name, size and date. Towpath reads the text of documents, and leaves out only what you list under <em>Skip</em>. These settings take effect the next time indexing starts; to apply them now, pause and resume. Files already indexed aren't read again until they change.</p>
 {% if saved == 'indexing' %}<div class="notice" role="status">Saved.</div>{% endif %}

@@ -96,6 +96,14 @@ def _folders_view(c: dict) -> dict:
 def _view(c: dict) -> dict:
     if c["adapter"] == "recoll":
         return _folders_view(c)
+    if c["adapter"] == "model":
+        tested = c["settings"].get("tested") or {}
+        gone = c["state"] == "disconnected"
+        return {**c, "status": {"text": "Disconnected" if gone else "Connected", "tone": "warn" if gone else "ok",
+                                "busy": False},
+                "address": c["settings"]["base_url"], "indexed": None, "model": c["settings"]["model"],
+                "tested_text": (f"answered in {tested['seconds']} s, {tested['at'][:16].replace('T', ' ')} UTC"
+                                if tested else None)}
     progress = c["progress"] or {}
     rate = (progress.get("rate") or {}).get("per_minute")
     when = progress.get("at")
@@ -135,6 +143,8 @@ def add(request, provider):
         return _gmail_page(request)
     if provider == "folders":
         return _folders_page(request)
+    if provider == "model":
+        return _model_page(request)
     if provider not in connections.PROVIDERS:
         raise Http404
     preset = connections.PROVIDERS[provider]
@@ -165,6 +175,47 @@ def add(request, provider):
                                                       "form": form, "error": error})
     response.status_code = 400 if error else 200
     return response
+
+
+def _model_page(request):
+    form = {"base_url": request.POST.get("base_url", "").strip(), "model": request.POST.get("model", "").strip()}
+    error = None
+    if request.method == "POST":
+        token = request.POST.get("password", "").strip()
+        try:
+            if not form["base_url"] or not form["model"]:
+                raise ConnectionProblem("Enter the model server's address and the model's name.")
+            tested = connections.test_model(form, token)
+            sid = connections.add_model(_store(), _creds(), form, token, tested, _config_ids())
+        except ConnectionProblem as exc:
+            error = str(exc)
+        else:
+            return redirect(f"/connections/{sid}/")
+        finally:
+            token = None  # noqa: F841 - drop the only reference as soon as it is stored or rejected
+    response = render(request, "connection_model.html", {"nav": "connections", "form": form, "error": error})
+    response.status_code = 400 if error else 200
+    return response
+
+
+@require_POST
+def test_model(request, sid):
+    """Ask a model connection to answer again (a synthetic prompt), and record how long it took."""
+    from towpath import credentials
+
+    c = _get(sid)
+    if c["adapter"] != "model":
+        raise Http404
+    try:
+        token = credentials.resolve(f"file:{connections.secret_path(_creds(), sid)}")
+        tested = connections.test_model(c["settings"], token or "")
+    except (ConnectionProblem, credentials.CredentialError) as exc:
+        return render(request, "connection_detail.html", {**_detail_context(sid), "error": str(exc)}, status=400)
+    finally:
+        token = None  # noqa: F841
+    connections._update(_store(), sid, "model-tested", {"seconds": tested["seconds"]},
+                        settings={**c["settings"], "tested": tested}, last_error=None)
+    return redirect(f"/connections/{sid}/?saved=test")
 
 
 @require_http_methods(["GET", "POST"])

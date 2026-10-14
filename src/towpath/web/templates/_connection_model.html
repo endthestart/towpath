@@ -1,0 +1,6 @@
+<p class="lead">{{ c.address }} · <span class="status {{ c.status.tone }}">{{ c.status.text }}</span></p>
+<section class="detail-card"><h2 class="card-title">AI model</h2>
+{% if saved == 'test' %}<div class="notice" role="status">The model answered.</div>{% endif %}
+<p>Model <strong>{{ c.model }}</strong>{% if c.tested_text %}; last test {{ c.tested_text }}{% endif %}. Towpath uses it to propose dated events for your life story, and sends it the text of your email only after you allow that on the <a href="/life/">Life</a> page.</p>
+{% if c.state != 'disconnected' %}<form method="post" action="/connections/{{ c.source_id }}/test" class="inline-form">{% csrf_token %}<button class="button secondary" type="submit">Test again</button></form>{% endif %}
+</section>

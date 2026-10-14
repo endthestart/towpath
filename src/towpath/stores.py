@@ -25,6 +25,7 @@ WRITERS = {
     "ledger": {"worker"},
     "quota": {"connect"},
     "files": {"connect"},
+    "life": {"worker"},
     "connections": {"connect"},
 }
 
@@ -218,6 +219,21 @@ CREATE TABLE IF NOT EXISTS citations (
 CREATE TABLE IF NOT EXISTS recoveries (
   recovery_id TEXT PRIMARY KEY, occurrence_id TEXT NOT NULL, version TEXT, path TEXT NOT NULL,
   sha256 TEXT NOT NULL, size INTEGER NOT NULL, created_at TEXT NOT NULL);
+""",
+    "life": """
+-- Claims the life-story job proposed (towpath.claim/0 documents), each dated by its evidence. Rebuildable: the
+-- owner's reviews live in the decisions store, keyed by claim ID, so they survive a re-run.
+CREATE TABLE IF NOT EXISTS claims (
+  claim_id TEXT PRIMARY KEY, body TEXT NOT NULL, earliest TEXT, latest TEXT, source_id TEXT, run_id TEXT NOT NULL,
+  created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS claims_by_date ON claims (earliest, claim_id);
+-- One proposal run over a slice of one source the owner chose; resumable from what it has already read.
+CREATE TABLE IF NOT EXISTS runs (
+  run_id TEXT PRIMARY KEY, source_id TEXT NOT NULL, slice TEXT NOT NULL, state TEXT NOT NULL, progress TEXT,
+  started_at TEXT NOT NULL, finished_at TEXT);
+CREATE TABLE IF NOT EXISTS examined (
+  run_id TEXT NOT NULL, item_id TEXT NOT NULL, outcome TEXT NOT NULL, at TEXT NOT NULL,
+  PRIMARY KEY (run_id, item_id));
 """,
     "ledger": """
 CREATE TABLE IF NOT EXISTS capability_reports (
