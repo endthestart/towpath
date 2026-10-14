@@ -234,10 +234,8 @@ def test_runs_unprivileged_with_no_network_and_read_only_mounts(box):
 
 def test_file_discovery_needs_no_gmail_or_models(box):
     script = textwrap.dedent("""\
-        import importlib.util
         import sys
-        assert importlib.util.find_spec('openai') is None
-        for module in ('googleapiclient', 'google_auth_oauthlib', 'google.auth', 'imapclient', 'openai'):
+        for module in ('googleapiclient', 'google_auth_oauthlib', 'google.auth', 'imapclient', 'openai', 'jsonschema'):
             sys.modules[module] = None  # fail if file discovery tries to import any of these
         from towpath.cli import app
         sys.argv = ['towpath', 'files', 'status', '--config', '/config/towpath.toml']
