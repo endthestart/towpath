@@ -546,7 +546,9 @@ def save_gmail(store_dir: Path, credentials_dir: Path, token_json: str, address:
 # -- indexing (request worker) --------------------------------------------------------------------------
 
 
-def _plain_stop(termination: str, reason: str | None) -> str:
+def _plain_stop(termination: str, reason: str | None, adapter: str | None = None) -> str:
+    if termination == "auth-stop" and adapter == "gmail":
+        return "Google's sign-in for this account has expired. Choose Reconnect Gmail below to sign in again."
     if termination == "auth-stop":
         return "The account rejected Towpath's stored sign-in. Reconnect or replace the password to continue."
     if termination in ("quota-stop", "daily-budget-stop"):
@@ -597,6 +599,7 @@ def index_pending(config, credentials_dir: Path, slice_seconds: float = SLICE_SE
                   clock=time.monotonic) -> list[dict]:
     """Run one bounded slice for each connection the owner asked to index. Returns a summary per slice."""
     from towpath import connect
+    from towpath.adapters.errors import SyncStop
 
     store_dir = config.store_dir
     summaries = []
@@ -609,6 +612,11 @@ def index_pending(config, credentials_dir: Path, slice_seconds: float = SLICE_SE
         tracker = _tracker(store_dir, sid, clock() + slice_seconds, clock)
         try:
             result = connect.sync(merged(config, credentials_dir), sid, progress=tracker)
+        except SyncStop as exc:  # raised before sync could record it, such as a sign-in that has expired
+            _update(store_dir, sid, "indexing-stopped", {"termination": exc.code}, indexing="idle",
+                    last_error=_plain_stop(exc.code, exc.reason, c["adapter"]))
+            summaries.append({"source_id": sid, "termination": exc.code})
+            continue
         except Exception as exc:  # noqa: BLE001 - recorded by sync; keep data out of the store
             _update(store_dir, sid, "indexing-error", {"type": type(exc).__name__}, indexing="idle",
                     last_error="Indexing stopped on an unexpected error. Progress is saved; start it again.")
@@ -620,7 +628,7 @@ def index_pending(config, credentials_dir: Path, slice_seconds: float = SLICE_SE
             _update(store_dir, sid, "indexed", {"total": result["indexed_total"]}, indexing="idle")
         elif not (termination == "capped" and tracker.stop in ("slice", "paused")):
             _update(store_dir, sid, "indexing-stopped", {"termination": termination}, indexing="idle",
-                    last_error=_plain_stop(termination, result.get("reason")))
+                    last_error=_plain_stop(termination, result.get("reason"), c["adapter"]))
         summaries.append({"source_id": sid, "termination": termination, "slice": tracker.stop,
                           "indexed_total": result["indexed_total"]})
     return summaries

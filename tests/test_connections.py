@@ -247,3 +247,18 @@ def test_an_ai_model_connection_is_tested_saved_and_handed_to_the_gateway(env, o
     assert worker.endpoints[sid].destination == "self-hosted"  # personal data needs the owner's grant
     assert fingerprint(worker.endpoints[sid]) == fingerprint(web.endpoints[sid])  # a web grant matches the worker
     assert connections.start_scheduled(env.store, env.credentials) == []  # a model is never indexed
+
+
+def test_an_expired_sign_in_is_explained_not_reported_as_an_unexpected_error(env, monkeypatch):
+    from towpath import connect
+    from towpath.adapters.errors import AuthStop
+
+    sid = env.add()
+    connections.choose_folders(env.store, sid, ["INBOX"])
+    connections.start_indexing(env.store, env.credentials, sid)
+    monkeypatch.setattr(connect, "sync", lambda *a, **k: (_ for _ in ()).throw(AuthStop("expired")))
+    assert request_worker.run_once(env.config, env.credentials)["indexing"] == [
+        {"source_id": sid, "termination": "auth-stop"}]
+    c = connections.get(env.store, sid)
+    assert c["indexing"] == "idle" and "rejected Towpath's stored sign-in" in c["last_error"]
+    assert "sign-in for this account has expired" in connections._plain_stop("auth-stop", "expired", "gmail")
