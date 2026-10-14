@@ -6,11 +6,11 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `2006f84` (Space shows what Keep did; each connection can check by itself on a schedule the owner
-chooses), publishing run [38337835291](https://github.com/endthestart/towpath/actions/runs/38337835291):
+Revision `458d1c4` (life story foundation: AI model connections, the Life page, proposed events with their
+evidence, and review), publishing run [38589210586](https://github.com/endthestart/towpath/actions/runs/38589210586):
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:0dd4f6d796526b62dc09bd6b7bd322b326f04deac211f7dea79cead8bdbd15d1`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:fa10ee9fbec53805c826e149c85f5d34758e2f2f310389c46c717ff2f18df082`
+- `web`: `ghcr.io/endthestart/towpath@sha256:0bbc7b49fe84bdbd931f556de9a0c7a6ccef60051ae3f962d3bea71f76a85f43`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:3cf776cc52360078cf1e1a92247aac2f279d746f00788e868d26b3221facb455`
 
 Towpath's data folder (stores, sign-ins and the Recoll index) lives on a mirrored SSD pool since 2026-10-08,
 with hourly snapshots replicated to the main pool: Recoll's index writes had saturated the spinning disks. The
@@ -25,6 +25,7 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `2006f84` | Space shows what Keep did; schedules per connection | `towpath@sha256:0dd4f6d7…`, `towpath-recoll@sha256:fa10ee9f…` |
 | `277261c` | Keep folders off Space's clutter list; archives and mailboxes; SQLite temp files on the data folder | `towpath@sha256:0bf3b553…`, `towpath-recoll@sha256:6381d07d…` |
 | `44b16a1` | Re-observing leaves search entries alone; "items in search"; indexing from the command line | `towpath@sha256:1c51a380…`, `towpath-recoll@sha256:162a7ebb…` |
 | `48aade4` | Pages read only stored catalog counts | `towpath@sha256:5d7e9e72…`, `towpath-recoll@sha256:104af734…` |
