@@ -107,7 +107,7 @@ def run_id(value: dict) -> str:
     return "lrun_" + digest({k: value[k] for k in ("source_id", "after", "before")})[:16]
 
 
-def blocked(config, value: dict | None) -> str | None:
+def blocked(config, value: dict | None, role: str = "worker") -> str | None:
     """Why proposing can't run now, in plain words, or None."""
     from towpath import decisions
     from towpath.unified import grants
@@ -121,7 +121,7 @@ def blocked(config, value: dict | None) -> str | None:
     endpoint_id = config.tasks.get(TASK)
     if endpoint_id is None:
         return "No AI model is connected."
-    if not decisions.model_granted(config, endpoint_id, "content"):
+    if not decisions.model_granted(config, endpoint_id, "content", role=role):
         return "The AI model isn't allowed to read email text yet."
     if value["source_id"] not in config.sources:
         return "That mail account isn't connected."

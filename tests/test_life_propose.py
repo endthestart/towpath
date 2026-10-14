@@ -69,6 +69,10 @@ def test_nothing_is_read_or_sent_until_the_owner_allows_it(world):
     assert "isn't allowed to read email text" in life_propose.blocked(worker, life_propose.request(config.store_dir))
     before = len(model.chat_requests())
     assert life_propose.propose_pending(worker, credentials) == [] and len(model.chat_requests()) == before
+    decisions_db = config.store_dir / "decisions.db"
+    written = decisions_db.stat().st_mtime_ns
+    life_propose.propose_pending(worker, credentials)
+    assert decisions_db.stat().st_mtime_ns == written  # the worker only reads the owner's decisions
 
 
 def test_events_are_proposed_with_verbatim_evidence_and_never_twice(world):

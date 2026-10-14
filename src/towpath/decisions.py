@@ -83,14 +83,14 @@ def revoke_model(config, endpoint_id: str, data_class: str, author: str = "local
     return removed > 0
 
 
-def model_granted(config, endpoint_id: str, data_class: str) -> bool:
-    """Whether the owner allowed a data class on the endpoint as it is configured now."""
+def model_granted(config, endpoint_id: str, data_class: str, role: str = ROLE) -> bool:
+    """Whether the owner allowed a data class on the endpoint as it is configured now (read-only for other roles)."""
     from towpath.models.profiles import fingerprint
 
     endpoint = config.endpoints.get(endpoint_id)
     if endpoint is None:
         return False
-    db = open_store(config.store_dir, "decisions", ROLE)
+    db = open_store(config.store_dir, "decisions", role)
     try:
         return db.execute("SELECT 1 FROM model_grants WHERE endpoint_id = ? AND fingerprint = ? AND data_class = ?",
                           (endpoint_id, fingerprint(endpoint), data_class)).fetchone() is not None

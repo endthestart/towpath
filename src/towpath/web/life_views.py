@@ -49,7 +49,7 @@ def _status() -> dict:
     run = life_propose.progress(settings.TOWPATH_STORE_DIR)
     if run is not None and value is not None and run["run_id"] != life_propose.run_id(value):
         run = None  # that run was for an earlier slice
-    reason = life_propose.blocked(config, value)
+    reason = life_propose.blocked(config, value, role="web")
     running = reason is None and not (run and run["state"] == "done")
     return {"request": value, "run": run, "blocked": reason, "running": running}
 
