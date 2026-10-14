@@ -108,3 +108,20 @@ its message. Nothing is ranked, merged or summarised yet.
 - **Coverage and cost.** Which messages are worth sending to a model, sampling across years, and how far the
   first pass should go before the owner reviews.
 - **Other sources.** Photo dates and places, documents and calendars, once those sources are connected.
+
+## Owner direction for the next layers (2026-10-14)
+
+From reviewing the first build:
+
+- **Finding events runs by itself** in the background across all mail the owner allowed, newest years first,
+  and keeps up as new mail arrives. No period has to be chosen.
+- **A second layer groups events**, like photo-library "memories". The relationship is many-to-many: one event can
+  belong to "Trip to Example City", "Person A over the years", "Living in Example State" and "Life in your 30s".
+  Group kinds: occasions and trips, people and relationships, projects and topics, and life chapters (places,
+  jobs, eras, decades of age).
+- **The owner reviews groups, not single events**: approve a group, open it to remove an event that doesn't
+  belong or add events from elsewhere. Single events stay editable inside a group.
+- **A small owner profile** (birthday and other basics) anchors groups to ages and life stages.
+
+Groups need their own records: a group with kind, title, period and members (event references), where the
+owner's additions, removals and approval are decisions kept apart from regenerated proposals, as for claims.
