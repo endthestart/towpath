@@ -28,9 +28,25 @@ def mailboxes():
                                      date="Sat, 04 Apr 2009 08:00:00 +0000"))})}
 
 
-def event(statement, modality, earliest, latest, precision, excerpt):
-    return {"statement": statement, "modality": modality, "kind": "event", "expression": earliest,
-            "earliest": earliest, "latest": latest, "precision": precision, "excerpt": excerpt}
+def event(statement, modality, earliest, latest, precision, excerpt, significance="notable"):
+    return {"statement": statement, "significance": significance, "modality": modality, "kind": "event",
+            "expression": earliest, "earliest": earliest, "latest": latest, "precision": precision, "excerpt": excerpt}
+
+
+def answer(*events, email="transaction"):
+    return json.dumps({"email": email, "events": list(events)})
+
+
+def allow(config, sid, mid):
+    life_propose.set_request(config.store_dir, sid, "2009-01-01", "2009-12-31")
+    grants.grant(config.store_dir, sid, "life-evidence")
+    decisions.grant_model(connections.merged(config, None, role="web"), mid, "content")
+    return connections.merged(config, config.store_dir.parent / "credentials")
+
+
+def email_prompts(model):
+    return [r["body"]["messages"][-1]["content"] for r in model.chat_requests()
+            if "Email date:" in r["body"]["messages"][-1]["content"]]
 
 
 @pytest.fixture
@@ -47,11 +63,9 @@ def world(tmp_path, openai_stub):
     connections.start_indexing(config.store_dir, credentials, sid)
     request_worker.run_once(config, credentials)  # index the mailbox's metadata
     model = openai_stub(model="local-9b", answers=[
-        json.dumps({"events": [event("Ordered a red bicycle", "occurred", "2009-04-04", "2009-04-04", "day", ORDER)]}),
-        json.dumps({"events": [event("Planned a trip to Example Junction", "plan", "2009-05-14", "2009-05-17",
-                                     "range", BOOKING),
-                               event("Won a prize", "occurred", "2009-04-02", "2009-04-02", "day",
-                                     "You have won a prize")]})])
+        answer(event("Ordered a red bicycle", "occurred", "2009-04-04", "2009-04-04", "day", ORDER, "routine")),
+        answer(event("Planned a trip to Example Junction", "plan", "2009-05-14", "2009-05-17", "range", BOOKING),
+               event("Won a prize", "occurred", "2009-04-02", "2009-04-02", "day", "You have won a prize"))])
     form = {"base_url": f"http://127.0.0.1:{model.port}/v1", "model": "local-9b"}
     mid = connections.add_model(config.store_dir, credentials, form, "token-1", connections.test_model(form, "token-1"))
     yield config, credentials, sid, mid, model, state
@@ -83,8 +97,7 @@ def test_events_are_proposed_with_verbatim_evidence_and_never_twice(world):
     worker = connections.merged(config, credentials)
     result = life_propose.propose_pending(worker, credentials)
     assert result == [{"source_id": sid, "step": "proposing", "examined": 2, "proposed_total": 2}]
-    sent = [r["body"]["messages"][-1]["content"] for r in model.chat_requests()
-            if "Email date:" in r["body"]["messages"][-1]["content"]]
+    sent = email_prompts(model)
     assert len(sent) == 2 and not any("Save 20%" in s for s in sent)  # advertising is never sent to the model
     claims = {c.statement: c for c in life.claims(config.store_dir)}
     assert set(claims) == {"Ordered a red bicycle", "Planned a trip to Example Junction"}  # the prize had no quote
@@ -92,7 +105,9 @@ def test_events_are_proposed_with_verbatim_evidence_and_never_twice(world):
     assert trip.modality == "plan" and trip.when.bounds()[0].isoformat() == "2009-05-14" and not trip.when.basis
     assert trip.citations[0].captured_excerpt == BOOKING and "plan, not that it happened" in trip.uncertainty
     assert [b.meaning for b in bike.when.basis] == ["message-date"]  # dated by the receipt itself
-    assert trip.producer == "model:local-9b/life.propose/1" and trip.citations[0].ref.startswith(f"{sid}:INBOX")
+    assert (bike.significance, trip.significance) == ("routine", "notable")
+    assert trip.producer == f"model:local-9b/{life_propose.PROMPT_VERSION}"
+    assert trip.citations[0].ref.startswith(f"{sid}:INBOX")
     assert life_propose.propose_pending(worker, credentials) == []  # nothing left in the slice
     assert life_propose.progress(config.store_dir)["state"] == "done"
     assert len(life.claims(config.store_dir)) == 2
@@ -144,3 +159,36 @@ def test_an_unreachable_model_leaves_messages_unread_for_later(world):
     assert life_propose.propose_pending(worker, credentials) == [
         {"step": "stopped", "reason": "Towpath's worker couldn't reach the AI model."}]
     assert life_propose.progress(config.store_dir)["examined"] == 0
+
+
+def test_promotions_marketing_and_spam_never_become_events(world):
+    from towpath.stores import open_store
+
+    config, credentials, sid, mid, model, state = world
+    with open_store(config.store_dir, "source", "connect") as db:  # the provider filed the receipt as Promotions
+        db.execute("UPDATE observations SET labels = '[\"CATEGORY_PROMOTIONS\", \"INBOX\"]' WHERE item_id IN "
+                   "(SELECT item_id FROM items WHERE subject = 'Your order receipt')")
+    model.answers[:] = [answer(event("Planned a trip to Example Junction", "plan", "2009-05-14", "2009-05-17",
+                                     "range", BOOKING), email="spam")]
+    worker = allow(config, sid, mid)
+    life_propose.propose_pending(worker, credentials)
+    assert [p for p in email_prompts(model) if ORDER in p] == []  # never sent to the model
+    assert len(email_prompts(model)) == 1 and life.claims(config.store_dir) == []
+    with open_store(config.store_dir, "life", life.WRITER) as db:
+        assert sorted(r[0] for r in db.execute("SELECT outcome FROM examined")) == ["advertising", "ok"]
+
+
+def test_a_new_prompt_reads_again_but_leaves_what_the_owner_decided(world, monkeypatch):
+    config, credentials, sid, mid, model, state = world
+    worker = allow(config, sid, mid)
+    life_propose.propose_pending(worker, credentials)
+    first = {c.statement: c for c in life.claims(config.store_dir)}
+    life.review(config.store_dir, first["Ordered a red bicycle"].claim_id, "reject")
+    monkeypatch.setattr(life_propose, "PROMPT_VERSION", "life.propose/next")
+    model.answers[:] = [answer(event("Booked a stay at Example Junction", "plan", "2009-05-14", "2009-05-17",
+                                     "range", BOOKING))]
+    before = len(email_prompts(model))
+    life_propose.propose_pending(worker, credentials)
+    assert len(email_prompts(model)) == before + 1  # the rejected receipt isn't read again
+    now = {c.statement: c.state for c in life.claims(config.store_dir)}
+    assert now == {"Ordered a red bicycle": "rejected", "Booked a stay at Example Junction": "proposed"}

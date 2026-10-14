@@ -92,6 +92,13 @@ def test_basis_must_point_at_a_citation_that_carries_that_date():
     assert any("does not carry" in p for p in claims.validate(document))
 
 
+def test_significance_is_optional_and_round_trips():
+    document = copy.deepcopy(examples()[0])
+    assert "significance" not in claims.Claim.from_dict(document).to_dict()  # older claims read unchanged
+    document["significance"] = "milestone"
+    assert claims.validate(document) == [] and claims.Claim.from_dict(document).significance == "milestone"
+
+
 @pytest.mark.parametrize("change,message", [
     (lambda d: d.update(modality="dreamed"), "modality"),
     (lambda d: d.update(schema="towpath.claim/9"), "unsupported claim schema"),
@@ -102,6 +109,7 @@ def test_basis_must_point_at_a_citation_that_carries_that_date():
     (lambda d: d["citations"][0].update(ref="no-colon"), "is not <source>:<native>"),
     (lambda d: d["citations"][0].update(external={"source_id": "x", "native_id": "y"}), "exactly one"),
     (lambda d: d.update(claim_id="trip"), "claim_id"),
+    (lambda d: d.update(significance="huge"), "significance"),
 ])
 def test_invalid_claims_are_rejected_with_a_reason(change, message):
     document = copy.deepcopy(examples()[0])

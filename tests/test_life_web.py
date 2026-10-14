@@ -101,3 +101,23 @@ def test_proposals_start_from_the_page_and_each_event_is_reviewed_there(life_pag
     assert client.post("/life/review", {"claim_id": "clm_missing", "action": "accept"}).status_code == 400
     client.post("/life/review", {"claim_id": trip.claim_id, "action": "reopen"})
     assert "1 to review" in client.get("/life/").content.decode()
+
+
+def test_everyday_events_wait_under_minor(life_page):
+    import dataclasses
+
+    from towpath import life
+    from towpath.stores import open_store
+    from test_life import proposal
+
+    env, client, sid, model = life_page
+    trip = dataclasses.replace(proposal("Planned a trip to Example Junction", "2009-05-14"), significance="notable")
+    pad = dataclasses.replace(proposal("Ordered a desk lamp", "2009-04-04", ref="gmail-x:msg3", modality="occurred"),
+                              significance="routine")
+    with open_store(env.store, "life", life.WRITER) as db:
+        for claim in (trip, pad):
+            life.save(db, claim, sid, "run1")
+    page = client.get("/life/").content.decode()
+    assert "1 to review" in page and "1 minor" in page and "Ordered a desk lamp" not in page
+    minor = client.get("/life/?show=minor").content.decode()
+    assert "Ordered a desk lamp" in minor and "Planned a trip" not in minor

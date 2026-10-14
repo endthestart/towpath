@@ -38,8 +38,17 @@ def _accounts(config) -> list[dict]:
     return out
 
 
-SHOW = {"review": ("proposed",), "kept": ("accepted", "corrected"), "rejected": ("rejected",),
+SHOW = {"review": ("proposed",), "minor": ("proposed",), "kept": ("accepted", "corrected"), "rejected": ("rejected",),
         "all": ("proposed", "accepted", "corrected", "rejected")}
+
+
+def _shown(claim, show: str) -> bool:
+    """Whether a claim belongs under a filter: everyday events the model judged routine wait under Minor."""
+    if claim.state not in SHOW.get(show, SHOW["review"]):
+        return False
+    if show == "minor":
+        return claim.significance == "routine"
+    return show != "review" or claim.significance != "routine"
 
 
 def _status() -> dict:
@@ -59,7 +68,7 @@ def _row(claim) -> dict:
     return {"id": claim.claim_id, "statement": claim.statement, "when": claim.when.expression,
             "earliest": claim.when.earliest, "latest": claim.when.latest, "precision": claim.when.precision,
             "modality": {"plan": "planned", "occurred": "happened"}.get(claim.modality, claim.modality),
-            "state": claim.state, "uncertainty": claim.uncertainty,
+            "state": claim.state, "uncertainty": claim.uncertainty, "significance": claim.significance,
             "quote": citation.captured_excerpt if citation else None,
             "evidence_url": "/ref/?" + urlencode({"r": citation.ref}) if citation and citation.ref else None,
             "year": (claim.when.earliest or "")[:4] or "Undated"}
@@ -73,16 +82,18 @@ def overview(request):
     endpoint = config.endpoints.get(endpoint_id) if endpoint_id else None
     proposed = life.claims(settings.TOWPATH_STORE_DIR, limit=5000)
     show = request.GET.get("show", "review")
-    wanted = SHOW.get(show, SHOW["review"])
-    rows = [_row(c) for c in proposed if c.state in wanted][:300]
+    show = show if show in SHOW else "review"
+    rows = [_row(c) for c in proposed if _shown(c, show)][:300]
     status = _status()
     year = date.today().year - 1
     return render(request, "life.html", {
         "nav": "life", "accounts": _accounts(config), "saved": request.GET.get("saved"), "show": show,
         "model": {"id": endpoint_id, "name": endpoint.model, "address": endpoint.base_url,
                   "allowed": decisions.model_granted(config, endpoint_id, "content")} if endpoint else None,
-        "rows": rows, "counts": {s: sum(c.state == s for c in proposed)
-                                 for s in ("proposed", "accepted", "corrected", "rejected")},
+        "rows": rows, "counts": {**{s: sum(c.state == s for c in proposed) for s in ("accepted", "corrected",
+                                                                                   "rejected")},
+                                 "proposed": sum(_shown(c, "review") for c in proposed),
+                                 "minor": sum(_shown(c, "minor") for c in proposed)},
         "status": status, "live": status["running"],
         "default_after": (status["request"] or {}).get("after", f"{year}-01-01"),
         "default_before": (status["request"] or {}).get("before", f"{year}-12-31"),

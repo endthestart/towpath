@@ -31,8 +31,9 @@ AUDIENCES = ("owner", "shareable")
 MODEL_USE = ("follow-grants", "local-only", "excluded")
 STATES = ("proposed", "accepted", "rejected", "corrected", "superseded")
 RELATIONS = ("contradicts", "supports", "same-event", "corrects", "supersedes")
+SIGNIFICANCE = ("milestone", "notable", "routine")  # a producer's judgement; unknown when absent
 CLAIM_KEYS = {"schema", "claim_id", "kind", "statement", "modality", "when", "citations", "audience", "model_use",
-              "producer", "state", "uncertainty", "author", "review", "relations", "subjects"}
+              "producer", "state", "uncertainty", "author", "review", "relations", "subjects", "significance"}
 CLAIM_ID = re.compile(r"^clm_[A-Za-z0-9_-]{1,64}$")
 
 
@@ -197,6 +198,7 @@ class Claim:
     review: dict | None = None
     relations: tuple[dict, ...] = ()
     subjects: tuple[str, ...] = field(default_factory=tuple)
+    significance: str | None = None
 
     def __post_init__(self):
         if not CLAIM_ID.match(self.claim_id):
@@ -206,6 +208,8 @@ class Claim:
                                      (self.model_use, MODEL_USE, "model_use")):
             if value not in allowed:
                 raise ClaimError(f"{what} must be one of {', '.join(allowed)}")
+        if self.significance is not None and self.significance not in SIGNIFICANCE:
+            raise ClaimError(f"significance must be one of {', '.join(SIGNIFICANCE)}")
         if not self.statement.strip():
             raise ClaimError("a claim needs a statement")
         if not self.citations and self.modality != "recollected":
@@ -235,6 +239,8 @@ class Claim:
                "model_use": self.model_use, "producer": self.producer, "state": self.state,
                "uncertainty": self.uncertainty, "author": self.author, "review": self.review,
                "relations": [dict(r) for r in self.relations], "subjects": list(self.subjects)}
+        if self.significance is not None:
+            out["significance"] = self.significance
         return out
 
     @classmethod
@@ -252,7 +258,7 @@ class Claim:
                    data.get("state", "proposed"), data.get("audience", "owner"),
                    data.get("model_use", "follow-grants"), data.get("uncertainty"), data.get("author"),
                    data.get("review"), tuple(dict(r) for r in data.get("relations", [])),
-                   tuple(data.get("subjects", [])))
+                   tuple(data.get("subjects", [])), data.get("significance"))
 
     def canonical(self) -> str:
         return canonical_json(self.to_dict())

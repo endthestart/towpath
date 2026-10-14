@@ -221,7 +221,7 @@ The action runner (`towpath-act`), where deployed, recomputes the digest, refuse
 }
 ```
 
-Validation and lossless round trips are implemented in `src/towpath/unified/claims.py` ([unified discovery](unified-discovery.md#timeline-claims)). It adds `when.basis` (which cited date facts the dates rest on; process dates alone cannot date a plan or event), `ref` citations, `date_facts`, `relations` and `review`.
+Validation and lossless round trips are implemented in `src/towpath/unified/claims.py` ([unified discovery](unified-discovery.md#timeline-claims)). It adds `when.basis` (which cited date facts the dates rest on; process dates alone cannot date a plan or event), `ref` citations, `date_facts`, `relations`, `review` and an optional `significance` (`milestone`, `notable` or `routine`, the producer's judgement).
 
 `modality` distinguishes `plan`, `occurred`, `recollected`, and `inferred`. An `external` citation references an item another system owns, such as a photo or document, by its native ID; Towpath does not copy it. `audience` is `owner` or `shareable`; `model_use` is `follow-grants`, `local-only`, or `excluded` ([life stream](life-stream.md#audience-and-model-use)). `captured_excerpt` is filled when the claim is accepted. `preserved` is optional: the person can also keep the whole message (`item`) or one attachment (`part`) as a [preserved artifact](scans-and-destinations.md#preserved-artifacts) when the source itself is valuable. A recollection citation points to a recollection version, with its author, in the decisions store.
 

@@ -109,6 +109,13 @@ its message. Nothing is ranked, merged or summarised yet.
   first pass should go before the owner reviews.
 - **Other sources.** Photo dates and places, documents and calendars, once those sources are connected.
 
+After the owner's first look, the second prompt (`life.propose/2`) addresses salience and junk: mail Gmail
+files under Promotions is never sent to the model; the model says whether an email is personal, a transaction, a
+notification, marketing or spam, and nothing is proposed from marketing or spam; each event gets a significance
+(`milestone`, `notable` or `routine`), and routine events (ordinary purchases, deliveries, bills, sign-ups) wait
+under Minor instead of in the review list. A new prompt version reads the slice again: proposals the owner already
+reviewed stay, with their message, and unreviewed ones are replaced.
+
 ## Owner direction for the next layers (2026-10-14)
 
 From reviewing the first build:
