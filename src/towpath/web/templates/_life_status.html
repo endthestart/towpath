@@ -1,0 +1,5 @@
+<div id="life-status" class="live-region"{% if status.running %} hx-get="/life/status" hx-trigger="every 5s" hx-swap="outerHTML"{% endif %}>
+{% if status.request %}<p><strong>{{ status.request.source_id }}</strong>, {{ status.request.after }} to {{ status.request.before }}:
+{% if status.run %}{{ status.run.examined }} likely message{{ status.run.examined|pluralize }} read, {{ status.run.proposed }} event{{ status.run.proposed|pluralize }} proposed{% if status.run.last %}, reached {{ status.run.last }}{% endif %}{% if status.run.state == 'done' %}. Finished.{% else %}.{% endif %}{% else %}not started yet.{% endif %}
+{% if status.blocked %}<span class="muted">{{ status.blocked }}</span>{% elif status.running %}<span class="muted">Working; a model on a sleeping machine can take a minute to start.</span>{% endif %}</p>{% endif %}
+</div>

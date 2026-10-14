@@ -20,8 +20,35 @@
 {% else %}<p>No AI model is connected. <a href="/connections/add/model">Add one on the Connections page</a>.</p>{% endif %}
 </section>
 
-<section class="detail-card"><h2 class="card-title">Proposed events</h2>
-{% if claims %}<p>{{ counts.proposed }} to review, {{ counts.accepted }} accepted, {{ counts.corrected }} corrected, {{ counts.rejected }} rejected.</p>
-{% else %}<p>None yet. Proposals start once a mail account and the model are allowed above.</p>{% endif %}
+<section class="detail-card"><h2 class="card-title">Propose events from your mail</h2>
+<p>Towpath reads only messages that look like they're about your life (bookings, orders, appointments, jobs, school, celebrations), newest first, and asks the model for the events each one shows. Every event it keeps quotes the email it came from.</p>
+{% include '_life_status.html' %}
+<form method="post" action="/life/start" class="inline-form">{% csrf_token %}
+  <label>Account <select name="source_id">{% for a in accounts %}{% if a.allowed %}<option value="{{ a.source_id }}"{% if status.request.source_id == a.source_id %} selected{% endif %}>{{ a.name }}</option>{% endif %}{% endfor %}</select></label>
+  <label>From <input type="date" name="after" value="{{ default_after }}"></label>
+  <label>To <input type="date" name="before" value="{{ default_before }}"></label>
+  <button class="button" type="submit">Propose events</button></form>
+{% if status.request %}<form method="post" action="/life/pause" class="inline-form">{% csrf_token %}<input type="hidden" name="pause" value="{% if status.request.state == 'paused' %}0{% else %}1{% endif %}"><button class="button secondary" type="submit">{% if status.request.state == 'paused' %}Resume{% else %}Pause{% endif %}</button></form>{% endif %}
+</section>
+
+<section class="detail-card" id="claims"><h2 class="card-title">Your events</h2>
+<p><a href="?show=review#claims"{% if show == 'review' %} aria-current="page"{% endif %}>{{ counts.proposed }} to review</a> · <a href="?show=kept#claims"{% if show == 'kept' %} aria-current="page"{% endif %}>{{ counts.accepted|add:counts.corrected }} kept</a> · <a href="?show=rejected#claims"{% if show == 'rejected' %} aria-current="page"{% endif %}>{{ counts.rejected }} rejected</a> · <a href="?show=all#claims"{% if show == 'all' %} aria-current="page"{% endif %}>all</a></p>
+{% regroup rows by year as years %}
+{% for y in years %}<h3 class="space-section">{{ y.grouper }}</h3>
+{% for r in y.list %}<article class="life-claim">
+  <p><strong>{{ r.statement }}</strong> <span class="muted">· {{ r.when }} · {{ r.modality }}{% if r.state != 'proposed' %} · {{ r.state }}{% endif %}</span></p>
+  {% if r.quote %}<blockquote>“{{ r.quote }}”{% if r.evidence_url %} <a href="{{ r.evidence_url }}">open the email</a>{% endif %}</blockquote>{% endif %}
+  {% if r.uncertainty %}<p class="footnote">{{ r.uncertainty }}</p>{% endif %}
+  <form method="post" action="/life/review" class="inline-form">{% csrf_token %}<input type="hidden" name="claim_id" value="{{ r.id }}"><input type="hidden" name="show" value="{{ show }}">
+    {% if r.state == 'proposed' %}<button class="button" name="action" value="accept">Keep</button><button class="button secondary" name="action" value="reject">Reject</button>{% else %}<button class="button secondary" name="action" value="reopen">Undo</button>{% endif %}</form>
+  <details><summary>Correct it</summary>
+  <form method="post" action="/life/review" class="settings-form">{% csrf_token %}<input type="hidden" name="claim_id" value="{{ r.id }}"><input type="hidden" name="action" value="correct"><input type="hidden" name="show" value="{{ show }}">
+    <label>What happened <input name="statement" value="{{ r.statement }}"></label>
+    <label>When, in words <input name="expression" value="{{ r.when }}"></label>
+    <label>From <input type="date" name="earliest" value="{{ r.earliest|default:'' }}"></label>
+    <label>To <input type="date" name="latest" value="{{ r.latest|default:'' }}"></label>
+    <label>Precision <select name="precision"><option value="day"{% if r.precision == 'day' %} selected{% endif %}>Day</option><option value="month"{% if r.precision == 'month' %} selected{% endif %}>Month</option><option value="year"{% if r.precision == 'year' %} selected{% endif %}>Year</option><option value="range"{% if r.precision == 'range' %} selected{% endif %}>Range</option></select></label>
+    <div class="form-actions"><button class="button" type="submit">Save correction</button></div></form></details>
+</article>{% endfor %}{% empty %}<p>{% if show == 'review' %}Nothing to review.{% else %}None here yet.{% endif %}</p>{% endfor %}
 </section>
 {% endblock %}

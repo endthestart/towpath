@@ -44,6 +44,9 @@ def run_once(config, credentials_dir=None):
         indexing += connections.index_pending(config, credentials_dir)
     if credentials_dir is not None:  # folders, when this connector has a data folder
         indexing += folders.index_pending(config, Path(config.store_dir).parent)
+        from towpath import life_propose  # life-story proposals, only once the owner allowed them
+
+        indexing += life_propose.propose_pending(config, credentials_dir)
     return {"searches": search["searches_run"], "fetched": fetched["fetched"],
             "failed": fetched["failed"], "presence_checked": fetched.get("presence_checked", 0),
             "termination": fetched["termination"], "indexing": indexing}
