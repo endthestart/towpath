@@ -53,7 +53,7 @@ jobs:
         run: |
           set -euo pipefail
           uv lock --check
-          uv export --frozen --no-dev --extra web --extra gmail --extra imap --no-emit-project --format requirements-txt -o packaging/requirements-image.txt
+          uv export --frozen --no-dev --extra web --extra gmail --extra imap --extra models --no-emit-project --format requirements-txt -o packaging/requirements-image.txt
           git diff --exit-code packaging/requirements-image.txt
           uv sync --locked --extra dev --python "${{ matrix.python-version }}"
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"

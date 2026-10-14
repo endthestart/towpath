@@ -28,12 +28,13 @@ PAPER_SHA = hashlib.sha256(corpus.docx(corpus.PAPER_TEXT)).hexdigest()
 recoll_only = pytest.mark.skipif(KIND != "recoll", reason="needs the recoll image")
 
 
-def test_mail_and_ui_dependencies_are_available_without_starting_services():
+def test_mail_model_and_ui_dependencies_are_available_without_starting_services():
     python = "python" if KIND == "core" else "/opt/towpath/bin/python"
     result = subprocess.run(
         ["docker", "run", "--rm", "--network", "none", "--read-only", "--entrypoint", python, IMAGE,
-         "-c", "import django, googleapiclient.discovery, google.auth, imapclient; "
-         "from towpath import request_worker"], capture_output=True, text=True, timeout=60)
+         "-c", "import django, googleapiclient.discovery, google.auth, imapclient, openai, jsonschema, json_repair; "
+         "from towpath import request_worker, life_propose; from towpath.models import gateway"],
+        capture_output=True, text=True, timeout=60)
     assert result.returncode == 0, result.stderr
 
 CONFIG = """\
