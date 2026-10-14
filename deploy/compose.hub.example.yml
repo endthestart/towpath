@@ -40,12 +40,16 @@ services:
       timeout: 10s
       retries: 3
 
-  # Runs searches, content requests and the indexing you start on the Connections page. Never on its own.
+  # Runs searches, content requests, the indexing you start or schedule on the Connections page, and the
+  # life-story proposals you allow. On the proxy network too, so it reaches a model server there.
   connect:
     <<: *runtime
     image: ${TOWPATH_RECOLL_IMAGE}
     command: ["connect", "run-worker", "--data-dir", "/data"]
     restart: unless-stopped
+    networks:
+      default: {}
+      proxy: {}
     depends_on:
       connect-setup: {condition: service_healthy}
     group_add: ["${TOWPATH_READ_GROUP:-568}"]

@@ -109,3 +109,38 @@ def test_a_paused_request_does_nothing(world):
     assert life_propose.propose_pending(connections.merged(config, credentials), credentials) == []
     with pytest.raises(ValueError):
         life_propose.set_request(config.store_dir, sid, "2010-01-01", "2009-01-01")
+
+
+def test_a_mail_account_that_stops_pauses_proposing_without_stopping_the_worker(world, monkeypatch):
+    from towpath.adapters import imap
+    from towpath.adapters.errors import AuthStop
+
+    config, credentials, sid, mid, model, state = world
+    life_propose.set_request(config.store_dir, sid, "2009-01-01", "2009-12-31")
+    grants.grant(config.store_dir, sid, "life-evidence")
+    decisions.grant_model(connections.merged(config, None, role="web"), mid, "content")
+    worker = connections.merged(config, credentials)
+    real = imap.ImapConnector.fetch
+    monkeypatch.setattr(imap.ImapConnector, "fetch", lambda *a, **k: (_ for _ in ()).throw(AuthStop("sign in again")))
+    assert life_propose.propose_pending(worker, credentials) == [
+        {"step": "stopped", "reason": "The mail account stopped: sign in again"}]
+    run = life_propose.progress(config.store_dir)
+    assert run["state"] == "stopped" and run["examined"] == 0 and run["retry_at"] > run["stopped_at"]
+    assert life_propose.propose_pending(worker, credentials) == []  # waits for the retry time
+    assert request_worker.run_once(config, credentials)["termination"] == "complete"  # the worker carries on
+    monkeypatch.setattr(imap.ImapConnector, "fetch", real)
+    life_propose.pause(config.store_dir, False)  # the owner presses Try again now
+    assert life_propose.propose_pending(worker, credentials)[0]["proposed_total"] == 2
+    assert life_propose.progress(config.store_dir)["state"] == "running"
+
+
+def test_an_unreachable_model_leaves_messages_unread_for_later(world):
+    config, credentials, sid, mid, model, state = world
+    life_propose.set_request(config.store_dir, sid, "2009-01-01", "2009-12-31")
+    grants.grant(config.store_dir, sid, "life-evidence")
+    decisions.grant_model(connections.merged(config, None, role="web"), mid, "content")
+    model.close()  # the model server is gone
+    worker = connections.merged(config, credentials)
+    assert life_propose.propose_pending(worker, credentials) == [
+        {"step": "stopped", "reason": "Towpath's worker couldn't reach the AI model."}]
+    assert life_propose.progress(config.store_dir)["examined"] == 0

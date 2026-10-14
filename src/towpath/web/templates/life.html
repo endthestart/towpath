@@ -28,7 +28,7 @@
   <label>From <input type="date" name="after" value="{{ default_after }}"></label>
   <label>To <input type="date" name="before" value="{{ default_before }}"></label>
   <button class="button" type="submit">Propose events</button></form>
-{% if status.request %}<form method="post" action="/life/pause" class="inline-form">{% csrf_token %}<input type="hidden" name="pause" value="{% if status.request.state == 'paused' %}0{% else %}1{% endif %}"><button class="button secondary" type="submit">{% if status.request.state == 'paused' %}Resume{% else %}Pause{% endif %}</button></form>{% endif %}
+{% if status.request %}<form method="post" action="/life/pause" class="inline-form">{% csrf_token %}<input type="hidden" name="pause" value="{% if status.request.state == 'paused' or status.run.state == 'stopped' %}0{% else %}1{% endif %}"><button class="button secondary" type="submit">{% if status.request.state == 'paused' %}Resume{% elif status.run.state == 'stopped' %}Try again now{% else %}Pause{% endif %}</button></form>{% endif %}
 </section>
 
 <section class="detail-card" id="claims"><h2 class="card-title">Your events</h2>

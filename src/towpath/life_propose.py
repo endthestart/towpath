@@ -13,7 +13,7 @@ import json
 import re
 import time
 from contextlib import closing
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
 from towpath import life
 from towpath.canonical import digest
@@ -24,6 +24,9 @@ TASK = "life.propose"
 PROMPT_VERSION = "life.propose/1"
 REQUEST_TARGET, REQUEST_KEY = "life:request", "slice"
 SLICE_SECONDS = 90  # per worker poll, so mail checks and searches keep running
+RETRY_SECONDS = 30 * 60  # after the mail account stopped (a sign-in that expired, a server error)
+MODEL_RETRY_SECONDS = 10 * 60  # after the model couldn't be reached
+TRANSIENT = ("APIConnectionError", "APITimeoutError", "InternalServerError", "RateLimitError")
 BATCH = 20  # candidate messages read from the index at a time
 TEXT_LIMIT = 12_000  # characters of a message sent to the model
 EXCERPT_LIMIT = 300
@@ -73,6 +76,13 @@ def request(store_dir) -> dict | None:
         row = db.execute("SELECT value FROM settings WHERE target_id = ? AND key = ?",
                          (REQUEST_TARGET, REQUEST_KEY)).fetchone()
     return json.loads(row[0]) if row else None
+
+
+def _requested_at(store_dir) -> str:
+    """Which change of the owner's request is current: the decision log's sequence, which only grows."""
+    with closing(open_store(store_dir, "decisions", "worker")) as db:
+        row = db.execute("SELECT max(seq) FROM decision_log WHERE kind = 'life-request'").fetchone()
+    return str(row[0] or 0)
 
 
 def set_request(store_dir, source_id: str, after: str, before: str, author: str = "owner") -> dict:
@@ -199,9 +209,23 @@ def claims_from(answer: dict, message: dict, text: str, source_id: str, producer
     return out
 
 
+def _stop(db, rid: str, state: dict, reason: str, retry_seconds: int, requested_at: str) -> list[dict]:
+    """Stop the run with a plain reason, to be tried again later or as soon as the owner changes the request."""
+    retry = datetime.now(timezone.utc) + timedelta(seconds=retry_seconds)
+    state = {**state, "reason": reason, "stopped_at": life.now(), "retry_at": retry.isoformat(timespec="seconds"),
+             "request_at": requested_at}
+    db.execute("UPDATE runs SET state = 'stopped', progress = ? WHERE run_id = ?", (json.dumps(state), rid))
+    db.commit()
+    return [{"step": "stopped", "reason": reason}]
+
+
 def propose_pending(config, credentials_dir, slice_seconds: float = SLICE_SECONDS, clock=time.monotonic) -> list[dict]:
-    """One bounded slice of proposing for the owner's request; nothing happens unless everything is allowed."""
+    """One bounded slice of proposing for the owner's request; nothing happens unless everything is allowed.
+
+    Never raises for a source or model problem: the run stops with a plain reason, shown on the Life page, and
+    is tried again after a while or as soon as the owner resumes."""
     from towpath.adapters import build_connector
+    from towpath.adapters.errors import SyncStop
     from towpath.models import gateway
 
     value = request(config.store_dir)
@@ -209,8 +233,6 @@ def propose_pending(config, credentials_dir, slice_seconds: float = SLICE_SECOND
         return []
     rid = run_id(value)
     endpoint_id = config.tasks[TASK]
-    if gateway.capability_report(config, endpoint_id) is None:
-        gateway.probe(config, endpoint_id)  # synthetic prompts only; needed once per model profile
     deadline = clock() + slice_seconds
     db = open_store(config.store_dir, "life", life.WRITER)
     connector = None
@@ -219,7 +241,23 @@ def propose_pending(config, credentials_dir, slice_seconds: float = SLICE_SECOND
         db.execute("INSERT OR IGNORE INTO runs (run_id, source_id, slice, state, progress, started_at) "
                    "VALUES (?,?,?,?,?,?)", (rid, value["source_id"], json.dumps(value, sort_keys=True), "running",
                                             json.dumps({"examined": 0, "proposed": 0}), now))
-        state = json.loads(db.execute("SELECT progress FROM runs WHERE run_id = ?", (rid,)).fetchone()[0])
+        run_state, raw_state = db.execute("SELECT state, progress FROM runs WHERE run_id = ?", (rid,)).fetchone()
+        state = {k: v for k, v in json.loads(raw_state).items()
+                 if k not in ("reason", "stopped_at", "retry_at", "request_at")}
+        requested_at = _requested_at(config.store_dir)
+        if run_state == "stopped":
+            stopped = json.loads(raw_state)
+            if now < stopped.get("retry_at", "") and requested_at == stopped.get("request_at"):
+                return []  # wait for the retry time, or for the owner to resume
+            db.execute("UPDATE runs SET state = 'running', progress = ? WHERE run_id = ?", (json.dumps(state), rid))
+            db.commit()
+        report = gateway.capability_report(config, endpoint_id)
+        if report is None or not report["capabilities"].get("chat"):
+            gateway.probe(config, endpoint_id)  # synthetic prompts only
+            report = gateway.capability_report(config, endpoint_id)
+            if report is None or not report["capabilities"].get("chat"):
+                return _stop(db, rid, state, "Towpath's worker couldn't reach the AI model.", MODEL_RETRY_SECONDS,
+                             requested_at)
         examined = {r[0] for r in db.execute("SELECT item_id FROM examined WHERE run_id = ?", (rid,))}
         batch = _candidates(config, value, examined, BATCH)
         if not batch:
@@ -227,7 +265,6 @@ def propose_pending(config, credentials_dir, slice_seconds: float = SLICE_SECOND
                        (now, rid))
             db.commit()
             return []
-        connector = build_connector(config.sources[value["source_id"]], config)
         producer = f"model:{config.endpoints[endpoint_id].model}/{PROMPT_VERSION}"
         done = []
         for message in batch:
@@ -235,7 +272,16 @@ def propose_pending(config, credentials_dir, slice_seconds: float = SLICE_SECOND
                 break
             outcome, proposed = "no-text", 0
             if message["part"] is not None:
-                raw = connector.fetch(message["native_id"], message["part"]["part_id"])
+                try:
+                    if connector is None:
+                        connector = build_connector(config.sources[value["source_id"]], config)
+                    raw = connector.fetch(message["native_id"], message["part"]["part_id"])
+                except SyncStop as exc:
+                    return _stop(db, rid, state, f"The mail account stopped: {exc.reason}", RETRY_SECONDS,
+                                 requested_at)
+                except Exception as exc:  # noqa: BLE001 - never stop the worker; keep data out of the reason
+                    return _stop(db, rid, state, f"Reading mail stopped on an unexpected error "
+                                                 f"({type(exc).__name__}).", RETRY_SECONDS, requested_at)
                 text = _text(raw, message["part"])[:TEXT_LIMIT]
                 prompt = (f"{INSTRUCTION}\n\nEmail date: {message['date']}\nFrom: {message['from']}\n"
                           f"Subject: {message['subject']}\n\n{text}")
@@ -246,7 +292,10 @@ def propose_pending(config, credentials_dir, slice_seconds: float = SLICE_SECOND
                     found = claims_from(result["output"], message, text, value["source_id"], producer)
                     proposed = sum(life.save(db, c, value["source_id"], rid) for c in found)
                 elif outcome in ("refused", "disabled"):
-                    break  # a grant or the model changed: stop, and say why on the Life page
+                    break  # a grant or the model changed: the Life page says why
+                elif any(t in (result.get("reason") or "") for t in TRANSIENT):
+                    return _stop(db, rid, state, "The AI model didn't answer; Towpath tries again shortly.",
+                                 MODEL_RETRY_SECONDS, requested_at)  # this message stays unread, to be tried again
             db.execute("INSERT OR REPLACE INTO examined (run_id, item_id, outcome, at) VALUES (?,?,?,?)",
                        (rid, message["item_id"], outcome, life.now()))
             state = {"examined": state["examined"] + 1, "proposed": state["proposed"] + proposed,
