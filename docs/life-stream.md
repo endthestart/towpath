@@ -83,3 +83,28 @@ An owner-only item can still be fine for a local model; a shareable item can sti
 ## Family edition (long term)
 
 A curated selection of accepted claims with `shareable` audience and recollections, released after review, exported in an open format with its citations. Not designed in detail yet.
+
+## Open design questions (first build, 2026-10-14)
+
+The first proposal job is deliberately simple, so the owner can review real output before these are decided:
+it reads messages whose subject suggests a life event (bookings, orders, appointments, jobs, school,
+celebrations), newest first within the period the owner chose, and keeps every event whose quote appears in
+its message. Nothing is ranked, merged or summarised yet.
+
+- **Selection.** Subject words favour commerce and miss personal correspondence, which may matter most. Other
+  signals: mail the owner sent or replied to, long threads, people written to often.
+- **Salience.** How much correspondence with a person, or about a topic, in a period suggests what mattered
+  then: a burst of mail with someone could raise every event with them in that period. Size, recurrence (a
+  monthly bill versus a one-off) and the owner's own replies are other signals.
+- **Granularity and grouping.** One message gives one or more events today, so one trip can appear as a
+  booking, a flight, a hotel and receipts. Episodes ("Trip to Example City") could gather them, using the
+  claims' `same-event` relations. Copies of the same mail in two accounts can propose the same event twice.
+- **Chapters.** Jobs, homes, schools and relationships are periods, not points; a story probably needs both.
+- **People and places.** Participants and places from mail and contacts, with the frequency signals above.
+- **Plans versus what happened.** A booking supports a plan; photos taken there, or receipts on the day,
+  could support that it happened.
+- **Review load.** Showing every event at once won't scale: top events per month or year, review in batches,
+  and the owner's rejections teaching what isn't interesting.
+- **Coverage and cost.** Which messages are worth sending to a model, sampling across years, and how far the
+  first pass should go before the owner reviews.
+- **Other sources.** Photo dates and places, documents and calendars, once those sources are connected.
