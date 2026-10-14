@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block title %}Life · Towpath{% endblock %}
+{% block content %}
+<header class="page-head compact"><h1>Life</h1>
+<p class="lead">Towpath proposes dated events from your own records, each with the evidence it rests on. You accept, correct or reject them; your decisions are kept when proposals are made again.</p></header>
+{% if saved %}<div class="notice" role="status">Saved.</div>{% endif %}
+
+<section class="detail-card"><h2 class="card-title">Which mail the life story may use</h2>
+{% for a in accounts %}<form method="post" action="/life/account" class="inline-form">{% csrf_token %}<input type="hidden" name="source_id" value="{{ a.source_id }}"><input type="hidden" name="allow" value="{% if a.allowed %}0{% else %}1{% endif %}">
+  <span><strong>{{ a.name }}</strong> — {% if a.allowed %}used for your life story{% else %}not used{% endif %}</span>
+  <button class="button secondary" type="submit">{% if a.allowed %}Stop using it{% else %}Use it{% endif %}</button></form>
+{% empty %}<p>No mail accounts yet. <a href="/connections/">Connect one</a>.</p>{% endfor %}
+</section>
+
+<section class="detail-card"><h2 class="card-title">The AI model that proposes events</h2>
+{% if model %}<form method="post" action="/life/model" class="inline-form">{% csrf_token %}<input type="hidden" name="endpoint_id" value="{{ model.id }}"><input type="hidden" name="allow" value="{% if model.allowed %}0{% else %}1{% endif %}">
+  <span><strong>{{ model.name }}</strong> at {{ model.address }} — {% if model.allowed %}may read the text of the mail you chose above{% else %}receives no personal content yet{% endif %}</span>
+  <button class="button{% if model.allowed %} secondary{% endif %}" type="submit">{% if model.allowed %}Stop sending email text{% else %}Allow sending email text{% endif %}</button></form>
+<p class="footnote">Allowing it covers this model at this address with this token only. Change any of them and Towpath asks again.</p>
+{% else %}<p>No AI model is connected. <a href="/connections/add/model">Add one on the Connections page</a>.</p>{% endif %}
+</section>
+
+<section class="detail-card"><h2 class="card-title">Proposed events</h2>
+{% if claims %}<p>{{ counts.proposed }} to review, {{ counts.accepted }} accepted, {{ counts.corrected }} corrected, {{ counts.rejected }} rejected.</p>
+{% else %}<p>None yet. Proposals start once a mail account and the model are allowed above.</p>{% endif %}
+</section>
+{% endblock %}

@@ -71,6 +71,33 @@ def mark_folder(store_dir, provider_id: str, root: str, path: str, keep: bool, a
         db.close()
 
 
+def revoke_model(config, endpoint_id: str, data_class: str, author: str = "local-user") -> bool:
+    """Withdraw a data class from one endpoint, whatever fingerprint it was granted under."""
+    db = open_store(config.store_dir, "decisions", ROLE)
+    removed = db.execute("DELETE FROM model_grants WHERE endpoint_id = ? AND data_class = ?",
+                         (endpoint_id, data_class)).rowcount
+    db.execute("INSERT INTO decision_log (kind, target_id, detail, author, at) VALUES ('model-revoke', ?, ?, ?, ?)",
+               (endpoint_id, json.dumps({"data_class": data_class}), author, now()))
+    db.commit()
+    db.close()
+    return removed > 0
+
+
+def model_granted(config, endpoint_id: str, data_class: str) -> bool:
+    """Whether the owner allowed a data class on the endpoint as it is configured now."""
+    from towpath.models.profiles import fingerprint
+
+    endpoint = config.endpoints.get(endpoint_id)
+    if endpoint is None:
+        return False
+    db = open_store(config.store_dir, "decisions", ROLE)
+    try:
+        return db.execute("SELECT 1 FROM model_grants WHERE endpoint_id = ? AND fingerprint = ? AND data_class = ?",
+                          (endpoint_id, fingerprint(endpoint), data_class)).fetchone() is not None
+    finally:
+        db.close()
+
+
 def grant_model(config, endpoint_id: str, data_class: str, author: str = "local-user") -> str:
     """Allow a data class on one endpoint, tied to its current fingerprint."""
     from towpath.config import DATA_CLASSES
