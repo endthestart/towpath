@@ -6,11 +6,13 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `0269418` (life story foundation, with the model libraries now in both images), publishing run
-[38609539366](https://github.com/endthestart/towpath/actions/runs/38609539366):
+Revision `96d67a7` (life-story proposals stop cleanly when a source or the model fails; an expired sign-in is
+explained; Connect and Reconnect Gmail reach Google's sign-in page), publishing run
+[38625253772](https://github.com/endthestart/towpath/actions/runs/38625253772). The connect service now joins the
+proxy network too, so the worker reaches a model server there.
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:f21b860a835ae4474d657c4a2d1de8778c2395a5228f311aa565a50dae44d900`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:6b1fb565d1f2b28cf0b7a44680a58f59af4dd92e28a243b67b27a7942ddecc7a`
+- `web`: `ghcr.io/endthestart/towpath@sha256:a7650b0135344106f00952f3d8d9f304478d2cf01729139ebd931db47af4aebe`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:984615454ab7fd559c415c75ac3921ae1818d711faa4ce83b8b130522d146dcb`
 
 Towpath's data folder (stores, sign-ins and the Recoll index) lives on a mirrored SSD pool since 2026-10-08,
 with hourly snapshots replicated to the main pool: Recoll's index writes had saturated the spinning disks. The
@@ -25,6 +27,7 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `0269418` | Life story foundation with the model libraries in the images | `towpath@sha256:f21b860a…`, `towpath-recoll@sha256:6b1fb565…` |
 | `458d1c4` | Life story foundation; adding a model connection failed (model libraries missing from the images) | `towpath@sha256:0bbc7b49…`, `towpath-recoll@sha256:3cf776cc…` |
 | `2006f84` | Space shows what Keep did; schedules per connection | `towpath@sha256:0dd4f6d7…`, `towpath-recoll@sha256:fa10ee9f…` |
 | `277261c` | Keep folders off Space's clutter list; archives and mailboxes; SQLite temp files on the data folder | `towpath@sha256:0bf3b553…`, `towpath-recoll@sha256:6381d07d…` |
