@@ -6,13 +6,13 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `96d67a7` (life-story proposals stop cleanly when a source or the model fails; an expired sign-in is
-explained; Connect and Reconnect Gmail reach Google's sign-in page), publishing run
-[38625253772](https://github.com/endthestart/towpath/actions/runs/38625253772). The connect service now joins the
+Revision `1b29e1e` (life-story proposals skip marketing and spam, rate each event's significance and keep
+everyday events under Minor; a busy model is waited for), publishing run
+[38679907267](https://github.com/endthestart/towpath/actions/runs/38679907267). The connect service joins the
 proxy network too, so the worker reaches a model server there.
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:a7650b0135344106f00952f3d8d9f304478d2cf01729139ebd931db47af4aebe`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:984615454ab7fd559c415c75ac3921ae1818d711faa4ce83b8b130522d146dcb`
+- `web`: `ghcr.io/endthestart/towpath@sha256:73c8a3f75236d78da7b002b303290bbed3ad8f666110f4112d2d7bfd516b8f23`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:a3348cc83c46a62155eac4f3ae6d411f5bb4f02632f4adae63d02373a8afa840`
 
 Towpath's data folder (stores, sign-ins and the Recoll index) lives on a mirrored SSD pool since 2026-10-08,
 with hourly snapshots replicated to the main pool: Recoll's index writes had saturated the spinning disks. The
@@ -27,6 +27,8 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `216cc2c` | Proposals skip marketing and spam and rate significance; a busy model failed each email instead of waiting | `towpath@sha256:9f018712…`, `towpath-recoll@sha256:90c796ee…` |
+| `96d67a7` | Proposals stop cleanly on source or model problems; expired sign-ins explained; Gmail sign-in page reachable | `towpath@sha256:a7650b01…`, `towpath-recoll@sha256:98461545…` |
 | `0269418` | Life story foundation with the model libraries in the images | `towpath@sha256:f21b860a…`, `towpath-recoll@sha256:6b1fb565…` |
 | `458d1c4` | Life story foundation; adding a model connection failed (model libraries missing from the images) | `towpath@sha256:0bbc7b49…`, `towpath-recoll@sha256:3cf776cc…` |
 | `2006f84` | Space shows what Keep did; schedules per connection | `towpath@sha256:0dd4f6d7…`, `towpath-recoll@sha256:fa10ee9f…` |
