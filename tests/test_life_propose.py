@@ -192,3 +192,16 @@ def test_a_new_prompt_reads_again_but_leaves_what_the_owner_decided(world, monke
     assert len(email_prompts(model)) == before + 1  # the rejected receipt isn't read again
     now = {c.statement: c.state for c in life.claims(config.store_dir)}
     assert now == {"Ordered a red bicycle": "rejected", "Booked a stay at Example Junction": "proposed"}
+
+
+def test_a_busy_model_is_waited_for_and_nothing_is_marked_read(world, monkeypatch):
+    from towpath.models import gateway
+
+    config, credentials, sid, mid, model, state = world
+    worker = allow(config, sid, mid)
+    busy = {"status": "manual-review", "reason": "json_schema: ConflictError; prompt: ConflictError"}
+    monkeypatch.setattr(gateway, "infer", lambda *a, **k: busy)  # Poundlock answers 409 while serving someone else
+    assert life_propose.propose_pending(worker, credentials) == [
+        {"step": "stopped", "reason": "The AI model is busy with another request; Towpath tries again in a minute."}]
+    run = life_propose.progress(config.store_dir)
+    assert run["examined"] == 0 and run["state"] == "stopped"

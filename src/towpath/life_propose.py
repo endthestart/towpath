@@ -31,7 +31,9 @@ REQUEST_TARGET, REQUEST_KEY = "life:request", "slice"
 SLICE_SECONDS = 90  # per worker poll, so mail checks and searches keep running
 RETRY_SECONDS = 30 * 60  # after the mail account stopped (a sign-in that expired, a server error)
 MODEL_RETRY_SECONDS = 10 * 60  # after the model couldn't be reached
+BUSY_RETRY_SECONDS = 60  # a gateway serving one request at a time answers 409 while it's busy
 TRANSIENT = ("APIConnectionError", "APITimeoutError", "InternalServerError", "RateLimitError")
+BUSY = ("ConflictError",)
 BATCH = 20  # candidate messages read from the index at a time
 TEXT_LIMIT = 12_000  # characters of a message sent to the model
 EXCERPT_LIMIT = 300
@@ -344,6 +346,9 @@ def propose_pending(config, credentials_dir, slice_seconds: float = SLICE_SECOND
                     proposed = sum(life.save(db, c, value["source_id"], rid) for c in found)
                 elif outcome in ("refused", "disabled"):
                     break  # a grant or the model changed: the Life page says why
+                elif any(t in (result.get("reason") or "") for t in BUSY):
+                    return _stop(db, rid, state, "The AI model is busy with another request; Towpath tries again in "
+                                                 "a minute.", BUSY_RETRY_SECONDS, requested_at)  # stays unread
                 elif any(t in (result.get("reason") or "") for t in TRANSIENT):
                     return _stop(db, rid, state, "The AI model didn't answer; Towpath tries again shortly.",
                                  MODEL_RETRY_SECONDS, requested_at)  # this message stays unread, to be tried again
