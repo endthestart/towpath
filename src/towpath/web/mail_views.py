@@ -22,6 +22,7 @@ from towpath.unified import grants
 MAIL_STORES = ("decisions", "connections")
 PAGE = 100
 MESSAGE_ACTIONS = ("mark_read", "mark_unread", "flag", "unflag", "archive", "trash")
+WAITING_SHOWN = 30
 OUTCOMES = {"done": "Done", "dry-run": "Dry run", "skipped": "Skipped", "refused": "Refused", "failed": "Failed"}
 
 
@@ -90,10 +91,14 @@ def _undone(rows: list[dict], waiting: list[dict]) -> set[str]:
     return {r["key"] for r in rows if f"undo:{actions.proposal_id(r['body'])}" in producers}
 
 
-def _activity(source_id: str | None = None) -> dict:
-    rows = executor.receipts(_store(), source_id, limit=50)
-    waiting = [w for w in executor.pending(_store(), role="web") if source_id in (None, w["source_id"])]
-    undone = _undone(rows, waiting)
+def _activity(source_id: str | None = None, item_id: str | None = None) -> dict:
+    rows = executor.receipts(_store(), source_id, limit=50 if item_id is None else 10**6)
+    everything = [w for w in executor.pending(_store(), role="web") if source_id in (None, w["source_id"])]
+    if item_id is not None:  # one message's changes, however many others are waiting
+        rows = [r for r in rows if r["body"]["target"].get("item_id") == item_id]
+        everything = [w for w in everything if w["body"]["target"].get("item_id") == item_id]
+    undone = _undone(rows, everything)
+    waiting = everything[:WAITING_SHOWN]
     names = _subjects([b["body"]["target"]["item_id"] for b in rows + waiting if b["body"]["target"].get("item_id")])
     for r in rows + waiting:
         target = r["body"]["target"]
@@ -102,7 +107,7 @@ def _activity(source_id: str | None = None) -> dict:
             "subject": target.get("sender") or target.get("message_id") or "a new message"}
         r["outcome_text"] = OUTCOMES.get(r.get("outcome"), "Waiting")
         r["can_undo"] = r.get("outcome") == "done" and r.get("inverse") and r["key"] not in undone
-    return {"receipts": rows, "waiting": waiting}
+    return {"receipts": rows, "waiting": waiting, "waiting_total": len(everything)}
 
 
 def _proposals() -> list[dict]:
@@ -354,7 +359,7 @@ def reader(request, item_id):
             "SELECT item_id, subject, from_name, from_addr, date_utc, mailbox FROM messages WHERE source_id = ? AND "
             "thread_key = ? ORDER BY date_utc", (m["source_id"], m["thread_key"]))]
     present = _present([m["item_id"]])
-    activity = _activity(m["source_id"])
+    activity = _activity(m["source_id"], item_id)
     mine = [r for r in activity["receipts"] + activity["waiting"] if r["body"]["target"].get("item_id") == item_id]
     choices = [(k, actions.TYPES[k]["label"]) for k in MESSAGE_ACTIONS
                if not (k == "mark_read" and not m["unread"]) and not (k == "mark_unread" and m["unread"])
