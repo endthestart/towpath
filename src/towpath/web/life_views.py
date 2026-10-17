@@ -174,7 +174,8 @@ def year(request, year):
     mail_peak = max((m["received"] + m["sent"] for m in found["months"]), default=0)
     return render(request, "life_year.html", {
         "nav": "life", "y": found, "age": _age(life_groups.profile(store).get("birthday"), year),
-        "previous": str(int(year) - 1), "next": str(int(year) + 1), "peak": peak or 1, "mail_peak": mail_peak or 1})
+        "previous": str(int(year) - 1), "next": str(int(year) + 1) if int(year) < date.today().year else None,
+        "peak": peak or 1, "mail_peak": mail_peak or 1})
 
 
 @require_GET

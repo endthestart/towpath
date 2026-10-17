@@ -4,13 +4,14 @@
 <a class="back-link" href="/life/timeline">← Timeline</a>
 <header class="page-head compact"><p class="eyebrow">LIFE{% if age is not None %} · AGE {{ age }}{% endif %}</p><h1>{{ y.year }}</h1>
 <p class="lead">{% if y.totals.photos %}<a href="/photos/?after={{ y.year }}-01-01&amp;before={{ y.year }}-12-31">{{ y.totals.photos }} photos</a> · {% endif %}{{ y.totals.received }} emails received, {{ y.totals.sent }} sent · {{ y.events|length }} event{{ y.events|length|pluralize }}</p>
-<p><a href="/life/year/{{ previous }}">← {{ previous }}</a> · <a href="/life/year/{{ next }}">{{ next }} →</a></p></header>
+<p><a href="/life/year/{{ previous }}">← {{ previous }}</a>{% if next %} · <a href="/life/year/{{ next }}">{{ next }} →</a>{% endif %}</p></header>
 {% if y.year_events %}<section class="detail-card"><h2 class="card-title">During the year</h2>
 {% for e in y.year_events %}<p>{{ e.statement }} <span class="muted">· {{ e.when }} · {{ e.state }}</span>{% if e.evidence_url %} <a href="{{ e.evidence_url }}">source</a>{% endif %}</p>{% endfor %}</section>{% endif %}
 <section class="detail-card"><h2 class="card-title">Month by month</h2>
 <table class="space-table"><thead><tr><th>Month</th><th>Photos</th><th>Mail in</th><th>Mail out</th><th>Events</th></tr></thead><tbody>
-{% for m in y.months %}<tr><td>{{ m.label }}</td><td>{{ m.photos|default:"" }}</td><td>{{ m.received|default:"" }}</td><td>{{ m.sent|default:"" }}</td>
-<td>{% for e in m.events %}{{ e.statement }}{% if e.evidence_url %} <a href="{{ e.evidence_url }}" aria-label="Source for {{ e.statement }}">↗</a>{% endif %}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td></tr>{% endfor %}</tbody></table></section>
+{% for m in y.months %}{% if m.photos or m.received or m.sent or m.events %}<tr><td>{{ m.label }}</td><td>{{ m.photos|default:"" }}</td><td>{{ m.received|default:"" }}</td><td>{{ m.sent|default:"" }}</td>
+<td>{% for e in m.events %}{{ e.statement }}{% if e.evidence_url %} <a href="{{ e.evidence_url }}" aria-label="Source for {{ e.statement }}">↗</a>{% endif %}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td></tr>{% endif %}{% empty %}{% endfor %}</tbody></table>
+{% if not y.totals.photos and not y.totals.received and not y.totals.sent and not y.events %}<p>Nothing in Towpath's records for this year yet.</p>{% endif %}</section>
 {% if y.days %}<section class="detail-card"><h2 class="card-title">Days with the most photos</h2>
 {% for d in y.days %}<p><a href="/photos/?after={{ d.0 }}&amp;before={{ d.0 }}">{{ d.0 }}</a> <span class="muted">· {{ d.1 }} photos</span></p>{% endfor %}
 {% if y.cameras %}<p class="footnote">Cameras: {% for c in y.cameras %}{{ c.0 }} ({{ c.1 }}){% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}</section>{% endif %}
