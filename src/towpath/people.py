@@ -75,6 +75,9 @@ def person(store_dir, address: str, role: str = "web") -> dict:
     events = [c for c in life.claims(store_dir, limit=10**6, role=role)
               if c.state != "rejected" and any(cit.ref in native for cit in c.citations)]
     years = sorted(set(by_year) | set(sent_by_year), reverse=True)
+    dated = [y for y in years if y]
     return {"address": address, "name": names.get(address), "years": [
-        {"year": y, "received": by_year.get(y, 0), "sent": sent_by_year.get(y, 0)} for y in years if y],
-            "conversations": conversations, "events": events}
+        {"year": y, "received": by_year.get(y, 0), "sent": sent_by_year.get(y, 0)} for y in dated],
+            "conversations": conversations, "events": events, "accounts": _managed(store_dir),
+            "received": sum(by_year.values()), "sent": sum(sent_by_year.values()),
+            "span": (min(dated), max(dated)) if dated else None}

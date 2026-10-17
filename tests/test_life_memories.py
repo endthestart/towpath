@@ -196,6 +196,7 @@ def test_people_pages(world, monkeypatch):
         assert "sam@example.org" in client.get("/people/?q=sam").content.decode()
         page = client.get("/people/sam@example.org/").content.decode()
         assert "Helped Sam move" in page and "Saturday?" in page
+        assert "1 from them, 1 from you" in page and f"/mail/{world.sid}/search?q=from%3Asam%40example.org" in page
 
 
 def test_the_owners_own_memories(world, monkeypatch):
