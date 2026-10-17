@@ -30,6 +30,7 @@
 {% include '_deep_search.html' %}
 {% endif %}
 
+{% if people %}<section class="detail-card"><h2 class="card-title">People</h2>{% for p in people %}<p><a href="/people/{{ p.address|urlencode }}/">{{ p.name|default:p.address }}</a>{% if p.name %} <span class="muted">· {{ p.address }}</span>{% endif %}{% if p.messages %} <span class="muted">· {{ p.messages }} message{{ p.messages|pluralize }}</span>{% endif %}</p>{% endfor %}</section>{% endif %}
 <section class="index-results">
   <div class="result-heading"><h2>Subjects, senders and names</h2>{% if groups|length == 1 %}<span class="result-meta">{{ groups.0.summary }}{% if next_url and groups.0.more %} · <a href="{{ next_url }}">Next {{ page_size }} →</a>{% endif %}</span>{% endif %}</div>
   {% include '_groups.html' with groups=groups empty_text='No matches in subjects, senders or names.' %}

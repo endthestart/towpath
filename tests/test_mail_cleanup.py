@@ -248,3 +248,15 @@ def test_clean_up_never_includes_flagged_mail(world):
         db.commit()
     after = {m["subject"] for m in candidates(world.store, world.sid, criteria)}
     assert "Weekly deals" not in after and after == before - {"Weekly deals"}
+
+
+def test_search_all_lists_matching_people(world, monkeypatch):
+    monkeypatch.setattr(auth, "_setup_codes", {})
+    configure(world.store)
+    auth.create_account(world.store, "owner", OWNER)
+    with override_settings(TOWPATH_STORE_DIR=world.store, TOWPATH_CONFIG=world.worker(), ALLOWED_HOSTS=["testserver"]):
+        client = Client()
+        client.post("/login", {"username": "owner", "password": OWNER})
+        page = client.get("/search/", {"q": "sam"}).content.decode()
+        assert "/people/sam%40example.org/" in page
+        assert "card-title\">People<" not in client.get("/search/", {"q": "zebra"}).content.decode()

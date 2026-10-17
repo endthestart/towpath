@@ -121,6 +121,12 @@ def search(request):
         else:
             context.update(response=response, groups=_present(response, labels, types), filters=filters,
                            reasons=present.reasons(response, labels), first_page=cursor is None, page_size=PAGE)
+            if cursor is None and filters.words:  # people whose name or address has every word
+                from towpath import people
+
+                words = [w.lower() for w in filters.words]
+                context["people"] = [p for p in people.everyone(_store(), limit=2000)
+                                     if all(w in f"{p['name'] or ''} {p['address']}".lower() for w in words)][:6]
             if response["next_cursor"]:
                 context["next_url"] = _search_url(query, chosen) + "&" + urlencode({"cursor": response["next_cursor"]})
             if not filters.metadata_only and deep:
