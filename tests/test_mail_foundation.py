@@ -208,11 +208,28 @@ def test_a_requested_change_is_a_dry_run_until_its_type_is_turned_on(env):
     assert len(env.receipts()) == 1
 
 
+def test_dry_runs_only_overrides_turned_on_types(env):
+    env.index()
+    env.manage()
+    env.analyze()
+    env.give_write_password()
+    settings.set_enabled_types(env.store, SID, {"mark_read"})
+    assert settings.dry_run(env.store, SID)  # on until the owner turns it off
+    env.ask("mark_read", "Lunch on Friday?")
+    env.run()
+    assert env.receipts()["req_000001"]["outcome"] == "dry-run" and env.state.writes == []
+    settings.set_dry_run(env.store, SID, False)
+    env.ask("mark_read", "Lunch on Friday?")
+    env.run()
+    assert env.receipts()["req_000002"]["outcome"] == "done"
+
+
 def test_without_the_write_password_a_turned_on_type_is_still_a_dry_run(env):
     env.index()
     env.manage()
     env.analyze()
     settings.set_enabled_types(env.store, SID, {"mark_read"})
+    settings.set_dry_run(env.store, SID, False)
     env.ask("mark_read", "Lunch on Friday?")
     env.run()
     assert env.receipts()["req_000001"]["outcome"] == "dry-run"
@@ -225,6 +242,7 @@ def test_turned_on_changes_are_carried_out_with_receipts_and_undo(env):
     env.analyze()
     env.give_write_password()
     settings.set_enabled_types(env.store, SID, {"mark_read", "archive", "move"})
+    settings.set_dry_run(env.store, SID, False)
     env.ask("mark_read", "Lunch on Friday?")
     env.ask("archive", "October offers")
     env.run()
@@ -251,6 +269,7 @@ def test_a_change_to_a_message_that_moved_is_skipped(env):
     env.analyze()
     env.give_write_password()
     settings.set_enabled_types(env.store, SID, {"flag"})
+    settings.set_dry_run(env.store, SID, False)
     env.ask("flag", "Lunch on Friday?")
     box = env.state.mailboxes["INBOX"]
     env.state.mailboxes["Archive"].messages[1] = box.messages.pop(1)  # moved on the phone meanwhile
@@ -303,6 +322,7 @@ def test_a_draft_is_appended_to_drafts_and_undo_moves_it_to_trash(env):
     env.manage()
     env.give_write_password()
     settings.set_enabled_types(env.store, SID, {"draft", "trash"})
+    settings.set_dry_run(env.store, SID, False)
     raw = reply(9, "Re: Lunch on Friday?", "Noon is perfect.").decode()
     settings.ask(env.store, SID, actions.make(SID, "draft", {"mailbox_role": "drafts"}, {"message": raw}))
     env.run()

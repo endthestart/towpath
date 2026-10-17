@@ -28,6 +28,7 @@ urlpatterns = [
     path("mail/manage", mail_views.manage, name="mail-manage"),
     path("mail/pause", mail_views.pause, name="mail-pause"),
     path("mail/writes", mail_views.writes, name="mail-writes"),
+    path("mail/dry-run", mail_views.dry_run, name="mail-dry-run"),
     path("mail/answer", mail_views.answer, name="mail-answer"),
     path("mail/undo", mail_views.undo, name="mail-undo"),
     path("mail/act", mail_views.act, name="mail-act"),

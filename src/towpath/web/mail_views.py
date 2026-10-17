@@ -51,6 +51,7 @@ def _accounts(config) -> list[dict]:
             "enabled_labels": [actions.TYPES[k]["label"] for k in actions.TYPES
                                if k in mail_settings.enabled_types(_store(), sid, role="web")],
             "paused": mail_settings.paused(_store(), sid, role="web"),
+            "dry_run": mail_settings.dry_run(_store(), sid, role="web"),
             "progress": analysis.progress(_store(), sid), "watch": watch.state(_store(), sid)})
     return out
 
@@ -149,6 +150,15 @@ def writes(request):
     chosen = set(request.POST.getlist("types")) & set(actions.TYPES)
     mail_settings.set_enabled_types(_store(), sid, chosen)
     return redirect("/mail/?saved=writes")
+
+
+@require_POST
+def dry_run(request):
+    sid = request.POST.get("source_id", "")
+    if not _account(_config(), sid)["managed"]:
+        return HttpResponseBadRequest("Turn mail management on for this account first.")
+    mail_settings.set_dry_run(_store(), sid, request.POST.get("dry_run") == "1")
+    return redirect("/mail/?saved=dry-run")
 
 
 @require_POST

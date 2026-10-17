@@ -3,9 +3,10 @@
 Inputs are changes the owner asked for directly (``maildecisions`` requests) and proposals the owner approved
 (``mailplan`` proposals with a matching answer in ``maildecisions``). It ignores classifications,
 model output and anything else. Before acting it checks the digest, the type, the owner's per-type switch and the
-message itself (identity, and Message-ID where known). An action type the owner hasn't turned on, or an account
-without a write password, runs as a **dry run**: the message is checked through the read-only connection and the
-receipt says what would have changed. Every request gets exactly one receipt; a receipt is never replaced.
+message itself (identity, and Message-ID where known). While the account's "dry runs only" switch is on, or for
+an action type the owner hasn't turned on, or an account without a write password, a change runs as a **dry
+run**: the message is checked through the read-only connection and the receipt says what would have changed.
+Every request gets exactly one receipt; a receipt is never replaced.
 
 :class:`ActSession` is the whole write surface: SELECT, UID STORE of ``\\Seen``, ``\\Flagged`` and labels (never
 ``\\Deleted``), UID MOVE to an existing mailbox, APPEND to Drafts or the inbox, and UNSELECT. There is no EXPUNGE,
@@ -328,7 +329,8 @@ def run_pending(config, credentials_dir, limit: int = LIMIT, pause: float = PAUS
     try:
         for sid, items in by_source.items():
             source = config.sources[sid]
-            enabled = settings.enabled_types(config.store_dir, sid)
+            dry = settings.dry_run(config.store_dir, sid)
+            enabled = set() if dry else settings.enabled_types(config.store_dir, sid)
             secret = password_path(credentials_dir, sid)
             reader, act, counts = None, None, {}
             try:

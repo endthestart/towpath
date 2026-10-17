@@ -112,6 +112,9 @@ def test_turned_on_changes_happen_and_can_be_undone(mail):
     connections.save_write_password(env.store, env.credentials, sid, WRITE_PASSWORD,
                                     connections.test_write_imap(env.settings, WRITE_PASSWORD))
     assert client.post("/mail/writes", {"source_id": sid, "types": ["archive", "move", "bogus"]}).status_code == 302
+    assert "Dry runs only." in client.get("/mail/").content.decode()
+    client.post("/mail/dry-run", {"source_id": sid, "dry_run": "0"})
+    assert "Live." in client.get("/mail/").content.decode()
     message = item_id(env, "Lock report 5")
     client.post("/mail/act", {"item_id": message, "type": "archive"})
     client.post("/mail/act", {"item_id": item_id(env, "Lock report 4"), "type": "mark_read"})  # off: a dry run

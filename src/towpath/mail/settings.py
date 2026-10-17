@@ -2,8 +2,9 @@
 
 - Which accounts are managed: the ``mail-manage`` source grant (towpath.unified.grants).
 - Whether reading an account's mail is paused.
-- Which action types may change mail. A type not listed runs as a dry run: the action runner checks the message
-  and records what it would have done, and changes nothing. All types start off.
+- Dry runs only: an account-wide switch, on until the owner turns it off. While it is on, nothing changes mail.
+- Which action types may change mail once dry runs are off. A type not listed still runs as a dry run: the action
+  runner checks the message and records what it would have done, and changes nothing. All types start off.
 Answers to proposed changes, tied to the digest of what was proposed, and changes the owner asks for directly (a
 button on a message, Undo) live in their own store, ``maildecisions``, also written only by the web role.
 """
@@ -59,6 +60,15 @@ def paused(store_dir, source_id: str, role: str = "connect") -> bool:
 
 def set_paused(store_dir, source_id: str, value: bool, author: str = "owner") -> None:
     _set(store_dir, source_id, "analysis", "paused" if value else "running", "mail-analysis", author)
+
+
+def dry_run(store_dir, source_id: str, role: str = "act") -> bool:
+    """Whether every change to this account is a dry run. On unless the owner turned it off."""
+    return _get(store_dir, source_id, "dry_run", role) is not False
+
+
+def set_dry_run(store_dir, source_id: str, value: bool, author: str = "owner") -> None:
+    _set(store_dir, source_id, "dry_run", bool(value), "mail-dry-run", author)
 
 
 def enabled_types(store_dir, source_id: str, role: str = "act") -> set[str]:
