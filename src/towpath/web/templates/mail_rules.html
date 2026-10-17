@@ -6,8 +6,10 @@
 <p class="lead">Rules look at your mail and propose changes. A rule asks you first until you switch it to <em>automatic</em>, and automatic rules still only make dry runs while the account is in dry runs only. Moving to Trash always asks.</p></header>
 {% if saved %}<div class="notice" role="status">Saved.</div>{% endif %}
 <section class="detail-card"><form method="post" action="/mail/{{ account.source_id }}/rules/describe" class="search">{% csrf_token %}<label for="description" class="sr-only">Describe a rule</label><input id="description" name="description" maxlength="400" placeholder="Describe a rule: label receipts and archive them once read"><button class="button" type="submit">Draft it</button></form>
-<div class="form-actions"><a class="button" href="/mail/{{ account.source_id }}/rules/new">New rule</a>
-{% for key, name in templates %}<a class="button secondary" href="/mail/{{ account.source_id }}/rules/new?template={{ key }}">{{ name }}</a>{% endfor %}</div></section>
+<div class="form-actions"><a class="button" href="/mail/{{ account.source_id }}/rules/new">New rule</a></div></section>
+<section class="detail-card"><h2 class="card-title">Start from a template</h2>
+{% for t in templates %}<p><a href="/mail/{{ account.source_id }}/rules/new?template={{ t.key }}"><strong>{{ t.name }}</strong></a>{% if t.inbox %} <span class="muted">· would look at {{ t.inbox }} message{{ t.inbox|pluralize }} in your inbox now, {{ t.unread }} unread</span>{% endif %}</p>{% endfor %}
+<p class="footnote">A template opens in the rule form: preview it on your mail before you save it.</p></section>
 {% for r in rows %}<section class="detail-card"><h2 class="card-title">{{ r.name }} <span class="muted">· {% if not r.enabled %}off{% elif r.mode == 'auto' %}automatic{% else %}asks you first{% endif %}</span></h2>
 <p>When {{ r.conditions }}: {{ r.what }}. <span class="muted">{% if r.body.scope == 'all' %}All mail, including history.{% else %}New mail only.{% endif %} Looked at {{ r.examined }}, matched {{ r.matched }}.</span></p>
 <form method="post" action="/mail/rules/change" class="form-actions">{% csrf_token %}<input type="hidden" name="rule_id" value="{{ r.rule_id }}">

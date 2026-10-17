@@ -133,9 +133,16 @@ def _runs(sid: str) -> dict:
 def rule_list(request, sid):
     account = _managed(sid)
     runs = _runs(sid)
+    in_inbox = {c["category"]: c for c in senders.inbox(_store(), sid)["categories"]}
+    templates = []
+    for key, t in rules.TEMPLATES.items():
+        covers = [in_inbox[c] for c in t["conditions"].get("categories", []) if c in in_inbox]
+        templates.append({"key": key, "name": t["name"], "inbox": sum(c["messages"] for c in covers),
+                          "unread": sum(c["unread"] for c in covers)})
+    templates.sort(key=lambda t: -t["inbox"])
     return render(request, "mail_rules.html", {
         "nav": "mail", "account": account, "rows": [_row(r, runs) for r in rules.all_rules(_store(), sid, "web")],
-        "templates": [(k, v["name"]) for k, v in rules.TEMPLATES.items()], "saved": request.GET.get("saved")})
+        "templates": templates, "saved": request.GET.get("saved")})
 
 
 def _form_body(post) -> dict:
