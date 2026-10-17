@@ -211,7 +211,7 @@ def pause(request):
     sid = request.POST.get("source_id", "")
     _account(_config(), sid)
     mail_settings.set_paused(_store(), sid, request.POST.get("pause") == "1")
-    return redirect("/mail/?saved=paused")
+    return _back(request, "/mail/?saved=paused")
 
 
 @require_POST
@@ -221,7 +221,7 @@ def writes(request):
         return HttpResponseBadRequest("Turn mail management on for this account first.")
     chosen = set(request.POST.getlist("types")) & set(actions.TYPES)
     mail_settings.set_enabled_types(_store(), sid, chosen)
-    return redirect("/mail/?saved=writes")
+    return _back(request, "/mail/?saved=writes")
 
 
 @require_POST
@@ -230,7 +230,26 @@ def dry_run(request):
     if not _account(_config(), sid)["managed"]:
         return HttpResponseBadRequest("Turn mail management on for this account first.")
     mail_settings.set_dry_run(_store(), sid, request.POST.get("dry_run") == "1")
-    return redirect("/mail/?saved=dry-run")
+    return _back(request, "/mail/?saved=dry-run")
+
+
+def _back(request, default: str):
+    """Back to the Mail page a form came from (only pages under /mail/), else ``default``."""
+    nxt = request.POST.get("next") or ""
+    return redirect(nxt if nxt.startswith("/mail/") and "//" not in nxt else default)
+
+
+@require_GET
+def settings_page(request, sid):
+    account = _account(_config(), sid)
+    if not account["managed"]:
+        return redirect("/mail/")
+    account = next(a for a in _accounts(_config()) if a["source_id"] == sid)
+    return render(request, "mail_settings.html", {
+        "nav": "mail", "a": account, "here": f"/mail/{sid}/settings", "saved": request.GET.get("saved"),
+        "types": [{"key": k, **v} for k, v in actions.TYPES.items()],
+        "alert_modes": list(notify.ALERT_MODES.items()), "digest_every": list(notify.DIGEST_EVERY.items()),
+        "follow_up_days": list(notify.FOLLOW_UP_DAYS.items())})
 
 
 @require_POST
@@ -252,7 +271,7 @@ def tell_me(request):
                 notify.set_reply_labels(_store(), sid, on)
     except ValueError:
         return HttpResponseBadRequest("Choose one of the listed options.")
-    return redirect("/mail/?saved=1")
+    return _back(request, "/mail/?saved=1")
 
 
 @require_POST
@@ -265,7 +284,7 @@ def draft_notes(request):
         threads.set_notes(_store(), sid, request.POST.get("notes", ""))
     except ValueError as exc:
         return HttpResponseBadRequest(str(exc).capitalize() + ".")
-    return redirect("/mail/?saved=1")
+    return _back(request, "/mail/?saved=1")
 
 
 @require_GET

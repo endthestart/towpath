@@ -81,8 +81,13 @@ def test_statistics_are_measured_and_shown(world, monkeypatch):
         assert notify.follow_up_days(world.store, world.sid) == 7
         assert notify.reply_labels_setting(world.store, world.sid)["on"]
         client.post("/mail/draft-notes", {"source_id": world.sid, "notes": "Sign off with just M."})
-        page = client.get("/mail/").content.decode()
+        page = client.get(f"/mail/{world.sid}/settings").content.decode()
         assert "Sign off with just M." in page and '<option value="7" selected>' in page
+        back = client.post("/mail/pause", {"source_id": world.sid, "pause": "1", "next": f"/mail/{world.sid}/settings"})
+        assert back["Location"] == f"/mail/{world.sid}/settings"
+        assert "Reading is paused." in client.get("/mail/").content.decode()
+        off_site = client.post("/mail/pause", {"source_id": world.sid, "pause": "0", "next": "https://elsewhere.example/"})
+        assert off_site["Location"].startswith("/mail/")
         assert client.post("/mail/draft-notes", {"source_id": world.sid, "notes": "x" * 2001}).status_code == 400
 
 

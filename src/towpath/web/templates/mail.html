@@ -10,42 +10,21 @@
   <h3>{{ a.name }}{% if a.address %} <span class="muted">· {{ a.address }}</span>{% endif %}</h3>
   {% if not a.supported %}<p>Towpath manages mail over IMAP. Gmail joins later, over IMAP; until then Inbox Zero manages this account.</p>
   {% else %}
-  <form method="post" action="/mail/manage" class="inline-form">{% csrf_token %}<input type="hidden" name="source_id" value="{{ a.source_id }}"><input type="hidden" name="manage" value="{% if a.managed %}0{% else %}1{% endif %}">
-    <span>{% if a.managed %}<strong>Managed.</strong> Towpath reads this account's mail.{% else %}Not managed. Towpath only indexes this account for search.{% endif %}</span>
-    <button class="button{% if a.managed %} secondary{% endif %}" type="submit">{% if a.managed %}Stop managing{% else %}Manage this account{% endif %}</button></form>
-  {% if a.managed %}
-  <p>{% if a.progress %}Read {{ a.progress.read }} of {{ a.progress.indexed }} indexed messages{% if a.progress.history_done %}, the whole history{% else %}, newest first{% endif %}.{% if a.progress.reason %} <span class="warn-text">{{ a.progress.reason }}</span>{% endif %}{% else %}Reading starts with the next check, after the account is indexed.{% endif %}
-  {% if a.watch %}{% if a.watch.state == 'watching' %}New mail is noticed as it arrives.{% elif a.watch.state == 'stopped' %}Watching for new mail stopped ({{ a.watch.detail }}).{% elif a.watch.state == 'unsupported' %}This server can't tell Towpath about new mail; it is found at each scheduled check.{% endif %}{% endif %}
-  <a href="/mail/{{ a.source_id }}/">Messages</a> · <a href="/mail/{{ a.source_id }}/conversations?state=needs_owner_reply">To reply{% if a.conversations.needs_owner_reply %} ({{ a.conversations.needs_owner_reply }}){% endif %}</a> · <a href="/mail/{{ a.source_id }}/conversations?state=awaiting_others">Awaiting reply{% if a.conversations.awaiting_others %} ({{ a.conversations.awaiting_others }}){% endif %}</a> · <a href="/mail/{{ a.source_id }}/senders">Senders</a> · <a href="/mail/{{ a.source_id }}/rules">Rules</a> · <a href="/mail/{{ a.source_id }}/search">Search</a> · <a href="/mail/{{ a.source_id }}/attachments">Attachments</a> · <a href="/mail/{{ a.source_id }}/purchases">Purchases</a> · <a href="/mail/{{ a.source_id }}/space">Space</a> · <a href="/mail/{{ a.source_id }}/clean">Clean up</a> · <a href="/mail/{{ a.source_id }}/unsubscribe">Unsubscribe</a> · <a href="/mail/{{ a.source_id }}/archives">Archives</a> · <a href="/mail/{{ a.source_id }}/stats">Statistics</a></p>
-  <h4>Telling you about mail</h4>
-  <form method="post" action="/mail/tell-me" class="inline-form">{% csrf_token %}<input type="hidden" name="source_id" value="{{ a.source_id }}">
-    <label>When someone is waiting for your reply <select name="alerts">{% for key, label in alert_modes %}<option value="{{ key }}"{% if key == a.alerts %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
-    <label>Digest in your inbox <select name="digest">{% for key, label in digest_every %}<option value="{{ key }}"{% if key == a.digest %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
-    <label>Label conversations in your mailbox <select name="reply_labels"><option value="0">Off</option><option value="1"{% if a.reply_labels %} selected{% endif %}>“To-reply” and “Awaiting-reply”</option></select></label>
-    <label>Remind you to follow up <select name="follow_up">{% for key, label in follow_up_days %}<option value="{{ key }}"{% if key == a.follow_up %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
-    <button class="button secondary" type="submit">Save</button></form>
-  <p class="footnote">Your mail app tells you about flagged or labelled mail if you set it to. The digest is put straight into your inbox; nothing is sent. A follow-up reminder labels your last message “Follow-up” when nobody has answered, drafts a nudge, and takes the label off when someone answers. All are dry runs until flags, labels or notes are turned on below and dry runs are off.</p>
-  <h4>Drafting replies</h4>
-  <form method="post" action="/mail/draft-notes" class="settings-form">{% csrf_token %}<input type="hidden" name="source_id" value="{{ a.source_id }}">
-    <label>Notes drafts may use <textarea name="notes" rows="4" maxlength="2000" placeholder="When you're usually free, your phone number, how you sign off, words you never use…">{{ a.notes }}</textarea></label>
-    <div class="form-actions"><button class="button secondary" type="submit">Save notes</button></div></form>
-  <form method="post" action="/mail/pause" class="inline-form">{% csrf_token %}<input type="hidden" name="source_id" value="{{ a.source_id }}"><input type="hidden" name="pause" value="{% if a.paused %}0{% else %}1{% endif %}"><button class="button secondary" type="submit">{% if a.paused %}Resume reading{% else %}Pause reading{% endif %}</button></form>
-
-  <h4>What Towpath may change</h4>
-  <form method="post" action="/mail/dry-run" class="inline-form">{% csrf_token %}<input type="hidden" name="source_id" value="{{ a.source_id }}"><input type="hidden" name="dry_run" value="{% if a.dry_run %}0{% else %}1{% endif %}">
-    <span>{% if a.dry_run %}<strong>Dry runs only.</strong> Nothing changes mail, whatever is ticked below: Towpath checks each message and records what it would have done.{% else %}<strong>Live.</strong> The kinds of change ticked below are carried out; the rest are dry runs.{% endif %}</span>
-    <button class="button{% if a.dry_run %} secondary{% endif %}" type="submit">{% if a.dry_run %}Turn dry runs off{% else %}Back to dry runs only{% endif %}</button></form>
-  {% if not a.write %}<p>Towpath has only a read-only password for this account, so every change is a dry run. <a href="/connections/{{ a.source_id }}/write-password">Add a write password</a> on the Connections page to let it change mail.</p>{% endif %}
-  <form method="post" action="/mail/writes" class="settings-form">{% csrf_token %}<input type="hidden" name="source_id" value="{{ a.source_id }}">
-    <fieldset><legend>Carry out these kinds of change (off: dry run only)</legend>
-    {% for t in types %}<label class="check"><input type="checkbox" name="types" value="{{ t.key }}"{% if t.key in a.enabled %} checked{% endif %}> {{ t.label }}{% if not t.auto %} <span class="muted">· always asks you first</span>{% endif %}</label>{% endfor %}
-    </fieldset>
-    <div class="form-actions"><button class="button" type="submit">Save</button></div></form>
+  {% if not a.managed %}<form method="post" action="/mail/manage" class="inline-form">{% csrf_token %}<input type="hidden" name="source_id" value="{{ a.source_id }}"><input type="hidden" name="manage" value="1">
+    <span>Not managed. Towpath only indexes this account for search.</span>
+    <button class="button" type="submit">Manage this account</button></form>
+  {% else %}
+  <p>{% if a.progress %}Read {{ a.progress.read }} of {{ a.progress.indexed }} indexed messages{% if a.progress.history_done %}, the whole history{% else %}, newest first{% endif %}.{% if a.progress.reason %} <span class="warn-text">{{ a.progress.reason }}</span>{% endif %}{% else %}Reading starts with the next check, after the account is indexed.{% endif %}{% if a.paused %} <strong>Reading is paused.</strong>{% endif %}
+  {% if a.watch %}{% if a.watch.state == 'watching' %}New mail is noticed as it arrives.{% elif a.watch.state == 'stopped' %}Watching for new mail stopped ({{ a.watch.detail }}).{% elif a.watch.state == 'unsupported' %}This server can't tell Towpath about new mail; it is found at each scheduled check.{% endif %}{% endif %}</p>
+  <p><strong>{% if a.dry_run %}Dry runs only.{% else %}Live.{% endif %}</strong> {% if a.dry_run %}Nothing changes mail: Towpath records what it would have done.{% else %}{% for label in a.enabled_labels %}{% if forloop.first %}Carried out: {% endif %}{{ label }}{% if not forloop.last %}, {% endif %}{% empty %}No kind of change is turned on, so these are dry runs too.{% endfor %}{% endif %} <a href="/mail/{{ a.source_id }}/settings">Settings →</a></p>
+  {% if not a.write %}<p class="footnote">Towpath has only a read-only password for this account, so every change is a dry run. <a href="/connections/{{ a.source_id }}/write-password">Add a write password</a> on the Connections page to let it change mail.</p>{% endif %}
+  <p><a href="/mail/{{ a.source_id }}/conversations?state=needs_owner_reply">To reply{% if a.conversations.needs_owner_reply %} ({{ a.conversations.needs_owner_reply }}){% endif %}</a> · <a href="/mail/{{ a.source_id }}/conversations?state=awaiting_others">Awaiting reply{% if a.conversations.awaiting_others %} ({{ a.conversations.awaiting_others }}){% endif %}</a> · <a href="/mail/{{ a.source_id }}/">Messages</a> · <a href="/mail/{{ a.source_id }}/search">Search</a> · <a href="/mail/{{ a.source_id }}/rules">Rules</a></p>
+  <p class="footnote"><a href="/mail/{{ a.source_id }}/senders">Senders</a> · <a href="/mail/{{ a.source_id }}/attachments">Attachments</a> · <a href="/mail/{{ a.source_id }}/purchases">Purchases</a> · <a href="/mail/{{ a.source_id }}/stats">Statistics</a> · <a href="/mail/{{ a.source_id }}/space">Space</a> · <a href="/mail/{{ a.source_id }}/clean">Clean up</a> · <a href="/mail/{{ a.source_id }}/unsubscribe">Unsubscribe</a> · <a href="/mail/{{ a.source_id }}/archives">Archives</a></p>
   {% endif %}{% endif %}
 </article>{% empty %}<p>No mail accounts yet. <a href="/connections/">Connect one</a>.</p>{% endfor %}
 </section>
 
-<section class="detail-card" id="models"><h2 class="card-title">AI models for mail</h2>
+<details class="detail-card" id="models"{% if saved == 'models' %} open{% endif %}><summary class="card-title">AI models for mail</summary>
 <p>Towpath works out who needs to reply, drafts replies and sorts mail with the models you choose here. A model reads email text only after you allow it. Prefer models on your network.</p>
 {% for m in models %}<div class="mail-model"><strong>{{ m.label }}</strong>
   {% if m.choices %}<form method="post" action="/mail/model" class="inline-form">{% csrf_token %}<input type="hidden" name="task" value="{{ m.task }}">
@@ -56,7 +35,7 @@
     <button class="button{% if m.allowed %} secondary{% endif %}" type="submit">{% if m.allowed %}Stop{% else %}Allow reading email text{% endif %}</button></form>{% endif %}
   {% else %}<p>No AI model is connected. <a href="/connections/add/model">Add one on the Connections page</a>.</p>{% endif %}
 </div>{% endfor %}
-</section>
+</details>
 
 {% if groups %}<section class="detail-card"><h2 class="card-title">Waiting for your answer</h2>
 {% for g in groups %}<article class="mail-account"><h3>{{ g.name }} <span class="muted">· {{ g.count }} change{{ g.count|pluralize }}</span></h3>

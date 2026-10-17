@@ -9,9 +9,10 @@ Decisions I made for you to confirm or reverse are listed in the
 
 1. **Overview** (`/`): the Today cards: conversations waiting for your reply, life events and memories to review,
    On this day, photos read.
-2. **Mail** (`/mail/`): Fastmail is managed; its whole history (114,924 messages) is read. Check the model section
-   (Mac Pro 35B for all three mail tasks, allowed to read mail text). The **What Towpath may change** switches are
-   all off and **Dry runs only** is on.
+2. **Mail** (`/mail/`): Fastmail is managed; its whole history (114,924 messages) is read. Open *AI models for
+   mail* (Mac Pro 35B for all three mail tasks, allowed to read mail text). The account's **Settings** page holds
+   everything you set: what Towpath may change (all off, **Dry runs only** on), alerts, follow-ups, reply labels,
+   the digest, notes for drafts, pausing.
 3. **To reply** and **Awaiting reply**: are the conversations right? Mark any that aren't; your mark always wins.
    Open one with a draft: is the voice yours? Edit and **Save to Drafts** (a dry run: check the receipt on Mail).
 
@@ -23,8 +24,8 @@ Decisions I made for you to confirm or reverse are listed in the
 | Senders | Mail → Senders | categories by people, newsletters, marketing…; change one and it sticks, and other senders from that company's domain follow (not gmail.com and the like) |
 | Rules | Mail → Rules → a template | Preview on recent mail; save; proposals appear under *Waiting for your answer*; approve per rule |
 | Rules in your words | Mail → Rules → *Describe a rule* | e.g. "label receipts and archive them"; the model fills in the rule form; check, preview, save |
-| Notes for drafts | Mail → *Drafting replies* | when you're free, phone number, sign-off; new drafts use them |
-| Follow-up reminders | Mail → *Remind you to follow up* | after 3/7/14 days unanswered: a *Follow-up* label (dry run) and a drafted nudge under *Awaiting reply* |
+| Notes for drafts | Mail → Settings → *Drafting replies* | when you're free, phone number, sign-off; new drafts use them |
+| Follow-up reminders | Mail → Settings → *Remind you to follow up* | after 3/7/14 days unanswered: a *Follow-up* label (dry run) and a drafted nudge under *Awaiting reply* |
 | Attachments | Mail → Attachments | every file by kind, year and sender; search names; each message once |
 | Purchases | Mail → Purchases | what you bought, by year and merchant, read from receipts (fills in slowly); try Ask "when did I buy …?" |
 | Search operators | Mail → Search | `from:`, `in:Archive`, `after:2019`, `has:attachment`, `is:unread`, `larger:5MB` |
@@ -34,13 +35,13 @@ Decisions I made for you to confirm or reverse are listed in the
 | Clean up | Mail → Clean up | old marketing/newsletters: counts and examples; *Move to Archive* (dry run) |
 | Archive to a file | Clean up → *Archive to a file…* | Mail → Archives: copies checked one by one; removal stays a dry run |
 | Unsubscribe | Mail → Unsubscribe | one-click / email / page; *Asked* after you tick; dry-run receipts |
-| Alerts and digest | Mail → *Telling you about mail* | turn on the digest; tomorrow 7am a dry-run receipt for the note |
+| Alerts and digest | Mail → Settings → *Telling you about mail* | turn on the digest; tomorrow 7am a dry-run receipt for the note |
 | Statistics | Mail → Statistics | weekly volume, reply time, top correspondents |
 | Keep from cloud | Senders, or a message | the mark shows; local models still read it |
 
 **Going live** (only when you're happy): Connections → Fastmail → *Add a write password* (a second Fastmail app
-password with full IMAP and SMTP access), then on Mail tick the kinds of change you want and press **Turn dry runs
-off**. Start with *Mark as read*, *Flag* and *Archive*; leave *Move to Trash* and *Unsubscribe* for later.
+password with full IMAP and SMTP access), then on Mail → Settings tick the kinds of change you want and press
+**Turn dry runs off**. Start with *Mark as read*, *Flag* and *Archive*; leave *Move to Trash* and *Unsubscribe* for later.
 
 ## 3. Life story
 
