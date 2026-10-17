@@ -53,6 +53,9 @@ def run_once(config, credentials_dir=None):
         watch.ensure(config, analysis.eligible(config))
         indexing += executor.run_pending(config, credentials_dir)
         indexing += analysis.analyze_pending(config)
+        from towpath.mail import threads
+
+        indexing += threads.track_pending(config)
     return {"searches": search["searches_run"], "fetched": fetched["fetched"],
             "failed": fetched["failed"], "presence_checked": fetched.get("presence_checked", 0),
             "termination": fetched["termination"], "indexing": indexing}

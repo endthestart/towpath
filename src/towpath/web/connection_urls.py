@@ -24,6 +24,7 @@ urlpatterns = [
     path("connections/<str:sid>/pacing", v.pacing, name="connection-pacing"),
     path("connections/<str:sid>/schedule", v.schedule, name="connection-schedule"),
     path("connections/<str:sid>/test", v.test_model, name="connection-test"),
+    path("connections/<str:sid>/models", v.further_model, name="connection-models"),
     path("connections/<str:sid>/indexing", v.indexing_settings, name="connection-indexing"),
     path("setup", auth.setup, name="setup"),
     path("login", auth.login, name="login"),

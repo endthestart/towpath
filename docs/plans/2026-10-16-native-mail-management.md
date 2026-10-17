@@ -28,7 +28,8 @@ Branch `claude/native-mail-management`, cut from the deployed head `9cbc7f9`.
 ## Status
 
 - Milestone 0: approved by the owner on 2026-10-16.
-- Milestone 1: built and tested against a synthetic server with Fastmail's extensions ([mail management](../mail-management.md#towpath-native-mail-management)). Next: release, then qualify on Hub against the owner's Fastmail in dry run (management turned on, history read, a few dry-run changes checked), and then, with the owner, the write password and one kind of change turned on.
+- Milestone 1: deployed 2026-10-17 (`6147799`); Fastmail management on, its whole history read in dry run. Live changes wait for the owner's UAT.
+- Milestone 2: built 2026-10-17 (reply tracking and drafts). Continued in the [autonomous build plan](2026-10-17-autonomous-build.md).
 
 ## Facts to verify before the milestone that needs them
 

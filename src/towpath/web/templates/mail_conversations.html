@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }} · {{ account.name }} · Mail · Towpath{% endblock %}
+{% block content %}
+<a class="back-link" href="/mail/">← Mail</a>
+<header class="page-head compact"><p class="eyebrow">MAIL · {{ account.name|upper }}</p><h1>{{ title }}</h1>
+<p class="lead">Conversations with people, newest first. Mailing lists and automated mail are left out. Your own marks always win.</p></header>
+{% if saved == 'draft' %}<div class="notice" role="status">Asked. Towpath saves the draft within a minute or two{% if account.dry_run %}, as a dry run while dry runs only is on{% endif %}.</div>{% elif saved %}<div class="notice" role="status">Saved.</div>{% endif %}
+<nav class="tabs" aria-label="States">{% for key, label, n in tabs %}<a href="?state={{ key }}"{% if key == state %} aria-current="page"{% endif %}>{{ label }}{% if n %} ({{ n }}){% endif %}</a>{% endfor %}</nav>
+{% for r in rows %}<article class="life-claim">
+  <p><a href="/mail/m/{{ r.last_item }}/"><strong>{{ r.subject|default:'(No subject)' }}</strong></a> <span class="muted">· {{ r.participants|join:", "|default:'just you' }} · {{ r.last_date|slice:":10" }} · {{ r.messages }} message{{ r.messages|pluralize }}{% if r.marked %} · marked by you{% endif %}</span></p>
+  <p class="footnote">{{ r.reason }}</p>
+  <form method="post" action="/mail/mark" class="form-actions">{% csrf_token %}<input type="hidden" name="source_id" value="{{ account.source_id }}"><input type="hidden" name="thread_key" value="{{ r.thread_key }}"><input type="hidden" name="next" value="?state={{ state }}">
+    {% for key, label, n in tabs %}{% if key != state %}<button class="button secondary" name="state" value="{{ key }}">{{ label }}</button>{% endif %}{% endfor %}
+    {% if r.marked %}<button class="button secondary" name="state" value="">Let Towpath decide</button>{% endif %}</form>
+  {% if r.draft and state == 'needs_owner_reply' %}<details><summary>Draft reply{% if not r.draft_current %} (written before the latest message){% endif %}</summary>
+  <form method="post" action="/mail/save-draft" class="settings-form">{% csrf_token %}<input type="hidden" name="source_id" value="{{ account.source_id }}"><input type="hidden" name="thread_key" value="{{ r.thread_key }}"><input type="hidden" name="next" value="?state={{ state }}&amp;saved=draft">
+    <textarea name="body" rows="7">{{ r.draft }}</textarea>
+    <div class="form-actions"><button class="button" type="submit">Save to Drafts</button></div></form></details>{% endif %}
+</article>{% empty %}<div class="empty"><h2>Nothing here.</h2><p>Towpath reads new mail first; conversations appear as it goes.</p></div>{% endfor %}
+{% if next_before %}<nav class="pagination" aria-label="Older"><span></span><div><a href="?state={{ state }}&amp;before={{ next_before|urlencode }}">Older →</a></div></nav>{% endif %}
+{% endblock %}

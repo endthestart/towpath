@@ -84,12 +84,13 @@ Built in milestone 1 of the [build plan](plans/2026-10-16-native-mail-management
 | Reading | connect → `mail` | Every message's headers, flags, thread (the server's `THREADID` where offered, otherwise `References`), list headers and new text (quotes removed, at most 20,000 characters), read with EXAMINE and `BODY.PEEK` in resumable slices: new mail first, then the whole history. Flags that changed are read with CONDSTORE. |
 | Watching | connect | IDLE on each managed inbox; new mail starts indexing, then reading. |
 | Owner's decisions | web → `maildecisions` | Changes asked for on a message (and Undo), and answers to proposals, each tied to the digest of exactly what was asked. Which kinds of change may run, per account (decisions store); all start off. |
-| Proposals | worker → `mailplan` | Changes Towpath's features propose (from milestone 2). Immutable. |
+| Conversations | worker → `mailintel` | Reply tracking: each conversation is *to reply*, *awaiting reply*, *FYI* or *done*. Header rules first (mailing lists and automated senders are FYI; who wrote last; age), then the model reads conversations with people, newest first, across the whole history. The owner's mark (in `maildecisions`) outranks both. For recent conversations waiting on the owner, the model drafts a reply in the owner's voice, with a few of their sent messages as examples; the owner edits it and saves it to Drafts (a `draft` change). |
+| Proposals | worker → `mailplan` | Changes Towpath's features propose (from milestone 3). Immutable. |
 | Action runner | act → `mailact` | The only code with the write password. Checks the digest, approval, type and the message itself, then carries the change out, or, for a kind not turned on or an account without a write password, checks the message read-only and records a **dry run**. One receipt per request, with the inverse change for Undo. |
 
 The write session (`towpath.mail.executor.ActSession`) offers only SELECT, UID STORE of `\Seen`, `\Flagged` and labels (never `\Deleted`), UID MOVE to an existing mailbox, APPEND to Drafts or the inbox, and UNSELECT (or EXAMINE, never CLOSE). There is no EXPUNGE, DELETE, COPY, CREATE or RENAME. Moving to Trash is the furthest a change goes; the provider's own Trash retention deletes. The write password is a second app password, entered on the account's Connections page, refused if it is the read-only one or can only read.
 
-Cloud models: an AI model connection is marked as running on the owner's network (the default) or at a cloud service. Either way nothing personal reaches it without the owner's grant.
+Models: an AI model connection is marked as running on the owner's network (the default) or at a cloud service, and can offer further models on the same server and token (*Other models on this server*). The Mail page chooses the model for each mail feature (`mail.thread`, `mail.draft`, `mail.classify`) and whether it may read email text; nothing personal reaches any model without that grant. A whole account can be set to *Dry runs only* (the default), whatever kinds of change are ticked.
 
 ## Prompt injection and model output
 

@@ -16,6 +16,15 @@
 <div class="content-text">{{ m.text|default:'(No text part.)' }}</div>
 {% if m.quoted_removed or m.text_truncated %}<p class="footnote">{% if m.quoted_removed %}Quoted earlier messages are left out.{% endif %}{% if m.text_truncated %} Only the start of a long message is shown.{% endif %} Open it in your mail app for everything, including formatting and attachments.</p>{% endif %}
 </section>
+{% if conversation %}<section class="detail-card"><h2 class="card-title">{{ conversation.label }}</h2>
+<p>{{ conversation.reason }}{% if conversation.state_by == 'model' %} <span class="muted">(the AI model's view)</span>{% endif %}</p>
+<form method="post" action="/mail/mark" class="form-actions">{% csrf_token %}<input type="hidden" name="source_id" value="{{ m.source_id }}"><input type="hidden" name="thread_key" value="{{ m.thread_key }}"><input type="hidden" name="next" value="/mail/m/{{ m.item_id }}/">
+  {% for key, label in states %}{% if key != conversation.state %}<button class="button secondary" name="state" value="{{ key }}">{{ label }}</button>{% endif %}{% endfor %}</form>
+{% if conversation.draft %}<h3>Draft reply{% if not conversation.draft_current %} <span class="muted">· written before the latest message</span>{% endif %}</h3>
+<form method="post" action="/mail/save-draft" class="settings-form">{% csrf_token %}<input type="hidden" name="source_id" value="{{ m.source_id }}"><input type="hidden" name="thread_key" value="{{ m.thread_key }}"><input type="hidden" name="next" value="/mail/m/{{ m.item_id }}/?saved=asked">
+  <label>Edit it if you like <textarea name="body" rows="8">{{ conversation.draft }}</textarea></label>
+  <div class="form-actions"><button class="button" type="submit">Save to Drafts</button></div></form>{% endif %}
+</section>{% endif %}
 {% if thread %}<section class="detail-card"><h2 class="card-title">This conversation</h2>
 {% for t in thread %}<p>{% if t.item_id == m.item_id %}<strong>{% else %}<a href="/mail/m/{{ t.item_id }}/">{% endif %}{{ t.date_utc|slice:":10" }} · {{ t.from_name|default:t.from_addr }} · {{ t.subject|default:'(No subject)' }}{% if t.item_id == m.item_id %}</strong>{% else %}</a>{% endif %} <span class="muted">· {{ t.mailbox }}</span></p>{% endfor %}
 </section>{% endif %}

@@ -13,7 +13,8 @@
 | mail      | connect | worker, act, web |
 | mailplan  | worker  | act, web       |
 | mailact   | act     | worker, web    |
-| maildecisions | web | act            |
+| maildecisions | web | act, worker    |
+| mailintel | worker  | web            |
 
 Readers open with ``mode=ro`` so the database itself refuses writes.
 """
@@ -35,6 +36,7 @@ WRITERS = {
     "mailplan": {"worker"},
     "mailact": {"act"},
     "maildecisions": {"web"},
+    "mailintel": {"worker"},
 }
 
 # Columns and tables added after a store was first released. Applied on every
@@ -294,6 +296,25 @@ CREATE TABLE IF NOT EXISTS requests (
   author TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS answers (
   proposal_id TEXT PRIMARY KEY, digest TEXT NOT NULL, decision TEXT NOT NULL, author TEXT NOT NULL, at TEXT NOT NULL);
+-- The owner's own word on a conversation's state (to reply, awaiting, FYI, done); it outranks rules and models.
+CREATE TABLE IF NOT EXISTS thread_marks (
+  source_id TEXT NOT NULL, thread_key TEXT NOT NULL, state TEXT NOT NULL, author TEXT NOT NULL, at TEXT NOT NULL,
+  PRIMARY KEY (source_id, thread_key));
+""",
+    # What mail management concluded about conversations (rebuildable from the mail store and the models).
+    "mailintel": """
+CREATE TABLE IF NOT EXISTS threads (
+  source_id TEXT NOT NULL, thread_key TEXT NOT NULL, subject TEXT, first_date TEXT, last_date TEXT,
+  last_item TEXT NOT NULL, last_from TEXT, last_from_owner INTEGER NOT NULL, messages INTEGER NOT NULL,
+  participants TEXT NOT NULL, kind TEXT NOT NULL, state TEXT NOT NULL, state_by TEXT NOT NULL, reason TEXT,
+  input_digest TEXT NOT NULL, model TEXT, updated_at TEXT NOT NULL, PRIMARY KEY (source_id, thread_key));
+CREATE INDEX IF NOT EXISTS threads_state ON threads (source_id, state, last_date);
+CREATE TABLE IF NOT EXISTS drafts (
+  source_id TEXT NOT NULL, thread_key TEXT NOT NULL, reply_to_item TEXT NOT NULL, input_digest TEXT NOT NULL,
+  body TEXT NOT NULL, model TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (source_id, thread_key));
+-- Per source: how far the conversation job has looked at the mail store (its rowids), and its progress.
+CREATE TABLE IF NOT EXISTS progress (
+  source_id TEXT PRIMARY KEY, watermark INTEGER NOT NULL, state TEXT NOT NULL, updated_at TEXT NOT NULL);
 """,
     "ledger": """
 CREATE TABLE IF NOT EXISTS capability_reports (

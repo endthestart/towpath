@@ -16,7 +16,7 @@
   {% if a.managed %}
   <p>{% if a.progress %}Read {{ a.progress.read }} of {{ a.progress.indexed }} indexed messages{% if a.progress.history_done %}, the whole history{% else %}, newest first{% endif %}.{% if a.progress.reason %} <span class="warn-text">{{ a.progress.reason }}</span>{% endif %}{% else %}Reading starts with the next check, after the account is indexed.{% endif %}
   {% if a.watch %}{% if a.watch.state == 'watching' %}New mail is noticed as it arrives.{% elif a.watch.state == 'stopped' %}Watching for new mail stopped ({{ a.watch.detail }}).{% elif a.watch.state == 'unsupported' %}This server can't tell Towpath about new mail; it is found at each scheduled check.{% endif %}{% endif %}
-  <a href="/mail/{{ a.source_id }}/">Messages</a></p>
+  <a href="/mail/{{ a.source_id }}/">Messages</a> · <a href="/mail/{{ a.source_id }}/conversations?state=needs_owner_reply">To reply{% if a.conversations.needs_owner_reply %} ({{ a.conversations.needs_owner_reply }}){% endif %}</a> · <a href="/mail/{{ a.source_id }}/conversations?state=awaiting_others">Awaiting reply{% if a.conversations.awaiting_others %} ({{ a.conversations.awaiting_others }}){% endif %}</a></p>
   <form method="post" action="/mail/pause" class="inline-form">{% csrf_token %}<input type="hidden" name="source_id" value="{{ a.source_id }}"><input type="hidden" name="pause" value="{% if a.paused %}0{% else %}1{% endif %}"><button class="button secondary" type="submit">{% if a.paused %}Resume reading{% else %}Pause reading{% endif %}</button></form>
 
   <h4>What Towpath may change</h4>
@@ -31,6 +31,19 @@
     <div class="form-actions"><button class="button" type="submit">Save</button></div></form>
   {% endif %}{% endif %}
 </article>{% empty %}<p>No mail accounts yet. <a href="/connections/">Connect one</a>.</p>{% endfor %}
+</section>
+
+<section class="detail-card" id="models"><h2 class="card-title">AI models for mail</h2>
+<p>Towpath works out who needs to reply, drafts replies and sorts mail with the models you choose here. A model reads email text only after you allow it. Prefer models on your network.</p>
+{% for m in models %}<div class="mail-model"><strong>{{ m.label }}</strong>
+  {% if m.choices %}<form method="post" action="/mail/model" class="inline-form">{% csrf_token %}<input type="hidden" name="task" value="{{ m.task }}">
+    <label>Model <select name="endpoint">{% for e in m.choices %}<option value="{{ e.id }}"{% if e.id == m.chosen %} selected{% endif %}>{{ e.name }}{% if e.cloud %} (cloud){% endif %}</option>{% endfor %}</select></label>
+    <button class="button secondary" type="submit">Use it</button></form>
+  {% if m.chosen %}<form method="post" action="/mail/model" class="inline-form">{% csrf_token %}<input type="hidden" name="task" value="{{ m.task }}"><input type="hidden" name="endpoint" value="{{ m.chosen }}"><input type="hidden" name="allow" value="{% if m.allowed %}0{% else %}1{% endif %}">
+    <span>{% if m.allowed %}May read email text.{% else %}Can't read email text yet; Towpath uses header rules only.{% endif %}</span>
+    <button class="button{% if m.allowed %} secondary{% endif %}" type="submit">{% if m.allowed %}Stop{% else %}Allow reading email text{% endif %}</button></form>{% endif %}
+  {% else %}<p>No AI model is connected. <a href="/connections/add/model">Add one on the Connections page</a>.</p>{% endif %}
+</div>{% endfor %}
 </section>
 
 {% if proposals %}<section class="detail-card"><h2 class="card-title">Waiting for your answer</h2>

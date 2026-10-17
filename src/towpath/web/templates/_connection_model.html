@@ -4,3 +4,12 @@
 <p>Model <strong>{{ c.model }}</strong>, {% if c.cloud %}at a cloud service{% else %}on your network{% endif %}{% if c.tested_text %}; last test {{ c.tested_text }}{% endif %}. Towpath uses it to propose dated events for your life story, and sends it the text of your email only after you allow that on the <a href="/life/">Life</a> page.</p>
 {% if c.state != 'disconnected' %}<form method="post" action="/connections/{{ c.source_id }}/test" class="inline-form">{% csrf_token %}<button class="button secondary" type="submit">Test again</button></form>{% endif %}
 </section>
+{% if c.state != 'disconnected' %}<section class="detail-card"><h2 class="card-title">Other models on this server</h2>
+{% if saved == 'models' %}<div class="notice" role="status">Saved.</div>{% endif %}
+<p>The same server and token can offer more models, such as a larger one for drafting. Each is tested with a made-up question before it is added, and each needs its own permission before it reads anything personal. Choose which model each feature uses on the <a href="/mail/">Mail</a> page.</p>
+{% for m in c.further %}<form method="post" action="/connections/{{ c.source_id }}/models" class="inline-form">{% csrf_token %}<span><strong>{{ m.name }}</strong>, {% if m.cloud %}at a cloud service{% else %}on your network{% endif %}{% if m.seconds %}; answered in {{ m.seconds }} s{% endif %}</span><button class="button secondary" name="remove" value="{{ m.name }}">Remove</button></form>{% endfor %}
+<form method="post" action="/connections/{{ c.source_id }}/models" class="inline-form">{% csrf_token %}
+  <label>Model name <input name="model" required placeholder="macpro-qwen3.6-35b-a3b-udq4ks-128k"></label>
+  <label>Where it runs <select name="destination"><option value="self-hosted">On your network</option><option value="third-party">A cloud service</option></select></label>
+  <button class="button secondary" type="submit">Test and add</button></form>
+</section>{% endif %}

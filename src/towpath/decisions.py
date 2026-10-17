@@ -98,6 +98,40 @@ def model_granted(config, endpoint_id: str, data_class: str, role: str = ROLE) -
         db.close()
 
 
+MODELS_TARGET, TASKS_KEY = "models", "tasks"
+
+
+def task_models(store_dir, role: str = ROLE) -> dict[str, str]:
+    """Which model endpoint the owner chose for each task, where they chose one."""
+    from contextlib import closing
+
+    from towpath.stores import store_path
+
+    if not store_path(store_dir, "decisions").exists():
+        return {}
+    with closing(open_store(store_dir, "decisions", role)) as db:
+        row = db.execute("SELECT value FROM settings WHERE target_id = ? AND key = ?",
+                         (MODELS_TARGET, TASKS_KEY)).fetchone()
+    return json.loads(row[0]) if row else {}
+
+
+def set_task_model(store_dir, task: str, endpoint_id: str | None, author: str = "local-user") -> dict:
+    """Choose the model for one task (None: back to the default, the first model connection)."""
+    chosen = {k: v for k, v in task_models(store_dir).items() if k != task}
+    if endpoint_id:
+        chosen[task] = endpoint_id
+    db = open_store(store_dir, "decisions", ROLE)
+    try:
+        db.execute("INSERT OR REPLACE INTO settings (target_id, key, value, author, at) VALUES (?,?,?,?,?)",
+                   (MODELS_TARGET, TASKS_KEY, json.dumps(chosen, sort_keys=True), author, now()))
+        db.execute("INSERT INTO decision_log (kind, target_id, detail, author, at) VALUES ('model-task', ?, ?, ?, ?)",
+                   (MODELS_TARGET, json.dumps({"task": task, "endpoint": endpoint_id}), author, now()))
+        db.commit()
+    finally:
+        db.close()
+    return chosen
+
+
 def grant_model(config, endpoint_id: str, data_class: str, author: str = "local-user") -> str:
     """Allow a data class on one endpoint, tied to its current fingerprint."""
     from towpath.config import DATA_CLASSES

@@ -14,8 +14,8 @@ from django.http import Http404, HttpResponseBadRequest
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_GET, require_POST
 
-from towpath import connections, stores
-from towpath.mail import FEATURE, actions, analysis, executor, settings as mail_settings, watch
+from towpath import connections, decisions, stores
+from towpath.mail import FEATURE, actions, analysis, executor, settings as mail_settings, threads, watch
 from towpath.stores import open_store, store_path
 from towpath.unified import grants
 
@@ -52,7 +52,24 @@ def _accounts(config) -> list[dict]:
                                if k in mail_settings.enabled_types(_store(), sid, role="web")],
             "paused": mail_settings.paused(_store(), sid, role="web"),
             "dry_run": mail_settings.dry_run(_store(), sid, role="web"),
-            "progress": analysis.progress(_store(), sid), "watch": watch.state(_store(), sid)})
+            "progress": analysis.progress(_store(), sid), "watch": watch.state(_store(), sid),
+            "conversations": threads.counts(_store(), sid) if managed else {}})
+    return out
+
+
+MAIL_TASKS = ("mail.thread", "mail.draft", "mail.classify")
+
+
+def _models(config) -> list[dict]:
+    """Which model each mail feature uses, and whether that model may read email text."""
+    model_ids = {c["source_id"] for c in connections.all_connections(_store(), role="web") if c["adapter"] == "model"}
+    endpoints = [{"id": e.id, "name": e.model, "cloud": e.destination == "third-party"}
+                 for e in config.endpoints.values() if e.id.split(":")[0] in model_ids]
+    out = []
+    for task in MAIL_TASKS:
+        chosen = config.tasks.get(task)
+        out.append({"task": task, "label": connections.TASK_LABELS[task], "chosen": chosen, "choices": endpoints,
+                    "allowed": bool(chosen) and decisions.model_granted(config, chosen, "content")})
     return out
 
 
@@ -110,7 +127,24 @@ def overview(request):
     types = [{"key": k, **v} for k, v in actions.TYPES.items()]
     return render(request, "mail.html", {"nav": "mail", "accounts": accounts, "types": types,
                                          "saved": request.GET.get("saved"), "proposals": _proposals(),
-                                         **_activity()})
+                                         "models": _models(config), "labels": threads.LABELS, **_activity()})
+
+
+@require_POST
+def model(request):
+    """Choose the model a mail feature uses, or allow or stop it reading email text."""
+    config = _config()
+    task, endpoint = request.POST.get("task", ""), request.POST.get("endpoint", "")
+    if task not in MAIL_TASKS or endpoint not in config.endpoints:
+        return HttpResponseBadRequest("Choose one of the listed models.")
+    if "allow" in request.POST:
+        if request.POST["allow"] == "1":
+            decisions.grant_model(config, endpoint, "content", author="owner")
+        else:
+            decisions.revoke_model(config, endpoint, "content", author="owner")
+    else:
+        decisions.set_task_model(_store(), task, endpoint, author="owner")
+    return redirect("/mail/?saved=models#models")
 
 
 def _account(config, sid: str) -> dict:
@@ -256,9 +290,60 @@ def reader(request, item_id):
                if not (k == "mark_read" and not m["unread"]) and not (k == "mark_unread" and m["unread"])
                and not (k == "flag" and m["flagged"]) and not (k == "unflag" and not m["flagged"])
                and not (k == "archive" and m["mailbox"].lower() == "archive")]
+    conversation = threads.thread(_store(), m["source_id"], m["thread_key"])
     return render(request, "mail_reader.html", {
         "nav": "mail", "m": m, "account": account, "thread": thread if len(thread) > 1 else [],
+        "conversation": {**conversation, "label": threads.LABELS[conversation["state"]]} if conversation else None,
+        "states": list(threads.LABELS.items()),
         "here": m["item_id"] in present, "choices": choices, "activity": mine, "saved": request.GET.get("saved")})
+
+
+@require_GET
+def conversations(request, sid):
+    account = _account(_config(), sid)
+    if not account["managed"]:
+        return redirect("/mail/")
+    state = request.GET.get("state") if request.GET.get("state") in threads.STATES else "needs_owner_reply"
+    rows = threads.listing(_store(), sid, state, limit=101, before=request.GET.get("before"))
+    more = len(rows) > 100
+    rows = rows[:100]
+    counts = threads.counts(_store(), sid)
+    return render(request, "mail_conversations.html", {
+        "nav": "mail", "account": account, "state": state, "title": threads.LABELS[state], "rows": rows,
+        "tabs": [(k, v, counts.get(k, 0)) for k, v in threads.LABELS.items()],
+        "next_before": rows[-1]["last_date"] if more and rows else None, "saved": request.GET.get("saved")})
+
+
+@require_POST
+def mark(request):
+    sid, key = request.POST.get("source_id", ""), request.POST.get("thread_key", "")
+    if not _account(_config(), sid)["managed"] or threads.thread(_store(), sid, key) is None:
+        return HttpResponseBadRequest("That conversation isn't known.")
+    state = request.POST.get("state") or None
+    try:
+        threads.mark(_store(), sid, key, state)
+    except ValueError:
+        return HttpResponseBadRequest("Choose one of the listed states.")
+    return redirect(request.POST.get("next") or f"/mail/{sid}/conversations?saved=marked")
+
+
+@require_POST
+def save_draft(request):
+    """Save a reply draft (as written by the model, or as the owner edited it) to the mailbox's Drafts folder."""
+    sid, key = request.POST.get("source_id", ""), request.POST.get("thread_key", "")
+    if not _account(_config(), sid)["managed"]:
+        return HttpResponseBadRequest("Turn mail management on for this account first.")
+    found = threads.thread(_store(), sid, key)
+    body = (request.POST.get("body") or (found or {}).get("draft") or "").strip()
+    if found is None or not body:
+        return HttpResponseBadRequest("There is no draft to save.")
+    try:
+        raw = threads.draft_message(_store(), sid, key, body)
+    except ValueError as exc:
+        return HttpResponseBadRequest(str(exc))
+    mail_settings.ask(_store(), sid, actions.make(sid, "draft", {"mailbox_role": "drafts"}, {"message": raw},
+                                                  reason=f"Reply to: {found['subject'] or '(no subject)'}"))
+    return redirect(request.POST.get("next") or f"/mail/{sid}/conversations?saved=draft")
 
 
 @require_POST

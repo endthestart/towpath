@@ -41,7 +41,12 @@ def serve(store_dir: Path = typer.Option(None, "--store-dir", help="Folder holdi
         raise typer.BadParameter(f"{store_dir} is not a folder")
     from towpath import stores
 
-    try:  # the UI never migrates a store; it refuses to start until an explicit upgrade has run
+    # The stores the web service itself writes gain this version's tables first, as the connector does for its own
+    # (add-only: CREATE TABLE IF NOT EXISTS and ADD COLUMN). Other services' stores are never changed here.
+    for name, roles in stores.WRITERS.items():
+        if "web" in roles and stores.store_path(store_dir, name).exists():
+            stores.open_store(store_dir, name, "web").close()
+    try:  # it refuses to start while another service's store lacks what this version reads
         stores.require_current(store_dir, None)
     except stores.SchemaOutdated as exc:
         raise typer.BadParameter(str(exc)) from None

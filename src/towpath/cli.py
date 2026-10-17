@@ -118,6 +118,24 @@ def request_worker(config: Path = OptionalConfigOpt,
         raise typer.Exit(1) from None
 
 
+@connect_app.command("add-model")
+def connect_add_model(connection: str, model: str,
+                      destination: str = typer.Option(None, "--destination",
+                                                      help="self-hosted (your network) or third-party (cloud)"),
+                      config: Path = OptionalConfigOpt, credentials_dir: Path = CredentialsDirOpt,
+                      data_dir: Path = DataDirOpt):
+    """Test another model on an AI model connection's server with its stored token, and add it."""
+    from towpath import connections
+
+    cfg, credentials_dir = _connector_setup(data_dir, config, credentials_dir)
+    try:
+        tested = connections.add_model_name(cfg.store_dir, credentials_dir, connection, model, destination)
+    except connections.ConnectionProblem as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from None
+    typer.echo(f"{connection}:{model} answered in {tested['seconds']} s")
+
+
 @connect_app.command("indexing")
 def connect_indexing(source: str, action: str = typer.Argument(..., help="start (also continues) or pause"),
                      config: Path = OptionalConfigOpt, credentials_dir: Path = CredentialsDirOpt,
@@ -478,14 +496,41 @@ def model_probe(endpoint: str, config: Path = ConfigOpt, as_json: bool = typer.O
     _emit(report, as_json)
 
 
+def _decision_config(config: Path, data_dir: Path | None, role: str = "web"):
+    """For web-role decisions: the configuration file, or a data folder's configuration with its connections."""
+    if data_dir is None:
+        return _load(config)
+    from towpath import connections, layout as layout_mod
+
+    layout = layout_mod.Layout(Path(data_dir))
+    return connections.merged(config_mod.for_data(layout), None, role=role)
+
+
 @model_app.command("grant")
-def model_grant(endpoint: str, data_class: str, config: Path = ConfigOpt):
+def model_grant(endpoint: str, data_class: str, config: Path = ConfigOpt, data_dir: Path = DataDirOpt,
+                author: str = typer.Option("local-user", "--author", help="Who gave the grant, for the log.")):
     """Allow a data class on a named endpoint's current profile (web role decision)."""
     try:
-        fp = decisions.grant_model(_load(config), endpoint, data_class)
-    except ValueError as exc:
+        fp = decisions.grant_model(_decision_config(config, data_dir), endpoint, data_class, author=author)
+    except (ValueError, KeyError) as exc:
         raise typer.BadParameter(str(exc)) from exc
     typer.echo(f"granted {data_class} on {endpoint} (profile {fp}); changing the profile voids this grant")
+
+
+@model_app.command("use")
+def model_use(task: str, endpoint: str = typer.Argument(None, help="Endpoint ID; leave out for the default"),
+              config: Path = ConfigOpt, data_dir: Path = DataDirOpt,
+              author: str = typer.Option("local-user", "--author")):
+    """Choose the model endpoint one task uses (web role decision)."""
+    from towpath import connections
+
+    cfg = _decision_config(config, data_dir)
+    if task not in connections.MODEL_TASKS:
+        raise typer.BadParameter(f"task must be one of {', '.join(connections.MODEL_TASKS)}")
+    if endpoint and endpoint not in cfg.endpoints:
+        raise typer.BadParameter(f"no endpoint {endpoint!r}; known: {', '.join(sorted(cfg.endpoints))}")
+    decisions.set_task_model(cfg.store_dir, task, endpoint, author=author)
+    typer.echo(f"{task}: {endpoint or 'default'}")
 
 
 @model_app.command("run-queue")

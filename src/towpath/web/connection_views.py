@@ -103,6 +103,9 @@ def _view(c: dict) -> dict:
                                 "busy": False},
                 "address": c["settings"]["base_url"], "indexed": None, "model": c["settings"]["model"],
                 "cloud": c["settings"].get("destination") == "third-party",
+                "further": [{"name": k, "cloud": v.get("destination") == "third-party",
+                             "seconds": (v.get("tested") or {}).get("seconds")}
+                            for k, v in sorted((c["settings"].get("models") or {}).items())],
                 "tested_text": (f"answered in {tested['seconds']} s, {tested['at'][:16].replace('T', ' ')} UTC"
                                 if tested else None)}
     progress = c["progress"] or {}
@@ -219,6 +222,25 @@ def test_model(request, sid):
     connections._update(_store(), sid, "model-tested", {"seconds": tested["seconds"]},
                         settings={**c["settings"], "tested": tested}, last_error=None)
     return redirect(f"/connections/{sid}/?saved=test")
+
+
+@require_POST
+def further_model(request, sid):
+    """Add (test with the stored token) or remove another model on an AI model connection's server."""
+    c = _get(sid)
+    if c["adapter"] != "model":
+        raise Http404
+    if request.POST.get("remove"):
+        connections.remove_model_name(_store(), sid, request.POST["remove"])
+        return redirect(f"/connections/{sid}/?saved=models")
+    try:
+        connections.add_model_name(_store(), _creds(), sid, request.POST.get("model", ""),
+                                   request.POST.get("destination") or None)
+    except ConnectionProblem as exc:
+        response = render(request, "connection_detail.html", {**_detail_context(sid), "error": str(exc)})
+        response.status_code = 400
+        return response
+    return redirect(f"/connections/{sid}/?saved=models")
 
 
 @require_http_methods(["GET", "POST"])

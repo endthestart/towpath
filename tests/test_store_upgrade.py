@@ -136,6 +136,27 @@ def test_the_ui_refuses_outdated_stores_with_an_actionable_message_and_never_mig
     assert digest(legacy / "source.db") == source_before
 
 
+def test_the_ui_brings_only_its_own_stores_up_to_date_at_start(legacy):
+    stores.upgrade(legacy, ["source"])  # the connector's store is current; the web's own two are not
+    source_before = digest(legacy / "source.db")
+    before = {s: dump(legacy / f"{s}.db") for s in ("decisions", "queue")}
+    launched = []
+    import towpath.web.application as application
+
+    original = application.launch
+    application.launch = lambda *a, **k: launched.append(True)
+    try:
+        out = CliRunner().invoke(app, ["web", "serve", "--store-dir", str(legacy)])
+    finally:
+        application.launch = original
+    assert out.exit_code == 0 and launched
+    assert all(r["current"] for r in stores.schema_status(legacy))
+    for store, tables in before.items():
+        after = dump(legacy / f"{store}.db")
+        assert {t: after[t] for t in tables} == tables
+    assert digest(legacy / "source.db") == source_before
+
+
 def test_after_the_upgrade_the_ui_works_and_old_decisions_still_apply(legacy):
     stores.upgrade(legacy)
     configure(legacy, None)

@@ -38,7 +38,11 @@ PROVIDERS = {
 MODEL_DESTINATIONS = {"self-hosted": "On your network", "third-party": "A cloud service"}
 # What an AI model connection is used for. Personal content reaches it only after the owner allows it on the Life
 # page (a grant in the decisions store, tied to this endpoint's address, model and token file).
-MODEL_TASKS = ("life.propose",)
+MODEL_TASKS = ("life.propose", "mail.thread", "mail.draft", "mail.classify", "ask.answer", "search.translate")
+TASK_LABELS = {"life.propose": "Life story: propose events", "mail.thread": "Mail: who needs to reply",
+               "mail.draft": "Mail: draft replies", "mail.classify": "Mail: categories and rules",
+               "ask.answer": "Ask: answer questions from your records",
+               "search.translate": "Search: understand plain-English questions"}
 MODEL_TIMEOUT_SECONDS = 300.0  # a model on a sleeping machine can take a minute or two to wake and load
 # Folders left out by default: special use (RFC 6154) first, then common names for servers that omit it.
 SKIP_SPECIAL = {"\\trash", "\\junk", "\\drafts"}
@@ -411,8 +415,12 @@ def merged(config, credentials_dir: Path | None, role: str = ROLE):
             added[sid] = config_mod.Source(sid, "mail-provider", "gmail",
                                            token=token_path(credentials_dir, c) if credentials_dir else None)
     models = [c for c in all_connections(config.store_dir, role) if c["adapter"] == "model" and c["state"] == "ready"]
-    endpoints = {c["source_id"]: model_endpoint(config.store_dir, c) for c in models}
-    tasks = {task: models[0]["source_id"] for task in MODEL_TASKS if models and task not in config.tasks}
+    endpoints = {e.id: e for c in models for e in model_endpoints(config.store_dir, c)}
+    from towpath.decisions import task_models
+
+    chosen = task_models(config.store_dir, role=role)
+    tasks = {task: chosen[task] if chosen.get(task) in endpoints else models[0]["source_id"]
+             for task in MODEL_TASKS if models and task not in config.tasks}
     pacing = gmail_pacing(config, role)
     if added or endpoints or pacing is not config.gmail_pacing:
         config = dataclasses.replace(config, sources={**config.sources, **added}, gmail_pacing=pacing,
@@ -435,6 +443,46 @@ def model_endpoint(store_dir: Path, c: dict):
     destination = s.get("destination") if s.get("destination") in MODEL_DESTINATIONS else "self-hosted"
     return config_mod.Endpoint(c["source_id"], s["base_url"].rstrip("/"), ref, s["model"], "chat", destination,
                                ("synthetic", "metadata", "content"), MODEL_TIMEOUT_SECONDS)
+
+
+def model_endpoints(store_dir: Path, c: dict) -> list:
+    """The connection's main model, then each further model on the same server (same address and token). A
+    further model's endpoint ID is ``<connection>:<model name>``; each has its own grants."""
+    from towpath import config as config_mod
+
+    main = model_endpoint(store_dir, c)
+    out = [main]
+    for name, extra in sorted((c["settings"].get("models") or {}).items()):
+        destination = extra.get("destination") if extra.get("destination") in MODEL_DESTINATIONS else main.destination
+        out.append(config_mod.Endpoint(f"{c['source_id']}:{name}", main.base_url, main.credential, name, "chat",
+                                       destination, main.allow_data, MODEL_TIMEOUT_SECONDS))
+    return out
+
+
+def add_model_name(store_dir: Path, credentials_dir: Path, source_id: str, model: str,
+                   destination: str | None = None) -> dict:
+    """Test another model on an existing model connection's server, with its stored token, and add it."""
+    c = _require(store_dir, source_id)
+    if c["adapter"] != "model":
+        raise ConnectionProblem("Only an AI model connection can offer further models.")
+    model = model.strip()
+    if not model or model == c["settings"]["model"]:
+        raise ConnectionProblem("Enter the name of a different model on the same server.")
+    destination = destination or c["settings"].get("destination") or "self-hosted"
+    if destination not in MODEL_DESTINATIONS:
+        raise ConnectionProblem("Choose where the model runs.")
+    path = secret_path(credentials_dir, source_id)
+    token = path.read_text() if path.is_file() else ""
+    tested = test_model({"base_url": c["settings"]["base_url"], "model": model}, token)
+    models = {**(c["settings"].get("models") or {}), model: {"tested": tested, "destination": destination}}
+    _update(store_dir, source_id, "model-added", {"model": model}, settings={**c["settings"], "models": models})
+    return tested
+
+
+def remove_model_name(store_dir: Path, source_id: str, model: str) -> None:
+    c = _require(store_dir, source_id)
+    models = {k: v for k, v in (c["settings"].get("models") or {}).items() if k != model}
+    _update(store_dir, source_id, "model-removed", {"model": model}, settings={**c["settings"], "models": models})
 
 
 def test_model(settings: dict, token: str) -> dict:
