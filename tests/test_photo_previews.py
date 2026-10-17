@@ -159,3 +159,24 @@ def test_the_photos_page_and_preview_route(world, monkeypatch):
         assert client.get(f"/photos/preview/{by['private']}").status_code == 404
         client.post("/photos/previews", {"on": "0"})
         assert client.get(f"/photos/preview/{by['plain']}").status_code == 404
+
+
+def test_the_year_page_shows_previews_of_its_busiest_days_but_never_a_hidden_photo(world, monkeypatch):
+    from django.test import Client, override_settings
+
+    from towpath.unified import grants
+    from towpath.web import auth
+    from towpath.web.application import configure
+
+    config, fake, _, by, _ = world
+    run(config, fake)
+    grants.grant(config.store_dir, "folders", "life-evidence", author="owner")
+    monkeypatch.setattr(auth, "_setup_codes", {})
+    configure(config.store_dir)
+    auth.create_account(config.store_dir, "owner", "correct horse battery staple")
+    with override_settings(TOWPATH_STORE_DIR=config.store_dir, TOWPATH_CONFIG=config, ALLOWED_HOSTS=["testserver"]):
+        client = Client()
+        client.post("/login", {"username": "owner", "password": "correct horse battery staple"})
+        page = client.get("/life/year/2019").content.decode()
+        assert f"/photos/preview/{by['plain']}" in page and f"/photos/preview/{by['hidden original']}" not in page
+        assert f"/photos/preview/{by['private']}" not in page

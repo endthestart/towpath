@@ -53,8 +53,9 @@ def story(store_dir, role: str = "web") -> dict:
             if c.citations:
                 notes.append({"n": len(notes) + 1, "ref": c.citations[0].ref, "quote": c.citations[0].captured_excerpt})
                 n = len(notes)
+            photo = next((cit.ref.partition(":")[2] for cit in c.citations if cit.ref.startswith("folders:")), None)
             lines.append({"statement": c.statement, "when": c.when.expression, "note": n,
-                          "remembered": c.modality == "recollected"})
+                          "remembered": c.modality == "recollected", "photo": photo})
         chapters.setdefault(name, []).append({**e, "lines": lines, "year": year})
     return {"name": me.get("name"), "chapters": list(chapters.items()), "notes": notes}
 

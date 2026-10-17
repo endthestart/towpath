@@ -13,7 +13,7 @@
 <td>{% for e in m.events %}{{ e.statement }}{% if e.evidence_url %} <a href="{{ e.evidence_url }}" aria-label="Source for {{ e.statement }}">↗</a>{% endif %}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td></tr>{% endif %}{% empty %}{% endfor %}</tbody></table>
 {% if not y.totals.photos and not y.totals.received and not y.totals.sent and not y.events %}<p>Nothing in Towpath's records for this year yet.</p>{% endif %}</section>
 {% if y.days %}<section class="detail-card"><h2 class="card-title">Days with the most photos</h2>
-{% for d in y.days %}<p><a href="/photos/?after={{ d.0 }}&amp;before={{ d.0 }}">{{ d.0 }}</a> <span class="muted">· {{ d.1 }} photos</span></p>{% endfor %}
+{% for d in y.days %}<p><a href="/photos/?after={{ d.0 }}&amp;before={{ d.0 }}">{{ d.0 }}</a> <span class="muted">· {{ d.1 }} photos</span>{% if d.2 %}<br>{% for o, turn in d.2 %}<img class="photo-preview {{ turn }}" src="/photos/preview/{{ o }}" alt="" loading="lazy" width="96" height="72"> {% endfor %}{% endif %}</p>{% endfor %}
 {% if y.cameras %}<p class="footnote">Cameras: {% for c in y.cameras %}{{ c.0 }} ({{ c.1 }}){% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}</section>{% endif %}
 {% if y.people %}<section class="detail-card"><h2 class="card-title">People you wrote to most</h2>
 {% for p in y.people %}<p><a href="/people/{{ p.0|urlencode }}/">{{ p.0 }}</a> <span class="muted">· {{ p.1 }} message{{ p.1|pluralize }}</span></p>{% endfor %}</section>{% endif %}

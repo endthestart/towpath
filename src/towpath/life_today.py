@@ -124,7 +124,7 @@ def one_year(store_dir, year: str, role: str = "web", sources: set[str] | None =
     for c in events:
         month = (c.when.earliest or "")[5:7]
         (months[month]["events"] if month in months and c.when.precision != "year" else undated_month).append(c)
-    days, cameras = [], []
+    days, cameras, samples = [], [], {}
     if store_path(store_dir, "files").exists():
         with closing(open_store(store_dir, "files", role)) as db:
             only, args = "", ()
@@ -141,6 +141,10 @@ def one_year(store_dir, year: str, role: str = "web", sources: set[str] | None =
             days = [tuple(r) for r in db.execute(
                 f"SELECT substr(taken, 1, 10), count(*) FROM photo_meta WHERE substr(taken, 1, 4) = ?{only} GROUP BY 1 "
                 "ORDER BY 2 DESC LIMIT 8", (year, *args))]
+            # a few of each busy day's photos, for previews
+            samples = {d: [r[0] for r in db.execute(
+                f"SELECT occurrence_id FROM photo_meta WHERE substr(taken, 1, 10) = ?{only} ORDER BY taken LIMIT 4",
+                (d, *args))] for d, _ in days}
             cameras = [tuple(r) for r in db.execute(
                 "SELECT trim(coalesce(make, '') || ' ' || model), count(*) FROM photo_meta WHERE substr(taken, 1, 4) "
                 f"= ? AND model IS NOT NULL{only} GROUP BY 1 ORDER BY 2 DESC LIMIT 5", (year, *args))]
@@ -171,6 +175,6 @@ def one_year(store_dir, year: str, role: str = "web", sources: set[str] | None =
                                 first.append((when[:10], a))
                         seen_before.add(a)
     return {"year": year, "months": list(months.values()), "events": events, "year_events": undated_month,
-            "days": days, "cameras": cameras,
+            "days": days, "cameras": cameras, "samples": samples,
             "people": sorted(people.items(), key=lambda x: -x[1])[:12], "first": first[:20],
             "totals": {k: sum(m[k] for m in months.values()) for k in ("photos", "received", "sent")}}

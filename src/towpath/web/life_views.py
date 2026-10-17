@@ -17,6 +17,7 @@ from towpath import connections, decisions, life, life_ask, life_groups, life_pr
 from towpath.unified import grants
 from towpath.web.auth import local_next
 
+_TURN = {3: "rot180", 6: "rot90", 8: "rot270"}  # EXIF orientation to the preview's turn
 LIFE_STORES = ("decisions", "connections")
 FEATURE = "life-evidence"
 TASK = "life.propose"
@@ -170,6 +171,11 @@ def year(request, year):
     for m in found["months"]:
         m["events"] = [_row(c) for c in m["events"]]
     found["year_events"] = [_row(c) for c in found["year_events"]]
+    from towpath import thumbs
+
+    shown = thumbs.available(store, [o for ids in found["samples"].values() for o in ids])
+    found["days"] = [(d, n, [(o, _TURN.get(shown[o], "")) for o in found["samples"].get(d, []) if o in shown])
+                     for d, n in found["days"]]
     peak = max((m["photos"] for m in found["months"]), default=0)
     mail_peak = max((m["received"] + m["sent"] for m in found["months"]), default=0)
     return render(request, "life_year.html", {
@@ -292,6 +298,13 @@ def story(request):
     from towpath import life_story
 
     found = life_story.story(settings.TOWPATH_STORE_DIR)
+    from towpath import thumbs
+
+    lines = [line for _, entries in found["chapters"] for e in entries for line in e["lines"]]
+    shown = thumbs.available(settings.TOWPATH_STORE_DIR, [line["photo"] for line in lines if line["photo"]])
+    for line in lines:
+        line["preview"] = line["photo"] in shown
+        line["turn"] = _TURN.get(shown.get(line["photo"]), "")
     if request.GET.get("format") == "md":
         response = HttpResponse(life_story.markdown(found), content_type="text/markdown; charset=utf-8")
         response["Content-Disposition"] = 'attachment; filename="my-story.md"'
