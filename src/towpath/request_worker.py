@@ -52,6 +52,9 @@ def run_once(config, credentials_dir=None):
 
         indexing += photos.extract_pending(config)
         indexing += photos.translate_pending(config)
+        from towpath import search_translate
+
+        indexing += search_translate.translate_pending(config)
         from towpath import life_propose  # life-story proposals, only once the owner allowed them
 
         indexing += life_propose.propose_pending(config, credentials_dir)

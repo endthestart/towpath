@@ -109,3 +109,27 @@ def test_without_exiftool_nothing_happens(library):
     config, _, _ = library
     assert photos.extract_pending(config, exiftool="/nonexistent/exiftool") == []
     assert photos.progress(config.store_dir)["read"] == 0
+
+
+def test_a_plain_english_search_becomes_a_checked_query(tmp_path, openai_stub):
+    from towpath import config as config_mod, connections, decisions, search_translate
+
+    answers = iter(['{"query": "extension:pdf in:\\"files/house\\" after:2019-01-01 before:2019-12-31"}',
+                    '{"query": "size:lots"}'])
+    stub = openai_stub(model="local", respond=lambda p: next(answers) if "Question:" in p else '{"ok": true}')
+    (tmp_path / "towpath.toml").write_text('[stores]\ndir = "state"\n')
+    base = config_mod.load(tmp_path / "towpath.toml")
+    form = {"base_url": f"http://127.0.0.1:{stub.port}/v1", "model": "local"}
+    mid = connections.add_model(base.store_dir, tmp_path / "credentials", form, "t", connections.test_model(form, "t"))
+    worker = connections.merged(base, tmp_path / "credentials")
+    first = search_translate.ask(base.store_dir, "PDFs about the house from 2019")
+    search_translate.translate_pending(worker)  # no permission yet: the question's words
+    assert search_translate.answer(base.store_dir, first) == {"query": "PDFs about the house from 2019",
+                                                               "status": "words"}
+    decisions.grant_model(worker, mid, "content", author="owner")
+    second = search_translate.ask(base.store_dir, "PDFs about the house from 2019")
+    third = search_translate.ask(base.store_dir, "huge things")
+    search_translate.translate_pending(worker)
+    assert search_translate.answer(base.store_dir, second)["status"] == "translated"
+    assert search_translate.answer(base.store_dir, second)["query"].startswith("extension:pdf")
+    assert search_translate.answer(base.store_dir, third) == {"query": "huge things", "status": "words-after-invalid"}

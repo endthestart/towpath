@@ -11,6 +11,8 @@
   {% for s in sources %}<label class="toggle"><input type="checkbox" name="source" value="{{ s.source_id }}" {% if s.checked %}checked{% endif %}><span>{{ s.label }}</span></label>{% endfor %}
   </fieldset>{% endif %}
 </form>
+<form class="search" method="post" action="/search/ask">{% csrf_token %}<label for="question" class="sr-only">Ask in plain English</label><input id="question" name="question" maxlength="300" placeholder="Or ask in plain English: PDFs about the house from 2019"><button class="button secondary" type="submit">Ask</button></form>
+{% if asked %}<p class="footnote">“{{ asked }}” became <code>{{ query }}</code>. Edit it above to refine.</p>{% endif %}
 <details class="tips"><summary>Search tips</summary>
   <p>Words match subjects, senders and attachment names right away; use <em>Search inside messages</em> for full text. Narrow with:</p>
   <ul><li><code>after:2010-01-01</code> or <code>before:2015-12-31</code> — by date</li>

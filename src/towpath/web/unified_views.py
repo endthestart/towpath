@@ -63,6 +63,37 @@ def _present(response: dict, labels: dict, types: dict) -> list[dict]:
     return out
 
 
+@require_POST
+def search_ask(request):
+    """A plain-English search: queued for the worker's model, then shown as the query it became."""
+    from django.shortcuts import redirect
+
+    from towpath import search_translate
+
+    try:
+        seq = search_translate.ask(settings.TOWPATH_STORE_DIR, request.POST.get("question", ""))
+    except ValueError:
+        return HttpResponseBadRequest("Ask something.")
+    return redirect(f"/search/ask/{seq}")
+
+
+@require_GET
+def search_asked(request, seq: int):
+    from urllib.parse import urlencode
+
+    from django.shortcuts import redirect
+
+    from towpath import search_translate
+
+    text = search_translate.question(settings.TOWPATH_STORE_DIR, seq)
+    if text is None:
+        raise Http404
+    found = search_translate.answer(settings.TOWPATH_STORE_DIR, seq)
+    if found:
+        return redirect("/search/?" + urlencode({"q": found["query"], "asked": text}))
+    return render(request, "search_waiting.html", {"nav": "search", "text": text})
+
+
 @require_GET
 def search(request):
     query = request.GET.get("q", "").strip()[:512]
@@ -79,7 +110,7 @@ def search(request):
                "deep_labels": [labels[s] for s in deep], "deep_names": present.join([labels[s] for s in deep]),
                "deep_verb": "are" if len(deep) > 1 else "is", "overview": [present.overview(s, labels[s["source_id"]])
                                                                      for s in statuses],
-               "error": None, "response": None, "provider": None,
+               "error": None, "response": None, "provider": None, "asked": request.GET.get("asked"),
                "waiting": False}
     if query:
         try:
