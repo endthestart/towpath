@@ -174,7 +174,7 @@ def test_the_pages_for_senders_rules_and_batch_answers(world, monkeypatch):
     assert settings.dry_run(world.store, world.sid)
 
 
-def test_a_category_the_owner_gives_one_sender_is_learned_for_its_domain(world):
+def test_a_category_the_owner_gives_one_sender_is_learned_for_its_domain(world, monkeypatch):
     from test_mail_threads import mail
 
     from towpath import connect
@@ -182,17 +182,18 @@ def test_a_category_the_owner_gives_one_sender_is_learned_for_its_domain(world):
 
     world.state.mailboxes["INBOX"].messages[9] = mail(9, "Shop Orders <orders@shop.example>", "reader@example.com",
                                                       "Your order", "Thanks for your order.", 1)
-    world.state.mailboxes["INBOX"].messages[10] = mail(10, "Friend <friend@gmail.com>", "reader@example.com",
+    monkeypatch.setattr(senders, "SHARED_DOMAINS", {"mail.example"})  # a personal mail provider, as gmail is
+    world.state.mailboxes["INBOX"].messages[10] = mail(10, "Friend <friend@mail.example>", "reader@example.com",
                                                        "hi", "hello", 1)
     connect.sync(world.worker(), world.sid)
     analysis.analyze_pending(world.worker())
     senders.mark(world.store, world.sid, "news@shop.example", "receipt")
-    senders.mark(world.store, world.sid, "someone@gmail.com", "receipt")  # a shared domain: nothing learned
+    senders.mark(world.store, world.sid, "someone@mail.example", "receipt")  # a shared domain: nothing learned
     senders.categorize_pending(world.worker())
     got = {r["address"]: r for r in senders.listing(world.store, world.sid)}
     learned = got["orders@shop.example"]
     assert learned["category"] == "receipt" and learned["category_by"] == "learned"
-    assert got["friend@gmail.com"]["category_by"] != "learned"
+    assert got["friend@mail.example"]["category_by"] != "learned"
 
 
 def test_the_owners_marks_are_examples_for_the_model(world):
