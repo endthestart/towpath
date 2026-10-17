@@ -1,6 +1,7 @@
 # Life stream
 
-Status: **designed, not built.** Comes after mail management in the [roadmap](roadmap.md), but does not depend on mail.
+Status: **first layers built** (2026-10-17): events found by themselves across allowed mail, memories (groups),
+an owner profile, a timeline, and Ask with cited answers. See [the next layers](#built-2026-10-17) below.
 
 The life stream helps a person uncover forgotten memories, connect timelines across sources, ask questions with cited answers, and, in the long term, curate a life story to share with family. That family story is a long-term outcome; early milestones only need to produce reviewable, cited claims.
 
@@ -132,3 +133,20 @@ From reviewing the first build:
 
 Groups need their own records: a group with kind, title, period and members (event references), where the
 owner's additions, removals and approval are decisions kept apart from regenerated proposals, as for claims.
+
+## Built 2026-10-17
+
+- **Finding events by itself** (`life_propose`, *Find events by itself* on the Life page): every account the life
+  story may use, a year at a time, newest first; the current year is looked at again every ten minutes for new mail.
+  Likely messages now include mail with people the owner writes to and mail the owner sent, not only telling
+  subjects; where mail management has read a message, its text (quotes removed) is used without fetching again.
+- **Memories** (`life_groups`): people (three or more events in mail with one person mail management counts as a
+  person), life chapters by decade from the owner's birthday, and occasions, trips and projects that the model
+  gathers from each month's events (with the days around it). The owner keeps (a snapshot in the decisions store),
+  renames, edits or dismisses a memory; a kept memory is offered newly found events rather than changed. Proposals
+  mostly repeating a decided memory aren't shown again.
+- **Profile**: name and birthday, for ages on the timeline and the decade chapters.
+- **Timeline**: years, newest first, each with its memories and the events in no memory; everyday events on request.
+- **Ask** (`life_ask`): a question is answered from events and messages of accounts the life story may use, found by
+  its words, as numbered sources; the model's sentences each cite sources, and one without is marked unsupported.
+  Without a model the sources alone are shown.

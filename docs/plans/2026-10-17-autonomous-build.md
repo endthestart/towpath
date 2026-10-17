@@ -40,6 +40,8 @@ Balanced across three areas, mail first:
 
 1. **Attachment filing** (kept in scope at the start): where should Towpath file attachments from mail — Paperless
    (its consume folder or API), Immich for photos, a NAS folder, or Google Drive? Building it waits for this.
+2. **Fastmail for the life story and Ask:** only Gmail (`gmail_test`) is allowed for the life story today, so
+   events, memories and Ask don't use Fastmail, which Towpath now reads in full. Allow it?
 
 ## Decisions made for review
 
@@ -76,6 +78,11 @@ Balanced across three areas, mail first:
 14. **Alerts and digest:** alerts mark only mail that arrives after they're turned on; the digest is written at 7am
     Chicago time (the owner's time zone is assumed), daily or on Mondays, and put in the inbox from "Towpath digest"
     at the owner's own address.
+15. **Finding events by itself** goes a year at a time, newest first, per account, and rechecks the current year
+    every ten minutes; it waits behind a period the owner asked for explicitly.
+16. **Memories:** a person needs three or more events to get a memory; chapters are decades of age; the model
+    groups each month's events with ten days either side; the life-story, grouping and Ask tasks run on the Mac
+    Pro 35B on Hub (Carbonio is busy), logged as the owner's chat permission.
 
 ## Progress
 
@@ -89,3 +96,4 @@ Balanced across three areas, mail first:
 - 2026-10-17: `75f606a` deployed (reading resumed past the 8-bit header); the Mac Pro 35B added on Hub, chosen for
   the three mail tasks and allowed to read mail text, logged as the owner's chat permission. Milestone 5 built
   (alerts, digest, statistics); attachment filing waits on open question 1.
+- 2026-10-17: life story layers built: finding events by itself, memories, profile, timeline, Ask.

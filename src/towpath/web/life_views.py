@@ -6,14 +6,14 @@ both are given.
 """
 
 from django.conf import settings
-from django.http import HttpResponseBadRequest
+from django.http import Http404, HttpResponseBadRequest
 from django.shortcuts import redirect, render
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from datetime import date
 from urllib.parse import urlencode
 
-from towpath import connections, decisions, life, life_propose, stores
+from towpath import connections, decisions, life, life_ask, life_groups, life_propose, stores
 from towpath.unified import grants
 
 LIFE_STORES = ("decisions", "connections")
@@ -60,7 +60,9 @@ def _status() -> dict:
         run = None  # that run was for an earlier slice
     reason = life_propose.blocked(config, value, role="web")
     running = reason is None and not (run and run["state"] == "done")
-    return {"request": value, "run": run, "blocked": reason, "running": running}
+    on = life_propose.auto(settings.TOWPATH_STORE_DIR, role="web")
+    return {"request": value, "run": run, "blocked": reason, "running": running or on, "auto": on,
+            "auto_progress": life_propose.auto_progress(settings.TOWPATH_STORE_DIR) if on else None}
 
 
 def _row(claim) -> dict:
@@ -87,7 +89,8 @@ def overview(request):
     status = _status()
     year = date.today().year - 1
     return render(request, "life.html", {
-        "nav": "life", "accounts": _accounts(config), "saved": request.GET.get("saved"), "show": show,
+        "nav": "life", "profile": life_groups.profile(settings.TOWPATH_STORE_DIR), "accounts": _accounts(config),
+        "saved": request.GET.get("saved"), "show": show,
         "model": {"id": endpoint_id, "name": endpoint.model, "address": endpoint.base_url,
                   "allowed": decisions.model_granted(config, endpoint_id, "content")} if endpoint else None,
         "rows": rows, "counts": {**{s: sum(c.state == s for c in proposed) for s in ("accepted", "corrected",
@@ -117,6 +120,135 @@ def start(request):
                                  request.POST.get("before", ""))
     except ValueError:
         return HttpResponseBadRequest("Choose a period with a start date before its end date.")
+    return redirect("/life/?saved=started")
+
+
+def _age(birthday: str | None, year: str) -> int | None:
+    if not birthday or not year.isdigit():
+        return None
+    return int(year) - int(birthday[:4])
+
+
+@require_GET
+def timeline(request):
+    """Years, newest first: the memories in each year, then events not in any memory."""
+    stores.require_current(settings.TOWPATH_STORE_DIR, LIFE_STORES)
+    store = settings.TOWPATH_STORE_DIR
+    me = life_groups.profile(store)
+    claims_ = {c.claim_id: c for c in life.claims(store, limit=10**6) if c.state != "rejected"}
+    memories = [g for g in life_groups.groups(store) if g["state"] != "dismissed" and g["kind"] != "chapter"]
+    in_group = {m for g in memories for m in g["members"]}
+    years: dict[str, dict] = {}
+    for g in memories:
+        year = (g["earliest"] or "Undated")[:4]
+        years.setdefault(year, {"groups": [], "events": []})["groups"].append(
+            {**g, "events": [_row(claims_[m]) for m in g["members"] if m in claims_]})
+    show_minor = request.GET.get("minor") == "1"
+    for c in claims_.values():
+        if c.claim_id in in_group or (c.significance == "routine" and not show_minor):
+            continue
+        years.setdefault(_row(c)["year"], {"groups": [], "events": []})["events"].append(_row(c))
+    ordered = [{"year": y, "age": _age(me.get("birthday"), y), **years[y]} for y in sorted(years, reverse=True)]
+    return render(request, "life_timeline.html", {"nav": "life", "years": ordered, "profile": me,
+                                                  "show_minor": show_minor})
+
+
+@require_GET
+def memories(request):
+    store = settings.TOWPATH_STORE_DIR
+    show = request.GET.get("show", "proposed")
+    found = [g for g in life_groups.groups(store) if show == "all" or g["state"] == show]
+    counts = {s: sum(g["state"] == s for g in life_groups.groups(store)) for s in ("proposed", "kept", "dismissed")}
+    return render(request, "life_memories.html", {"nav": "life", "groups": found, "show": show, "counts": counts,
+                                                  "profile": life_groups.profile(store)})
+
+
+@require_GET
+def memory(request, group_id):
+    store = settings.TOWPATH_STORE_DIR
+    g = life_groups.get(store, group_id)
+    if g is None:
+        raise Http404
+    claims_ = {c.claim_id: c for c in life.claims(store, limit=10**6)}
+    query = request.GET.get("q", "").strip().lower()
+    candidates = [_row(c) for c in claims_.values() if query and query in c.statement.lower()
+                  and c.claim_id not in g["members"]][:30]
+    return render(request, "life_memory.html", {
+        "nav": "life", "g": g, "events": [_row(claims_[m]) for m in g["members"] if m in claims_],
+        "new_events": [_row(claims_[m]) for m in g.get("new_members", []) if m in claims_],
+        "kinds": list(life_groups.KINDS.items()), "query": request.GET.get("q", ""), "candidates": candidates})
+
+
+@require_POST
+def memory_decide(request):
+    store = settings.TOWPATH_STORE_DIR
+    g = life_groups.get(store, request.POST.get("group_id", ""))
+    if g is None:
+        return HttpResponseBadRequest("That memory no longer exists.")
+    action = request.POST.get("action", "")
+    members = list(g["members"])
+    if action == "remove":
+        members = [m for m in members if m != request.POST.get("claim_id")]
+    elif action == "add":
+        members.append(request.POST.get("claim_id", ""))
+    known = {c.claim_id for c in life.claims(store, limit=10**6)}
+    members = [m for m in members if m in known]
+    if action == "undo":
+        life_groups.undecide(store, g["group_id"])
+    elif action in ("keep", "remove", "add", "rename"):
+        life_groups.decide(store, g, "kept", title=request.POST.get("title") or g["title"],
+                           kind=request.POST.get("kind") if request.POST.get("kind") in life_groups.KINDS else None,
+                           members=members)
+    elif action == "dismiss":
+        life_groups.decide(store, g, "dismissed")
+    else:
+        return HttpResponseBadRequest("Unknown action.")
+    return redirect(request.POST.get("next") or f"/life/memories/{g['group_id']}/")
+
+
+def _ask_view(q: dict) -> dict:
+    a = q["answer"]
+    if not a:
+        return q
+    sources = []
+    for i, s in enumerate(a["sources"], start=1):
+        url = (f"/mail/m/{s['item_id']}/" if s["kind"] == "message" else
+               "/ref/?" + urlencode({"r": s["ref"]}) if s.get("ref") else None)
+        sources.append({**s, "n": i, "url": url})
+    return {**q, "sources": sources, "sentences": a["sentences"], "unknown": a["unknown"], "status": a["status"]}
+
+
+@require_http_methods(["GET", "POST"])
+def ask(request):
+    store = settings.TOWPATH_STORE_DIR
+    if request.method == "POST":
+        try:
+            life_ask.ask(store, request.POST.get("question", ""))
+        except ValueError:
+            return HttpResponseBadRequest("Ask a question.")
+        return redirect("/life/ask")
+    asked = [_ask_view(q) for q in life_ask.questions(store)]
+    config = _config()
+    endpoint_id = config.tasks.get("ask.answer")
+    return render(request, "life_ask.html", {
+        "nav": "life", "asked": asked, "waiting": any(q["answer"] is None for q in asked),
+        "model_ok": bool(endpoint_id) and decisions.model_granted(config, endpoint_id, "content")})
+
+
+@require_POST
+def profile(request):
+    try:
+        life_groups.set_profile(settings.TOWPATH_STORE_DIR, request.POST.get("name", ""),
+                                request.POST.get("birthday") or None)
+    except ValueError:
+        return HttpResponseBadRequest("Enter the birthday as a date.")
+    return redirect("/life/?saved=profile")
+
+
+@require_POST
+def auto(request):
+    """Turn finding events by itself on or off."""
+    life_propose.set_auto(settings.TOWPATH_STORE_DIR, request.POST.get("on") == "1")
     return redirect("/life/?saved=started")
 
 

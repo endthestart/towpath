@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block title %}Ask · Life · Towpath{% endblock %}
+{% block content %}
+<a class="back-link" href="/life/">← Life</a>
+<header class="page-head compact"><h1>Ask</h1>
+<p class="lead">Ask about your life. Towpath answers only from your own records (the events it found and the mail the life story may use), and every sentence names its sources.{% if not model_ok %} No AI model may read your mail yet, so you'll see the sources it finds, without an answer.{% endif %}</p></header>
+<form class="search" method="post">{% csrf_token %}<label for="question" class="sr-only">Question</label><input id="question" name="question" maxlength="500" placeholder="When did we first go to Example City?"><button class="button" type="submit">Ask →</button></form>
+<div{% if waiting %} hx-get="/life/ask" hx-trigger="every 5s" hx-select="#answers" hx-target="#answers" hx-swap="outerHTML"{% endif %} id="answers">
+{% for q in asked %}<section class="detail-card"><h2 class="card-title">{{ q.text }}</h2>
+{% if not q.answer %}<p class="muted">Looking through your records…</p>{% else %}
+{% if q.unknown %}<p class="warn-text">Your records don't answer this{% if q.sentences %}; here is what they show{% endif %}.</p>{% endif %}
+{% for s in q.sentences %}<p>{{ s.text }} {% for n in s.sources %}<a href="#q{{ q.question_id }}-{{ n }}">[{{ n }}]</a>{% empty %}<span class="status warn">unsupported</span>{% endfor %}</p>{% endfor %}
+{% if q.sources %}<details{% if q.status == 'sources-only' %} open{% endif %}><summary>Sources ({{ q.sources|length }})</summary>
+{% for s in q.sources %}<p id="q{{ q.question_id }}-{{ s.n }}" class="footnote">[{{ s.n }}] {% if s.kind == 'event' %}Event, {{ s.date }}: {{ s.text }}{% else %}Email, {{ s.date }}, from {{ s.from }}: {{ s.text }}{% endif %}{% if s.url %} <a href="{{ s.url }}">open</a>{% endif %}</p>{% endfor %}</details>{% elif not q.sentences %}<p>Nothing in your records matched.</p>{% endif %}{% endif %}
+</section>{% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %}{{ g.title }} · Memories · Towpath{% endblock %}
+{% block content %}
+<a class="back-link" href="/life/memories/">← Memories</a>
+<header class="page-head compact"><p class="eyebrow">{{ g.label|upper }}{% if g.state != 'proposed' %} · {{ g.state|upper }}{% endif %}</p><h1>{{ g.title }}</h1>
+{% if g.summary %}<p class="lead">{{ g.summary }}</p>{% endif %}</header>
+<section class="detail-card"><form method="post" action="/life/memories/decide" class="inline-form">{% csrf_token %}<input type="hidden" name="group_id" value="{{ g.group_id }}">
+  <label>Title <input name="title" value="{{ g.title }}"></label>
+  <label>Kind <select name="kind">{% for key, label in kinds %}<option value="{{ key }}"{% if key == g.kind %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <button class="button" name="action" value="{% if g.state == 'kept' %}rename{% else %}keep{% endif %}">{% if g.state == 'kept' %}Save{% else %}Keep{% endif %}</button>
+  {% if g.state == 'proposed' %}<button class="button secondary" name="action" value="dismiss">Dismiss</button>{% else %}<button class="button secondary" name="action" value="undo">Undo</button>{% endif %}</form></section>
+<section class="detail-card"><h2 class="card-title">Events</h2>
+{% for e in events %}<form method="post" action="/life/memories/decide" class="inline-form">{% csrf_token %}<input type="hidden" name="group_id" value="{{ g.group_id }}"><input type="hidden" name="claim_id" value="{{ e.id }}">
+<span>{{ e.statement }} <span class="muted">· {{ e.when }}</span>{% if e.quote %}<br><span class="footnote">“{{ e.quote }}”{% if e.evidence_url %} <a href="{{ e.evidence_url }}">open</a>{% endif %}</span>{% endif %}</span>
+<button class="button secondary" name="action" value="remove">Remove</button></form>{% endfor %}</section>
+{% if new_events %}<section class="detail-card"><h2 class="card-title">Newly found, not in your kept memory</h2>
+{% for e in new_events %}<form method="post" action="/life/memories/decide" class="inline-form">{% csrf_token %}<input type="hidden" name="group_id" value="{{ g.group_id }}"><input type="hidden" name="claim_id" value="{{ e.id }}">
+<span>{{ e.statement }} <span class="muted">· {{ e.when }}</span></span><button class="button secondary" name="action" value="add">Add</button></form>{% endfor %}</section>{% endif %}
+<section class="detail-card"><h2 class="card-title">Add events from elsewhere</h2>
+<form method="get" class="inline-form"><label>Find events <input name="q" value="{{ query }}"></label><button class="button secondary" type="submit">Find</button></form>
+{% for e in candidates %}<form method="post" action="/life/memories/decide" class="inline-form">{% csrf_token %}<input type="hidden" name="group_id" value="{{ g.group_id }}"><input type="hidden" name="claim_id" value="{{ e.id }}">
+<span>{{ e.statement }} <span class="muted">· {{ e.when }}</span></span><button class="button secondary" name="action" value="add">Add</button></form>{% endfor %}</section>
+{% endblock %}

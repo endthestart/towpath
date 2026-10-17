@@ -38,10 +38,11 @@ PROVIDERS = {
 MODEL_DESTINATIONS = {"self-hosted": "On your network", "third-party": "A cloud service"}
 # What an AI model connection is used for. Personal content reaches it only after the owner allows it on the Life
 # page (a grant in the decisions store, tied to this endpoint's address, model and token file).
-MODEL_TASKS = ("life.propose", "mail.thread", "mail.draft", "mail.classify", "ask.answer", "search.translate")
-TASK_LABELS = {"life.propose": "Life story: propose events", "mail.thread": "Mail: who needs to reply",
-               "mail.draft": "Mail: draft replies", "mail.classify": "Mail: categories and rules",
-               "ask.answer": "Ask: answer questions from your records",
+MODEL_TASKS = ("life.propose", "life.group", "mail.thread", "mail.draft", "mail.classify", "ask.answer",
+               "search.translate")
+TASK_LABELS = {"life.propose": "Life story: propose events", "life.group": "Life story: gather events into memories",
+               "mail.thread": "Mail: who needs to reply", "mail.draft": "Mail: draft replies",
+               "mail.classify": "Mail: categories and rules", "ask.answer": "Ask: answer questions from your records",
                "search.translate": "Search: understand plain-English questions"}
 MODEL_TIMEOUT_SECONDS = 300.0  # a model on a sleeping machine can take a minute or two to wake and load
 # Folders left out by default: special use (RFC 6154) first, then common names for servers that omit it.

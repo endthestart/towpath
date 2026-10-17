@@ -28,6 +28,7 @@ from towpath.unified.claims import Citation, Claim, ClaimError, DateBasis, When
 TASK = "life.propose"
 PROMPT_VERSION = "life.propose/2"
 REQUEST_TARGET, REQUEST_KEY = "life:request", "slice"
+AUTO_TARGET, AUTO_KEY = "life:auto", "state"
 SLICE_SECONDS = 90  # per worker poll, so mail checks and searches keep running
 RETRY_SECONDS = 30 * 60  # after the mail account stopped (a sign-in that expired, a server error)
 MODEL_RETRY_SECONDS = 10 * 60  # after the model couldn't be reached
@@ -141,6 +142,28 @@ def _write(store_dir, value: dict, author: str) -> None:
         db.commit()
 
 
+def auto(store_dir, role: str = "worker") -> bool:
+    """Whether the owner turned on finding events by itself, across every account the life story may use."""
+    if not store_path(store_dir, "decisions").exists():
+        return False
+    with closing(open_store(store_dir, "decisions", role)) as db:
+        row = db.execute("SELECT value FROM settings WHERE target_id = ? AND key = ?",
+                         (AUTO_TARGET, AUTO_KEY)).fetchone()
+    return bool(row and json.loads(row[0]) == "running")
+
+
+def set_auto(store_dir, on: bool, author: str = "owner") -> None:
+    from towpath.decisions import now
+
+    value = json.dumps("running" if on else "paused")
+    with closing(open_store(store_dir, "decisions", "web")) as db:
+        db.execute("INSERT OR REPLACE INTO settings (target_id, key, value, author, at) VALUES (?,?,?,?,?)",
+                   (AUTO_TARGET, AUTO_KEY, value, author, now()))
+        db.execute("INSERT INTO decision_log (kind, target_id, detail, author, at) VALUES ('life-request', ?, ?, ?, ?)",
+                   (AUTO_TARGET, value, author, now()))
+        db.commit()
+
+
 def run_id(value: dict) -> str:
     """One run per slice and prompt version: a new prompt reads the slice again."""
     return "lrun_" + digest({**{k: value[k] for k in ("source_id", "after", "before")}, "prompt": PROMPT_VERSION})[:16]
@@ -152,7 +175,7 @@ def blocked(config, value: dict | None, role: str = "worker") -> str | None:
     from towpath.unified import grants
 
     if value is None:
-        return "Choose a mail account and a period to start."
+        return "Turn on finding events, or choose a mail account and a period."
     if value.get("state") == "paused":
         return "Paused."
     if "life-evidence" not in grants.granted(config.store_dir).get(value["source_id"], set()):
@@ -177,20 +200,59 @@ def progress(store_dir, role: str = "web") -> dict | None:
             "finished_at": row[4]} if row else None
 
 
+def auto_progress(store_dir, role: str = "web") -> dict:
+    """Finding by itself: messages read and events proposed so far, the years finished, and the latest stop."""
+    out = {"examined": 0, "proposed": 0, "years": [], "reason": None, "retry_at": None}
+    if not store_path(store_dir, "life").exists():
+        return out
+    with closing(open_store(store_dir, "life", role)) as db:
+        for slice_, state, raw in db.execute("SELECT slice, state, progress FROM runs ORDER BY started_at"):
+            value, p = json.loads(slice_), json.loads(raw or "{}")
+            if not value.get("auto"):
+                continue
+            out["examined"] += p.get("examined", 0)
+            out["proposed"] += p.get("proposed", 0)
+            if state == "done":
+                out["years"].append(f"{value['source_id']} {value['after'][:4]}")
+            if state == "stopped":
+                out["reason"], out["retry_at"] = p.get("reason"), p.get("retry_at")
+    return out
+
+
 # -- the worker side ------------------------------------------------------------------------------------------
 
 
+def _people(config, source_id: str) -> tuple[set[str], set[str]]:
+    """People the owner corresponds with (senders mail management counts as people) and the account's sent
+    folders, where mail management knows them; empty otherwise."""
+    from towpath.mail import senders, threads
+
+    people = {a for a, c in senders.categories(config.store_dir, source_id, "worker").items() if c == "person"}
+    sent = threads.sent_mailboxes(config.store_dir, source_id, "worker") | {"SENT"}
+    return people, sent
+
+
+def _likely(subject: str | None, sender: str | None, labels: list[str], people: set[str], sent: set[str]) -> bool:
+    """A message that may record something in the owner's life: a telling subject, mail from or to a person the
+    owner corresponds with, or mail the owner sent."""
+    low = (subject or "").lower()
+    return any(w in low for w in WORDS) or (sender or "").lower() in people or bool(set(labels) & sent)
+
+
 def _candidates(config, value: dict, examined: set[str], limit: int) -> list[dict]:
-    likes = " OR ".join("lower(coalesce(subject, '')) LIKE ?" for _ in WORDS)
+    people, sent = _people(config, value["source_id"])
     with closing(open_store(config.store_dir, "source", "worker")) as db:
         rows = db.execute(
             "SELECT item_id, native_id, subject, from_addr, date_utc FROM items WHERE source_id = ? "
             "AND absent_since_run IS NULL AND date_utc IS NOT NULL AND substr(date_utc, 1, 10) BETWEEN ? AND ? "
-            f"AND ({likes}) ORDER BY date_utc DESC",
-            (value["source_id"], value["after"], value["before"], *(f"%{w}%" for w in WORDS))).fetchall()
+            "ORDER BY date_utc DESC", (value["source_id"], value["after"], value["before"])).fetchall()
         out = []
         for row in rows:
             if row[0] in examined:
+                continue
+            seen = db.execute("SELECT labels FROM observations WHERE item_id = ? ORDER BY observed_at DESC LIMIT 1",
+                              (row[0],)).fetchone()
+            if not _likely(row[2], row[3], json.loads(seen[0]) if seen else [], people, sent):
                 continue
             part = db.execute("SELECT part_id, mime_type, charset FROM parts WHERE item_id = ? AND mime_type IN "
                               "('text/plain', 'text/html') AND (disposition IS NULL OR disposition != 'attachment') "
@@ -203,6 +265,15 @@ def _candidates(config, value: dict, examined: set[str], limit: int) -> list[dic
             if len(out) >= limit:
                 break
         return out
+
+
+def _stored_text(config, item_id: str) -> str | None:
+    """The message's text from mail management's copy (quotes already removed), when it has read it."""
+    if not store_path(config.store_dir, "mail").exists():
+        return None
+    with closing(open_store(config.store_dir, "mail", "worker")) as db:
+        row = db.execute("SELECT text FROM messages WHERE item_id = ?", (item_id,)).fetchone()
+    return row[0] if row and row[0] else None
 
 
 def _text(raw: bytes, part: dict) -> str:
@@ -264,6 +335,53 @@ def _stop(db, rid: str, state: dict, reason: str, retry_seconds: int, requested_
     return [{"step": "stopped", "reason": reason}]
 
 
+RECHECK_SECONDS = 600  # how often finding by itself looks for new mail in years it has finished
+_rechecked: dict[str, float] = {}
+
+
+def _pending_request(config, value: dict | None) -> bool:
+    """Whether the owner's own period request still has work (it goes before finding by itself)."""
+    if value is None or value.get("state") == "paused":
+        return False
+    if not store_path(config.store_dir, "life").exists():
+        return True
+    with closing(open_store(config.store_dir, "life", "worker")) as db:
+        row = db.execute("SELECT state FROM runs WHERE run_id = ?", (run_id(value),)).fetchone()
+    return row is None or row[0] != "done"
+
+
+def _years(config, source_id: str) -> list[str]:
+    with closing(open_store(config.store_dir, "source", "worker")) as db:
+        return [r[0] for r in db.execute("SELECT DISTINCT substr(date_utc, 1, 4) FROM items WHERE source_id = ? AND "
+                                         "date_utc IS NOT NULL AND absent_since_run IS NULL ORDER BY 1 DESC",
+                                         (source_id,))]
+
+
+def _next_auto(config, clock=time.monotonic) -> dict | None:
+    """Finding by itself: the newest year, in any account the life story may use, that still has unread likely
+    messages. Finished years are looked at again now and then for newly arrived mail."""
+    from towpath.unified import grants
+
+    allowed = sorted(sid for sid, f in grants.granted(config.store_dir).items()
+                     if "life-evidence" in f and sid in config.sources)
+    done: dict[str, str] = {}
+    if store_path(config.store_dir, "life").exists():
+        with closing(open_store(config.store_dir, "life", "worker")) as db:
+            done = {r[0]: r[1] for r in db.execute("SELECT run_id, state FROM runs")}
+    current = str(date.today().year)
+    for sid in allowed:
+        for year in _years(config, sid):
+            value = {"source_id": sid, "after": f"{year}-01-01", "before": f"{year}-12-31", "state": "running",
+                     "auto": True}
+            rid = run_id(value)
+            if done.get(rid) == "done":
+                if year != current or clock() - _rechecked.get(rid, float("-inf")) < RECHECK_SECONDS:
+                    continue
+                _rechecked[rid] = clock()
+            return value
+    return None
+
+
 def propose_pending(config, credentials_dir, slice_seconds: float = SLICE_SECONDS, clock=time.monotonic) -> list[dict]:
     """One bounded slice of proposing for the owner's request; nothing happens unless everything is allowed.
 
@@ -274,6 +392,8 @@ def propose_pending(config, credentials_dir, slice_seconds: float = SLICE_SECOND
     from towpath.models import gateway
 
     value = request(config.store_dir)
+    if not _pending_request(config, value):
+        value = _next_auto(config, clock) if auto(config.store_dir) else None
     if blocked(config, value) is not None:
         return []
     rid = run_id(value)
@@ -323,18 +443,21 @@ def propose_pending(config, credentials_dir, slice_seconds: float = SLICE_SECOND
             elif message["advertising"]:
                 outcome = "advertising"
                 db.executemany("DELETE FROM claims WHERE claim_id = ?", [(c,) for c in unreviewed])
-            elif message["part"] is not None:
-                try:
-                    if connector is None:
-                        connector = build_connector(config.sources[value["source_id"]], config)
-                    raw = connector.fetch(message["native_id"], message["part"]["part_id"])
-                except SyncStop as exc:
-                    return _stop(db, rid, state, f"The mail account stopped: {exc.reason}", RETRY_SECONDS,
-                                 requested_at)
-                except Exception as exc:  # noqa: BLE001 - never stop the worker; keep data out of the reason
-                    return _stop(db, rid, state, f"Reading mail stopped on an unexpected error "
-                                                 f"({type(exc).__name__}).", RETRY_SECONDS, requested_at)
-                text = _text(raw, message["part"])[:TEXT_LIMIT]
+            elif message["part"] is not None or _stored_text(config, message["item_id"]):
+                text = _stored_text(config, message["item_id"])  # what mail management already read
+                if text is None:
+                    try:
+                        if connector is None:
+                            connector = build_connector(config.sources[value["source_id"]], config)
+                        raw = connector.fetch(message["native_id"], message["part"]["part_id"])
+                    except SyncStop as exc:
+                        return _stop(db, rid, state, f"The mail account stopped: {exc.reason}", RETRY_SECONDS,
+                                     requested_at)
+                    except Exception as exc:  # noqa: BLE001 - never stop the worker; keep data out of the reason
+                        return _stop(db, rid, state, f"Reading mail stopped on an unexpected error "
+                                                     f"({type(exc).__name__}).", RETRY_SECONDS, requested_at)
+                    text = _text(raw, message["part"])
+                text = text[:TEXT_LIMIT]
                 prompt = (f"{INSTRUCTION}\n\nEmail date: {message['date']}\nFrom: {message['from']}\n"
                           f"Subject: {message['subject']}\n\n{text}")
                 result = gateway.infer(config, TASK, prompt, "content", SCHEMA, [message["item_id"]],

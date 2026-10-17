@@ -82,7 +82,7 @@ def test_status_names_every_missing_table_without_writing(legacy):
     report = {r["store"]: r for r in stores.schema_status(legacy)}
     assert report["source"]["missing_tables"] == ["search_runs"]
     assert report["queue"]["missing_tables"] == ["search_requests"]
-    assert report["decisions"]["missing_tables"] == ["collection_items", "collections", "source_grants"]
+    assert report["decisions"]["missing_tables"] == ["collection_items", "collections", "questions", "source_grants"]
     assert all(not r["current"] for s, r in report.items() if s in DDL)
     assert report["files"]["exists"] is False and report["files"]["current"] is True
     assert {s: digest(legacy / f"{s}.db") for s in DDL} == before

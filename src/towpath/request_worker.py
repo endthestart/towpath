@@ -48,6 +48,12 @@ def run_once(config, credentials_dir=None):
         from towpath import life_propose  # life-story proposals, only once the owner allowed them
 
         indexing += life_propose.propose_pending(config, credentials_dir)
+        from towpath import life_groups
+
+        indexing += life_groups.propose_groups(config)
+        from towpath import life_ask
+
+        indexing += life_ask.answer_pending(config)
         from towpath.mail import analysis, executor, watch  # mail management, for accounts the owner chose
 
         watch.ensure(config, analysis.eligible(config))

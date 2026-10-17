@@ -76,7 +76,7 @@ def test_nothing_is_read_or_sent_until_the_owner_allows_it(world):
     config, credentials, sid, mid, model, state = world
     worker = connections.merged(config, credentials)
     assert life_propose.blocked(worker, life_propose.request(config.store_dir)) == (
-        "Choose a mail account and a period to start.")
+        "Turn on finding events, or choose a mail account and a period.")
     life_propose.set_request(config.store_dir, sid, "2009-01-01", "2009-12-31")
     assert "isn't allowed for your life story" in life_propose.blocked(worker, life_propose.request(config.store_dir))
     grants.grant(config.store_dir, sid, "life-evidence")
@@ -205,3 +205,34 @@ def test_a_busy_model_is_waited_for_and_nothing_is_marked_read(world, monkeypatc
         {"step": "stopped", "reason": "The AI model is busy with another request; Towpath tries again in a minute."}]
     run = life_propose.progress(config.store_dir)
     assert run["examined"] == 0 and run["state"] == "stopped"
+
+
+def test_finding_by_itself_reads_every_year_newest_first_without_a_period(world, monkeypatch):
+    config, credentials, sid, mid, model, state = world
+    state.mailboxes["INBOX"].messages[4] = stub.Message(stub.message(
+        4, "Your appointment is confirmed", "See you at the clinic on 3 March 2011.",
+        date="Tue, 01 Mar 2011 09:00:00 +0000"))
+    connections.start_indexing(config.store_dir, credentials, sid)
+    request_worker.run_once(config, credentials)
+    grants.grant(config.store_dir, sid, "life-evidence")
+    decisions.grant_model(connections.merged(config, None, role="web"), mid, "content")
+    worker = connections.merged(config, credentials)
+    assert life_propose.propose_pending(worker, credentials) == []  # off until the owner turns it on
+    life_propose.set_auto(config.store_dir, True)
+    model.answers = [answer()] * 10
+    life_propose.propose_pending(worker, credentials)
+    first = email_prompts(model)
+    assert len(first) == 1 and "2011" in first[0]  # the newest year with likely mail
+    life_propose.propose_pending(worker, credentials)  # 2011 is done; then 2009
+    life_propose.propose_pending(worker, credentials)
+    assert len(email_prompts(model)) == 3 and any("2009" in p for p in email_prompts(model)[1:])
+    life_propose.set_auto(config.store_dir, False)
+    before = len(model.chat_requests())
+    life_propose.propose_pending(worker, credentials)
+    assert len(model.chat_requests()) == before
+
+
+def test_people_the_owner_writes_to_are_likely_even_without_a_telling_subject():
+    assert life_propose._likely("hi", "friend@example.org", [], {"friend@example.org"}, set())
+    assert life_propose._likely("Lunch?", "me@example.org", ["Sent"], set(), {"Sent"})
+    assert not life_propose._likely("Weekly deals", "shop@example.org", ["INBOX"], set(), {"Sent"})

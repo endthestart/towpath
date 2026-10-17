@@ -4,6 +4,14 @@
 <header class="page-head compact"><h1>Life</h1>
 <p class="lead">Towpath proposes dated events from your own records, each with the evidence it rests on. You accept, correct or reject them; your decisions are kept when proposals are made again.</p></header>
 {% if saved %}<div class="notice" role="status">Saved.</div>{% endif %}
+<p><a class="button" href="/life/timeline">Timeline</a> <a class="button secondary" href="/life/memories/">Memories</a> <a class="button secondary" href="/life/ask">Ask</a></p>
+
+<section class="detail-card"><h2 class="card-title">About you</h2>
+<form method="post" action="/life/profile" class="inline-form">{% csrf_token %}
+  <label>Name <input name="name" value="{{ profile.name|default:'' }}"></label>
+  <label>Birthday <input type="date" name="birthday" value="{{ profile.birthday|default:'' }}"></label>
+  <button class="button secondary" type="submit">Save</button></form>
+<p class="footnote">Your birthday lets the timeline show your age and gather events into the decades of your life.</p></section>
 
 <section class="detail-card"><h2 class="card-title">Which mail the life story may use</h2>
 {% for a in accounts %}<form method="post" action="/life/account" class="inline-form">{% csrf_token %}<input type="hidden" name="source_id" value="{{ a.source_id }}"><input type="hidden" name="allow" value="{% if a.allowed %}0{% else %}1{% endif %}">
@@ -21,13 +29,17 @@
 </section>
 
 <section class="detail-card"><h2 class="card-title">Propose events from your mail</h2>
-<p>Towpath reads only messages that look like they're about your life (bookings, orders, appointments, jobs, school, celebrations), newest first, and asks the model for the events each one shows. It skips Gmail's Promotions and anything the model judges to be marketing or spam, and files everyday things such as ordinary purchases under Minor. Every event it keeps quotes the email it came from.</p>
+<p>Towpath reads messages that look like they're about your life (bookings, orders, appointments, jobs, school, celebrations, and mail with the people you write to), and asks the model for the events each one shows. It skips Gmail's Promotions and anything the model judges to be marketing or spam, and files everyday things such as ordinary purchases under Minor. Every event it keeps quotes the email it came from.</p>
 {% include '_life_status.html' %}
+<form method="post" action="/life/auto" class="inline-form">{% csrf_token %}<input type="hidden" name="on" value="{% if status.auto %}0{% else %}1{% endif %}">
+  <span>{% if status.auto %}Towpath works through all your allowed mail by itself, newest years first, and keeps up with new mail.{% else %}Let Towpath work through all your allowed mail by itself, newest years first.{% endif %}</span>
+  <button class="button{% if status.auto %} secondary{% endif %}" type="submit">{% if status.auto %}Stop finding events{% else %}Find events by itself{% endif %}</button></form>
+<details><summary>Or just one period</summary>
 <form method="post" action="/life/start" class="inline-form">{% csrf_token %}
   <label>Account <select name="source_id">{% for a in accounts %}{% if a.allowed %}<option value="{{ a.source_id }}"{% if status.request.source_id == a.source_id %} selected{% endif %}>{{ a.name }}</option>{% endif %}{% endfor %}</select></label>
   <label>From <input type="date" name="after" value="{{ default_after }}"></label>
   <label>To <input type="date" name="before" value="{{ default_before }}"></label>
-  <button class="button" type="submit">Propose events</button></form>
+  <button class="button" type="submit">Propose events</button></form></details>
 {% if status.request %}<form method="post" action="/life/pause" class="inline-form">{% csrf_token %}<input type="hidden" name="pause" value="{% if status.request.state == 'paused' or status.run.state == 'stopped' %}0{% else %}1{% endif %}"><button class="button secondary" type="submit">{% if status.request.state == 'paused' %}Resume{% elif status.run.state == 'stopped' %}Try again now{% else %}Pause{% endif %}</button></form>{% endif %}
 </section>
 

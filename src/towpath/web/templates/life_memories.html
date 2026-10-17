@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block title %}Memories · Life · Towpath{% endblock %}
+{% block content %}
+<a class="back-link" href="/life/">← Life</a>
+<header class="page-head compact"><h1>Memories</h1>
+<p class="lead">Events Towpath gathered together: trips and occasions, the people you correspond with{% if profile.birthday %}, and the decades of your life{% endif %}. Keep the ones that are right, rename them, and add or remove events; Towpath won't change a memory you kept.</p></header>
+<nav class="tabs" aria-label="Memories"><a href="?show=proposed"{% if show == 'proposed' %} aria-current="page"{% endif %}>To review ({{ counts.proposed }})</a><a href="?show=kept"{% if show == 'kept' %} aria-current="page"{% endif %}>Kept ({{ counts.kept }})</a><a href="?show=dismissed"{% if show == 'dismissed' %} aria-current="page"{% endif %}>Dismissed ({{ counts.dismissed }})</a></nav>
+{% for g in groups %}<article class="life-claim"><p><a href="/life/memories/{{ g.group_id }}/"><strong>{{ g.title }}</strong></a> <span class="muted">· {{ g.label }} · {{ g.earliest|slice:":10" }}{% if g.latest and g.latest|slice:":10" != g.earliest|slice:":10" %} to {{ g.latest|slice:":10" }}{% endif %} · {{ g.members|length }} event{{ g.members|length|pluralize }}</span></p>
+{% if g.summary %}<p class="footnote">{{ g.summary }}</p>{% endif %}
+{% if g.state == 'proposed' %}<form method="post" action="/life/memories/decide" class="inline-form">{% csrf_token %}<input type="hidden" name="group_id" value="{{ g.group_id }}"><input type="hidden" name="next" value="?show=proposed">
+<button class="button" name="action" value="keep">Keep</button><button class="button secondary" name="action" value="dismiss">Dismiss</button></form>{% endif %}
+</article>{% empty %}<p>None here yet.</p>{% endfor %}
+{% endblock %}

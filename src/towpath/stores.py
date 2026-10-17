@@ -154,6 +154,9 @@ CREATE TABLE IF NOT EXISTS collections (
 CREATE TABLE IF NOT EXISTS collection_items (
   collection_id TEXT NOT NULL, ref TEXT NOT NULL, role TEXT NOT NULL, version TEXT, title TEXT, source_type TEXT,
   note TEXT, author TEXT NOT NULL, added_at TEXT NOT NULL, PRIMARY KEY (collection_id, ref, role));
+-- Questions the owner asked of their records (Ask); the worker's answers are in the life store.
+CREATE TABLE IF NOT EXISTS questions (
+  question_id TEXT PRIMARY KEY, text TEXT NOT NULL, author TEXT NOT NULL, at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS decision_log (
   seq INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, target_id TEXT NOT NULL, detail TEXT NOT NULL,
   author TEXT NOT NULL, at TEXT NOT NULL);
@@ -244,6 +247,17 @@ CREATE TABLE IF NOT EXISTS runs (
 CREATE TABLE IF NOT EXISTS examined (
   run_id TEXT NOT NULL, item_id TEXT NOT NULL, outcome TEXT NOT NULL, at TEXT NOT NULL,
   PRIMARY KEY (run_id, item_id));
+-- Groups of events proposed by the worker ("memories"): occasions and trips, people, life chapters. Rebuildable;
+-- the groups the owner keeps are snapshots in the decisions store.
+CREATE TABLE IF NOT EXISTS groups (
+  group_id TEXT PRIMARY KEY, kind TEXT NOT NULL, title TEXT NOT NULL, summary TEXT, earliest TEXT, latest TEXT,
+  members TEXT NOT NULL, producer TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS groups_by_date ON groups (earliest, group_id);
+-- Answers to the owner's questions, each sentence citing evidence (claims or messages) by number.
+CREATE TABLE IF NOT EXISTS answers (
+  question_id TEXT PRIMARY KEY, status TEXT NOT NULL, body TEXT NOT NULL, model TEXT, at TEXT NOT NULL);
+-- What the grouping job has already looked at (a month of events, by the digest of its members).
+CREATE TABLE IF NOT EXISTS group_runs (key TEXT PRIMARY KEY, digest TEXT NOT NULL, updated_at TEXT NOT NULL);
 """,
     # Mail management (towpath.mail): what Towpath has read of each message it manages. Rebuildable from the
     # mailbox; written only by the connector, which holds the read-only connection.

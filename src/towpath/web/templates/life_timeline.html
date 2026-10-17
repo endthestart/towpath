@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block title %}Timeline · Life · Towpath{% endblock %}
+{% block content %}
+<a class="back-link" href="/life/">← Life</a>
+<header class="page-head compact"><h1>{% if profile.name %}{{ profile.name }}'s timeline{% else %}Your timeline{% endif %}</h1>
+<p class="lead">Memories and events, newest first. Each event quotes the record it came from. {% if show_minor %}<a href="?">Hide everyday events</a>{% else %}<a href="?minor=1">Show everyday events too</a>{% endif %}.</p></header>
+{% for y in years %}<section class="detail-card"><h2 class="card-title">{{ y.year }}{% if y.age is not None %} <span class="muted">· age {{ y.age }}</span>{% endif %}</h2>
+{% for g in y.groups %}<article class="life-claim"><p><a href="/life/memories/{{ g.group_id }}/"><strong>{{ g.title }}</strong></a> <span class="muted">· {{ g.label }}{% if g.state == 'kept' %} · kept{% endif %} · {{ g.events|length }} event{{ g.events|length|pluralize }}</span></p>
+{% if g.summary %}<p class="footnote">{{ g.summary }}</p>{% endif %}
+<ul>{% for e in g.events|slice:":6" %}<li>{{ e.statement }} <span class="muted">· {{ e.when }}</span></li>{% endfor %}</ul></article>{% endfor %}
+{% for e in y.events %}<p>{{ e.statement }} <span class="muted">· {{ e.when }} · {{ e.modality }}{% if e.significance == 'milestone' %} · milestone{% endif %}</span>{% if e.evidence_url %} <a href="{{ e.evidence_url }}">evidence</a>{% endif %}</p>{% endfor %}
+</section>{% empty %}<p>No events yet. Turn on finding events on the <a href="/life/">Life</a> page.</p>{% endfor %}
+{% endblock %}
