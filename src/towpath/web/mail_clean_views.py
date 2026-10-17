@@ -107,6 +107,13 @@ def purchases_page(request, sid):
         "rows": purchases.listing(_store(), sid, q, year), "summary": purchases.summary(_store(), sid)})
 
 
+@require_GET
+def accounts_page(request, sid):
+    account = _managed(sid)
+    rows = senders.accounts(_store(), sid)
+    return render(request, "mail_accounts.html", {"nav": "mail", "account": account, "rows": rows})
+
+
 # -- clean-up -----------------------------------------------------------------------------------------------------
 
 def _criteria(source) -> dict:

@@ -157,6 +157,18 @@ def test_the_pages_for_senders_rules_and_batch_answers(world, monkeypatch):
         assert f"/mail/{world.sid}/?box=INBOX&amp;category=marketing" in client.get("/mail/").content.decode()
         listed = client.get(f"/mail/{world.sid}/", {"box": "INBOX", "category": "marketing"}).content.decode()
         assert "Big sale" in listed and "Saturday?" not in listed and "Clean these up" in listed
+        from test_mail_threads import mail
+
+        from towpath import connect
+        from towpath.mail import analysis
+
+        world.state.mailboxes["INBOX"].messages[30] = mail(30, "Example ID <security@id.example>", "reader@example.com",
+                                                           "Your sign-in code", "Use 123456 to sign in.", 2)
+        connect.sync(world.worker(), world.sid)
+        analysis.analyze_pending(world.worker())
+        found = senders.accounts(world.store, world.sid)
+        assert [(a["domain"], a["messages"]) for a in found] == [("id.example", 1)]
+        assert "id.example" in client.get(f"/mail/{world.sid}/accounts").content.decode()
         rules_page = client.get(f"/mail/{world.sid}/rules").content.decode()
         assert "· would look at 1 message in your inbox now" in rules_page.split("Archive marketing")[1][:80]
         page = client.get(f"/mail/{world.sid}/senders").content.decode()

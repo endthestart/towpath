@@ -387,6 +387,34 @@ def listing(store_dir, source_id: str, category: str | None = None, order: str =
     return out[offset:offset + limit]
 
 
+def accounts(store_dir, source_id: str, role: str = "web") -> list[dict]:
+    """Services the owner has an account with, from sign-in, security and password mail, by sender domain: how
+    many such messages, the first and latest, and the latest subject. Most recent first."""
+    if not store_path(store_dir, "mail").exists():
+        return []
+    cats = categories(store_dir, source_id, role)
+    by_domain: dict[str, dict] = {}
+    with closing(open_store(store_dir, "mail", role)) as db:
+        for m in db.execute(
+                "SELECT subject, from_addr, from_name, list_id, date_utc FROM messages WHERE source_id = ? AND ("
+                "lower(subject) LIKE '%code%' OR lower(subject) LIKE '%sign%' OR lower(subject) LIKE '%log%in%' OR "
+                "lower(subject) LIKE '%password%' OR lower(subject) LIKE '%verif%' OR lower(subject) LIKE '%secur%' OR "
+                "lower(subject) LIKE '%factor%' OR lower(subject) LIKE '%device%' OR lower(subject) LIKE '%confirm%')",
+                (source_id,)):
+            m = dict(m)
+            if not m["from_addr"] or message_category(m, cats.get(m["from_addr"])) != "account":
+                continue
+            domain = m["from_addr"].rpartition("@")[2]
+            d = by_domain.setdefault(domain, {"domain": domain, "name": m["from_name"], "messages": 0,
+                                              "first": m["date_utc"], "last": m["date_utc"], "subject": m["subject"]})
+            d["messages"] += 1
+            if (m["date_utc"] or "") < (d["first"] or "9999"):
+                d["first"] = m["date_utc"]
+            if (m["date_utc"] or "") > (d["last"] or ""):
+                d["last"], d["subject"], d["name"] = m["date_utc"], m["subject"], m["from_name"] or d["name"]
+    return sorted(by_domain.values(), key=lambda d: d["last"] or "", reverse=True)
+
+
 def inbox(store_dir, source_id: str, role: str = "web") -> dict:
     """What is in the inbox now, by category: how many messages and how many unread, most first."""
     if not store_path(store_dir, "mail").exists():
