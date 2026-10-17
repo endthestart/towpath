@@ -7,7 +7,7 @@
 {% if saved == 'draft' %}<div class="notice" role="status">Asked. Towpath saves the draft within a minute or two{% if account.dry_run %}, as a dry run while dry runs only is on{% endif %}.</div>{% elif saved %}<div class="notice" role="status">Saved.</div>{% endif %}
 <nav class="tabs" aria-label="States">{% for key, label, n in tabs %}<a href="?state={{ key }}"{% if key == state %} aria-current="page"{% endif %}>{{ label }}{% if n %} ({{ n }}){% endif %}</a>{% endfor %}</nav>
 {% for r in rows %}<article class="life-claim">
-  <p><a href="/mail/m/{{ r.last_item }}/"><strong>{{ r.subject|default:'(No subject)' }}</strong></a> <span class="muted">· {{ r.participants|join:", "|default:'just you' }} · {{ r.last_date|slice:":10" }} · {{ r.messages }} message{{ r.messages|pluralize }}{% if r.marked %} · marked by you{% endif %}</span></p>
+  <p><a href="/mail/{{ account.source_id }}/conversation?t={{ r.thread_key|urlencode }}"><strong>{{ r.subject|default:'(No subject)' }}</strong></a> <span class="muted">· {{ r.participants|join:", "|default:'just you' }} · {{ r.last_date|slice:":10" }} · {{ r.messages }} message{{ r.messages|pluralize }}{% if r.marked %} · marked by you{% endif %}</span></p>
   <p class="footnote">{{ r.reason }}</p>
   <form method="post" action="/mail/mark" class="form-actions">{% csrf_token %}<input type="hidden" name="source_id" value="{{ account.source_id }}"><input type="hidden" name="thread_key" value="{{ r.thread_key }}"><input type="hidden" name="next" value="?state={{ state }}">
     {% for key, label, n in tabs %}{% if key != state %}<button class="button secondary" name="state" value="{{ key }}">{{ label }}</button>{% endif %}{% endfor %}

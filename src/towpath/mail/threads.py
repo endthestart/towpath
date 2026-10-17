@@ -595,7 +595,9 @@ def thread(store_dir, source_id: str, thread_key: str, role: str = "web") -> dic
     if row is None:
         return None
     out = dict(row)
-    out["state"] = marks(store_dir, source_id, role).get(thread_key, out["state"])
+    owner_marks = marks(store_dir, source_id, role)
+    out["state"] = owner_marks.get(thread_key, out["state"])
+    out["marked"] = thread_key in owner_marks
     return out
 
 

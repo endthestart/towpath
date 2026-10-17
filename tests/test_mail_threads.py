@@ -152,6 +152,22 @@ def test_a_draft_is_written_in_the_owners_voice_and_saved_to_drafts_through_the_
         page = client.get(f"/mail/{world.sid}/conversations?state=needs_owner_reply").content.decode()
         assert "Saturday?" in page and "[time]" in page
         assert "To reply (1)" in client.get("/mail/").content.decode()
+        from urllib.parse import quote
+
+        listing = client.get(f"/mail/{world.sid}/conversations").content.decode()
+        assert f"/mail/{world.sid}/conversation?t={quote(row['thread_key'], safe='')}" in listing
+        page = client.get(f"/mail/{world.sid}/conversation", {"t": row["thread_key"]}).content.decode()
+        assert "move a couch on Saturday" in page and "Draft reply" in page and "[time]" in page
+        marked = client.post("/mail/mark", {"source_id": world.sid, "thread_key": row["thread_key"], "state": "done",
+                                            "next": f"/mail/{world.sid}/conversation?t=x&saved=marked"})
+        assert marked["Location"].startswith(f"/mail/{world.sid}/conversation")
+        page = client.get(f"/mail/{world.sid}/conversation", {"t": row["thread_key"]}).content.decode()
+        assert "MARKED BY YOU" in page
+        client.post("/mail/mark", {"source_id": world.sid, "thread_key": row["thread_key"], "state": ""})
+        away = client.post("/mail/mark", {"source_id": world.sid, "thread_key": row["thread_key"], "state": "",
+                                          "next": "https://elsewhere.example/"})
+        assert away["Location"].startswith("/mail/")
+        assert client.get(f"/mail/{world.sid}/conversation", {"t": "nope"}).status_code == 404
         edited = "Yes! 10am Saturday works."
         assert client.post("/mail/save-draft", {"source_id": world.sid, "thread_key": row["thread_key"],
                                                 "body": edited}).status_code == 302

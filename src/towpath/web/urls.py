@@ -55,6 +55,7 @@ urlpatterns = [
     path("mail/draft-notes", mail_views.draft_notes, name="mail-draft-notes"),
     path("mail/<str:sid>/stats", mail_views.stats_page, name="mail-stats"),
     path("mail/<str:sid>/settings", mail_views.settings_page, name="mail-settings"),
+    path("mail/<str:sid>/conversation", mail_views.conversation, name="mail-conversation"),
     path("mail/mark", mail_views.mark, name="mail-mark"),
     path("mail/save-draft", mail_views.save_draft, name="mail-save-draft"),
     path("mail/<str:sid>/conversations", mail_views.conversations, name="mail-conversations"),

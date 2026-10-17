@@ -8,6 +8,7 @@ dry run.
 
 import json
 from contextlib import closing
+from urllib.parse import quote
 
 from django.conf import settings
 from django.http import Http404, HttpResponseBadRequest
@@ -236,7 +237,8 @@ def dry_run(request):
 def _back(request, default: str):
     """Back to the Mail page a form came from (only pages under /mail/), else ``default``."""
     nxt = request.POST.get("next") or ""
-    return redirect(nxt if nxt.startswith("/mail/") and "//" not in nxt else default)
+    local = (nxt.startswith("/mail/") or nxt.startswith("?")) and "//" not in nxt and "\\" not in nxt
+    return redirect(nxt if local else default)
 
 
 @require_GET
@@ -439,6 +441,27 @@ def conversations(request, sid):
         "next_before": rows[-1]["last_date"] if more and rows else None, "saved": request.GET.get("saved")})
 
 
+@require_GET
+def conversation(request, sid):
+    """A whole conversation, oldest first, with its state, the owner's mark and the draft."""
+    account = _account(_config(), sid)
+    if not account["managed"]:
+        return redirect("/mail/")
+    key = request.GET.get("t", "")
+    found = threads.thread(_store(), sid, key)
+    if found is None:
+        raise Http404
+    with closing(open_store(_store(), "mail", "web")) as db:
+        msgs = threads._messages(db, sid, key)
+        me = threads.owner(_store(), sid, db, "web")
+    for m in msgs:
+        m["mine"] = m["from_addr"] in me["addresses"] or m["mailbox"] in me["sent"]
+    return render(request, "mail_conversation.html", {
+        "nav": "mail", "account": account, "c": {**found, "label": threads.LABELS[found["state"]]}, "msgs": msgs,
+        "states": list(threads.LABELS.items()), "here": f"/mail/{sid}/conversation?t={quote(key)}",
+        "saved": request.GET.get("saved")})
+
+
 @require_POST
 def mark(request):
     sid, key = request.POST.get("source_id", ""), request.POST.get("thread_key", "")
@@ -449,7 +472,7 @@ def mark(request):
         threads.mark(_store(), sid, key, state)
     except ValueError:
         return HttpResponseBadRequest("Choose one of the listed states.")
-    return redirect(request.POST.get("next") or f"/mail/{sid}/conversations?saved=marked")
+    return _back(request, f"/mail/{sid}/conversations?saved=marked")
 
 
 @require_POST
@@ -468,7 +491,7 @@ def save_draft(request):
         return HttpResponseBadRequest(str(exc))
     mail_settings.ask(_store(), sid, actions.make(sid, "draft", {"mailbox_role": "drafts"}, {"message": raw},
                                                   reason=f"Reply to: {found['subject'] or '(no subject)'}"))
-    return redirect(request.POST.get("next") or f"/mail/{sid}/conversations?saved=draft")
+    return _back(request, f"/mail/{sid}/conversations?saved=draft")
 
 
 @require_POST
