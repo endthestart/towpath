@@ -6,14 +6,14 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `ffae7c4` (photo previews, never for the private export or photos hidden in Apple Photos; finding life
-events starts with stored mail), publishing run
-[39069314340](https://github.com/endthestart/towpath/actions/runs/39069314340). New stores and tables only; the web
+Revision `6c07ed8` (the Overview's mail totals and the Photos page's counts kept for a few minutes; on top of
+`ffae7c4`'s photo previews), publishing run
+[39071681066](https://github.com/endthestart/towpath/actions/runs/39071681066). New stores and tables only; the web
 service and connector add their own tables at start. On Hub, Fastmail is allowed for the life story and finding
 events by itself is on (the owner's answers of October 17).
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:9aa88615786802be12760c58c550c4361621a1bd41a6bb7cb240e8dbb1a6203a`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:9623d91eb0a5cfe22fa012a939a138c765ad82ba51b09a3f55dd599eee6cc12b`
+- `web`: `ghcr.io/endthestart/towpath@sha256:c15bb67b8c1044ba0d2b7161360a33f8cc616471a30bd4fca8d10f86e577eca8`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:4bb01445290bdfef2099c3c32cbbe008d16bb93468e504faf9714a5771865b02`
 
 Towpath's data folder (stores, sign-ins and the Recoll index) lives on a mirrored SSD pool since 2026-10-08,
 with hourly snapshots replicated to the main pool: Recoll's index writes had saturated the spinning disks. The
@@ -28,6 +28,7 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `ffae7c4` | Photo previews, never for the private export or photos hidden in Apple Photos; stored mail first for life events | `towpath@sha256:9aa88615…`, `towpath-recoll@sha256:9623d91e…` |
 | `44d310e` | Filing documents from mail into the data folder, as a dry run first | `towpath@sha256:3def2759…`, `towpath-recoll@sha256:f384e8e9…` |
 | `1d06040` | Fixes from a privacy review: the private export kept out of the catalog and Recoll, model calls name their mail, grants honoured | `towpath@sha256:df03a081…`, `towpath-recoll@sha256:8ce94950…` |
 | `84e4283` | Fixes from a review of the code that changes mail: Trash only as the owner allows, safe unsubscribing, archive edge cases | `towpath@sha256:d7c6ac81…`, `towpath-recoll@sha256:bbf0eef6…` |
