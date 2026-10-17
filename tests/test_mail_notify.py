@@ -75,6 +75,7 @@ def test_statistics_are_measured_and_shown(world, monkeypatch):
     found = notify.measure(world.store, world.sid)
     assert dict(found["top_correspondents"]) == {"dana@example.net": 1, "pat@example.org": 1, "sam@example.org": 1}
     assert sum(w[1] for w in found["weeks"]) == 3 and sum(w[2] for w in found["weeks"]) == 3
+    assert sum(c[1] for c in found["by_category_90"]) == 3 and dict(found["top_senders_90"])["sam@example.org"] == 1
     monkeypatch.setattr(auth, "_setup_codes", {})
     configure(world.store)
     auth.create_account(world.store, "owner", OWNER)

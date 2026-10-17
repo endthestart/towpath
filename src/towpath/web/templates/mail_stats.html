@@ -7,6 +7,9 @@
 {% if not stats %}<p>Towpath measures these once it has read the account's mail.</p>{% else %}
 <section class="detail-card"><h2 class="card-title">Mail per week, last year</h2><table class="space-table"><thead><tr><th>Week</th><th>Received</th><th>Sent</th></tr></thead><tbody>
 {% for w in stats.weeks %}<tr><td>{{ w.0 }}</td><td>{{ w.1 }}</td><td>{{ w.2 }}</td></tr>{% endfor %}</tbody></table></section>
+{% if stats.by_category_90 %}<section class="detail-card"><h2 class="card-title">What arrived in the last 90 days</h2><table class="space-table"><thead><tr><th>Category</th><th>Messages</th><th>Still unread</th></tr></thead><tbody>
+{% for c in stats.by_category_90 %}<tr><td>{{ c.0 }}</td><td>{{ c.1 }}</td><td>{{ c.2 }}</td></tr>{% endfor %}</tbody></table>
+<h3>Who sent the most</h3>{% for s in stats.top_senders_90 %}<p><a href="/mail/{{ account.source_id }}/?from={{ s.0|urlencode }}">{{ s.0 }}</a> <span class="muted">· {{ s.1 }}</span></p>{% endfor %}</section>{% endif %}
 <section class="detail-card"><h2 class="card-title">People you write to most (last year)</h2>
 {% for c in stats.top_correspondents %}<p><a href="/mail/{{ account.source_id }}/?from={{ c.0|urlencode }}">{{ c.0 }}</a> <span class="muted">· {{ c.1 }} message{{ c.1|pluralize }}</span></p>{% empty %}<p>None yet.</p>{% endfor %}</section>
 {% endif %}
