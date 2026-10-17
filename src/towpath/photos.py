@@ -30,6 +30,7 @@ PRIVATE = re.compile(r"(^|/)Exports/Hidden(/|$)", re.I)
 TAGS = ("-Make", "-Model", "-LensModel", "-LensID", "-DateTimeOriginal", "-CreateDate", "-GPSLatitude",
         "-GPSLongitude", "-ImageWidth", "-ImageHeight")
 BATCH = 200
+FIRST_YEAR = 1826  # the oldest surviving photograph; earlier dates are a clock never set
 SCAN = 20_000  # catalog rows looked at per batch while finding photos
 SLICE_SECONDS = 60
 TIMEOUT = 300
@@ -48,8 +49,8 @@ def is_photo(rel_path: str, media_type: str | None) -> bool:
 def _taken(value) -> str | None:
     """EXIF ``2019:05:14 10:15:00`` as ``2019-05-14T10:15:00`` (local time as the camera recorded it)."""
     m = re.match(r"(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})", str(value or ""))
-    if not m or m.group(1) == "0000":
-        return None
+    if not m or not FIRST_YEAR <= int(m.group(1)) <= datetime.now(timezone.utc).year + 1:
+        return None  # unset, or a camera clock that was never set (0000, 4501)
     return f"{m.group(1)}-{m.group(2)}-{m.group(3)}T{m.group(4)}:{m.group(5)}:{m.group(6)}"
 
 
@@ -97,6 +98,8 @@ def extract_pending(config, slice_seconds: float = SLICE_SECONDS, clock=time.mon
     roots = {alias: Path(r.path) for alias, r in files.roots.items()}
     read = 0
     with closing(open_store(config.store_dir, "files", ROLE)) as db:
+        db.execute("UPDATE photo_meta SET taken = NULL WHERE taken IS NOT NULL AND (taken < ? OR taken >= ?)",
+                   (f"{FIRST_YEAR:04d}", f"{datetime.now(timezone.utc).year + 2:04d}"))  # read by an earlier version
         row = db.execute("SELECT value FROM photo_progress WHERE key = 'cursor'").fetchone()
         cursor = int(row[0]) if row else 0
         top = db.execute("SELECT max(rowid) FROM occurrences").fetchone()[0] or 0

@@ -45,6 +45,22 @@ def space_page(request, sid):
     return render(request, "mail_space.html", {"nav": "mail", "account": account, "space": found, "top": top})
 
 
+@require_GET
+def attachments_page(request, sid):
+    from towpath.mail import attachments
+
+    account = _managed(sid)
+    f = {k: request.GET.get(k, "").strip() for k in ("kind", "q", "year", "sender", "order")}
+    page = max(1, int(request.GET["page"])) if request.GET.get("page", "").isdigit() else 1
+    rows = attachments.listing(_store(), sid, f, limit=101, offset=(page - 1) * 100)
+    filtered = any(f[k] for k in ("kind", "q", "year", "sender"))
+    return render(request, "mail_attachments.html", {
+        "nav": "mail", "account": account, "f": f, "rows": rows[:100], "more": len(rows) > 100, "page": page,
+        "summary": None if filtered or page > 1 else attachments.summary(_store(), sid),
+        "kinds": list(attachments.LABELS.items()), "orders": [("newest", "Newest"), ("oldest", "Oldest"),
+                                                             ("largest", "Largest")]})
+
+
 # -- clean-up -----------------------------------------------------------------------------------------------------
 
 def _criteria(source) -> dict:

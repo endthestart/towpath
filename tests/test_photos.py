@@ -182,3 +182,11 @@ def test_ask_finds_file_names_in_allowed_folders(tmp_path):
     found = life_ask.evidence(config, "When was the wedding?")
     assert [s["text"] for s in found] == ["docs/letters/wedding vows draft.docx"]  # never the private export
     assert found[0]["ref"] == "folders:occ_0" and found[0]["date"] == "2009-05-01"
+
+
+def test_a_camera_clock_never_set_gives_no_date():
+    from towpath.photos import _taken
+
+    assert _taken("2019:05:14 10:15:00") == "2019-05-14T10:15:00"
+    assert _taken("4501:01:01 00:00:00") is None and _taken("0000:00:00 00:00:00") is None
+    assert _taken("1964:06:15 00:00:00") == "1964-06-15T00:00:00"

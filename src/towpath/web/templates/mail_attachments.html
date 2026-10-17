@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block title %}Attachments · {{ account.name }} · Mail · Towpath{% endblock %}
+{% block content %}
+<a class="back-link" href="/mail/">← Mail</a>
+<header class="page-head compact"><p class="eyebrow">MAIL · {{ account.name|upper }}</p><h1>Attachments</h1>
+<p class="lead">Files sent in this account's mail, from what Towpath has indexed. A message in several folders counts once; small pictures inside messages (logos, signatures) are left out.</p></header>
+<form method="get" class="search" role="search">
+  <label for="q" class="sr-only">Words in the file name or subject</label><input id="q" name="q" value="{{ f.q }}" placeholder="File name or subject: invoice, lease, passport">
+  <label>Kind <select name="kind"><option value="">All but signatures</option>{% for key, label in kinds %}<option value="{{ key }}"{% if key == f.kind %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <label>Year <input name="year" value="{{ f.year }}" inputmode="numeric" maxlength="4" size="5"></label>
+  <label>From <input name="sender" value="{{ f.sender }}" size="16"></label>
+  <label>Order <select name="order">{% for key, label in orders %}<option value="{{ key }}"{% if key == f.order %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <button class="button" type="submit">Show</button></form>
+{% if summary %}<section class="detail-card"><h2 class="card-title">{{ summary.total.0 }} attachments, {{ summary.total.1|filesizeformat }}</h2>
+<table class="space-table"><thead><tr><th>Kind</th><th>Files</th><th>Space</th></tr></thead><tbody>
+{% for k in summary.kinds %}<tr><td><a href="?kind={{ k.0 }}">{{ k.1 }}</a></td><td>{{ k.2 }}</td><td>{{ k.3|filesizeformat }}</td></tr>{% endfor %}</tbody></table>
+<details><summary>By year and sender</summary>
+<table class="space-table"><thead><tr><th>Year</th><th>Files</th><th>Space</th></tr></thead><tbody>
+{% for y in summary.years %}<tr><td><a href="?year={{ y.0 }}">{{ y.0 }}</a></td><td>{{ y.1 }}</td><td>{{ y.2|filesizeformat }}</td></tr>{% endfor %}</tbody></table>
+<table class="space-table"><thead><tr><th>Sender</th><th>Files</th><th>Space</th></tr></thead><tbody>
+{% for s in summary.senders %}<tr><td><a href="?sender={{ s.0|urlencode }}">{{ s.0 }}</a></td><td>{{ s.1 }}</td><td>{{ s.2|filesizeformat }}</td></tr>{% endfor %}</tbody></table></details></section>{% endif %}
+<section class="detail-card">
+{% for r in rows %}<p><a href="/ref/?r={{ r.ref|urlencode }}"><strong>{{ r.filename|default:'(unnamed)' }}</strong></a> <span class="muted">· {{ r.label }} · {{ r.size|filesizeformat }} · {{ r.date_utc|slice:":10" }} · {{ r.from_addr }}</span><br><a class="footnote" href="/mail/m/{{ r.item_id }}/">{{ r.subject|default:'(No subject)' }}</a></p>
+{% empty %}<p>No attachments{% if f.q or f.kind or f.year or f.sender %} match{% endif %}.</p>{% endfor %}
+</section>
+{% if more or page > 1 %}<nav class="pagination" aria-label="Pages"><div>{% if page > 1 %}<a href="?{% for k, v in f.items %}{% if v %}{{ k }}={{ v|urlencode }}&amp;{% endif %}{% endfor %}page={{ page|add:-1 }}">← Previous</a>{% endif %}</div><div>{% if more %}<a href="?{% for k, v in f.items %}{% if v %}{{ k }}={{ v|urlencode }}&amp;{% endif %}{% endfor %}page={{ page|add:1 }}">More →</a>{% endif %}</div></nav>{% endif %}
+{% endblock %}
