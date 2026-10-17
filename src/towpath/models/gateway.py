@@ -270,13 +270,16 @@ def run_queue(config) -> dict:
                              row["item_id"], row["part_id"], task))
             counts["failed-changed-endpoint"] = counts.get("failed-changed-endpoint", 0) + 1
             continue
-        meta = source.execute("""SELECT i.subject, i.from_addr, p.filename, p.mime_type, p.size FROM parts p
-                                 JOIN items i USING (item_id) WHERE p.item_id = ? AND p.part_id = ?""",
+        meta = source.execute("""SELECT i.source_id, i.subject, i.from_addr, p.filename, p.mime_type, p.size FROM
+                                 parts p JOIN items i USING (item_id) WHERE p.item_id = ? AND p.part_id = ?""",
                               (row["item_id"], row["part_id"])).fetchone()
         instruction, schema = TASKS[task]
         prompt = (f"{instruction}\nFile name: {meta['filename']}\nType: {meta['mime_type']}\nSize: {meta['size']}\n"
                   f"Subject: {meta['subject']}\nSender domain: {(meta['from_addr'] or '').partition('@')[2]}")
-        result = infer(config, task, prompt, "metadata", schema, [row["item_id"]])
+        from towpath.mail.privacy import targets  # the message and its sender, for the owner's marks
+
+        result = infer(config, task, prompt, "metadata", schema,
+                       targets(meta["source_id"], [row["item_id"]], [meta["from_addr"]]))
         # Disabled work (for example, no probe yet) stays queued, pinned to this profile.
         status = {"ok": "done", "manual-review": "manual-review", "disabled": "queued"}.get(
             result["status"], result["status"])

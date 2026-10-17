@@ -367,7 +367,13 @@ def digest_text(store_dir, source_id: str, since: datetime, role: str = ROLE) ->
         lines += [f"  - {s['name'] or s['address']}: {s['unread']} unread of {s['messages']}" for s in noisy]
     from towpath import life_today
 
-    past = life_today.on_this_day(store_dir, role=role)["years"]
+    # This account's own mail and events, and photo folders, if allowed for the life story: nothing from another
+    # account is ever put into this one's mailbox.
+    from towpath import folders as folder_index
+
+    open_to = life_today.allowed(store_dir)
+    past = life_today.on_this_day(store_dir, role=role,
+                                  sources=({source_id} | {folder_index.SID}) & open_to)["years"]
     if past:
         lines += ["", "On this day:"]
         for y in past[:5]:

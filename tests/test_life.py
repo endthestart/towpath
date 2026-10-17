@@ -21,6 +21,9 @@ def proposal(statement: str, day: str | None, ref: str = "gmail-x:msg1", modalit
 
 @pytest.fixture
 def store(tmp_path):
+    from towpath.unified import grants
+
+    grants.grant(tmp_path, "gmail-x", "life-evidence", author="owner")  # events only come from allowed accounts
     db = open_store(tmp_path, "life", life.WRITER)
     yield tmp_path, db
     db.close()
@@ -70,7 +73,7 @@ def test_the_owners_review_survives_proposing_the_same_claim_again(store):
     assert {c.claim_id: c for c in life.claims(store_dir)}[job.claim_id].statement == "Started a new job"
     with closing(open_store(store_dir, "decisions", "web")) as decisions:
         kinds = [r[0] for r in decisions.execute("SELECT kind FROM decision_log ORDER BY seq")]
-    assert kinds == ["claim-review"] * 3
+    assert [k for k in kinds if k != "source-grant"] == ["claim-review"] * 3
 
 
 def test_a_review_that_changes_nothing_or_breaks_the_date_is_refused(store):

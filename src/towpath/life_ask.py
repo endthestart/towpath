@@ -91,9 +91,14 @@ def evidence(config, question: str, role: str = WRITER) -> list[dict]:
         if hits:
             scored.append((hits, c))
     scored.sort(key=lambda x: (-x[0], x[1].when.earliest or ""))
+    from towpath.mail import privacy
+
+    picked = [c for _, c in scored[:MAX_CLAIMS]]
+    named = privacy.ref_targets(config.store_dir, [cit.ref for c in picked for cit in c.citations], role)
     out = [{"kind": "event", "claim_id": c.claim_id, "text": c.statement, "date": c.when.expression,
             "quote": c.citations[0].captured_excerpt if c.citations else None,
-            "ref": c.citations[0].ref if c.citations else None} for _, c in scored[:MAX_CLAIMS]]
+            "ref": c.citations[0].ref if c.citations else None,
+            "targets": sorted({t for cit in c.citations for t in named.get(cit.ref, [])})} for c in picked]
     allowed = [sid for sid, f in grants.granted(config.store_dir).items() if "life-evidence" in f]
     found = []
     for sid in allowed:
@@ -133,7 +138,11 @@ def _years(config, question: str, allowed: set[str], role: str) -> list[dict]:
             bits.append("first wrote to " + ", ".join(f"{a} ({d})" for d, a in y["first"][:5]))
         if y["days"]:
             bits.append("most photos on " + ", ".join(f"{d} ({n})" for d, n in y["days"][:3]))
-        out.append({"kind": "year", "text": "; ".join(bits), "date": year, "ref": None})
+        from towpath.mail.privacy import targets
+
+        named = [a for a, _ in y["people"][:5]] + [a for _, a in y["first"][:5]]
+        out.append({"kind": "year", "text": "; ".join(bits), "date": year, "ref": None,
+                    "targets": sorted({t for sid in allowed for t in targets(sid, [], named)})})
     return out
 
 
@@ -148,9 +157,12 @@ def _purchases(config, terms: set[str], allowed: list[str], role: str) -> list[d
                 if r["item_id"] in seen:
                     continue
                 seen.add(r["item_id"])
+                with closing(open_store(config.store_dir, "mail", role)) as mail:
+                    found = mail.execute("SELECT from_addr FROM messages WHERE item_id = ?", (r["item_id"],)).fetchone()
                 total = f", {r['total']:.2f} {r['currency'] or ''}".rstrip() if r["total"] is not None else ""
                 bought = ", ".join(r["items"][:5]) or "items not named"
                 out.append({"kind": "purchase", "item_id": r["item_id"], "source_id": sid, "date": r["day"] or "",
+                            "from": found[0] if found else None,
                             "text": f"Bought from {r['merchant']}{total}: {bought}", "ref": f"mail:{r['item_id']}"})
     return out[:MAX_PURCHASES]
 
@@ -177,8 +189,9 @@ def _attachments(config, terms: set[str], allowed: list[str], role: str) -> list
 
 
 def _files(config, terms: set[str], allowed: list[str], role: str) -> list[dict]:
-    """Files whose names match the question, in folders the owner allowed for the life story (names only)."""
-    from towpath.photos import PRIVATE
+    """Files whose names match the question, in folders the owner allowed for the life story and still chose
+    (names only), never the private export."""
+    from towpath.photos import private_in
 
     if not terms or not store_path(config.store_dir, "files").exists():
         return []
@@ -197,7 +210,7 @@ def _files(config, terms: set[str], allowed: list[str], role: str) -> list[dict]
             f"o.provider_id IN ({','.join('?' for _ in providers)}) LIMIT 200", (match, *providers)).fetchall()
     out = []
     for provider, occ, root, rel, dates in rows:
-        if PRIVATE.search(rel):
+        if private_in(config, root, rel):
             continue
         when = next((d.get("value") for d in json.loads(dates or "[]") if d.get("meaning") == "file-modified"), "")
         out.append({"kind": "file", "text": f"{root}/{rel}", "date": (when or "")[:10], "ref": f"{provider}:{occ}"})
@@ -211,7 +224,7 @@ def _targets(sources: list[dict]) -> list[str]:
     excluded from model use, by the owner)."""
     from towpath.mail.privacy import targets
 
-    out: list[str] = []
+    out: list[str] = list({t for s in sources for t in s.get("targets", [])})
     for s in sources:
         if s.get("source_id") and s.get("item_id"):
             out += targets(s["source_id"], [s["item_id"]], [s.get("from")])

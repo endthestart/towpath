@@ -14,7 +14,7 @@ from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 
-from towpath.photos import PRIVATE
+from towpath.photos import PRIVATE, is_private
 from towpath.stores import open_store, store_path
 
 ROLE = "connect"
@@ -72,7 +72,7 @@ def confirm_pending(config, slice_seconds: float = SLICE_SECONDS, clock=time.mon
             for root, rel in group["places"]:
                 if clock() >= deadline:
                     break
-                if root not in roots or PRIVATE.search(rel):
+                if root not in roots or is_private(roots[root] / rel):
                     continue
                 full = group["size"] <= FULL_MAX
                 size, digest_ = done.get((root, rel), (None, None))

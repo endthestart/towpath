@@ -460,10 +460,19 @@ def propose_pending(config, credentials_dir, slice_seconds: float = SLICE_SECOND
                 text = text[:TEXT_LIMIT]
                 prompt = (f"{INSTRUCTION}\n\nEmail date: {message['date']}\nFrom: {message['from']}\n"
                           f"Subject: {message['subject']}\n\n{text}")
-                result = gateway.infer(config, TASK, prompt, "content", SCHEMA, [message["item_id"]],
+                from email.utils import parseaddr
+
+                from towpath.mail.privacy import targets
+                from towpath.mail.threads import item_refused
+
+                sender = parseaddr(str(message.get("from") or ""))[1].lower() or None
+                result = gateway.infer(config, TASK, prompt, "content", SCHEMA,
+                                       targets(value["source_id"], [message["item_id"]], [sender]),
                                        prompt_version=PROMPT_VERSION)
                 outcome = result["status"]
-                if outcome == "ok":
+                if item_refused(result):  # this message or its sender is kept from this model: the rest go on
+                    outcome = "kept"
+                elif outcome == "ok":
                     db.executemany("DELETE FROM claims WHERE claim_id = ?", [(c,) for c in unreviewed])
                     found = claims_from(result["output"], message, text, value["source_id"], producer)
                     proposed = sum(life.save(db, c, value["source_id"], rid) for c in found)

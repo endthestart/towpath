@@ -110,7 +110,10 @@ def test_everyday_events_wait_under_minor(life_page):
     from towpath.stores import open_store
     from test_life import proposal
 
+    from towpath.unified import grants
+
     env, client, sid, model = life_page
+    grants.grant(env.store, sid, "life-evidence", author="owner")  # events only come from allowed accounts
     trip = dataclasses.replace(proposal("Planned a trip to Example Junction", "2009-05-14"), significance="notable")
     pad = dataclasses.replace(proposal("Ordered a desk lamp", "2009-04-04", ref="gmail-x:msg3", modality="occurred"),
                               significance="routine")

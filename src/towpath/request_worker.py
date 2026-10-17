@@ -66,6 +66,7 @@ def run_once(config, credentials_dir=None):
         indexing += folders.index_pending(config, Path(config.store_dir).parent)
         from towpath import photos  # photo headers for photo search, and plain-English photo requests
 
+        indexing += photos.purge_private(config)
         indexing += photos.extract_pending(config)
         from towpath import space_hash
 

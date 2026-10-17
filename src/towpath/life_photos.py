@@ -10,7 +10,7 @@ from collections import Counter
 from contextlib import closing
 
 from towpath import life
-from towpath.photos import PRIVATE
+from towpath.photos import private_in
 from towpath.stores import open_store, store_path
 from towpath.unified.claims import Citation, Claim, ClaimError, When
 
@@ -27,11 +27,12 @@ def propose(config) -> list[dict]:
         return []
     days: dict[tuple[str, str], list] = {}
     with closing(open_store(config.store_dir, "files", "worker")) as db:
-        for provider, day, occ, rel in db.execute(
-                "SELECT o.provider_id, substr(p.taken, 1, 10), p.occurrence_id, o.rel_path FROM photo_meta p JOIN "
-                "occurrences o USING (occurrence_id) WHERE p.taken IS NOT NULL AND o.missing_since_run IS NULL "
-                "ORDER BY p.taken"):
-            if provider in allowed and not PRIVATE.search(rel):
+        for provider, day, occ, alias, rel in db.execute(
+                "SELECT o.provider_id, substr(p.taken, 1, 10), p.occurrence_id, o.root_alias, o.rel_path FROM "
+                "photo_meta p JOIN occurrences o USING (occurrence_id) WHERE p.taken IS NOT NULL AND "
+                "o.missing_since_run IS NULL ORDER BY p.taken"):
+            # only folders still chosen, and never the private export (tested on the full path)
+            if provider in allowed and not private_in(config, alias, rel):
                 days.setdefault((provider, day), []).append((occ, rel))
     made = 0
     with closing(open_store(config.store_dir, "life", life.WRITER)) as db:

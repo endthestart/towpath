@@ -214,12 +214,17 @@ def with_files(config, index_dir: Path, role: str = connections.ROLE):
 
 
 def write_conf(confdir: Path, roots: list[dict], scratch: Path, settings: dict | None = None) -> Path:
+    from towpath.photos import PRIVATE_GLOBS, is_private
+
     o = {**DEFAULTS, **(settings or {})}
     confdir.mkdir(parents=True, exist_ok=True)
-    topdirs = " ".join(json.dumps(r["path"]) for r in roots)  # Recoll accepts double-quoted paths
+    # Recoll never goes into the owner's private photo export: not as a chosen folder, nor inside one.
+    topdirs = " ".join(json.dumps(r["path"]) for r in roots if not is_private(r["path"]))
+    skipped = " ".join(json.dumps(g) for g in PRIVATE_GLOBS)
     conf = confdir / "recoll.conf"
     conf.write_text(f"""# Written by Towpath from the Folders page (folders and indexing settings); edits are replaced.
 topdirs = {topdirs}
+skippedPaths = {skipped}
 skippedNames = {o["skip"]}
 noContentSuffixes+ = {o["name_only"]}
 usesystemfilecommand = {int(bool(o["sniff"]))}

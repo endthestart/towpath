@@ -33,3 +33,19 @@ def keep(config, target: str, on: bool, author: str = "owner") -> None:
     from towpath import decisions
 
     decisions.set_item(config, target, author=author, model_use="no-cloud" if on else "follow-grants")
+
+
+def ref_targets(store_dir, refs, role: str = "worker") -> dict[str, list[str]]:
+    """For mail references (``<source>:<native id>``, as life events cite them): each one's message and sender as
+    gateway targets. References that aren't mail Towpath has indexed map to nothing."""
+    out: dict[str, list[str]] = {}
+    if not store_path(store_dir, "source").exists():
+        return out
+    with closing(open_store(store_dir, "source", role)) as src:
+        for ref in set(refs):
+            sid, _, native = str(ref).partition(":")
+            row = src.execute("SELECT item_id, from_addr FROM items WHERE source_id = ? AND native_id = ?",
+                              (sid, native.split("#part=")[0])).fetchone()
+            if row is not None:
+                out[ref] = targets(sid, [row[0]], [row[1]])
+    return out

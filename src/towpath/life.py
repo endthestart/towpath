@@ -103,7 +103,8 @@ def forget(store_dir, claim_id_: str) -> bool:
 def claims(store_dir, after: str | None = None, before: str | None = None, limit: int = 200,
            role: str = "web") -> list[Claim]:
     """Proposed claims in date order (undated last), each with the owner's latest review applied, and the owner's
-    own recollections."""
+    own recollections. Only claims from sources the owner still allows for the life story: taking a source's
+    permission away takes its events out of every page, answer and prompt."""
     remembered = [c for c in recollections(store_dir, role)
                   if (not after or (c.when.latest or "9999") >= after) and
                   (not before or (c.when.earliest or "") <= before)]
@@ -118,6 +119,12 @@ def claims(store_dir, after: str | None = None, before: str | None = None, limit
         if before:
             where.append("(earliest IS NULL OR earliest <= ?)")
             args.append(before)
+        from towpath.unified import grants
+
+        allowed = sorted(sid for sid, f in grants.granted(store_dir).items() if "life-evidence" in f)
+        marks = ",".join("?" for _ in allowed) or "''"
+        where.append(f"(source_id IS NULL OR source_id IN ({marks}))")
+        args += allowed
         rows = db.execute("SELECT body FROM claims" + (f" WHERE {' AND '.join(where)}" if where else "") +
                           " ORDER BY earliest IS NULL, earliest, claim_id LIMIT ?", (*args, limit)).fetchall()
     finally:

@@ -5,6 +5,7 @@ the design does not allow (for example a write credential). Secrets never
 appear here, only credential references (see ``towpath.credentials``).
 """
 
+import re
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -12,7 +13,12 @@ from pathlib import Path
 from towpath import credentials
 from towpath.quota import PacingSettings
 
-SOURCE_KINDS = {"mail-provider", "document-system", "photo-library"}
+# The owner's private photo export: never read, hashed, indexed for content or shown, wherever it sits. Shared by
+# discovery (which keeps it out of the catalog) and everything that reads photos or files.
+PRIVATE_EXPORT = re.compile(r"(^|/)Exports/Hidden(/|$)", re.I)
+PRIVATE_EXPORT_GLOBS = ("*/Exports/Hidden", "*/Exports/Hidden/*")  # the same folder, for Recoll's skippedPaths
+
+SOURCE_KINDS ={"mail-provider", "document-system", "photo-library"}
 ADAPTER_KEYS = {
     "fixture-gmail": {"path"},
     "gmail": {"client_secrets", "token"},

@@ -62,9 +62,13 @@ def _relative(child: str, parent: str) -> str:
 
 
 def excluded(root, rel_path: str) -> bool:
-    """fnmatch semantics: ``*`` also crosses folders, so ``private/*`` covers everything under private/."""
-    return any(fnmatch.fnmatchcase(rel_path, pattern) or fnmatch.fnmatchcase(rel_path + "/", pattern)
-               for pattern in root.exclude)
+    """fnmatch semantics: ``*`` also crosses folders, so ``private/*`` covers everything under private/. The owner's
+    private photo export (``towpath.photos.PRIVATE``, tested on the full path) is always excluded."""
+    from towpath.config import PRIVATE_EXPORT
+
+    return bool(PRIVATE_EXPORT.search(f"{root.path}/{rel_path}")) or any(
+        fnmatch.fnmatchcase(rel_path, pattern) or fnmatch.fnmatchcase(rel_path + "/", pattern)
+        for pattern in root.exclude)
 
 
 def check_relative(rel_path: str) -> str:

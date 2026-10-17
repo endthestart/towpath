@@ -216,7 +216,7 @@ def _settle(intel, source_id: str, s: dict, category: str, reason: str, model: s
 
 
 def _categorize(config, intel, mail, source_id: str, deadline: float, clock) -> tuple[int, str | None]:
-    from towpath.mail.threads import _failure
+    from towpath.mail.threads import _failure, item_refused
     from towpath.models import gateway
 
     model = config.endpoints[config.tasks[TASK]].model
@@ -236,11 +236,11 @@ def _categorize(config, intel, mail, source_id: str, deadline: float, clock) -> 
             result = gateway.infer(config, TASK, prompt, "content", GROUP_SCHEMA,
                                    targets(source_id, items, [s["address"] for s in group]),
                                    prompt_version=PROMPT_GROUP)
-            if result["status"] in ("refused", "disabled"):
+            if result["status"] in ("refused", "disabled") and not item_refused(result):
                 return done, "refused"
             if _failure(result):
                 return done, _failure(result)
-            answered = {}
+            answered = {}  # refused for one kept sender: each is asked about alone below
             if result["status"] == "ok":
                 answered = {a["n"]: a for a in result["output"]["senders"] if 1 <= a["n"] <= len(group)}
                 for n, a in answered.items():
@@ -256,6 +256,9 @@ def _categorize(config, intel, mail, source_id: str, deadline: float, clock) -> 
                                    prompt_version=PROMPT)
             if result["status"] == "ok":
                 _settle(intel, source_id, s, result["output"]["category"], result["output"]["reason"], model)
+            elif item_refused(result):  # kept from this model: the rule's category stands
+                intel.execute("UPDATE senders SET category_by = 'rule-kept' WHERE source_id = ? AND address = ?",
+                              (source_id, s["address"]))
             elif result["status"] in ("refused", "disabled"):
                 return done, "refused"
             elif _failure(result):

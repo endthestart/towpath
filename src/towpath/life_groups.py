@@ -257,9 +257,25 @@ def _occasions(config, db, claims_, spans, deadline, clock) -> tuple[int, str | 
         done = db.execute("SELECT digest FROM group_runs WHERE key = ?", (key,)).fetchone()
         if done and done[0] == member_digest:
             continue
-        listed = "\n".join(f"- {c.claim_id} | {spans[c.claim_id][0][:10]} | {c.statement}" for c in nearby[:80])
-        result = gateway.infer(config, TASK, f"{INSTRUCTION}\n\n<events>\n{listed}\n</events>", "content",
-                               SCHEMA, prompt_version=PROMPT)
+        from towpath.mail import privacy
+        from towpath.mail.threads import item_refused
+
+        named = privacy.ref_targets(config.store_dir, [cit.ref for c in nearby for cit in c.citations], WRITER)
+
+        def names(cs, named=named):
+            return sorted({t for c in cs for cit in c.citations for t in named.get(cit.ref, [])})
+
+        for _ in range(2):  # a second time without events from mail kept from this model, if it refused for them
+            listed = "\n".join(f"- {c.claim_id} | {spans[c.claim_id][0][:10]} | {c.statement}" for c in nearby[:80])
+            result = gateway.infer(config, TASK, f"{INSTRUCTION}\n\n<events>\n{listed}\n</events>", "content",
+                                   SCHEMA, names(nearby[:80]), prompt_version=PROMPT)
+            if not item_refused(result):
+                break
+            kept = privacy.kept(config.store_dir, names(nearby), role=WRITER)
+            nearby = [c for c in nearby if not set(names([c])) & kept]
+            if len(nearby) < 2:
+                result = {"status": "skipped"}
+                break
         if result["status"] == "ok":
             known = {c.claim_id for c in nearby}
             db.execute("DELETE FROM groups WHERE producer = ?", (f"model:{key}",))
@@ -277,7 +293,7 @@ def _occasions(config, db, claims_, spans, deadline, clock) -> tuple[int, str | 
             return made, "refused"
         elif _failure(result):
             return made, _failure(result)
-        else:
+        else:  # skipped (all kept from this model) or an unusable answer: not asked again until the events change
             db.execute("INSERT OR REPLACE INTO group_runs VALUES (?,?,?)", (key, member_digest, now()))
             db.commit()
     return made, None

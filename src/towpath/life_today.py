@@ -12,13 +12,25 @@ from towpath import life
 from towpath.stores import open_store, store_path
 
 
-def on_this_day(store_dir, day: date | None = None, role: str = "web") -> dict:
-    """Events, photos and the owner's own mail from this month and day in earlier years, newest year first."""
+def allowed(store_dir) -> set[str]:
+    """The accounts and folders the owner allows for the life story."""
+    from towpath.unified import grants
+
+    return {sid for sid, f in grants.granted(store_dir).items() if "life-evidence" in f}
+
+
+def on_this_day(store_dir, day: date | None = None, role: str = "web", sources: set[str] | None = None) -> dict:
+    """Events, photos and the owner's own mail from this month and day in earlier years, newest year first, from
+    ``sources`` only (by default, those allowed for the life story)."""
+    from towpath.photos import is_private
+
+    sources = allowed(store_dir) if sources is None else sources
     day = day or date.today()
     md = day.strftime("%m-%d")
     events = [c for c in life.claims(store_dir, limit=10**6, role=role)
               if c.state != "rejected" and (c.when.earliest or "")[5:10] == md and
-              (c.when.earliest or "")[:4] < str(day.year) and c.significance != "routine"]
+              (c.when.earliest or "")[:4] < str(day.year) and c.significance != "routine" and
+              (not c.citations or any(cit.ref.partition(":")[0] in sources for cit in c.citations))]
     photos = []
     if store_path(store_dir, "files").exists():
         with closing(open_store(store_dir, "files", role)) as db:
@@ -26,13 +38,16 @@ def on_this_day(store_dir, day: date | None = None, role: str = "web") -> dict:
                 "SELECT p.taken, p.model, p.occurrence_id, o.provider_id, o.root_alias, o.rel_path FROM photo_meta p "
                 "JOIN occurrences o "
                 "USING (occurrence_id) WHERE substr(p.taken, 6, 5) = ? AND substr(p.taken, 1, 4) < ? AND "
-                "o.missing_since_run IS NULL ORDER BY p.taken DESC LIMIT 60", (md, str(day.year)))]
+                "o.missing_since_run IS NULL ORDER BY p.taken DESC LIMIT 60", (md, str(day.year)))
+                if r["provider_id"] in sources and not is_private(r["rel_path"])]
     sent = []
     if store_path(store_dir, "mail").exists():
         from towpath.mail import threads
 
         with closing(open_store(store_dir, "mail", role)) as db:
             for sid in [r[0] for r in db.execute("SELECT DISTINCT source_id FROM messages")]:
+                if sid not in sources:
+                    continue
                 boxes = sorted(threads.sent_mailboxes(store_dir, sid, role))
                 marks = ",".join("?" for _ in boxes)
                 sent += [dict(r) for r in db.execute(
@@ -50,19 +65,25 @@ def on_this_day(store_dir, day: date | None = None, role: str = "web") -> dict:
                                   for y in years if y]}
 
 
-def year_context(store_dir, role: str = "web") -> dict[str, dict]:
-    """Per year: photos taken, mail received and sent, and the people written to most."""
+def year_context(store_dir, role: str = "web", sources: set[str] | None = None) -> dict[str, dict]:
+    """Per year: photos taken, mail received and sent, and the people written to most, from ``sources`` only (by
+    default, those allowed for the life story)."""
+    sources = allowed(store_dir) if sources is None else sources
     out: dict[str, dict] = {}
     if store_path(store_dir, "files").exists():
         with closing(open_store(store_dir, "files", role)) as db:
-            for year, n in db.execute("SELECT substr(taken, 1, 4), count(*) FROM photo_meta WHERE taken IS NOT NULL "
-                                      "GROUP BY 1"):
+            marks = ",".join("?" for _ in sources) or "''"
+            for year, n in db.execute(f"SELECT substr(p.taken, 1, 4), count(*) FROM photo_meta p JOIN occurrences o "
+                                      f"USING (occurrence_id) WHERE p.taken IS NOT NULL AND o.provider_id IN ({marks}) "
+                                      f"GROUP BY 1", sorted(sources)):
                 out.setdefault(year, {})["photos"] = n
     if store_path(store_dir, "mail").exists():
         from towpath.mail import threads
 
         with closing(open_store(store_dir, "mail", role)) as db:
             for sid in [r[0] for r in db.execute("SELECT DISTINCT source_id FROM messages")]:
+                if sid not in sources:
+                    continue
                 boxes = sorted(threads.sent_mailboxes(store_dir, sid, role))
                 marks = ",".join("?" for _ in boxes)
                 for year, is_sent, n in db.execute(
@@ -88,7 +109,8 @@ MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", 
 def one_year(store_dir, year: str, role: str = "web", sources: set[str] | None = None) -> dict:
     """A year in full: events by month, photos and mail per month, the busiest photo days, cameras, the people
     written to most, and the people written to for the first time. ``sources`` limits photos and mail to those
-    connections (Ask uses only what the owner allowed for the life story)."""
+    connections; by default, those the owner allowed for the life story."""
+    sources = allowed(store_dir) if sources is None else sources
     months = {f"{m:02d}": {"label": MONTHS[m - 1], "events": [], "photos": 0, "received": 0, "sent": 0}
               for m in range(1, 13)}
     events = sorted((c for c in life.claims(store_dir, limit=10**6, role=role)
@@ -102,7 +124,7 @@ def one_year(store_dir, year: str, role: str = "web", sources: set[str] | None =
     if store_path(store_dir, "files").exists():
         with closing(open_store(store_dir, "files", role)) as db:
             only, args = "", ()
-            if sources is not None:
+            if sources is not None:  # always, now; kept as a guard
                 marks = ",".join("?" for _ in sources) or "''"
                 only = (f" AND occurrence_id IN (SELECT occurrence_id FROM occurrences WHERE provider_id IN ({marks}) "
                         f"AND rel_path NOT LIKE '%Exports/Hidden%')")

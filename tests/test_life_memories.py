@@ -62,6 +62,7 @@ def world(tmp_path, openai_stub):
             claim("Started a new job", "2015-09-01", f"{w.sid}:z", "milestone")]
     TRIP.clear()
     TRIP.update(c.claim_id for c in made[:3])
+    grants.grant(w.store, w.sid, "life-evidence", author="owner")  # events only come from allowed accounts
     with closing(open_store(w.store, "life", "worker")) as db:
         for c in made:
             life.save(db, c, w.sid, "run_test")
@@ -257,6 +258,7 @@ def test_ask_cites_attachments_in_allowed_accounts(world):
     world.state.mailboxes["INBOX"].messages[30] = with_files(
         30, "Signed papers", [("apartment-lease-signed.pdf", b"%PDF synthetic", "application/pdf")])
     connect.sync(world.worker(), world.sid)
+    grants.revoke(world.store, world.sid, "life-evidence", author="owner")
     assert not any(s["kind"] == "attachment" for s in life_ask.evidence(world.worker(), "my lease"))  # not allowed
     grants.grant(world.store, world.sid, "life-evidence", author="owner")
     found = [s for s in life_ask.evidence(world.worker(), "When did I sign my lease?") if s["kind"] == "attachment"]
@@ -266,6 +268,7 @@ def test_ask_cites_attachments_in_allowed_accounts(world):
 def test_ask_summarizes_a_named_year_from_allowed_accounts_only(world):
     this_year = str(datetime.now(timezone.utc).year)
     question = f"Who did I write to in {this_year}?"
+    grants.revoke(world.store, world.sid, "life-evidence", author="owner")
     assert not any(s["kind"] == "year" for s in life_ask.evidence(world.worker(), question))  # not allowed yet
     grants.grant(world.store, world.sid, "life-evidence", author="owner")
     year = next(s for s in life_ask.evidence(world.worker(), question) if s["kind"] == "year")
@@ -294,3 +297,15 @@ def test_ask_leaves_out_sources_kept_from_the_model(world, monkeypatch):
     a = life_ask.questions(world.store)[0]["answer"]
     assert len(seen) == 2 and privacy.sender_target(world.sid, "sam@example.org") in seen[0]
     assert not any(s.get("from") == "sam@example.org" for s in a["sources"])
+
+
+def test_events_name_their_mail_for_the_gateway_and_revoked_accounts_drop_out(world):
+    from towpath import life_today
+    from towpath.mail import privacy
+
+    event = next(s for s in life_ask.evidence(world.worker(), "Helped Sam move") if s["kind"] == "event")
+    assert privacy.sender_target(world.sid, "sam@example.org") in event["targets"]
+    today = datetime.now(timezone.utc).date()
+    assert life_today.on_this_day(world.store, today, sources=set())["years"] == []
+    grants.revoke(world.store, world.sid, "life-evidence", author="owner")
+    assert life.claims(world.store) == [] and life_today.year_context(world.store) == {}

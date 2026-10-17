@@ -19,6 +19,7 @@ from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 
+from towpath.config import PRIVATE_EXPORT, PRIVATE_EXPORT_GLOBS
 from towpath.stores import open_store, store_path
 
 ROLE = "connect"
@@ -26,7 +27,8 @@ TYPES = ("image/jpeg", "image/jpg", "image/pjpeg", "image/heic", "image/heif", "
          "image/x-nikon-nef", "image/x-sony-arw", "image/x-adobe-dng", "image/x-fuji-raf", "image/x-panasonic-rw2")
 EXTENSIONS = (".jpg", ".jpeg", ".heic", ".heif", ".tif", ".tiff", ".nef", ".cr2", ".cr3", ".arw", ".dng", ".raf",
               ".rw2", ".orf")
-PRIVATE = re.compile(r"(^|/)Exports/Hidden(/|$)", re.I)
+PRIVATE = PRIVATE_EXPORT  # the owner's private photo export (defined with the configuration)
+PRIVATE_GLOBS = PRIVATE_EXPORT_GLOBS
 TAGS = ("-Make", "-Model", "-LensModel", "-LensID", "-DateTimeOriginal", "-CreateDate", "-GPSLatitude",
         "-GPSLongitude", "-ImageWidth", "-ImageHeight")
 BATCH = 200
@@ -40,8 +42,22 @@ def now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def is_private(path) -> bool:
+    """Whether a path (relative or absolute) is in the owner's private export: never read, hashed, shown or
+    indexed for its content."""
+    return bool(PRIVATE.search(str(path)))
+
+
+def private_in(config, alias: str, rel_path: str) -> bool:
+    """``is_private`` for a file in a configured root, tested on its full path (a root may be the export itself, or
+    sit inside it). A file whose root is no longer configured counts as private: it isn't read either."""
+    roots = getattr(getattr(config, "files", None), "roots", None) or {}
+    root = roots.get(alias)
+    return root is None or is_private(f"{root.path}/{rel_path}")
+
+
 def is_photo(rel_path: str, media_type: str | None) -> bool:
-    if PRIVATE.search(rel_path):
+    if is_private(rel_path):
         return False
     return (media_type or "").lower() in TYPES or rel_path.lower().endswith(EXTENSIONS)
 
@@ -86,6 +102,38 @@ def _record(row: dict | None) -> dict:
             "height": row.get("ImageHeight") if isinstance(row.get("ImageHeight"), int) else None, "problem": None}
 
 
+PURGE_VERSION = "1"
+
+
+def purge_private(config) -> list[dict]:
+    """Once: take out of the catalog, and out of everything read from it, any file in the private export that an
+    earlier version let in (a root chosen at or inside the export, or rows from before the check). Its name and
+    headers are then nowhere in Towpath's stores; Space is measured again without it."""
+    files = getattr(config, "files", None)
+    if files is None or not store_path(config.store_dir, "files").exists():
+        return []
+    with closing(open_store(config.store_dir, "files", ROLE)) as db:
+        row = db.execute("SELECT value FROM photo_progress WHERE key = 'private_purge'").fetchone()
+        if row and row[0] == PURGE_VERSION:
+            return []
+        doomed = [(oid, alias, rel) for oid, alias, rel in db.execute(
+            "SELECT occurrence_id, root_alias, rel_path FROM occurrences") if private_in(config, alias, rel)
+            and alias in (files.roots or {})]
+        for start in range(0, len(doomed), 500):
+            chunk = doomed[start:start + 500]
+            ids = [d[0] for d in chunk]
+            marks = ",".join("?" for _ in ids)
+            for table in ("photo_meta", "occurrence_versions", "occurrences"):
+                db.execute(f"DELETE FROM {table} WHERE occurrence_id IN ({marks})", ids)
+            db.executemany("DELETE FROM content_hashes WHERE root_alias = ? AND rel_path = ?",
+                           [(alias, rel) for _, alias, rel in chunk])
+        if doomed:  # Space is measured again, without them
+            db.execute("DELETE FROM space_summary")
+        db.execute("INSERT OR REPLACE INTO photo_progress VALUES ('private_purge', ?, ?)", (PURGE_VERSION, now()))
+        db.commit()
+    return [{"step": "private-purged", "files": len(doomed)}] if doomed else []
+
+
 def extract_pending(config, slice_seconds: float = SLICE_SECONDS, clock=time.monotonic,
                     exiftool: str = "exiftool") -> list[dict]:
     """One bounded slice of reading photo headers for the catalog, resuming from its cursor."""
@@ -112,7 +160,8 @@ def extract_pending(config, slice_seconds: float = SLICE_SECONDS, clock=time.mon
                 break
             picked, end = [], rows[-1][0]
             for r in rows:
-                if r[4] not in ("[]", "", None) or r[2] not in roots or not is_photo(r[3], r[5]):
+                if r[4] not in ("[]", "", None) or r[2] not in roots or not is_photo(r[3], r[5]) or \
+                        is_private(roots[r[2]] / r[3]):
                     continue
                 picked.append((r[1], roots[r[2]] / r[3], r[0]))
                 if len(picked) >= BATCH:
