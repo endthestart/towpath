@@ -6,13 +6,13 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `131fabe` (learned sender categories, the owner's marks as examples for the model, Ask citing file
-names; on top of the October 17 releases below), publishing run
-[39046692798](https://github.com/endthestart/towpath/actions/runs/39046692798). New stores and tables only; the web
+Revision `1a9f7c5` (purchases from receipts, plain-English mail search, a whole-conversation page, per-account
+mail Settings, iCloud contacts and calendars), publishing run
+[39051578566](https://github.com/endthestart/towpath/actions/runs/39051578566). New stores and tables only; the web
 service and connector add their own tables at start.
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:b68983cf21a7b1636b4e176bae3a404f1a4fd485bbbacb12bcebc33b8bf0b06f`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:7d6e28db67fb6e96f36111f57db784fe9a634808a2c3821218d78f6bf0bbdbb8`
+- `web`: `ghcr.io/endthestart/towpath@sha256:58f6d9f6daee3ccff263aff6ac337d3d21d5336e986d2c3a271ca6a0fd444b6c`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:51fb407cd26deebdb97042e36e487fac54bcdfb8653b06866bd16b4d583c37c2`
 
 Towpath's data folder (stores, sign-ins and the Recoll index) lives on a mirrored SSD pool since 2026-10-08,
 with hourly snapshots replicated to the main pool: Recoll's index writes had saturated the spinning disks. The
@@ -27,6 +27,9 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `4ff5d30` | Reply labels, Year pages, Ask cites attachments, company mail FYI without the model, senders sorted eight to a call | `towpath@sha256:3f195303…`, `towpath-recoll@sha256:c7d9308a…` |
+| `8c42865` | Follow-up reminders, notes for drafts, Attachments page, mail search operators, rules in plain English | `towpath@sha256:798787f7…`, `towpath-recoll@sha256:ed1b0216…` |
+| `131fabe` | Learned sender categories, the owner's marks as model examples, Ask cites file names | `towpath@sha256:b68983cf…`, `towpath-recoll@sha256:7d6e28db…` |
 | `00060df` | Recollections, Your story, days with many photos as life events, how long awaited replies have taken | `towpath@sha256:4d7c2937…`, `towpath-recoll@sha256:6f2fa103…` |
 | `b14b7d8` | People pages, Overview Today cards, plain-English Search all, duplicates confirmed by content | `towpath@sha256:a4a5893d…`, `towpath-recoll@sha256:5cd5c906…` |
 | `3d63e3f` | Keep-from-cloud marks, On this day, Search all filters and message text, Facebook export | `towpath@sha256:262d3bed…`, `towpath-recoll@sha256:60d74441…` |
