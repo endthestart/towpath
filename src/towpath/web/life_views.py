@@ -31,8 +31,10 @@ def _accounts(config) -> list[dict]:
     for sid, source in config.sources.items():
         if source.kind == "mail-provider":
             out.append({"source_id": sid, "name": sid, "allowed": FEATURE in allowed.get(sid, set())})
-    names = {c["source_id"]: c["display_name"] for c in connections.all_connections(settings.TOWPATH_STORE_DIR,
-                                                                                    role="web")}
+    rows = connections.all_connections(settings.TOWPATH_STORE_DIR, role="web")
+    names = {c["source_id"]: c["display_name"] for c in rows}
+    out += [{"source_id": c["source_id"], "name": c["display_name"],
+             "allowed": FEATURE in allowed.get(c["source_id"], set())} for c in rows if c["adapter"] == "dav"]
     for account in out:
         account["name"] = names.get(account["source_id"], account["name"])
     return out

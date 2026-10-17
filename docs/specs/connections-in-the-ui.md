@@ -106,11 +106,15 @@ and when it finishes lists the index into the files store page by page (5,000 ro
 folder, absence recorded only from a complete listing). File contents are searched through Recoll by the
 request worker, like Gmail and IMAP full-text search.
 
-## Later connection types (owner request, not scheduled)
+## Contacts and calendars (built 2026-10-17)
 
-- **Calendars (CalDAV):** past events as dated evidence for the life stream (who, when, where), read-only.
-- **Contacts (CardDAV):** names for addresses in mail, messages and other sources, as identity hints, never merged
-  automatically ([R5](../decisions.md#recommendations-in-this-design)).
+*Connections → Fastmail contacts and calendars* takes one read-only app password for CardDAV and CalDAV
+(`towpath.dav_sync`, `towpath.adapters.dav`). Towpath sends only PROPFIND and REPORT, lists every address book and
+calendar, reads only items whose ETag changed, and removes what a complete listing no longer shows; contacts and
+events go to the `dav` store. Contacts give names to mail addresses and make their senders *people*; they are
+identity hints, never merged automatically ([R5](../decisions.md#recommendations-in-this-design)). Past events that
+don't repeat become proposed life-story events (planned, citing the calendar entry) once the owner allows the
+connection on the Life page.
 
 Both fit the same page and storage: Fastmail offers per-protocol app passwords (CalDAV, CardDAV) with a read-only
 option, like the IMAP password used in phase 1.

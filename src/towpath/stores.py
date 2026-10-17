@@ -37,6 +37,7 @@ WRITERS = {
     "mailact": {"act"},
     "maildecisions": {"web"},
     "mailintel": {"worker"},
+    "dav": {"connect"},
 }
 
 # Columns and tables added after a store was first released. Applied on every
@@ -410,6 +411,22 @@ CREATE TABLE IF NOT EXISTS rule_matches (
 -- Per source: how far the conversation job has looked at the mail store (its rowids), and its progress.
 CREATE TABLE IF NOT EXISTS progress (
   source_id TEXT PRIMARY KEY, watermark INTEGER NOT NULL, state TEXT NOT NULL, updated_at TEXT NOT NULL);
+""",
+    # Contacts and calendar events read from CardDAV and CalDAV connections (rebuildable; references, not exports).
+    "dav": """
+CREATE TABLE IF NOT EXISTS contacts (
+  source_id TEXT NOT NULL, href TEXT NOT NULL, etag TEXT NOT NULL, uid TEXT, name TEXT, emails TEXT NOT NULL,
+  phones TEXT NOT NULL, birthday TEXT, org TEXT, collection TEXT NOT NULL, updated_at TEXT NOT NULL,
+  PRIMARY KEY (source_id, href));
+CREATE TABLE IF NOT EXISTS events (
+  source_id TEXT NOT NULL, href TEXT NOT NULL, n INTEGER NOT NULL, etag TEXT NOT NULL, uid TEXT, summary TEXT,
+  start TEXT, end TEXT, all_day INTEGER NOT NULL, tz TEXT, location TEXT, organizer TEXT, attendees TEXT NOT NULL,
+  recurring INTEGER NOT NULL, description TEXT, collection TEXT NOT NULL, updated_at TEXT NOT NULL,
+  PRIMARY KEY (source_id, href, n));
+CREATE INDEX IF NOT EXISTS events_start ON events (source_id, start);
+CREATE TABLE IF NOT EXISTS collections (
+  source_id TEXT NOT NULL, href TEXT NOT NULL, kind TEXT NOT NULL, name TEXT, ctag TEXT, items INTEGER,
+  synced_at TEXT, PRIMARY KEY (source_id, href));
 """,
     "ledger": """
 CREATE TABLE IF NOT EXISTS capability_reports (

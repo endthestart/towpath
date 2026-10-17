@@ -105,3 +105,6 @@ Balanced across three areas, mail first:
   plain-English requests).
 - 2026-10-17: mail milestone 6 built: Gmail over IMAP (preset, All Mail and Inbox, Gmail threads and labels, safe
   archive and Undo). Running it next to Inbox Zero waits for the owner to add a Gmail app password.
+- 2026-10-17: contacts and calendars built (Fastmail CardDAV/CalDAV, read-only); connecting them waits for an app
+  password. The photo-search release failed CI (ExifTool missing on the CI runner); fixed so photo reading skips
+  where ExifTool isn't installed.

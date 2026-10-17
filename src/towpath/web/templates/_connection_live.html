@@ -1,7 +1,12 @@
 <div id="connection-live" class="live-region"{% if c.status.busy %} hx-get="/connections/{{ c.source_id }}/live" hx-trigger="every 5s" hx-swap="outerHTML"{% endif %}>
 <p class="lead">{{ c.address }} · <span class="status {{ c.status.tone }}">{{ c.status.text }}</span></p>
 {% if c.last_error and not c.status.busy %}<div class="notice warn" role="alert">{{ c.last_error }}</div>{% endif %}
-{% if c.adapter == 'recoll' %}
+{% if c.adapter == 'dav' %}
+<section class="metrics">
+  <div class="metric"><p>Contacts and events</p><strong>{{ c.indexed_text|default:"0" }}</strong><span>{% if c.updated %}as of {{ c.updated }}{% else %}not read yet{% endif %}</span></div>
+  <div class="metric"><p>Address books and calendars</p><strong>{{ c.folders|length }}</strong><span>{% for f in c.folders %}{{ f.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</span></div>
+</section>
+{% elif c.adapter == 'recoll' %}
 <section class="metrics">
   <div class="metric"><p>In search</p><strong>{{ c.indexed_text|default:"0" }}</strong><span>{% if c.phase == 'reading' and not c.indexed %}added once reading finishes{% elif c.updated %}files, plus each mail message and each file inside an archive; as of {{ c.updated }}{% else %}not indexed yet{% endif %}</span></div>
   <div class="metric"><p>Folders</p><strong>{{ c.folders_chosen|length }}</strong><span>{{ c.folders_chosen|join:", " }}</span></div>
@@ -19,8 +24,8 @@
   {% if c.state == 'choose-folders' %}<a class="button" href="/connections/{{ c.source_id }}/folders">Choose folders</a>
   {% elif c.state == 'ready' %}
     {% if c.status.busy %}<form method="post" action="/connections/{{ c.source_id }}/pause">{% csrf_token %}<button class="button" type="submit">Pause</button></form>
-    {% else %}<form method="post" action="/connections/{{ c.source_id }}/start">{% csrf_token %}<button class="button" type="submit">{% if c.indexing == 'paused' %}Resume indexing{% elif c.phase == 'adding' or c.phase == 'measuring' %}Continue adding to search{% elif c.indexed and c.adapter == 'recoll' %}Index again{% elif c.indexed %}Check for new mail{% else %}Start indexing{% endif %}</button></form>{% endif %}
-    {% if c.adapter != 'gmail' %}<a class="button secondary" href="/connections/{{ c.source_id }}/folders">Change folders</a>{% endif %}
+    {% else %}<form method="post" action="/connections/{{ c.source_id }}/start">{% csrf_token %}<button class="button" type="submit">{% if c.indexing == 'paused' %}Resume indexing{% elif c.phase == 'adding' or c.phase == 'measuring' %}Continue adding to search{% elif c.indexed and c.adapter == 'recoll' %}Index again{% elif c.adapter == 'dav' %}{% if c.indexed %}Read again{% else %}Read contacts and calendars{% endif %}{% elif c.indexed %}Check for new mail{% else %}Start indexing{% endif %}</button></form>{% endif %}
+    {% if c.adapter != 'gmail' and c.adapter != 'dav' %}<a class="button secondary" href="/connections/{{ c.source_id }}/folders">Change folders</a>{% endif %}
   {% endif %}
   {% if c.adapter == 'recoll' %}{% if c.indexed and not c.status.busy %}<a class="button secondary" href="/space/">See where the space goes</a>{% endif %}
   {% elif c.adapter == 'gmail' %}

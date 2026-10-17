@@ -88,9 +88,11 @@ def _record(row: dict | None) -> dict:
 def extract_pending(config, slice_seconds: float = SLICE_SECONDS, clock=time.monotonic,
                     exiftool: str = "exiftool") -> list[dict]:
     """One bounded slice of reading photo headers for the catalog, resuming from its cursor."""
+    import shutil
+
     files = getattr(config, "files", None)
-    if files is None or not store_path(config.store_dir, "files").exists():
-        return []
+    if files is None or not store_path(config.store_dir, "files").exists() or shutil.which(exiftool) is None:
+        return []  # no catalog, or no ExifTool here (it is in the connector image)
     deadline = clock() + slice_seconds
     roots = {alias: Path(r.path) for alias, r in files.roots.items()}
     read = 0

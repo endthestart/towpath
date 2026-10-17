@@ -1,0 +1,160 @@
+"""Contacts and calendars over CardDAV and CalDAV: read-only requests, incremental sync, names and known people for
+mail, and past calendar events as life-story evidence. A synthetic server on loopback only."""
+
+import json
+import re
+import sys
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+import pytest
+
+from towpath import config as config_mod, connections, dav_sync, life, life_calendar
+from towpath.adapters import dav
+from towpath.unified import grants
+
+sys.path.insert(0, str(Path(__file__).parent))
+
+USER, PASSWORD = "reader@example.com", "dav-read-only"
+CARD = ("BEGIN:VCARD\r\nVERSION:3.0\r\nUID:c1\r\nFN:Sam Rivera\r\nEMAIL;TYPE=home:Sam@Example.org\r\n"
+        "item1.EMAIL:sam.work@example.net\r\nBDAY:1985-04-12\r\nORG:Example Lock;Ops\r\nEND:VCARD\r\n")
+EVENTS = {
+    "trip.ics": ("BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:e1\r\nSUMMARY:Flight to Example Junction\r\n"
+                 "DTSTART:20090514T081500Z\r\nDTEND:20090514T101500Z\r\nLOCATION:Example Airport\r\n"
+                 "BEGIN:VALARM\r\nACTION:DISPLAY\r\nSUMMARY:not this\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"),
+    "gym.ics": ("BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:e2\r\nSUMMARY:Gym\r\nDTSTART;TZID=America/Chicago:"
+                "20090101T070000\r\nRRULE:FREQ=WEEKLY\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"),
+    "future.ics": ("BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:e3\r\nSUMMARY:Far future\r\nDTSTART;VALUE=DATE:"
+                   "29990101\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"),
+}
+
+
+class Server:
+    def __init__(self):
+        self.items = {"/dav/addressbooks/user/reader@example.com/Default/sam.vcf": ("e-1", CARD)}
+        for name, text in EVENTS.items():
+            self.items[f"/dav/calendars/user/reader@example.com/Personal/{name}"] = ("e-1", text)
+        self.methods, self.multigets = [], []
+        outer = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def _reply(self, xml: str):
+                data = xml.encode()
+                self.send_response(207)
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def do_PROPFIND(self):  # noqa: N802
+                outer.methods.append("PROPFIND")
+                if self.headers.get("Authorization") != dav.DavClient(USER, PASSWORD)._auth:
+                    self.send_response(401)
+                    self.end_headers()
+                    return
+                path = self.path
+                resp = []
+                if path.endswith("/user/reader@example.com/"):
+                    kind = "card:addressbook" if "addressbooks" in path else "cal:calendar"
+                    child = "Default/" if "addressbooks" in path else "Personal/"
+                    resp.append(f"<d:response><d:href>{path}</d:href><d:propstat><d:prop><d:resourcetype>"
+                                f"<d:collection/></d:resourcetype></d:prop></d:propstat></d:response>")
+                    resp.append(f"<d:response><d:href>{path}{child}</d:href><d:propstat><d:prop><d:resourcetype>"
+                                f"<d:collection/><{kind}/></d:resourcetype><d:displayname>{child[:-1]}</d:displayname>"
+                                f"</d:prop></d:propstat></d:response>")
+                else:
+                    for href, (etag, _) in outer.items.items():
+                        if href.startswith(path):
+                            resp.append(f"<d:response><d:href>{href}</d:href><d:propstat><d:prop><d:getetag>{etag}"
+                                        f"</d:getetag></d:prop></d:propstat></d:response>")
+                self._reply('<d:multistatus xmlns:d="DAV:" xmlns:card="urn:ietf:params:xml:ns:carddav" '
+                            f'xmlns:cal="urn:ietf:params:xml:ns:caldav">{"".join(resp)}</d:multistatus>')
+
+            def do_REPORT(self):  # noqa: N802
+                outer.methods.append("REPORT")
+                body = self.rfile.read(int(self.headers["Content-Length"])).decode()
+                hrefs = re.findall(r"<d:href>([^<]+)</d:href>", body)
+                outer.multigets.append(hrefs)
+                tag = "card:address-data" if "addressbook" in body else "cal:calendar-data"
+                resp = "".join(f"<d:response><d:href>{h}</d:href><d:propstat><d:prop><d:getetag>{outer.items[h][0]}"
+                               f"</d:getetag><{tag}>{outer.items[h][1]}</{tag}></d:prop></d:propstat></d:response>"
+                               for h in hrefs if h in outer.items)
+                self._reply('<d:multistatus xmlns:d="DAV:" xmlns:card="urn:ietf:params:xml:ns:carddav" '
+                            f'xmlns:cal="urn:ietf:params:xml:ns:caldav">{resp}</d:multistatus>')
+
+            def do_PUT(self):  # noqa: N802
+                outer.methods.append("PUT")
+                self.send_response(500)
+                self.end_headers()
+
+        self.http = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=self.http.serve_forever, daemon=True).start()
+        base = f"http://127.0.0.1:{self.http.server_address[1]}"
+        self.urls = {"contacts": f"{base}/dav/addressbooks/user/{USER}/",
+                     "calendars": f"{base}/dav/calendars/user/{USER}/"}
+
+
+@pytest.fixture
+def world(tmp_path):
+    server = Server()
+    (tmp_path / "towpath.toml").write_text('[stores]\ndir = "state"\n')
+    config = config_mod.load(tmp_path / "towpath.toml")
+    creds = tmp_path / "credentials"
+    yield config, creds, server
+    server.http.shutdown()
+
+
+def test_parsing():
+    card = dav.parse_vcard(CARD)
+    assert card == {"uid": "c1", "name": "Sam Rivera", "emails": ["sam@example.org", "sam.work@example.net"],
+                    "phones": [], "birthday": "1985-04-12", "org": "Example Lock"}
+    trip, = dav.parse_events(EVENTS["trip.ics"])
+    assert trip["summary"] == "Flight to Example Junction" and trip["start"] == "2009-05-14T08:15:00Z"
+    assert trip["tz"] == "UTC" and not trip["recurring"]
+    gym, = dav.parse_events(EVENTS["gym.ics"])
+    assert gym["recurring"] and gym["tz"] == "America/Chicago" and gym["start"] == "2009-01-01T07:00:00"
+    with pytest.raises(dav.DavViolation):
+        dav.DavClient("a", "b").request("PUT", "https://example.org/", b"")
+    with pytest.raises(dav.DavViolation):
+        dav.DavClient("a", "b").request("PROPFIND", "http://example.org/", b"")
+
+
+def test_add_sync_and_read_only(world):
+    config, creds, server = world
+    with pytest.raises(connections.ConnectionProblem, match="rejected"):
+        dav_sync.test(USER, "wrong", server.urls)
+    found = dav_sync.test(USER, PASSWORD, server.urls)
+    assert {f["kind"] for f in found} == {"contacts", "calendars"}
+    sid = dav_sync.add(config.store_dir, creds, USER, PASSWORD, found, server.urls)
+    connections.start_indexing(config.store_dir, creds, sid)
+    result = dav_sync.sync_pending(config, creds)[0]
+    assert result["contacts"] == 1 and result["events"] == 3
+    assert dav_sync.names(config.store_dir) == {"sam@example.org": "Sam Rivera", "sam.work@example.net": "Sam Rivera"}
+    connections.start_indexing(config.store_dir, creds, sid)
+    server.multigets.clear()
+    dav_sync.sync_pending(config, creds)
+    assert server.multigets == [[], []] or all(m == [] for m in server.multigets)  # nothing changed: nothing read
+    server.items.pop(next(h for h in server.items if h.endswith("gym.ics")))
+    connections.start_indexing(config.store_dir, creds, sid)
+    assert dav_sync.sync_pending(config, creds)[0]["removed"] == 1
+    assert set(server.methods) == {"PROPFIND", "REPORT"}
+    assert PASSWORD not in "".join(p.read_bytes().decode("latin-1") for p in config.store_dir.glob("*.db"))
+
+
+def test_past_calendar_events_become_life_evidence_once_allowed(world):
+    config, creds, server = world
+    sid = dav_sync.add(config.store_dir, creds, USER, PASSWORD, dav_sync.test(USER, PASSWORD, server.urls),
+                       server.urls)
+    connections.start_indexing(config.store_dir, creds, sid)
+    dav_sync.sync_pending(config, creds)
+    assert life_calendar.propose(config) == []  # not allowed for the life story yet
+    grants.grant(config.store_dir, sid, "life-evidence", author="owner")
+    assert life_calendar.propose(config)[0]["proposed"] == 1  # the flight; not the weekly gym, not the future
+    claim, = life.claims(config.store_dir)
+    assert claim.statement == "Flight to Example Junction at Example Airport" and claim.modality == "plan"
+    assert claim.when.earliest.startswith("2009-05-14") and claim.significance == "notable"
+    assert life_calendar.propose(config) == []  # never twice
+    assert json.loads(json.dumps(claim.to_dict()))["citations"][0]["ref"].startswith(sid)

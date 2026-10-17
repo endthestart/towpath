@@ -103,11 +103,14 @@ def _owner_wrote(mail, source_id: str, sent: set[str]) -> set[str]:
     return out
 
 
-def rebuild(intel, mail, source_id: str, me: dict) -> int:
+def rebuild(intel, mail, source_id: str, me: dict, store_dir=None) -> int:
     """Recompute every sender's totals from the mail store, keeping categories that still fit. Returns senders."""
     from towpath.mail.threads import NOREPLY
 
+    from towpath import dav_sync
+
     wrote = _owner_wrote(mail, source_id, me["sent"])
+    known = dav_sync.names(store_dir)  # names and known people from the owner's contacts, if connected
     sent = sorted(me["sent"])
     marks_ = ",".join("?" for _ in sent)
     rows = mail.execute(  # each message once, though Gmail files it under All Mail and the Inbox
@@ -130,6 +133,8 @@ def rebuild(intel, mail, source_id: str, me: dict) -> int:
         key = digest([bool(list_id or unsub), owner_wrote, min(n, 3)])
         if owner_wrote:
             category, by, reason = "person", "rule", "You have written to them."
+        elif addr in known:
+            category, by, reason = "person", "rule", "In your contacts."
         elif NOREPLY.search(addr) and not (list_id or unsub):
             category, by, reason = "notification", "rule", "An automated address."
         elif addr in old and old[addr][4] == key and old[addr][2] in ("model", "rule-kept"):
@@ -141,8 +146,9 @@ def rebuild(intel, mail, source_id: str, me: dict) -> int:
                          first_date, last_date, list_id, unsubscribe, one_click, owner_wrote, inbox, category,
                          category_by, reason, input_digest, updated_at)
                          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                      (source_id, addr, name, addr.split("@")[-1], n, unread or 0, size or 0, first, last, list_id,
-                       unsub, int(bool(one_click)), int(owner_wrote), inbox or 0, category, by, reason, key, now()))
+                      (source_id, addr, name or known.get(addr), addr.split("@")[-1], n, unread or 0, size or 0, first,
+                       last, list_id, unsub, int(bool(one_click)), int(owner_wrote), inbox or 0, category, by, reason,
+                       key, now()))
         count += 1
     present = {r[0] for r in rows}
     gone = [a for a in old if a not in present]
@@ -219,7 +225,7 @@ def categorize_pending(config, slice_seconds: float = SLICE_SECONDS, clock=time.
             top = mail.execute("SELECT max(rowid) FROM messages WHERE source_id = ?", (sid,)).fetchone()[0] or 0
             rebuilt = 0
             if state.get("senders_rowid") != top:
-                rebuilt = rebuild(intel, mail, sid, threads.owner(config.store_dir, sid, mail))
+                rebuilt = rebuild(intel, mail, sid, threads.owner(config.store_dir, sid, mail), config.store_dir)
                 measure(intel, mail, sid)
                 from towpath.mail import notify
 

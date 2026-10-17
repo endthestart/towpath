@@ -1,0 +1,173 @@
+"""Contacts and calendars connections: test, add, and sync (connector only, like towpath.connections).
+
+A connection (adapter ``dav``) holds one read-only app password that can read both CardDAV and CalDAV; Fastmail's
+servers are filled in. Syncing lists every address book and calendar, compares ETags, reads only what changed with a
+multiget, and removes what a complete listing no longer shows. The owner starts it, or puts it on a schedule, on the
+Connections page, as for mail.
+"""
+
+import json
+from contextlib import closing
+from datetime import datetime, timezone
+from pathlib import Path
+
+from towpath import connections
+from towpath.adapters import dav
+from towpath.connections import ConnectionProblem, _update, _write_secret, secret_path
+from towpath.stores import open_store, store_path
+
+ROLE = "connect"
+PROVIDER = {"label": "Fastmail contacts and calendars",
+            "help_url": "https://www.fastmail.help/hc/en-us/articles/360058752854-App-passwords"}
+
+
+def now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def homes(username: str, contacts_url: str | None = None, calendars_url: str | None = None) -> dict:
+    return {"contacts": contacts_url or dav.FASTMAIL["contacts"].format(user=username),
+            "calendars": calendars_url or dav.FASTMAIL["calendars"].format(user=username)}
+
+
+def test(username: str, password: str, urls: dict | None = None, opener=None) -> list[dict]:
+    """Sign in and list the address books and calendars, or raise ConnectionProblem in plain words."""
+    from towpath.adapters.errors import AuthStop, ServerStop
+
+    if "@" not in username:
+        raise ConnectionProblem("Enter your full email address.")
+    if not password:
+        raise ConnectionProblem("Enter the app password.")
+    client = dav.DavClient(username, password, opener)
+    found = []
+    try:
+        for kind, home in (urls or homes(username)).items():
+            found += [{**c, "kind": kind} for c in client.collections(home, kind)]
+    except AuthStop:
+        raise ConnectionProblem("The server rejected the address or password. Use an app password that can read "
+                                "contacts and calendars.") from None
+    except (ServerStop, dav.DavViolation) as exc:
+        raise ConnectionProblem(f"Couldn't read contacts and calendars ({exc}).") from None
+    if not found:
+        raise ConnectionProblem("The account has no address books or calendars Towpath can read.")
+    return found
+
+
+def add(store_dir: Path, credentials_dir: Path, username: str, password: str, found: list[dict],
+        urls: dict | None = None, taken: set[str] = frozenset()) -> str:
+    sid = connections._new_id(store_dir, "contacts-calendars", set(taken))
+    _write_secret(secret_path(credentials_dir, sid), password)
+    settings = {"username": username, "homes": urls or homes(username)}
+    now_ = now()
+    folders = [{"name": c["name"], "kind": c["kind"], "href": c["href"]} for c in found]
+    with closing(open_store(store_dir, "connections", ROLE)) as db:
+        db.execute("""INSERT INTO connections (source_id, provider, adapter, display_name, settings, folders, state,
+                      indexing, created_at, updated_at)
+                      VALUES (?, 'fastmail_dav', 'dav', ?, ?, ?, 'ready', 'idle', ?, ?)""",
+                   (sid, PROVIDER["label"], json.dumps(settings), json.dumps(folders), now_, now_))
+        db.execute("INSERT INTO connection_events (source_id, at, event) VALUES (?, ?, 'added')", (sid, now_))
+        db.commit()
+    return sid
+
+
+def _store_items(db, sid: str, collection: dict, texts: dict[str, str], etags: dict[str, str]) -> int:
+    count = 0
+    for href, text in texts.items():
+        if collection["kind"] == "contacts":
+            card = dav.parse_vcard(text)
+            db.execute("INSERT OR REPLACE INTO contacts VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                       (sid, href, etags.get(href, ""), card["uid"], card["name"], json.dumps(card["emails"]),
+                        json.dumps(card["phones"]), card["birthday"], card["org"], collection["href"], now()))
+        else:
+            db.execute("DELETE FROM events WHERE source_id = ? AND href = ?", (sid, href))
+            for n, e in enumerate(dav.parse_events(text)):
+                db.execute("INSERT INTO events VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                           (sid, href, n, etags.get(href, ""), e["uid"], e["summary"], e["start"], e["end"],
+                            int(e["all_day"]), e["tz"], e["location"], e["organizer"], json.dumps(e["attendees"]),
+                            int(e["recurring"] or bool(e["recurrence_id"])), e["description"], collection["href"],
+                            now()))
+        count += 1
+    return count
+
+
+def sync(store_dir: Path, credentials_dir: Path, c: dict, opener=None) -> dict:
+    """Bring one connection's contacts and events up to date. Returns counts."""
+    sid = c["source_id"]
+    password = secret_path(credentials_dir, sid).read_text()
+    client = dav.DavClient(c["settings"]["username"], password, opener)
+    totals = {"contacts": 0, "events": 0, "read": 0, "removed": 0}
+    with closing(open_store(store_dir, "dav", ROLE)) as db:
+        for kind, home in c["settings"]["homes"].items():
+            for col in client.collections(home, kind):
+                col["kind"] = kind
+                etags = client.etags(col["href"])
+                table = "contacts" if kind == "contacts" else "events"
+                known = {r[0]: r[1] for r in db.execute(f"SELECT DISTINCT href, etag FROM {table} WHERE source_id = ? "
+                                                        f"AND collection = ?", (sid, col["href"]))}
+                changed = [h for h, e in etags.items() if known.get(h) != e]
+                totals["read"] += _store_items(db, sid, col, client.multiget(col["href"], changed, kind), etags)
+                gone = [h for h in known if h not in etags]
+                db.executemany(f"DELETE FROM {table} WHERE source_id = ? AND href = ?", [(sid, h) for h in gone])
+                totals["removed"] += len(gone)
+                db.execute("INSERT OR REPLACE INTO collections VALUES (?,?,?,?,?,?,?)",
+                           (sid, col["href"], kind, col["name"], col["ctag"], len(etags), now()))
+                db.commit()
+        totals["contacts"] = db.execute("SELECT count(*) FROM contacts WHERE source_id = ?", (sid,)).fetchone()[0]
+        totals["events"] = db.execute("SELECT count(*) FROM events WHERE source_id = ?", (sid,)).fetchone()[0]
+    return totals
+
+
+def sync_pending(config, credentials_dir: Path, opener=None) -> list[dict]:
+    """Sync each contacts-and-calendars connection the owner started or scheduled."""
+    from towpath.adapters.errors import SyncStop
+
+    out = []
+    for c in connections.all_connections(config.store_dir):
+        if c["adapter"] != "dav" or c["state"] != "ready" or c["indexing"] not in ("requested", "running"):
+            continue
+        sid = c["source_id"]
+        _update(config.store_dir, sid, "indexing-started", indexing="running")
+        try:
+            totals = sync(config.store_dir, credentials_dir, c, opener)
+        except SyncStop as exc:
+            _update(config.store_dir, sid, "indexing-stopped", {"termination": exc.code}, indexing="idle",
+                    last_error=connections._plain_stop(exc.code, exc.reason))
+            out.append({"source_id": sid, "termination": exc.code})
+            continue
+        _update(config.store_dir, sid, "indexed", totals, indexing="idle", last_error=None,
+                progress={"phase": "finished", "processed": totals["read"], "rate": None,
+                          "indexed": totals["contacts"] + totals["events"], "at": now()})
+        out.append({"source_id": sid, "step": "contacts-calendars", **totals})
+    return out
+
+
+# -- reading (any role) ---------------------------------------------------------------------------------------------
+
+def names(store_dir, role: str = "worker") -> dict[str, str]:
+    """Contact names by email address, from every contacts connection."""
+    if store_dir is None or not store_path(store_dir, "dav").exists():
+        return {}
+    out = {}
+    with closing(open_store(store_dir, "dav", role)) as db:
+        for name, emails in db.execute("SELECT name, emails FROM contacts WHERE name IS NOT NULL"):
+            for e in json.loads(emails):
+                out.setdefault(e, name)
+    return out
+
+
+def events(store_dir, source_id: str | None = None, before: str | None = None, role: str = "web") -> list[dict]:
+    if not store_path(store_dir, "dav").exists():
+        return []
+    where, args = ["start IS NOT NULL"], []
+    if source_id:
+        where.append("source_id = ?")
+        args.append(source_id)
+    if before:
+        where.append("start < ?")
+        args.append(before)
+    with closing(open_store(store_dir, "dav", role)) as db:
+        rows = [dict(r) for r in db.execute(f"SELECT * FROM events WHERE {' AND '.join(where)} ORDER BY start DESC",
+                                            args)]
+    for r in rows:
+        r["attendees"] = json.loads(r["attendees"])
+    return rows

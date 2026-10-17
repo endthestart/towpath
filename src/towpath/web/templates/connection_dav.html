@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Add Fastmail contacts and calendars · Towpath{% endblock %}
+{% block content %}
+<header class="page-head compact"><p class="eyebrow"><a href="/connections/">CONNECTIONS</a></p><h1>Add Fastmail contacts and calendars</h1>
+<p class="lead">Contacts give names to the addresses in your mail and tell Towpath who you know. Past calendar events become dated evidence for your life story, once you allow that on the Life page.</p></header>
+{% if error %}<div class="notice warn" role="alert">{{ error }}</div>{% endif %}
+<section class="detail-card steps"><h2 class="card-title">First, make an app password in Fastmail</h2>
+<ol>
+  <li>In Fastmail, open <a href="{{ preset.help_url }}" target="_blank" rel="noopener noreferrer">Settings → Privacy &amp; Security → App passwords</a> and choose <strong>New app password</strong>.</li>
+  <li>Name it “Towpath (contacts and calendars)”. For access, choose <strong>Contacts and calendars (CardDAV/CalDAV)</strong> and tick <strong>Read-only</strong>.</li>
+  <li>Paste it below. It's separate from the mail passwords.</li>
+</ol>
+<p class="footnote">Towpath only reads: it asks the server for lists and items, and never adds, changes or deletes a contact or an event.</p>
+</section>
+<section class="detail-card"><form method="post" class="auth-form" autocomplete="off">{% csrf_token %}
+  <label>Fastmail address <input type="email" name="username" value="{{ form.username }}" required autocomplete="username"></label>
+  <label>App password <input type="password" name="password" required autocomplete="new-password"></label>
+  <button class="button" type="submit">Test and save</button>
+</form></section>
+{% endblock %}

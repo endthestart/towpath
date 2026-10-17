@@ -43,6 +43,9 @@ def run_once(config, credentials_dir=None):
     if credentials_dir is not None:  # schedules the owner chose start connections first, then they run as if started
         indexing += connections.start_scheduled(config.store_dir, credentials_dir)
         indexing += connections.index_pending(config, credentials_dir)
+        from towpath import dav_sync  # contacts and calendars
+
+        indexing += dav_sync.sync_pending(config, credentials_dir)
     if credentials_dir is not None:  # folders, when this connector has a data folder
         indexing += folders.index_pending(config, Path(config.store_dir).parent)
         from towpath import photos  # photo headers for photo search, and plain-English photo requests
@@ -52,6 +55,9 @@ def run_once(config, credentials_dir=None):
         from towpath import life_propose  # life-story proposals, only once the owner allowed them
 
         indexing += life_propose.propose_pending(config, credentials_dir)
+        from towpath import life_calendar
+
+        indexing += life_calendar.propose(config)
         from towpath import life_groups
 
         indexing += life_groups.propose_groups(config)

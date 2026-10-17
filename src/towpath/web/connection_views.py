@@ -149,6 +149,8 @@ def add(request, provider):
         return _folders_page(request)
     if provider == "model":
         return _model_page(request)
+    if provider == "fastmail_dav":
+        return _dav_page(request)
     if provider not in connections.PROVIDERS:
         raise Http404
     preset = connections.PROVIDERS[provider]
@@ -177,6 +179,28 @@ def add(request, provider):
             password = None  # noqa: F841 - drop the only reference as soon as it is stored or rejected
     response = render(request, "connection_add.html", {"nav": "connections", "provider": provider, "preset": preset,
                                                       "form": form, "error": error})
+    response.status_code = 400 if error else 200
+    return response
+
+
+def _dav_page(request):
+    from towpath import dav_sync
+
+    form = {"username": request.POST.get("username", "").strip()}
+    error = None
+    if request.method == "POST":
+        password = request.POST.get("password", "").replace(" ", "").strip()
+        try:
+            found = dav_sync.test(form["username"], password)
+            sid = dav_sync.add(_store(), _creds(), form["username"], password, found, taken=_config_ids())
+        except ConnectionProblem as exc:
+            error = str(exc)
+        else:
+            return redirect(f"/connections/{sid}/")
+        finally:
+            password = None  # noqa: F841
+    response = render(request, "connection_dav.html", {"nav": "connections", "form": form, "error": error,
+                                                        "preset": dav_sync.PROVIDER})
     response.status_code = 400 if error else 200
     return response
 

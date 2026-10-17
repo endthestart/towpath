@@ -32,6 +32,8 @@ PROVIDERS = {
     "gmail_imap": {"label": "Gmail (IMAP)", "host": "imap.gmail.com", "port": 993, "security": "tls",
                    "help_url": "https://myaccount.google.com/apppasswords"},
     "imap": {"label": "Email (IMAP)", "host": None, "port": 993, "security": "tls", "help_url": None},
+    "fastmail_dav": {"label": "Fastmail contacts and calendars", "host": None, "port": None, "security": None,
+                     "help_url": "https://www.fastmail.help/hc/en-us/articles/360058752854-App-passwords"},
     "folders": {"label": "Folders on this server", "host": None, "port": None, "security": None, "help_url": None},
     "model": {"label": "AI model on your network", "host": None, "port": None, "security": None, "help_url": None},
 }
@@ -739,8 +741,8 @@ def index_pending(config, credentials_dir: Path, slice_seconds: float = SLICE_SE
     store_dir = config.store_dir
     summaries = []
     for c in all_connections(store_dir):
-        if c["indexing"] not in ("requested", "running") or c["state"] != "ready" or c["adapter"] == "recoll":
-            continue  # folders are indexed by towpath.folders
+        if c["indexing"] not in ("requested", "running") or c["state"] != "ready" or c["adapter"] in ("recoll", "dav"):
+            continue  # folders are indexed by towpath.folders, contacts and calendars by towpath.dav_sync
         sid = c["source_id"]
         _update(store_dir, sid, "indexing-slice" if c["indexing"] == "running" else "indexing-started",
                 indexing="running")

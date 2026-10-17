@@ -103,3 +103,9 @@ def test_a_plain_english_request_becomes_filters(library, tmp_path, openai_stub,
     prompt = next(r["body"]["messages"][-1]["content"] for r in stub.chat_requests()
                   if "Turn the owner's request" in r["body"]["messages"][-1]["content"])
     assert "FUJIFILM X100V" in prompt and "my Fuji in 2019" in prompt
+
+
+def test_without_exiftool_nothing_happens(library):
+    config, _, _ = library
+    assert photos.extract_pending(config, exiftool="/nonexistent/exiftool") == []
+    assert photos.progress(config.store_dir)["read"] == 0
