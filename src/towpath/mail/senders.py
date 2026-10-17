@@ -25,6 +25,9 @@ from towpath.canonical import digest
 from towpath.stores import open_store, store_path
 
 ROLE = "worker"
+SHARED_DOMAINS = {"gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com", "yahoo.com", "icloud.com",
+                  "me.com", "mac.com", "aol.com", "fastmail.com", "fastmail.fm", "proton.me", "protonmail.com",
+                  "gmx.com", "msn.com"}
 TASK = "mail.classify"
 PROMPT = "mail.sender/1"
 CATEGORIES = {"person": "People", "newsletter": "Newsletters", "marketing": "Marketing",
@@ -125,6 +128,13 @@ def rebuild(intel, mail, source_id: str, me: dict, store_dir=None) -> int:
             GROUP BY from_addr""", (source_id, *sent)).fetchall()
     old = {r[0]: r for r in intel.execute("SELECT address, category, category_by, reason, input_digest FROM senders "
                                           "WHERE source_id = ?", (source_id,))}
+    # Learned from the owner: a category they gave one sender holds for others at the same domain (not for
+    # personal mail domains, where one person says nothing about the next).
+    learned: dict[str, str] = {}
+    for address, category in marks(store_dir, source_id).items() if store_dir else ():
+        domain = address.rpartition("@")[2]
+        if domain and domain not in SHARED_DOMAINS and category != "person":
+            learned.setdefault(domain, category)
     count = 0
     for (addr, name, n, unread, size, first, last, list_id, unsub, one_click, inbox) in rows:
         if addr in me["addresses"]:
@@ -135,6 +145,9 @@ def rebuild(intel, mail, source_id: str, me: dict, store_dir=None) -> int:
             category, by, reason = "person", "rule", "You have written to them."
         elif addr in known:
             category, by, reason = "person", "rule", "In your contacts."
+        elif addr.rpartition("@")[2] in learned:
+            category, by = learned[addr.rpartition("@")[2]], "learned"
+            reason = f"You chose this for another sender at {addr.rpartition('@')[2]}."
         elif NOREPLY.search(addr) and not (list_id or unsub):
             category, by, reason = "notification", "rule", "An automated address."
         elif addr in old and old[addr][4] == key and old[addr][2] in ("model", "rule-kept"):

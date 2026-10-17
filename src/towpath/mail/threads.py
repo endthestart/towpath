@@ -296,12 +296,26 @@ def ready(config, task: str) -> bool:
     return bool(report and report["capabilities"].get("chat"))
 
 
+def _owner_examples(intel, store_dir, source_id: str, limit: int = 6) -> str:
+    """The owner's own marks, as examples of how they judge conversations (subjects and states only)."""
+    owner_marks = marks(store_dir, source_id)
+    if not owner_marks:
+        return ""
+    keys = list(owner_marks)[-200:]
+    rows = intel.execute(f"SELECT thread_key, subject FROM threads WHERE source_id = ? AND thread_key IN "
+                         f"({','.join('?' for _ in keys)})", (source_id, *keys)).fetchall()
+    lines = [f'- "{subject or "(no subject)"}": {owner_marks[key]}' for key, subject in rows[-limit:]]
+    return ("\n\nHow the owner has judged other conversations (follow their judgement):\n" + "\n".join(lines)
+            if lines else "")
+
+
 def _classify(config, intel, mail, source_id: str, me: dict, deadline: float, clock,
               days: int = OLD_DAYS) -> tuple[int, str | None]:
     from towpath.models import gateway
 
     done = 0
     endpoint = config.endpoints[config.tasks[TASK_STATE]]
+    examples = _owner_examples(intel, config.store_dir, source_id)
     while clock() < deadline:
         rows = intel.execute("SELECT thread_key FROM threads WHERE source_id = ? AND state_by = 'rule' AND "
                              "kind = 'conversation' AND last_date >= ? ORDER BY last_date DESC LIMIT ?",
@@ -319,7 +333,8 @@ def _classify(config, intel, mail, source_id: str, me: dict, deadline: float, cl
                 intel.commit()
                 continue
             t = summarize(source_id, key, msgs, me)
-            prompt = f"{STATE_INSTRUCTION}\n\n<conversation>\n{conversation_text(msgs, me)}\n</conversation>"
+            prompt = (f"{STATE_INSTRUCTION}{examples}\n\n<conversation>\n{conversation_text(msgs, me)}\n"
+                      f"</conversation>")
             from towpath.mail.privacy import targets
 
             result = gateway.infer(config, TASK_STATE, prompt, "content", STATE_SCHEMA,

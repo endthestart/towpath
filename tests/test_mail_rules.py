@@ -5,12 +5,14 @@ dry runs while the account is in dry runs only."""
 import json
 import re
 import sys
+from contextlib import closing
 from pathlib import Path
 
 import pytest
 from django.test import Client, override_settings
 
 from towpath.mail import executor, rules, senders, settings
+from towpath.stores import open_store
 from towpath.web import auth
 from towpath.web.application import configure
 
@@ -170,3 +172,35 @@ def test_the_pages_for_senders_rules_and_batch_answers(world, monkeypatch):
         history = client.get(f"/mail/{world.sid}/rules/{rule_id}/").content.decode()
         assert "approved 1" in history and "Big sale" in history
     assert settings.dry_run(world.store, world.sid)
+
+
+def test_a_category_the_owner_gives_one_sender_is_learned_for_its_domain(world):
+    from test_mail_threads import mail
+
+    from towpath import connect
+    from towpath.mail import analysis
+
+    world.state.mailboxes["INBOX"].messages[9] = mail(9, "Shop Orders <orders@shop.example>", "reader@example.com",
+                                                      "Your order", "Thanks for your order.", 1)
+    world.state.mailboxes["INBOX"].messages[10] = mail(10, "Friend <friend@gmail.com>", "reader@example.com",
+                                                       "hi", "hello", 1)
+    connect.sync(world.worker(), world.sid)
+    analysis.analyze_pending(world.worker())
+    senders.mark(world.store, world.sid, "news@shop.example", "receipt")
+    senders.mark(world.store, world.sid, "someone@gmail.com", "receipt")  # a shared domain: nothing learned
+    senders.categorize_pending(world.worker())
+    got = {r["address"]: r for r in senders.listing(world.store, world.sid)}
+    learned = got["orders@shop.example"]
+    assert learned["category"] == "receipt" and learned["category_by"] == "learned"
+    assert got["friend@gmail.com"]["category_by"] != "learned"
+
+
+def test_the_owners_marks_are_examples_for_the_model(world):
+    from towpath.mail import threads
+
+    threads.track_pending(world.worker())
+    key = next(r["thread_key"] for r in threads.listing(world.store, world.sid, "needs_owner_reply"))
+    threads.mark(world.store, world.sid, key, "done")
+    with closing(open_store(world.store, "mailintel", "worker")) as intel:
+        text = threads._owner_examples(intel, world.store, world.sid)
+    assert '"Saturday?": done' in text and "follow their judgement" in text
