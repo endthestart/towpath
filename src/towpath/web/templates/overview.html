@@ -2,7 +2,12 @@
 {% block title %}Overview · Towpath{% endblock %}
 {% block content %}
 <header class="page-head"><p class="eyebrow">YOUR DIGITAL LIFE</p><h1>A place to find your way.</h1>
-<p class="lead">Start with your email. Find a conversation, revisit a moment, or recover a document.</p></header>
+<p class="lead">Your mail, files, photos and life story, in one place. Find a conversation, revisit a moment, or recover a document.</p></header>
+<section class="metrics" aria-label="Today">
+  {% for a in today.accounts %}<div class="metric"><p>{{ a.name }}</p><strong><a href="/mail/{{ a.source_id }}/conversations?state=needs_owner_reply">{{ a.to_reply }}</a></strong><span>waiting for your reply · <a href="/mail/{{ a.source_id }}/conversations?state=awaiting_others">{{ a.awaiting }} awaiting others</a>{% if a.dry_run %} · dry runs only{% endif %}</span></div>{% endfor %}
+  <div class="metric"><p>Life story</p><strong><a href="/life/?show=review#claims">{{ today.events_to_review }}</a></strong><span>events to review · <a href="/life/memories/">{{ today.memories_to_review }} memories</a>{% if today.on_this_day %} · <a href="/life/today">on this day in {{ today.on_this_day }} year{{ today.on_this_day|pluralize }}</a>{% endif %}</span></div>
+  <div class="metric"><p>Photos</p><strong><a href="/photos/">{{ today.photos|floatformat:'0g' }}</a></strong><span>read for camera, date and place · <a href="/life/ask">Ask your records</a></span></div>
+</section>
 <section class="metrics" aria-label="Email index summary">
   <div class="metric"><p>Messages indexed</p><strong>{{ total|floatformat:'0g' }}</strong><span>Saved email metadata</span></div>
   <div class="metric"><p>Sent messages</p><strong>{{ sent|floatformat:'0g' }}</strong><span>Your side of the conversation</span></div>

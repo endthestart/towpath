@@ -56,7 +56,10 @@ class StoreSchemaMiddleware:
 
 @require_GET
 def overview(request):
-    return render(request, "overview.html", {"nav": "overview", **index.overview(settings.TOWPATH_STORE_DIR)})
+    from towpath.web import home
+
+    return render(request, "overview.html", {"nav": "overview", **index.overview(settings.TOWPATH_STORE_DIR),
+                                             "today": home.cards(settings.TOWPATH_STORE_DIR)})
 
 
 @require_GET

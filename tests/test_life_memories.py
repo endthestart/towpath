@@ -143,6 +143,8 @@ def test_the_pages(world, monkeypatch):
         assert "Junction 2009" in client.get(f"/life/memories/{gid}/").content.decode()
         client.post("/life/ask", {"question": "When did I go to Example Junction?"})
         assert "Looking through your records" in client.get("/life/ask").content.decode()
+        home = client.get("/").content.decode()
+        assert "waiting for your reply" in home and "events to review" in home
         client.post("/life/profile", {"name": "R", "birthday": "not a date"})
         assert life_groups.profile(world.store)["name"] == "Reader"
 
