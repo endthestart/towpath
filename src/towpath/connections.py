@@ -34,6 +34,8 @@ PROVIDERS = {
     "imap": {"label": "Email (IMAP)", "host": None, "port": 993, "security": "tls", "help_url": None},
     "fastmail_dav": {"label": "Fastmail contacts and calendars", "host": None, "port": None, "security": None,
                      "help_url": "https://www.fastmail.help/hc/en-us/articles/360058752854-App-passwords"},
+    "icloud_dav": {"label": "iCloud contacts and calendars", "host": None, "port": None, "security": None,
+                   "help_url": "https://support.apple.com/en-us/102654"},
     "facebook": {"label": "Facebook export", "host": None, "port": None, "security": None,
                  "help_url": "https://www.facebook.com/dyi"},
     "folders": {"label": "Folders on this server", "host": None, "port": None, "security": None, "help_url": None},

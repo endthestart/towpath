@@ -149,8 +149,8 @@ def add(request, provider):
         return _folders_page(request)
     if provider == "model":
         return _model_page(request)
-    if provider == "fastmail_dav":
-        return _dav_page(request)
+    if provider in ("fastmail_dav", "icloud_dav"):
+        return _dav_page(request, provider)
     if provider == "facebook":
         return _facebook_page(request)
     if provider not in connections.PROVIDERS:
@@ -212,16 +212,23 @@ def _facebook_page(request):
     return response
 
 
-def _dav_page(request):
+def _dav_page(request, provider: str = "fastmail_dav"):
     from towpath import dav_sync
+    from towpath.adapters import dav
 
     form = {"username": request.POST.get("username", "").strip()}
     error = None
     if request.method == "POST":
         password = request.POST.get("password", "").replace(" ", "").strip()
         try:
-            found = dav_sync.test(form["username"], password)
-            sid = dav_sync.add(_store(), _creds(), form["username"], password, found, taken=_config_ids())
+            urls = None
+            if provider == "icloud_dav":
+                if "@" not in form["username"] or not password:
+                    raise ConnectionProblem("Enter your Apple Account email and an app-specific password.")
+                urls = dav_sync.discover(form["username"], password, dav.ICLOUD)
+            found = dav_sync.test(form["username"], password, urls)
+            sid = dav_sync.add(_store(), _creds(), form["username"], password, found, urls, taken=_config_ids(),
+                               provider=provider)
         except ConnectionProblem as exc:
             error = str(exc)
         else:
@@ -229,7 +236,8 @@ def _dav_page(request):
         finally:
             password = None  # noqa: F841
     response = render(request, "connection_dav.html", {"nav": "connections", "form": form, "error": error,
-                                                        "preset": dav_sync.PROVIDER})
+                                                        "provider": provider,
+                                                        "preset": dav_sync.PROVIDERS[provider]})
     response.status_code = 400 if error else 200
     return response
 

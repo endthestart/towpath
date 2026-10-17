@@ -36,6 +36,7 @@ class Server:
         for name, text in EVENTS.items():
             self.items[f"/dav/calendars/user/reader@example.com/Personal/{name}"] = ("e-1", text)
         self.methods, self.multigets = [], []
+        self.calendar_home = None
         outer = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -57,7 +58,21 @@ class Server:
                     return
                 path = self.path
                 resp = []
-                if path.endswith("/user/reader@example.com/"):
+                body = self.rfile.read(int(self.headers.get("Content-Length") or 0)).decode()
+                base = f"http://127.0.0.1:{outer.http.server_address[1]}"
+                if path == "/" and "current-user-principal" in body:  # discovery, as iCloud does it
+                    resp.append("<d:response><d:href>/</d:href><d:propstat><d:prop><d:current-user-principal>"
+                                "<d:href>/principals/42/</d:href></d:current-user-principal></d:prop></d:propstat>"
+                                "</d:response>")
+                elif path == "/principals/42/":
+                    home = (f"<card:addressbook-home-set><d:href>{base}/dav/addressbooks/user/{USER}/</d:href>"
+                            "</card:addressbook-home-set>") if "addressbook-home-set" in body else \
+                        ("<cal:calendar-home-set><d:href>"
+                         f"{outer.calendar_home or base + '/dav/calendars/user/' + USER + '/'}"
+                         "</d:href></cal:calendar-home-set>")
+                    resp.append(f"<d:response><d:href>{path}</d:href><d:propstat><d:prop>{home}</d:prop></d:propstat>"
+                                "</d:response>")
+                elif path.endswith("/user/reader@example.com/"):
                     kind = "card:addressbook" if "addressbooks" in path else "cal:calendar"
                     child = "Default/" if "addressbooks" in path else "Personal/"
                     resp.append(f"<d:response><d:href>{path}</d:href><d:propstat><d:prop><d:resourcetype>"
@@ -158,3 +173,41 @@ def test_past_calendar_events_become_life_evidence_once_allowed(world):
     assert claim.when.earliest.startswith("2009-05-14") and claim.significance == "notable"
     assert life_calendar.propose(config) == []  # never twice
     assert json.loads(json.dumps(claim.to_dict()))["citations"][0]["ref"].startswith(sid)
+
+
+def test_icloud_style_discovery_finds_the_homes_and_stays_on_the_service(world):
+    config, creds, server = world
+    base = f"http://127.0.0.1:{server.http.server_address[1]}/"
+    homes = dav_sync.discover(USER, PASSWORD, {"contacts": base, "calendars": base})
+    assert homes == server.urls
+    sid = dav_sync.add(config.store_dir, creds, USER, PASSWORD, dav_sync.test(USER, PASSWORD, homes), homes,
+                       provider="icloud_dav")
+    assert connections.get(config.store_dir, sid)["display_name"] == "iCloud contacts and calendars"
+    server.calendar_home = "http://elsewhere.example/calendars/"  # a server pointing away is refused
+    with pytest.raises(connections.ConnectionProblem, match="pointed somewhere else"):
+        dav_sync.discover(USER, PASSWORD, {"calendars": base})
+    with pytest.raises(connections.ConnectionProblem, match="rejected"):
+        dav_sync.discover(USER, "wrong", {"contacts": base})
+    assert set(server.methods) <= {"PROPFIND", "REPORT"}  # reads only
+
+
+def test_the_add_pages_for_fastmail_and_icloud(world, monkeypatch):
+    from django.test import Client, override_settings
+
+    from towpath.web import auth
+    from towpath.web.application import configure
+
+    config, creds, _ = world
+    monkeypatch.setattr(auth, "_setup_codes", {})
+    configure(config.store_dir)
+    auth.create_account(config.store_dir, "owner", "correct horse battery staple")
+    with override_settings(TOWPATH_STORE_DIR=config.store_dir, TOWPATH_CONFIG=config,
+                           TOWPATH_CREDENTIALS_DIR=creds, ALLOWED_HOSTS=["testserver"],
+                           ROOT_URLCONF="towpath.web.connection_urls"):
+        client = Client()
+        client.post("/login", {"username": "owner", "password": "correct horse battery staple"})
+        assert "Fastmail address" in client.get("/connections/add/fastmail_dav").content.decode()
+        page = client.get("/connections/add/icloud_dav").content.decode()
+        assert "Apple Account email" in page and "app-specific password" in page
+        missing = client.post("/connections/add/icloud_dav", {"username": "reader", "password": ""})
+        assert missing.status_code == 400 and "Apple Account email" in missing.content.decode()

@@ -1,4 +1,5 @@
-"""Read-only contacts (CardDAV) and calendars (CalDAV), Fastmail first.
+"""Read-only contacts (CardDAV) and calendars (CalDAV): Fastmail's known addresses, or found the standard way
+(the account's principal, then its address-book and calendar homes) for iCloud and other servers.
 
 Towpath sends only PROPFIND and REPORT, the two read methods these protocols need: PROPFIND lists the address books
 and calendars and each item's ETag; REPORT (``addressbook-multiget``, ``calendar-multiget``) reads the items that
@@ -23,12 +24,32 @@ NS = {"d": "DAV:", "card": "urn:ietf:params:xml:ns:carddav", "cal": "urn:ietf:pa
 METHODS = {"PROPFIND", "REPORT"}
 FASTMAIL = {"contacts": "https://carddav.fastmail.com/dav/addressbooks/user/{user}/",
             "calendars": "https://caldav.fastmail.com/dav/calendars/user/{user}/"}
+ICLOUD = {"contacts": "https://contacts.icloud.com/", "calendars": "https://caldav.icloud.com/"}
 TIMEOUT = 60
 MULTIGET = 100
 
 LIST_BODY = b"""<?xml version="1.0" encoding="utf-8"?>
 <d:propfind xmlns:d="DAV:" xmlns:cs="http://calendarserver.org/ns/"><d:prop><d:resourcetype/><d:displayname/>
 <cs:getctag/><d:getetag/></d:prop></d:propfind>"""
+
+
+PRINCIPAL_BODY = b"""<?xml version="1.0" encoding="utf-8"?>
+<d:propfind xmlns:d="DAV:"><d:prop><d:current-user-principal/></d:prop></d:propfind>"""
+HOME_BODY = {"contacts": b"""<?xml version="1.0" encoding="utf-8"?>
+<d:propfind xmlns:d="DAV:" xmlns:card="urn:ietf:params:xml:ns:carddav"><d:prop><card:addressbook-home-set/></d:prop>
+</d:propfind>""", "calendars": b"""<?xml version="1.0" encoding="utf-8"?>
+<d:propfind xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav"><d:prop><cal:calendar-home-set/></d:prop>
+</d:propfind>"""}
+
+
+def same_service(base: str, other: str) -> bool:
+    """Whether a home the server pointed to is on the same service as the address Towpath asked (iCloud's homes are
+    on numbered hosts under icloud.com): same scheme, and the same last two labels of the host name."""
+    def tail(host):
+        return ".".join((host or "").split(".")[-2:])
+
+    a, b = urllib.parse.urlsplit(base), urllib.parse.urlsplit(other)
+    return a.scheme == b.scheme and (a.hostname == b.hostname or tail(a.hostname) == tail(b.hostname))
 
 
 class DavViolation(RuntimeError):
@@ -61,6 +82,23 @@ class DavClient:
             raise ServerStop(f"couldn't reach {parsed.hostname}") from None
         except ET.ParseError:
             raise ServerStop("the server's answer wasn't valid XML") from None
+
+    def discover(self, base: str, kind: str) -> str:
+        """The address-book or calendar home for this account: its principal, then the home set it names."""
+        root = self.request("PROPFIND", base, PRINCIPAL_BODY, depth="0")
+        principal = root.findtext(".//d:current-user-principal/d:href", namespaces=NS)
+        if not principal:
+            raise ServerStop("the server didn't say where this account's contacts and calendars are")
+        principal = urllib.parse.urljoin(base, principal)
+        tag = "card:addressbook-home-set" if kind == "contacts" else "cal:calendar-home-set"
+        home = self.request("PROPFIND", principal, HOME_BODY[kind], depth="0").findtext(f".//{tag}/d:href",
+                                                                                          namespaces=NS)
+        if not home:
+            raise ServerStop(f"the server has no {kind} for this account")
+        home = urllib.parse.urljoin(principal, home)
+        if not (same_service(base, principal) and same_service(base, home)):
+            raise DavViolation("the server pointed somewhere else; Towpath only reads from the service you chose")
+        return home
 
     def collections(self, home: str, kind: str) -> list[dict]:
         """Address books (``contacts``) or calendars (``calendars``) under a home URL."""

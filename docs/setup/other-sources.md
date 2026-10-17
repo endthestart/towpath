@@ -27,8 +27,8 @@ Apple offers no general data API, so these are copies you make, then index like 
 - **Messages:** there is no API. Export them on a Mac from its Messages database, or from a local iPhone backup,
   with an exporter such as [imessage-exporter](https://github.com/ReagentX/imessage-exporter) (text or HTML), into a
   folder on the server, and index that folder. A dedicated importer like the Facebook one is not built yet.
-- **Contacts and calendars:** iCloud supports CardDAV and CalDAV; Towpath's contacts-and-calendars connection is
-  set up for Fastmail's addresses today.
+- **Contacts and calendars:** *Connections → iCloud contacts and calendars*, with your Apple Account email and an
+  app-specific password. Towpath finds the address books and calendars the standard way and only reads them.
 
 ## Google
 

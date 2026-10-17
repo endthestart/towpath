@@ -1,9 +1,9 @@
 """Contacts and calendars connections: test, add, and sync (connector only, like towpath.connections).
 
-A connection (adapter ``dav``) holds one read-only app password that can read both CardDAV and CalDAV; Fastmail's
-servers are filled in. Syncing lists every address book and calendar, compares ETags, reads only what changed with a
-multiget, and removes what a complete listing no longer shows. The owner starts it, or puts it on a schedule, on the
-Connections page, as for mail.
+A connection (adapter ``dav``) holds one app password that can read both CardDAV and CalDAV; Fastmail's servers are
+filled in, and iCloud's are found from its standard starting addresses. Syncing lists every address book and
+calendar, compares ETags, reads only what changed with a multiget, and removes what a complete listing no longer
+shows. The owner starts it, or puts it on a schedule, on the Connections page, as for mail.
 """
 
 import json
@@ -17,8 +17,12 @@ from towpath.connections import ConnectionProblem, _update, _write_secret, secre
 from towpath.stores import open_store, store_path
 
 ROLE = "connect"
-PROVIDER = {"label": "Fastmail contacts and calendars",
-            "help_url": "https://www.fastmail.help/hc/en-us/articles/360058752854-App-passwords"}
+PROVIDERS = {
+    "fastmail_dav": {"label": "Fastmail contacts and calendars", "service": "Fastmail",
+                     "help_url": "https://www.fastmail.help/hc/en-us/articles/360058752854-App-passwords"},
+    "icloud_dav": {"label": "iCloud contacts and calendars", "service": "iCloud",
+                   "help_url": "https://support.apple.com/en-us/102654"}}
+PROVIDER = PROVIDERS["fastmail_dav"]
 
 
 def now() -> str:
@@ -28,6 +32,20 @@ def now() -> str:
 def homes(username: str, contacts_url: str | None = None, calendars_url: str | None = None) -> dict:
     return {"contacts": contacts_url or dav.FASTMAIL["contacts"].format(user=username),
             "calendars": calendars_url or dav.FASTMAIL["calendars"].format(user=username)}
+
+
+def discover(username: str, password: str, bases: dict, opener=None) -> dict:
+    """The homes for a server found the standard way (iCloud), from its starting addresses."""
+    from towpath.adapters.errors import AuthStop, ServerStop
+
+    client = dav.DavClient(username, password, opener)
+    try:
+        return {kind: client.discover(base, kind) for kind, base in bases.items()}
+    except AuthStop:
+        raise ConnectionProblem("The server rejected the address or password. Use an app-specific password.") \
+            from None
+    except (ServerStop, dav.DavViolation) as exc:
+        raise ConnectionProblem(f"Couldn't find the contacts and calendars ({exc}).") from None
 
 
 def test(username: str, password: str, urls: dict | None = None, opener=None) -> list[dict]:
@@ -54,7 +72,7 @@ def test(username: str, password: str, urls: dict | None = None, opener=None) ->
 
 
 def add(store_dir: Path, credentials_dir: Path, username: str, password: str, found: list[dict],
-        urls: dict | None = None, taken: set[str] = frozenset()) -> str:
+        urls: dict | None = None, taken: set[str] = frozenset(), provider: str = "fastmail_dav") -> str:
     sid = connections._new_id(store_dir, "contacts-calendars", set(taken))
     _write_secret(secret_path(credentials_dir, sid), password)
     settings = {"username": username, "homes": urls or homes(username)}
@@ -63,8 +81,9 @@ def add(store_dir: Path, credentials_dir: Path, username: str, password: str, fo
     with closing(open_store(store_dir, "connections", ROLE)) as db:
         db.execute("""INSERT INTO connections (source_id, provider, adapter, display_name, settings, folders, state,
                       indexing, created_at, updated_at)
-                      VALUES (?, 'fastmail_dav', 'dav', ?, ?, ?, 'ready', 'idle', ?, ?)""",
-                   (sid, PROVIDER["label"], json.dumps(settings), json.dumps(folders), now_, now_))
+                      VALUES (?, ?, 'dav', ?, ?, ?, 'ready', 'idle', ?, ?)""",
+                   (sid, provider, PROVIDERS[provider]["label"], json.dumps(settings), json.dumps(folders), now_,
+                    now_))
         db.execute("INSERT INTO connection_events (source_id, at, event) VALUES (?, ?, 'added')", (sid, now_))
         db.commit()
     return sid
