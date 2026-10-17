@@ -161,3 +161,8 @@ Balanced across three areas, mail first:
   work between model slices, safe form redirects, and huge duplicate files compared by samples (they had stalled
   each connector poll for minutes). A visual pass on synthetic data fixed a Mail page failure when serving a bare
   stores folder, and the newer pages' forms.
+- 2026-10-17: `b310977` deployed. A code review of the day's riskier changes found eleven problems, all fixed in
+  `d05ca6f`: the contacts-and-calendars password could follow a server's pointer to another host; Ask didn't apply
+  keep-from-cloud marks; labels put back after removal were dropped; follow-up labels stayed after reminders were
+  turned off; some forms failed after acting; purchases could be read twice; one refusal stalled drafts or purchases;
+  sampled duplicates counted as exact.
