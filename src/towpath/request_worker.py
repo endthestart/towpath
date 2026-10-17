@@ -95,6 +95,7 @@ def run_once(config, credentials_dir=None):
         from towpath.mail import notify
 
         indexing += notify.alerts_pending(config)
+        indexing += notify.follow_ups_pending(config)
         indexing += notify.digests_pending(config)
     return {"searches": search["searches_run"], "fetched": fetched["fetched"],
             "failed": fetched["failed"], "presence_checked": fetched.get("presence_checked", 0),

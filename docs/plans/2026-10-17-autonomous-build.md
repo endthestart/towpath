@@ -127,3 +127,6 @@ Balanced across three areas, mail first:
   message text; per-sender clean-up links.
 - 2026-10-17: Facebook export source built (posts, day-by-day conversations); how-tos for Facebook, Apple and
   Google data in [other sources](../setup/other-sources.md).
+- 2026-10-17: a category the owner gives one sender is learned for its domain (not for shared domains like
+  gmail.com); the owner's conversation marks are examples for the model; Ask cites file names in folders allowed for
+  the life story. Rules can be described in plain English and drafted by the model for the owner to check.

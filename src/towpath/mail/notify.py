@@ -6,6 +6,9 @@
 - **Digest.** Daily or weekly, a short message put straight into the inbox (APPEND; nothing is sent): who is waiting
   for a reply, what the owner is waiting on, new mail by category, rule activity, and senders worth unsubscribing
   from.
+- **Follow-up reminders.** When the owner wrote last and nobody has answered after a few days, the owner's message
+  gets the label "Follow-up" (and the worker drafts a nudge); the label comes off when someone answers. Only
+  conversations the owner wrote in during the month before the reminder would be due.
 - **Statistics.** Mail received and sent per week, how quickly the owner replies, and the people they write to most.
 
 Alerts and digests are ordinary mail changes proposed by the worker and approved by the owner's own setting, so they
@@ -28,6 +31,9 @@ from towpath.stores import open_store, store_path
 ROLE = "worker"
 ALERT_MODES = {"off": "Off", "flag": "Flag the message", "keyword": "Label it “Important”"}
 DIGEST_EVERY = {"off": "Off", "daily": "Every morning", "weekly": "Monday mornings"}
+FOLLOW_UP_DAYS = {0: "Off", 3: "After 3 days", 7: "After a week", 14: "After two weeks"}
+FOLLOW_UP_LABEL = "Follow-up"
+FOLLOW_UP_WINDOW_DAYS = 30
 TIMEZONE = "America/Chicago"
 DIGEST_HOUR = 7
 
@@ -60,10 +66,23 @@ def set_digest(store_dir, source_id: str, every: str, author: str = "owner") -> 
                   "mail-digest", author)
 
 
+def follow_up_days(store_dir, source_id: str, role: str = ROLE) -> int:
+    return int((settings._get(store_dir, source_id, "follow_up", role) or {}).get("days", 0))
+
+
+def set_follow_up(store_dir, source_id: str, days: int, author: str = "owner") -> None:
+    if days not in FOLLOW_UP_DAYS:
+        raise ValueError("unknown follow-up delay")
+    settings._set(store_dir, source_id, "follow_up", {"days": days}, "mail-follow-up", author)
+
+
 def auto_approved(store_dir, body: dict, role: str = "act") -> bool:
-    """An alert or digest the owner's current setting asked for."""
+    """An alert, digest or follow-up label the owner's current setting asked for."""
     producer = str(body.get("producer", ""))
     source = body.get("source_id")
+    if producer == f"follow-up:{source}":
+        return body.get("type") in ("add_keyword", "remove_keyword") and \
+            body.get("params", {}).get("keyword") == FOLLOW_UP_LABEL and follow_up_days(store_dir, source, role) > 0
     if producer == f"alert:{source}":
         mode = alert_setting(store_dir, source, role)["mode"]
         return (mode, body.get("type")) in (("flag", "flag"), ("keyword", "add_keyword"))
@@ -120,6 +139,71 @@ def alerts_pending(config) -> list[dict]:
             mail.close()
         if made:
             out.append({"source_id": sid, "step": "mail-alerts", "alerts": made})
+    return out
+
+
+# -- follow-up reminders ------------------------------------------------------------------------------------------
+
+def follow_up_due(store_dir, source_id: str, intel, days: int, role: str = ROLE) -> list[tuple]:
+    """(thread_key, last_item) of conversations the owner wrote last in, unanswered for ``days``."""
+    from towpath.mail import threads
+
+    owner_marks = threads.marks(store_dir, source_id, role)
+    due = (now() - timedelta(days=days)).isoformat()
+    since = (now() - timedelta(days=days + FOLLOW_UP_WINDOW_DAYS)).isoformat()
+    rows = intel.execute("SELECT thread_key, state, last_item FROM threads WHERE source_id = ? AND kind = "
+                         "'conversation' AND last_from_owner = 1 AND last_date <= ? AND last_date >= ? "
+                         "ORDER BY last_date DESC", (source_id, due, since)).fetchall()
+    return [(k, item) for k, state, item in rows if owner_marks.get(k, state) == "awaiting_others"]
+
+
+def follow_ups_pending(config) -> list[dict]:
+    from towpath.mail import analysis
+
+    out = []
+    for sid in analysis.eligible(config):
+        days = follow_up_days(config.store_dir, sid)
+        if not store_path(config.store_dir, "mailintel").exists():
+            continue
+        intel = open_store(config.store_dir, "mailintel", ROLE)
+        mail = open_store(config.store_dir, "mail", ROLE)
+        made = cleared = 0
+        try:
+            def target(item, mail=mail):
+                m = mail.execute("SELECT * FROM messages WHERE item_id = ?", (item,)).fetchone()
+                return actions.message_target(dict(m)) if m else None
+
+            if days:
+                done = {(r[0], r[1]) for r in intel.execute(
+                    "SELECT thread_key, last_item FROM follow_ups WHERE source_id = ?", (sid,))}
+                for key, item in follow_up_due(config.store_dir, sid, intel, days):
+                    found = target(item) if (key, item) not in done else None
+                    if found is None:
+                        continue
+                    body = actions.make(sid, "add_keyword", found, {"keyword": FOLLOW_UP_LABEL},
+                                        reason=f"Nobody has answered for {days} days.", producer=f"follow-up:{sid}")
+                    intel.execute("INSERT OR IGNORE INTO follow_ups VALUES (?,?,?,?,?,NULL)",
+                                  (sid, key, item, _propose(config, body), now().isoformat(timespec="seconds")))
+                    made += 1
+            # Someone answered (or the owner marked it otherwise): take the label off again.
+            for key, item in intel.execute(
+                    "SELECT f.thread_key, f.last_item FROM follow_ups f JOIN threads t USING (source_id, thread_key) "
+                    "WHERE f.source_id = ? AND f.cleared_proposal IS NULL AND t.last_from_owner = 0",
+                    (sid,)).fetchall():
+                found = target(item)
+                if found is None:
+                    continue
+                body = actions.make(sid, "remove_keyword", found, {"keyword": FOLLOW_UP_LABEL},
+                                    reason="Someone answered.", producer=f"follow-up:{sid}")
+                intel.execute("UPDATE follow_ups SET cleared_proposal = ? WHERE source_id = ? AND thread_key = ? AND "
+                              "last_item = ?", (_propose(config, body), sid, key, item))
+                cleared += 1
+            intel.commit()
+        finally:
+            intel.close()
+            mail.close()
+        if made or cleared:
+            out.append({"source_id": sid, "step": "mail-follow-ups", "labelled": made, "cleared": cleared})
     return out
 
 

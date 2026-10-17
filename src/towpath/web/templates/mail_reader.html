@@ -23,7 +23,7 @@
 <p>{{ conversation.reason }}{% if conversation.state_by == 'model' %} <span class="muted">(the AI model's view)</span>{% endif %}</p>
 <form method="post" action="/mail/mark" class="form-actions">{% csrf_token %}<input type="hidden" name="source_id" value="{{ m.source_id }}"><input type="hidden" name="thread_key" value="{{ m.thread_key }}"><input type="hidden" name="next" value="/mail/m/{{ m.item_id }}/">
   {% for key, label in states %}{% if key != conversation.state %}<button class="button secondary" name="state" value="{{ key }}">{{ label }}</button>{% endif %}{% endfor %}</form>
-{% if conversation.draft %}<h3>Draft reply{% if not conversation.draft_current %} <span class="muted">· written before the latest message</span>{% endif %}</h3>
+{% if conversation.draft %}<h3>{% if conversation.state == 'awaiting_others' %}Draft follow-up{% else %}Draft reply{% endif %}{% if not conversation.draft_current %} <span class="muted">· written before the latest message</span>{% endif %}</h3>
 <form method="post" action="/mail/save-draft" class="settings-form">{% csrf_token %}<input type="hidden" name="source_id" value="{{ m.source_id }}"><input type="hidden" name="thread_key" value="{{ m.thread_key }}"><input type="hidden" name="next" value="/mail/m/{{ m.item_id }}/?saved=asked">
   <label>Edit it if you like <textarea name="body" rows="8">{{ conversation.draft }}</textarea></label>
   <div class="form-actions"><button class="button" type="submit">Save to Drafts</button></div></form>{% endif %}

@@ -12,7 +12,7 @@
   <form method="post" action="/mail/mark" class="form-actions">{% csrf_token %}<input type="hidden" name="source_id" value="{{ account.source_id }}"><input type="hidden" name="thread_key" value="{{ r.thread_key }}"><input type="hidden" name="next" value="?state={{ state }}">
     {% for key, label, n in tabs %}{% if key != state %}<button class="button secondary" name="state" value="{{ key }}">{{ label }}</button>{% endif %}{% endfor %}
     {% if r.marked %}<button class="button secondary" name="state" value="">Let Towpath decide</button>{% endif %}</form>
-  {% if r.draft and state == 'needs_owner_reply' %}<details><summary>Draft reply{% if not r.draft_current %} (written before the latest message){% endif %}</summary>
+  {% if r.draft and state == 'needs_owner_reply' or r.draft and state == 'awaiting_others' %}<details><summary>{% if state == 'awaiting_others' %}Draft follow-up{% else %}Draft reply{% endif %}{% if not r.draft_current %} (written before the latest message){% endif %}</summary>
   <form method="post" action="/mail/save-draft" class="settings-form">{% csrf_token %}<input type="hidden" name="source_id" value="{{ account.source_id }}"><input type="hidden" name="thread_key" value="{{ r.thread_key }}"><input type="hidden" name="next" value="?state={{ state }}&amp;saved=draft">
     <textarea name="body" rows="7">{{ r.draft }}</textarea>
     <div class="form-actions"><button class="button" type="submit">Save to Drafts</button></div></form></details>{% endif %}

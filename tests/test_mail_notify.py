@@ -77,3 +77,50 @@ def test_statistics_are_measured_and_shown(world, monkeypatch):
         assert notify.alert_setting(world.store, world.sid)["mode"] == "keyword"
         assert notify.digest_setting(world.store, world.sid)["every"] == "weekly"
         assert client.post("/mail/tell-me", {"source_id": world.sid, "alerts": "loud"}).status_code == 400
+        client.post("/mail/tell-me", {"source_id": world.sid, "follow_up": "7"})
+        assert notify.follow_up_days(world.store, world.sid) == 7
+        client.post("/mail/draft-notes", {"source_id": world.sid, "notes": "Sign off with just M."})
+        page = client.get("/mail/").content.decode()
+        assert "Sign off with just M." in page and '<option value="7" selected>' in page
+        assert client.post("/mail/draft-notes", {"source_id": world.sid, "notes": "x" * 2001}).status_code == 400
+
+
+def test_a_follow_up_reminder_labels_the_unanswered_message_drafts_a_nudge_and_clears_on_an_answer(world):
+    import json
+
+    from test_mail_threads import answer, mail
+
+    from towpath import connect
+    from towpath.mail import analysis
+
+    def drafting(prompt):
+        if "draft a short follow-up" in prompt:
+            return json.dumps({"body": "Just checking in on the deck quote."})
+        return answer(prompt)
+
+    world.model_stub.respond = drafting
+    notify.set_follow_up(world.store, world.sid, 3)
+    threads.set_notes(world.store, world.sid, "I'm free weekday mornings.")
+    threads.track_pending(world.worker())
+    row = {r["subject"]: r for r in threads.listing(world.store, world.sid, "awaiting_others")}["Deck quote"]
+    assert row["draft"] == "Just checking in on the deck quote."
+    assert any("I'm free weekday mornings." in p for p in world.model_prompts())
+    nudge = message_from_bytes(threads.draft_message(world.store, world.sid, row["thread_key"], row["draft"]).encode(),
+                               policy=policy.default)
+    assert nudge["To"] == "dana@example.net"  # only the owner wrote: to whoever they wrote to
+    assert notify.follow_ups_pending(world.worker())[0]["labelled"] == 1
+    assert notify.follow_ups_pending(world.worker()) == []  # once per message
+    live(world, "add_keyword", "remove_keyword")
+    executor.run_pending(world.worker(), world.credentials, pause=0)
+    sent = world.state.mailboxes["Sent"].messages[1]
+    assert "Follow-up" in sent.flags
+    world.state.mailboxes["INBOX"].messages[4] = mail(7, "Dana <dana@example.net>", "reader@example.com",
+                                                      "Re: Deck quote", "Here it is.", 0, reply_to=2)
+    connect.sync(world.worker(), world.sid)
+    analysis.analyze_pending(world.worker())
+    threads.track_pending(world.worker())
+    assert notify.follow_ups_pending(world.worker())[0]["cleared"] == 1
+    executor.run_pending(world.worker(), world.credentials, pause=0)
+    assert "Follow-up" not in sent.flags
+    with pytest.raises(ValueError):
+        notify.set_follow_up(world.store, world.sid, 5)

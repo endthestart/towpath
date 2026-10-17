@@ -21,8 +21,13 @@
   <form method="post" action="/mail/tell-me" class="inline-form">{% csrf_token %}<input type="hidden" name="source_id" value="{{ a.source_id }}">
     <label>When someone is waiting for your reply <select name="alerts">{% for key, label in alert_modes %}<option value="{{ key }}"{% if key == a.alerts %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
     <label>Digest in your inbox <select name="digest">{% for key, label in digest_every %}<option value="{{ key }}"{% if key == a.digest %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <label>Remind you to follow up <select name="follow_up">{% for key, label in follow_up_days %}<option value="{{ key }}"{% if key == a.follow_up %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
     <button class="button secondary" type="submit">Save</button></form>
-  <p class="footnote">Your mail app tells you about flagged or labelled mail if you set it to. The digest is put straight into your inbox; nothing is sent. Both are dry runs until flags, labels or notes are turned on below and dry runs are off.</p>
+  <p class="footnote">Your mail app tells you about flagged or labelled mail if you set it to. The digest is put straight into your inbox; nothing is sent. A follow-up reminder labels your last message “Follow-up” when nobody has answered, drafts a nudge, and takes the label off when someone answers. All are dry runs until flags, labels or notes are turned on below and dry runs are off.</p>
+  <h4>Drafting replies</h4>
+  <form method="post" action="/mail/draft-notes" class="settings-form">{% csrf_token %}<input type="hidden" name="source_id" value="{{ a.source_id }}">
+    <label>Notes drafts may use <textarea name="notes" rows="4" maxlength="2000" placeholder="When you're usually free, your phone number, how you sign off, words you never use…">{{ a.notes }}</textarea></label>
+    <div class="form-actions"><button class="button secondary" type="submit">Save notes</button></div></form>
   <form method="post" action="/mail/pause" class="inline-form">{% csrf_token %}<input type="hidden" name="source_id" value="{{ a.source_id }}"><input type="hidden" name="pause" value="{% if a.paused %}0{% else %}1{% endif %}"><button class="button secondary" type="submit">{% if a.paused %}Resume reading{% else %}Pause reading{% endif %}</button></form>
 
   <h4>What Towpath may change</h4>

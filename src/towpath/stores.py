@@ -407,6 +407,11 @@ CREATE INDEX IF NOT EXISTS senders_category ON senders (source_id, category, mes
 CREATE TABLE IF NOT EXISTS alerts (
   source_id TEXT NOT NULL, thread_key TEXT NOT NULL, last_item TEXT NOT NULL, proposal_id TEXT NOT NULL,
   at TEXT NOT NULL, PRIMARY KEY (source_id, thread_key, last_item));
+-- Follow-up reminders: the owner's last message in a conversation nobody answered gets the label "Follow-up";
+-- when someone answers, the label is taken off again.
+CREATE TABLE IF NOT EXISTS follow_ups (
+  source_id TEXT NOT NULL, thread_key TEXT NOT NULL, last_item TEXT NOT NULL, proposal_id TEXT NOT NULL,
+  at TEXT NOT NULL, cleared_proposal TEXT, PRIMARY KEY (source_id, thread_key, last_item));
 CREATE TABLE IF NOT EXISTS digests (
   source_id TEXT NOT NULL, period TEXT NOT NULL, proposal_id TEXT NOT NULL, at TEXT NOT NULL,
   PRIMARY KEY (source_id, period));

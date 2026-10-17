@@ -81,7 +81,8 @@ def test_status_names_every_missing_table_without_writing(legacy):
     before = {s: digest(legacy / f"{s}.db") for s in DDL}
     report = {r["store"]: r for r in stores.schema_status(legacy)}
     assert report["source"]["missing_tables"] == ["search_runs"]
-    assert report["queue"]["missing_tables"] == ["photo_questions", "rule_requests", "search_questions", "search_requests"]
+    assert report["queue"]["missing_tables"] == ["photo_questions", "rule_requests", "search_questions",
+                                                 "search_requests"]
     assert report["decisions"]["missing_tables"] == ["collection_items", "collections", "questions", "source_grants"]
     assert all(not r["current"] for s, r in report.items() if s in DDL)
     assert report["files"]["exists"] is False and report["files"]["current"] is True
@@ -92,7 +93,8 @@ def test_upgrade_adds_only_new_tables_preserves_content_and_repeats_as_a_no_op(l
     before = {s: dump(legacy / f"{s}.db") for s in DDL}
     first = {r["store"]: r for r in stores.upgrade(legacy)}
     assert first["source"]["added_tables"] == ["search_runs"] and first["source"]["writer_role"] == "connect"
-    assert first["queue"]["added_tables"] == ["photo_questions", "rule_requests", "search_questions", "search_requests"]
+    assert first["queue"]["added_tables"] == ["photo_questions", "rule_requests", "search_questions",
+                                              "search_requests"]
     assert first["queue"]["writer_role"] == "web"
     assert first["decisions"]["writer_role"] == "web"
     for store, tables in before.items():

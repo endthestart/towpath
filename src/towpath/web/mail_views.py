@@ -56,7 +56,9 @@ def _accounts(config) -> list[dict]:
             "progress": analysis.progress(_store(), sid), "watch": watch.state(_store(), sid),
             "conversations": threads.counts(_store(), sid) if managed else {},
             "alerts": notify.alert_setting(_store(), sid, "web")["mode"],
-            "digest": notify.digest_setting(_store(), sid, "web")["every"]})
+            "digest": notify.digest_setting(_store(), sid, "web")["every"],
+            "follow_up": notify.follow_up_days(_store(), sid, "web"),
+            "notes": threads.notes(_store(), sid, "web") if managed else ""})
     return out
 
 
@@ -160,6 +162,7 @@ def overview(request):
     return render(request, "mail.html", {"nav": "mail", "accounts": accounts, "types": types,
                                          "alert_modes": list(notify.ALERT_MODES.items()),
                                          "digest_every": list(notify.DIGEST_EVERY.items()),
+                                         "follow_up_days": list(notify.FOLLOW_UP_DAYS.items()),
                                          "saved": request.GET.get("saved"), "groups": _proposal_groups(_proposals()),
                                          "models": _models(config), "labels": threads.LABELS, **_activity()})
 
@@ -240,8 +243,23 @@ def tell_me(request):
             notify.set_alerts(_store(), sid, request.POST["alerts"])
         if "digest" in request.POST:
             notify.set_digest(_store(), sid, request.POST["digest"])
+        if "follow_up" in request.POST:
+            notify.set_follow_up(_store(), sid, int(request.POST["follow_up"]))
     except ValueError:
         return HttpResponseBadRequest("Choose one of the listed options.")
+    return redirect("/mail/?saved=1")
+
+
+@require_POST
+def draft_notes(request):
+    """What drafts may use: availability, phone number, sign-off, style."""
+    sid = request.POST.get("source_id", "")
+    if not _account(_config(), sid)["managed"]:
+        return HttpResponseBadRequest("Turn mail management on for this account first.")
+    try:
+        threads.set_notes(_store(), sid, request.POST.get("notes", ""))
+    except ValueError as exc:
+        return HttpResponseBadRequest(str(exc).capitalize() + ".")
     return redirect("/mail/?saved=1")
 
 
