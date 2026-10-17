@@ -30,10 +30,15 @@ def _store():
 def search_page(request, sid):
     account = _managed(sid)
     query = request.GET.get("q", "").strip()
-    rows = mail_search.search(_store(), sid, query, limit=101, before=request.GET.get("before")) if query else []
+    try:
+        rows = mail_search.search(_store(), sid, query, limit=101, before=request.GET.get("before")) if query else []
+        error = None
+    except mail_search.QueryError as exc:
+        rows, error = [], str(exc)
     more = len(rows) > 100
     rows = rows[:100]
     return render(request, "mail_search.html", {"nav": "mail", "account": account, "query": query, "rows": rows,
+                                                "error": error,
                                                 "next_before": rows[-1]["date_utc"] if more and rows else None})
 
 

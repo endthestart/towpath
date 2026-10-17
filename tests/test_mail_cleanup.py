@@ -57,6 +57,23 @@ def test_search_finds_words_and_the_index_can_be_built_for_an_older_store(world)
     assert analysis.build_search(world.worker()) == []  # once only
 
 
+def test_search_operators_narrow_by_sender_folder_date_and_state(world):
+    def subjects(q):
+        return sorted(r["subject"] for r in search.search(world.store, world.sid, q))
+
+    assert subjects("from:sam") == ["Saturday?"]
+    assert subjects("couch from:pat") == []
+    assert subjects("to:dana in:sent") == ["Deck quote"]
+    assert subjects("in:inbox before:2000") == []
+    assert "Saturday?" in subjects("after:2020 is:read")
+    assert subjects("is:unread") == [] and subjects("has:attachment") == []
+    assert subjects("larger:0.2KB from:sam") == ["Saturday?"] and subjects("larger:1GB") == []
+    for bad in ("before:soon", "is:sleepy"):
+        with pytest.raises(search.QueryError):
+            search.search(world.store, world.sid, bad)
+    assert subjects("colour:red") == []  # not an operator: words, which match nothing
+
+
 def test_space_is_measured_by_year_folder_and_category(world):
     found = senders.space(world.store, world.sid)
     assert found["total"][0] == 8 and found["total"][1] > 0

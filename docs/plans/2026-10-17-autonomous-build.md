@@ -130,3 +130,6 @@ Balanced across three areas, mail first:
 - 2026-10-17: a category the owner gives one sender is learned for its domain (not for shared domains like
   gmail.com); the owner's conversation marks are examples for the model; Ask cites file names in folders allowed for
   the life story. Rules can be described in plain English and drafted by the model for the owner to check.
+- 2026-10-17: `131fabe` deployed. Follow-up reminders (a label and a drafted nudge after 3, 7 or 14 days
+  unanswered), notes for drafts, the Attachments page, mail search operators (`from:`, `in:`, `after:`,
+  `has:attachment`, `is:unread`, `larger:`…), and photo dates outside the years photography existed dropped.

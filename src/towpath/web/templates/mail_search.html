@@ -3,9 +3,9 @@
 {% block content %}
 <a class="back-link" href="/mail/">← Mail</a>
 <header class="page-head compact"><p class="eyebrow">MAIL · {{ account.name|upper }}</p><h1>Search mail</h1>
-<p class="lead">Searches the text Towpath has read of every message, including mail archived to a file and removed from the server. All words must appear; end a word with * to match its start.</p></header>
+<p class="lead">Searches the text Towpath has read of every message, including mail archived to a file and removed from the server. All words must appear; end a word with * to match its start. Narrow it with <code>from:</code>, <code>to:</code>, <code>in:Archive</code>, <code>after:2019</code>, <code>before:2020-06</code>, <code>has:attachment</code>, <code>is:unread</code>, <code>is:flagged</code> or <code>larger:5MB</code>.</p></header>
 <form class="search" method="get"><label for="q" class="sr-only">Search</label><input id="q" name="q" value="{{ query }}" maxlength="200" type="search" placeholder="Words from the subject, sender or text…"><button class="button" type="submit">Search →</button></form>
-{% if query %}<section class="mail-list" aria-label="Results">
+{% if error %}<div class="notice warn" role="alert">{{ error }}.</div>{% elif query %}<section class="mail-list" aria-label="Results">
 {% for r in rows %}<a class="mail-row" href="/mail/m/{{ r.item_id }}/"><span class="sender">{{ r.from_name|default:r.from_addr|default:'Unknown sender' }}</span>
 <span class="mail-title"><strong>{{ r.subject|default:'(No subject)' }}</strong><span class="row-context">{{ r.snippet }}</span>
 <span class="mail-tags"><span>{{ r.mailbox }}</span>{% if r.where == 'archive' %}<span>Archived to a file</span>{% elif r.where == 'gone' %}<span>No longer on the server</span>{% endif %}</span></span>
