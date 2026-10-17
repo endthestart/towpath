@@ -50,11 +50,13 @@ password with full IMAP and SMTP access), then on Mail → Settings tick the kin
 1. **Life** (`/life/`): fill in **About you** (name, birthday). Decide open questions 2 and 3 (Fastmail and finding
    events by itself) — the Life page's account switches and *Find events by itself* do it. Allow a photo folder too:
    days with many photos become proposed events.
-2. **Memories**: keep, rename or dismiss what Towpath gathered (people, decades, trips and occasions).
-3. **Write down a memory**: a few of your own; they appear on the timeline as remembered.
-4. **Timeline**, **On this day**, **Your story** (print or download as Markdown), **Ask** (try "When did I first go
+2. **2025 events to review** (Life → events to review): the re-read of 2025 finished on October 15 and left 16 of
+   its 101 events for you to keep or reject.
+3. **Memories**: keep, rename or dismiss what Towpath gathered (people, decades, trips and occasions).
+4. **Write down a memory**: a few of your own; they appear on the timeline as remembered.
+5. **Timeline**, **On this day**, **Your story** (print or download as Markdown), **Ask** (try "When did I first go
    to …?").
-5. **People** (`/people/`): a person's mail by year, conversations and events.
+6. **People** (`/people/`): a person's mail by year, conversations and events.
 
 ## 4. Photos and files
 
