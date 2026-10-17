@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block title %}People · Towpath{% endblock %}
+{% block content %}
+<header class="page-head compact"><h1>People</h1>
+<p class="lead">Everyone you correspond with, from your mail and your contacts, most mail first. Towpath never merges addresses into one person by itself.</p></header>
+<form class="search" method="get"><label for="q" class="sr-only">Find a person</label><input id="q" name="q" value="{{ query }}" placeholder="Name or address" type="search"><button class="button" type="submit">Find</button></form>
+<table class="space-table"><thead><tr><th>Person</th><th>Mail</th><th>From</th><th>To</th></tr></thead><tbody>
+{% for p in people %}<tr><td><a href="/people/{{ p.address|urlencode }}/"><strong>{{ p.name|default:p.address }}</strong></a>{% if p.name %}<br><span class="footnote">{{ p.address }}</span>{% endif %}</td>
+<td>{{ p.messages }}</td><td>{{ p.first|slice:":4" }}</td><td>{{ p.last|slice:":10" }}</td></tr>
+{% empty %}<tr><td colspan="4">No people yet. They appear once mail management has read an account, or a contacts connection is added.</td></tr>{% endfor %}</tbody></table>
+{% if total > 300 %}<p class="footnote">Showing 300 of {{ total }}; find someone by name.</p>{% endif %}
+{% endblock %}

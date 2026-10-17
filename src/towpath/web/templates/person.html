@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block title %}{{ p.name|default:p.address }} · People · Towpath{% endblock %}
+{% block content %}
+<a class="back-link" href="/people/">← People</a>
+<header class="page-head compact"><h1>{{ p.name|default:p.address }}</h1>{% if p.name %}<p class="lead">{{ p.address }}</p>{% endif %}</header>
+{% if memories %}<section class="detail-card"><h2 class="card-title">Memories</h2>{% for g in memories %}<p><a href="/life/memories/{{ g.group_id }}/">{{ g.title }}</a> <span class="muted">· {{ g.members|length }} events · {{ g.state }}</span></p>{% endfor %}</section>{% endif %}
+<section class="detail-card"><h2 class="card-title">Mail over the years</h2>
+<table class="space-table"><thead><tr><th>Year</th><th>From them</th><th>From you</th><th></th></tr></thead><tbody>
+{% for y in p.years %}<tr><td>{{ y.year }}</td><td>{{ y.received }}</td><td>{{ y.sent }}</td><td><meter min="0" max="100" value="{{ y.width }}"></meter></td></tr>{% empty %}<tr><td colspan="4">No mail with them yet.</td></tr>{% endfor %}</tbody></table></section>
+{% if events %}<section class="detail-card"><h2 class="card-title">Life events with them</h2>{% for e in events %}<p>{{ e.statement }} <span class="muted">· {{ e.when }}{% if e.state != 'proposed' %} · {{ e.state }}{% endif %}</span>{% if e.url %} <a href="{{ e.url }}">evidence</a>{% endif %}</p>{% endfor %}</section>{% endif %}
+<section class="detail-card"><h2 class="card-title">Latest conversations</h2>
+{% for c in p.conversations %}<p><a href="/mail/m/{{ c.item_id }}/">{{ c.subject|default:'(No subject)' }}</a> <span class="muted">· {{ c.date|slice:":10" }}</span></p>{% empty %}<p>None.</p>{% endfor %}</section>
+{% endblock %}

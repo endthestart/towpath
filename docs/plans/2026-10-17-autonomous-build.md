@@ -108,6 +108,8 @@ Balanced across three areas, mail first:
 - 2026-10-17: contacts and calendars built (Fastmail CardDAV/CalDAV, read-only); connecting them waits for an app
   password. The photo-search release failed CI (ExifTool missing on the CI runner); fixed so photo reading skips
   where ExifTool isn't installed.
+- 2026-10-17: People pages (correspondents and contacts, mail by year, conversations, life events); Overview
+  Today cards.
 - 2026-10-17: Search all filters by folder, size and month modified; plain-English search (the model writes the
   typed query, which is checked before it runs; the owner sees and can edit it).
 - 2026-10-17: keep-from-cloud marks for senders and messages (ADR 0002 point 7); On this day; Search all matches

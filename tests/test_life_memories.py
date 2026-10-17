@@ -168,3 +168,23 @@ def test_on_this_day_and_each_years_context(world, monkeypatch):
         client.post("/login", {"username": "owner", "password": OWNER})
         assert "Flew to Example Junction" in client.get("/life/today?day=2026-05-14").content.decode()
         assert "emails received" in client.get("/life/timeline").content.decode()
+
+
+def test_people_pages(world, monkeypatch):
+    from towpath import people
+
+    found = {p["address"]: p for p in people.everyone(world.store)}
+    assert {"sam@example.org", "pat@example.org"} <= set(found) and "news@shop.example" not in found
+    sam = people.person(world.store, "sam@example.org")
+    assert sum(y["received"] for y in sam["years"]) == 1 and sum(y["sent"] for y in sam["years"]) == 1
+    assert {c.statement for c in sam["events"]} == {"Booked a trip to Example Junction", "Helped Sam move",
+                                                   "Dinner with Sam"}
+    monkeypatch.setattr(auth, "_setup_codes", {})
+    configure(world.store)
+    auth.create_account(world.store, "owner", OWNER)
+    with override_settings(TOWPATH_STORE_DIR=world.store, TOWPATH_CONFIG=world.config, ALLOWED_HOSTS=["testserver"]):
+        client = Client()
+        client.post("/login", {"username": "owner", "password": OWNER})
+        assert "sam@example.org" in client.get("/people/?q=sam").content.decode()
+        page = client.get("/people/sam@example.org/").content.decode()
+        assert "Helped Sam move" in page and "Saturday?" in page
