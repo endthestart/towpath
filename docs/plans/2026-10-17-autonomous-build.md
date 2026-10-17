@@ -155,3 +155,9 @@ Balanced across three areas, mail first:
   companies and services settled as FYI without the model (on Hub *To reply* by rule fell from 989 to 249); senders
   sorted eight to a model call (about twice as many an hour). Then: purchases from receipts, plain-English mail
   search, a whole-conversation page, per-account mail Settings, iCloud contacts and calendars.
+- 2026-10-17: `1a9f7c5` deployed (purchases are being read on Hub). Since: inbox by category on the Mail and
+  Overview pages, the Accounts page, bulk sender categories, template coverage on Rules, 90-day statistics,
+  purchases in the digest, Ask answers about a year, people in Search all, flagged mail never cleaned up, owner-asked
+  work between model slices, safe form redirects, and huge duplicate files compared by samples (they had stalled
+  each connector poll for minutes). A visual pass on synthetic data fixed a Mail page failure when serving a bare
+  stores folder, and the newer pages' forms.
