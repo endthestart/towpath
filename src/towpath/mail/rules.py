@@ -275,7 +275,11 @@ def _ask_model(config, rules_: list[dict], message: dict) -> dict:
     email = (f"From: {message.get('from_name') or ''} <{message.get('from_addr') or ''}>\n"
              f"Subject: {message.get('subject') or ''}\n\n{(message.get('text') or '')[:4000]}")
     prompt = f"{INSTRUCTION}\n\nRules:\n{listed}\n\n<email>\n{email}\n</email>"
-    return gateway.infer(config, TASK, prompt, "content", schema, [message["item_id"]], prompt_version=PROMPT)
+    from towpath.mail.privacy import targets
+
+    return gateway.infer(config, TASK, prompt, "content", schema,
+                         targets(message["source_id"], [message["item_id"]], [message.get("from_addr")]),
+                         prompt_version=PROMPT)
 
 
 def evaluate_pending(config, slice_seconds: float = SLICE_SECONDS, clock=time.monotonic) -> list[dict]:

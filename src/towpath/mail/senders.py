@@ -187,7 +187,10 @@ def _categorize(config, intel, mail, source_id: str, deadline: float, clock) -> 
             if clock() >= deadline:
                 return done, None
             prompt, items = _prompt(mail, source_id, s)
-            result = gateway.infer(config, TASK, prompt, "content", SCHEMA, items, prompt_version=PROMPT)
+            from towpath.mail.privacy import targets
+
+            result = gateway.infer(config, TASK, prompt, "content", SCHEMA, targets(source_id, items, [s["address"]]),
+                                   prompt_version=PROMPT)
             if result["status"] == "ok":
                 category = result["output"]["category"]
                 if category == "cold_email" and (s["owner_wrote"] or s["messages"] > 3):

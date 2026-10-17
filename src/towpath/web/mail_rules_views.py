@@ -38,11 +38,31 @@ def sender_list(request, sid):
         else "messages"
     page = max(int(request.GET.get("page") or 1), 1) if (request.GET.get("page") or "1").isdigit() else 1
     rows = senders.listing(_store(), sid, category, order, limit=PAGE + 1, offset=(page - 1) * PAGE)
+    from towpath.mail import privacy
+
+    kept = privacy.kept(_store(), [privacy.sender_target(sid, r["address"]) for r in rows])
+    for r in rows:
+        r["kept"] = privacy.sender_target(sid, r["address"]) in kept
     return render(request, "mail_senders.html", {
         "nav": "mail", "account": account, "category": category, "order": order, "page": page,
         "rows": rows[:PAGE], "more": len(rows) > PAGE, "totals": senders.totals(_store(), sid),
         "categories": list(senders.CATEGORIES.items()), "saved": request.GET.get("saved"),
         "here": request.get_full_path()})
+
+
+@require_POST
+def sender_privacy(request):
+    """Keep a sender's mail (or one message) from cloud models, or allow it again."""
+    from towpath.mail import privacy
+
+    sid = request.POST.get("source_id", "")
+    _managed(sid)
+    target = (privacy.sender_target(sid, request.POST["address"]) if request.POST.get("address") else
+              request.POST.get("item_id", ""))
+    if not target:
+        return HttpResponseBadRequest("Choose a sender or a message.")
+    privacy.keep(_config(), target, request.POST.get("keep") == "1")
+    return redirect(request.POST.get("next") or f"/mail/{sid}/senders?saved=1")
 
 
 @require_POST

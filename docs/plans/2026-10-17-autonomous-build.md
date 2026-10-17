@@ -108,5 +108,7 @@ Balanced across three areas, mail first:
 - 2026-10-17: contacts and calendars built (Fastmail CardDAV/CalDAV, read-only); connecting them waits for an app
   password. The photo-search release failed CI (ExifTool missing on the CI runner); fixed so photo reading skips
   where ExifTool isn't installed.
+- 2026-10-17: keep-from-cloud marks for senders and messages (ADR 0002 point 7); On this day; Search all matches
+  message text; per-sender clean-up links.
 - 2026-10-17: Facebook export source built (posts, day-by-day conversations); how-tos for Facebook, Apple and
   Google data in [other sources](../setup/other-sources.md).

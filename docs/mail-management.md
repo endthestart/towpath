@@ -103,7 +103,7 @@ connection reads All Mail and the Inbox by default; threads come from `X-GM-THRI
 would delete it): putting a message back in a folder, as Undo does, adds the label instead. Sender totals count a
 message filed in two folders once.
 
-Models: an AI model connection is marked as running on the owner's network (the default) or at a cloud service, and can offer further models on the same server and token (*Other models on this server*). The Mail page chooses the model for each mail feature (`mail.thread`, `mail.draft`, `mail.classify`) and whether it may read email text; nothing personal reaches any model without that grant. A whole account can be set to *Dry runs only* (the default), whatever kinds of change are ticked.
+Models: an AI model connection is marked as running on the owner's network (the default) or at a cloud service, and can offer further models on the same server and token (*Other models on this server*). The Mail page chooses the model for each mail feature (`mail.thread`, `mail.draft`, `mail.classify`) and whether it may read email text; nothing personal reaches any model without that grant. A whole account can be set to *Dry runs only* (the default), whatever kinds of change are ticked. A sender, or one message, can be *kept from cloud models* (`model_use = no-cloud` on `sender:<account>:<address>` or the item): every model call about mail names both, and the gateway refuses such mail to an endpoint at a cloud service while models on the owner's network still read it.
 
 ## Prompt injection and model output
 

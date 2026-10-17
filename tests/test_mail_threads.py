@@ -220,3 +220,23 @@ def test_recent_conversations_are_sorted_and_drafted_before_the_history(world, m
     monkeypatch.setattr(threads, "_draft", lambda *a, **k: calls.append(("draft", None)) or real_draft(*a, **k))
     world.track()
     assert calls == [("classify", threads.DRAFT_DAYS), ("draft", None), ("classify", None)]
+
+
+def test_a_sender_kept_from_cloud_models_still_reaches_a_model_on_the_network(world):
+    import dataclasses
+
+    from towpath.mail import privacy
+    from towpath.models import gateway
+
+    cfg = world.worker()
+    privacy.keep(cfg, privacy.sender_target(world.sid, "sam@example.org"), True)
+    ids = privacy.targets(world.sid, ["itm_x"], ["Sam@Example.org"])
+    assert gateway.check_policy(cfg, threads.TASK_STATE, "content", ids)[0] == "ok"  # self-hosted: allowed
+    cloud = dataclasses.replace(cfg.endpoints[world.model], destination="third-party")
+    cloud_cfg = dataclasses.replace(cfg, endpoints={**cfg.endpoints, world.model: cloud})
+    decisions.grant_model(cloud_cfg, world.model, "content", author="owner")
+    status, reason, _ = gateway.check_policy(cloud_cfg, threads.TASK_STATE, "content", ids)
+    assert status == "refused" and "kept from cloud models" in reason
+    assert gateway.check_policy(cloud_cfg, threads.TASK_STATE, "content", ["itm_x"])[0] == "ok"
+    privacy.keep(cfg, privacy.sender_target(world.sid, "sam@example.org"), False)
+    assert gateway.check_policy(cloud_cfg, threads.TASK_STATE, "content", ids)[0] == "ok"

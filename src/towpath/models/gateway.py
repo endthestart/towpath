@@ -161,6 +161,8 @@ def check_policy(config, task: str, data_class: str, item_ids: list[str]) -> tup
         if use == "local-only" and not local:
             reason = f"item {item} is local-only and endpoint {endpoint.id} is {endpoint.destination}"
             return "refused", reason, endpoint
+        if use == "no-cloud" and endpoint.destination == "third-party":
+            return "refused", f"item {item} is kept from cloud models and endpoint {endpoint.id} is one", endpoint
     if data_class not in endpoint.allow_data:
         return "refused", f"endpoint {endpoint.id} does not allow data class {data_class}", endpoint
     if not local and data_class != "synthetic" and not _granted(config, endpoint, data_class):

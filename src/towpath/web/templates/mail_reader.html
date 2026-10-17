@@ -14,6 +14,9 @@
 {% if m.list_id or m.list_unsubscribe %}<div><dt>Mailing list</dt><dd>{{ m.list_id|default:'' }}{% if m.list_unsubscribe_post %} · one-click unsubscribe offered{% elif m.list_unsubscribe %} · unsubscribe offered{% endif %}</dd></div>{% endif %}
 <div><dt>Flags</dt><dd>{% if m.unread %}Unread{% else %}Read{% endif %}{% if m.flagged %} · Flagged{% endif %}</dd></div></dl>
 <div class="content-text">{{ m.text|default:'(No text part.)' }}</div>
+<form method="post" action="/mail/privacy" class="inline-form">{% csrf_token %}<input type="hidden" name="source_id" value="{{ m.source_id }}"><input type="hidden" name="item_id" value="{{ m.item_id }}"><input type="hidden" name="keep" value="{% if kept_item %}0{% else %}1{% endif %}"><input type="hidden" name="next" value="/mail/m/{{ m.item_id }}/">
+<span class="footnote">{% if kept_sender %}Mail from this sender is kept from cloud models. {% endif %}{% if kept_item %}This message is kept from cloud models.{% endif %}</span>
+<button class="link-button" type="submit">{% if kept_item %}Allow cloud models again{% else %}Keep this message from cloud models{% endif %}</button></form>
 {% if m.quoted_removed or m.text_truncated %}<p class="footnote">{% if m.quoted_removed %}Quoted earlier messages are left out.{% endif %}{% if m.text_truncated %} Only the start of a long message is shown.{% endif %} Open it in your mail app for everything, including formatting and attachments.</p>{% endif %}
 </section>
 {% if conversation %}<section class="detail-card"><h2 class="card-title">{{ conversation.label }}</h2>

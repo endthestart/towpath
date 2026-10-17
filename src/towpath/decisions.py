@@ -8,7 +8,7 @@ from towpath.stores import open_store
 ROLE = "web"
 SETTINGS = {
     "audience": {"owner", "shareable"},
-    "model_use": {"follow-grants", "local-only", "excluded"},
+    "model_use": {"follow-grants", "no-cloud", "local-only", "excluded"},
 }
 
 

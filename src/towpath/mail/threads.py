@@ -320,8 +320,11 @@ def _classify(config, intel, mail, source_id: str, me: dict, deadline: float, cl
                 continue
             t = summarize(source_id, key, msgs, me)
             prompt = f"{STATE_INSTRUCTION}\n\n<conversation>\n{conversation_text(msgs, me)}\n</conversation>"
+            from towpath.mail.privacy import targets
+
             result = gateway.infer(config, TASK_STATE, prompt, "content", STATE_SCHEMA,
-                                   [m["item_id"] for m in msgs][-20:], prompt_version=PROMPT_STATE)
+                                   targets(source_id, [m["item_id"] for m in msgs][-20:],
+                                           [m["from_addr"] for m in msgs]), prompt_version=PROMPT_STATE)
             if result["status"] == "ok":
                 t["state"], t["reason"] = result["output"]["state"], result["output"]["reason"].strip()[:200]
                 _save(intel, t, "model", f"{endpoint.model}/{PROMPT_STATE}")
@@ -374,8 +377,11 @@ def _draft(config, intel, mail, source_id: str, me: dict, deadline: float, clock
         prompt = (f"{DRAFT_INSTRUCTION}\n\nThe owner's name: {me['name'] or 'unknown'}\n\n"
                   f"How the owner writes:\n{examples or '(no examples)'}\n\n"
                   f"<conversation>\n{conversation_text(msgs, me)}\n</conversation>")
+        from towpath.mail.privacy import targets
+
         result = gateway.infer(config, TASK_DRAFT, prompt, "content", DRAFT_SCHEMA,
-                               [m["item_id"] for m in msgs][-20:], prompt_version=PROMPT_DRAFT)
+                               targets(source_id, [m["item_id"] for m in msgs][-20:], [m["from_addr"] for m in msgs]),
+                               prompt_version=PROMPT_DRAFT)
         if result["status"] == "ok" and result["output"]["body"].strip():
             intel.execute("INSERT OR REPLACE INTO drafts VALUES (?,?,?,?,?,?,?)",
                           (source_id, key, last["item_id"], current, result["output"]["body"].strip(),

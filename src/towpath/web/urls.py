@@ -49,6 +49,7 @@ urlpatterns = [
     path("mail/save-draft", mail_views.save_draft, name="mail-save-draft"),
     path("mail/<str:sid>/conversations", mail_views.conversations, name="mail-conversations"),
     path("mail/sender-category", mail_rules_views.sender_category, name="mail-sender-category"),
+    path("mail/privacy", mail_rules_views.sender_privacy, name="mail-privacy"),
     path("mail/rules/change", mail_rules_views.rule_change, name="mail-rule-change"),
     path("mail/answer-batch", mail_views.answer_batch, name="mail-answer-batch"),
     path("mail/<str:sid>/senders", mail_rules_views.sender_list, name="mail-senders"),

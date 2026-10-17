@@ -361,9 +361,13 @@ def reader(request, item_id):
                and not (k == "flag" and m["flagged"]) and not (k == "unflag" and not m["flagged"])
                and not (k == "archive" and m["mailbox"].lower() == "archive")]
     conversation = threads.thread(_store(), m["source_id"], m["thread_key"])
+    from towpath.mail import privacy
+
+    kept = privacy.kept(_store(), [m["item_id"], privacy.sender_target(m["source_id"], m["from_addr"])])
     return render(request, "mail_reader.html", {
         "nav": "mail", "m": m, "account": account, "thread": thread if len(thread) > 1 else [],
         "conversation": {**conversation, "label": threads.LABELS[conversation["state"]]} if conversation else None,
+        "kept_item": m["item_id"] in kept, "kept_sender": len(kept - {m["item_id"]}) > 0,
         "states": list(threads.LABELS.items()),
         "here": m["item_id"] in present, "choices": choices, "activity": mine, "saved": request.GET.get("saved")})
 
