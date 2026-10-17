@@ -55,13 +55,13 @@ password with full IMAP and SMTP access), then on Mail → Settings tick the kin
    its 101 events for you to keep or reject.
 3. **Pairs to settle** (Life → *pairs to settle*, when there are any): events worded alike on about the same day,
    or a few months apart; keep the right one or say both are right.
-3b. **Memories**: keep, rename or dismiss what Towpath gathered (people, decades, trips and occasions).
-4. **Export**: Your story → *Download everything Towpath knows*: a zip of plain JSON and Markdown (events,
+4. **Memories**: keep, rename or dismiss what Towpath gathered (people, decades, trips and occasions).
+5. **Export**: Your story → *Download everything Towpath knows*: a zip of plain JSON and Markdown (events,
    memories, people, rules, sender categories, purchases, decisions; no mail text or passwords).
-5. **Write down a memory**: a few of your own; they appear on the timeline as remembered.
-6. **Timeline**, **On this day**, **Your story** (print or download as Markdown), **Ask** (try "When did I first go
+6. **Write down a memory**: a few of your own; they appear on the timeline as remembered.
+7. **Timeline**, **On this day**, **Your story** (print or download as Markdown), **Ask** (try "When did I first go
    to …?").
-7. **People** (`/people/`): a person's mail by year, conversations and events.
+8. **People** (`/people/`): a person's mail by year, conversations and events.
 
 ## 4. Photos and files
 
