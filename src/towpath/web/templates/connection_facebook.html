@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block title %}Add a Facebook export · Towpath{% endblock %}
+{% block content %}
+<header class="page-head compact"><p class="eyebrow"><a href="/connections/">CONNECTIONS</a></p><h1>Add a Facebook export</h1>
+<p class="lead">A copy of your Facebook data, downloaded with “Download your information” in <strong>JSON</strong> format and unzipped into a folder on your server. Towpath reads your posts and your messages (one item per conversation per day) for search and your life story. It never changes the export.</p></header>
+{% if error %}<div class="notice warn" role="alert">{{ error }}</div>{% endif %}
+<section class="detail-card"><form method="post" class="settings-form">{% csrf_token %}
+  <fieldset><legend>The export's folder</legend>
+  {% for f in tree %}<label class="check indent-{{ f.depth }}"><input type="radio" name="path" value="{{ f.rel }}"{% if not f.readable %} disabled{% endif %}> {{ f.name }}{% if not f.readable %} <span class="muted">(can't be read)</span>{% endif %}</label>{% empty %}<p>No folders are visible on the server's library.</p>{% endfor %}
+  </fieldset>
+  <div class="form-actions"><button class="button" type="submit">Check and add</button></div></form>
+<p class="footnote">Don't have one? <a href="{{ preset.help_url }}" target="_blank" rel="noopener noreferrer">Facebook's download page</a> makes one; choose JSON and all dates.</p></section>
+{% endblock %}

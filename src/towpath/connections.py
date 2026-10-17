@@ -34,6 +34,8 @@ PROVIDERS = {
     "imap": {"label": "Email (IMAP)", "host": None, "port": 993, "security": "tls", "help_url": None},
     "fastmail_dav": {"label": "Fastmail contacts and calendars", "host": None, "port": None, "security": None,
                      "help_url": "https://www.fastmail.help/hc/en-us/articles/360058752854-App-passwords"},
+    "facebook": {"label": "Facebook export", "host": None, "port": None, "security": None,
+                 "help_url": "https://www.facebook.com/dyi"},
     "folders": {"label": "Folders on this server", "host": None, "port": None, "security": None, "help_url": None},
     "model": {"label": "AI model on your network", "host": None, "port": None, "security": None, "help_url": None},
 }
@@ -82,8 +84,8 @@ def token_path(credentials_dir: Path, c: dict) -> Path:
 
 
 def has_credential(credentials_dir: Path, c: dict) -> bool:
-    if c["adapter"] == "recoll":
-        return True  # folders on the NAS need no sign-in
+    if c["adapter"] in ("recoll", "facebook"):
+        return True  # folders and exports on the server need no sign-in
     path = token_path(credentials_dir, c) if c["adapter"] == "gmail" else secret_path(credentials_dir, c["source_id"])
     return path.is_file()
 
@@ -424,6 +426,8 @@ def merged(config, credentials_dir: Path | None, role: str = ROLE):
         elif c["adapter"] == "gmail":
             added[sid] = config_mod.Source(sid, "mail-provider", "gmail",
                                            token=token_path(credentials_dir, c) if credentials_dir else None)
+        elif c["adapter"] == "facebook":
+            added[sid] = config_mod.Source(sid, "mail-provider", "facebook", path=Path(c["settings"]["path"]))
     models = [c for c in all_connections(config.store_dir, role) if c["adapter"] == "model" and c["state"] == "ready"]
     endpoints = {e.id: e for c in models for e in model_endpoints(config.store_dir, c)}
     from towpath.decisions import task_models
@@ -438,6 +442,30 @@ def merged(config, credentials_dir: Path | None, role: str = ROLE):
     from towpath import folders
 
     return folders.with_files(config, Path(config.store_dir).parent / "index", role)
+
+
+def add_facebook(store_dir: Path, path: Path, taken: set[str] = frozenset()) -> str:
+    """Record a Facebook export folder (under the read-only library) as a source; nothing is read yet."""
+    from towpath import folders
+    from towpath.adapters.facebook import looks_like_export
+
+    base = folders.library().resolve()
+    path = Path(path).resolve()
+    if not folders._inside(base, path) or not path.is_dir():
+        raise ConnectionProblem("Choose a folder on the server's library.")
+    if not looks_like_export(path):
+        raise ConnectionProblem("That folder doesn't look like a Facebook export in JSON format (no posts or "
+                                "message files).")
+    sid = _new_id(store_dir, "facebook", set(taken))
+    now = _now()
+    with closing(open_store(store_dir, "connections", ROLE)) as db:
+        db.execute("""INSERT INTO connections (source_id, provider, adapter, display_name, settings, folders, state,
+                      indexing, created_at, updated_at)
+                      VALUES (?, 'facebook', 'facebook', 'Facebook export', ?, NULL, 'ready', 'idle', ?, ?)""",
+                   (sid, json.dumps({"path": str(path), "username": path.name}), now, now))
+        db.execute("INSERT INTO connection_events (source_id, at, event) VALUES (?, ?, 'added')", (sid, now))
+        db.commit()
+    return sid
 
 
 # -- AI models -------------------------------------------------------------------------------------------

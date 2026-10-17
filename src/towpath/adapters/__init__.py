@@ -36,6 +36,10 @@ def build_connector(source, config=None, **options):
         return ImmichConnector(source)
     if source.adapter == "folder":
         return FolderConnector(source.id, source.kind, source.path)
+    if source.adapter == "facebook":
+        from towpath.adapters.facebook import FacebookConnector
+
+        return FacebookConnector(source.id, source.path)
     raise ValueError(f"unknown adapter {source.adapter!r}")
 
 
