@@ -199,9 +199,23 @@ FILTERS = ("camera", "lens", "after", "before", "located", "text")
 
 
 def facets(store_dir, role: str = "web") -> dict:
-    """Cameras and lenses with how many photos each, the years photos were taken, and the days with the most."""
+    """Cameras and lenses with how many photos each, the years photos were taken, and the days with the most
+    (counted at most every ten minutes: they change only as photos are read)."""
     if not store_path(store_dir, "files").exists():
         return {"cameras": [], "lenses": [], "years": [], "days": []}
+    key = str(store_dir)
+    if key in _facets and time.monotonic() - _facets[key][0] < FACETS_SECONDS:
+        return _facets[key][1]
+    found = _count_facets(store_dir, role)
+    _facets[key] = (time.monotonic(), found)
+    return found
+
+
+FACETS_SECONDS = 600
+_facets: dict[str, tuple[float, dict]] = {}
+
+
+def _count_facets(store_dir, role: str) -> dict:
     with closing(open_store(store_dir, "files", role)) as db:
         return {
             "cameras": [tuple(r) for r in db.execute(
