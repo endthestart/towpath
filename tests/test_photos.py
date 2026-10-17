@@ -70,7 +70,7 @@ def test_filters_and_facets(library):
     config, fake, _ = library
     photos.extract_pending(config, exiftool=fake)
     rows, total = photos.search(config.store_dir, {"camera": "x100v"})
-    assert total == 2 and rows[0]["taken"] == "2019-05-15T18:00:00"
+    assert total == 2 and rows[0]["taken"] == "2019-05-15T18:00:00" and rows[0]["provider_id"] == "folders"
     assert photos.search(config.store_dir, {"after": "2021-01-01", "before": "2021-12-31"})[1] == 1
     assert photos.search(config.store_dir, {"located": True})[0][0]["lat"] == 45.43
     assert photos.search(config.store_dir, {"lens": "nikkor z"})[1] == 1
@@ -133,3 +133,28 @@ def test_a_plain_english_search_becomes_a_checked_query(tmp_path, openai_stub):
     assert search_translate.answer(base.store_dir, second)["status"] == "translated"
     assert search_translate.answer(base.store_dir, second)["query"].startswith("extension:pdf")
     assert search_translate.answer(base.store_dir, third) == {"query": "huge things", "status": "words-after-invalid"}
+
+
+def test_days_with_many_photos_become_life_evidence_once_allowed(tmp_path):
+    from towpath import life, life_photos
+    from towpath.unified import grants
+
+    store = tmp_path / "state"
+    with open_store(store, "files", "connect") as db:
+        for i in range(20):
+            rel = f"2009 Example Junction/IMG_{i}.jpg" if i < 18 else f"Exports/Hidden/{i}.jpg"
+            db.execute("INSERT INTO occurrences (occurrence_id, provider_id, native_id, root_alias, rel_path, members, "
+                       "media_type, size, dates, hashes, extraction, first_seen_run, last_seen_run, updated_at) "
+                       "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                       (f"occ_{i}", "folders", rel, "pics", rel, "[]", "image/jpeg", 9, "[]", "{}", "{}", "r", "r", "t"))
+            db.execute("INSERT INTO photo_meta (occurrence_id, taken, extracted_at) VALUES (?, ?, 't')",
+                       (f"occ_{i}", f"2009-05-15T1{i % 10}:00:00"))
+        db.commit()
+    config = SimpleNamespace(store_dir=store)
+    assert life_photos.propose(config) == []  # not allowed for the life story yet
+    grants.grant(store, "folders", "life-evidence", author="owner")
+    assert life_photos.propose(config)[0]["proposed"] == 1
+    claim, = life.claims(store)
+    assert claim.statement == "Took 18 photos (2009 Example Junction)"  # the private export isn't counted
+    assert claim.citations[0].ref == "folders:occ_0" and claim.when.earliest.startswith("2009-05-15")
+    assert life_photos.propose(config) == []

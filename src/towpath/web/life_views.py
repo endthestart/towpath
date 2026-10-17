@@ -33,8 +33,9 @@ def _accounts(config) -> list[dict]:
             out.append({"source_id": sid, "name": sid, "allowed": FEATURE in allowed.get(sid, set())})
     rows = connections.all_connections(settings.TOWPATH_STORE_DIR, role="web")
     names = {c["source_id"]: c["display_name"] for c in rows}
-    out += [{"source_id": c["source_id"], "name": c["display_name"],
-             "allowed": FEATURE in allowed.get(c["source_id"], set())} for c in rows if c["adapter"] == "dav"]
+    out += [{"source_id": c["source_id"], "name": "Photos in your folders" if c["adapter"] == "recoll" else
+             c["display_name"], "allowed": FEATURE in allowed.get(c["source_id"], set())}
+            for c in rows if c["adapter"] in ("dav", "recoll")]
     for account in out:
         account["name"] = names.get(account["source_id"], account["name"])
     return out
@@ -171,7 +172,7 @@ def today(request):
     for y in found["years"]:
         y["events"] = [_row(c) for c in y["events"]]
         for p in y["photos"]:
-            p["ref"] = "/ref/?" + urlencode({"r": f"file:{p['root_alias']}/{p['rel_path']}"})
+            p["ref"] = "/ref/?" + urlencode({"r": f"{p['provider_id']}:{p['occurrence_id']}"})
     return render(request, "life_today.html", {"nav": "life", **found})
 
 

@@ -113,6 +113,8 @@ Balanced across three areas, mail first:
 - 2026-10-17: contacts and calendars built (Fastmail CardDAV/CalDAV, read-only); connecting them waits for an app
   password. The photo-search release failed CI (ExifTool missing on the CI runner); fixed so photo reading skips
   where ExifTool isn't installed.
+- 2026-10-17: days with many photos as proposed life events (folders allowed on the Life page); photo links fixed
+  to open the file's evidence page.
 - 2026-10-17: Your story page: only what the owner kept, by decade of life, with sources; Markdown download.
 - 2026-10-17: recollections (the owner's own memories, in their words, on the timeline and in Ask).
 - 2026-10-17: duplicate candidates on the Space page confirmed by content (SHA-256 of the largest groups, never the

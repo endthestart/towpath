@@ -27,7 +27,7 @@ def page(request):
     active = any(v for v in f.values())
     rows, total = photos.search(_store(), f, limit=PAGE, offset=(number - 1) * PAGE) if active else ([], 0)
     for r in rows:
-        r["ref"] = "/ref/?" + urlencode({"r": f"file:{r['root_alias']}/{r['rel_path']}"})
+        r["ref"] = "/ref/?" + urlencode({"r": f"{r['provider_id']}:{r['occurrence_id']}"})
     query = urlencode({k: ("1" if v is True else v) for k, v in f.items() if v})
     return render(request, "photos.html", {
         "nav": "photos", "f": f, "rows": rows, "total": total, "page": number, "more": number * PAGE < total,

@@ -23,7 +23,8 @@ def on_this_day(store_dir, day: date | None = None, role: str = "web") -> dict:
     if store_path(store_dir, "files").exists():
         with closing(open_store(store_dir, "files", role)) as db:
             photos = [dict(r) for r in db.execute(
-                "SELECT p.taken, p.model, o.root_alias, o.rel_path FROM photo_meta p JOIN occurrences o "
+                "SELECT p.taken, p.model, p.occurrence_id, o.provider_id, o.root_alias, o.rel_path FROM photo_meta p "
+                "JOIN occurrences o "
                 "USING (occurrence_id) WHERE substr(p.taken, 6, 5) = ? AND substr(p.taken, 1, 4) < ? AND "
                 "o.missing_since_run IS NULL ORDER BY p.taken DESC LIMIT 60", (md, str(day.year)))]
     sent = []
