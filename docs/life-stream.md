@@ -146,6 +146,9 @@ owner's additions, removals and approval are decisions kept apart from regenerat
   renames, edits or dismisses a memory; a kept memory is offered newly found events rather than changed. Proposals
   mostly repeating a decided memory aren't shown again.
 - **Profile**: name and birthday, for ages on the timeline and the decade chapters.
+- **Recollections**: the owner writes down a memory with its date (year, month or day) and who was there; it is
+  kept in the decisions store in their words, accepted as theirs, without a citation, and appears on the timeline,
+  in memories and in Ask as remembered rather than found.
 - **Timeline**: years, newest first, each with its memories and the events in no memory; everyday events on request.
 - **Ask** (`life_ask`): a question is answered from events and messages of accounts the life story may use, found by
   its words, as numbered sources; the model's sentences each cite sources, and one without is marked unsupported.

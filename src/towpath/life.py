@@ -45,11 +45,70 @@ def load(db, claim_id_: str) -> Claim | None:
     return Claim.from_dict(json.loads(row[0])) if row else None
 
 
+RECOLLECTION_KEY = "recollection"
+
+
+def recollect(store_dir, statement: str, expression: str, precision: str, earliest: str, latest: str,
+              people: list[str] | None = None, author: str = "owner") -> Claim:
+    """The owner's own memory, kept in their words (decisions store): accepted as theirs, with no citation."""
+    import uuid
+
+    statement = " ".join(statement.split())
+    if not statement:
+        raise ValueError("write down the memory")
+    when = When(expression or earliest, precision, earliest or None, latest or earliest or None)
+    when.bounds()
+    claim = Claim("clm_rec_" + uuid.uuid4().hex[:16], "event", statement[:500], "recollected", when, (), "owner",
+                  state="accepted", author=author, review={"by": author, "at": now()},
+                  subjects=tuple(p.strip() for p in (people or []) if p.strip()))
+    db = open_store(store_dir, "decisions", "web")
+    try:
+        db.execute("INSERT INTO settings (target_id, key, value, author, at) VALUES (?,?,?,?,?)",
+                   (_target(claim.claim_id), RECOLLECTION_KEY, claim.canonical(), author, now()))
+        db.commit()
+    finally:
+        db.close()
+    return claim
+
+
+def recollections(store_dir, role: str = "web") -> list[Claim]:
+    if not store_path(store_dir, "decisions").exists():
+        return []
+    db = open_store(store_dir, "decisions", role)
+    try:
+        rows = db.execute("SELECT value FROM settings WHERE key = ?", (RECOLLECTION_KEY,)).fetchall()
+    finally:
+        db.close()
+    out = []
+    for (value,) in rows:
+        try:
+            out.append(Claim.from_dict(json.loads(value)))
+        except (ClaimError, ValueError, KeyError):
+            continue
+    return out
+
+
+def forget(store_dir, claim_id_: str) -> bool:
+    """Remove one of the owner's recollections."""
+    db = open_store(store_dir, "decisions", "web")
+    try:
+        n = db.execute("DELETE FROM settings WHERE target_id = ? AND key = ?",
+                       (_target(claim_id_), RECOLLECTION_KEY)).rowcount
+        db.commit()
+    finally:
+        db.close()
+    return n > 0
+
+
 def claims(store_dir, after: str | None = None, before: str | None = None, limit: int = 200,
            role: str = "web") -> list[Claim]:
-    """Proposed claims in date order (undated last), each with the owner's latest review applied."""
+    """Proposed claims in date order (undated last), each with the owner's latest review applied, and the owner's
+    own recollections."""
+    remembered = [c for c in recollections(store_dir, role)
+                  if (not after or (c.when.latest or "9999") >= after) and
+                  (not before or (c.when.earliest or "") <= before)]
     if not store_path(store_dir, "life").exists():
-        return []
+        return remembered[:limit]
     db = open_store(store_dir, "life", role)
     try:
         where, args = [], []
@@ -65,7 +124,9 @@ def claims(store_dir, after: str | None = None, before: str | None = None, limit
         db.close()
     proposed = [Claim.from_dict(json.loads(r[0])) for r in rows]
     found = reviews(store_dir, [c.claim_id for c in proposed], role)
-    return [reviewed(c, found.get(c.claim_id)) for c in proposed]
+    merged = [reviewed(c, found.get(c.claim_id)) for c in proposed] + remembered
+    merged.sort(key=lambda c: (c.when.earliest is None, c.when.earliest or "", c.claim_id))
+    return merged[:limit]
 
 
 # -- the owner's review (decisions store, written by the web service) -------------------------------------------

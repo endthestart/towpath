@@ -188,3 +188,24 @@ def test_people_pages(world, monkeypatch):
         assert "sam@example.org" in client.get("/people/?q=sam").content.decode()
         page = client.get("/people/sam@example.org/").content.decode()
         assert "Helped Sam move" in page and "Saturday?" in page
+
+
+def test_the_owners_own_memories(world, monkeypatch):
+    remembered = life.recollect(world.store, "The summer we drove to the coast", "the summer after college", "month",
+                                "2002-07-01", "2002-07-31", ["Sam"])
+    found = {c.claim_id: c for c in life.claims(world.store, limit=1000)}
+    assert found[remembered.claim_id].modality == "recollected" and found[remembered.claim_id].state == "accepted"
+    assert life.claims(world.store, before="2003-01-01")[0].claim_id == remembered.claim_id  # in date order
+    assert any(s["text"] == "The summer we drove to the coast" for s in life_ask.evidence(world.worker(), "coast"))
+    monkeypatch.setattr(auth, "_setup_codes", {})
+    configure(world.store)
+    auth.create_account(world.store, "owner", OWNER)
+    with override_settings(TOWPATH_STORE_DIR=world.store, TOWPATH_CONFIG=world.config, ALLOWED_HOSTS=["testserver"]):
+        client = Client()
+        client.post("/login", {"username": "owner", "password": OWNER})
+        assert client.post("/life/remember", {"statement": "First day at school", "date": "1986-09"}).status_code == 302
+        assert client.post("/life/remember", {"statement": "x", "date": "someday"}).status_code == 400
+        page = client.get("/life/timeline").content.decode()
+        assert "First day at school" in page and "your memory" in page
+        client.post("/life/forget", {"claim_id": remembered.claim_id})
+    assert remembered.claim_id not in {c.claim_id for c in life.claims(world.store, limit=1000)}

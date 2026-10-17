@@ -258,6 +258,37 @@ def ask(request):
 
 
 @require_POST
+def remember(request):
+    """Write down a memory in the owner's own words."""
+    day = request.POST.get("date", "").strip()
+    try:
+        if len(day) == 4:
+            expression, precision, earliest, latest = day, "year", f"{day}-01-01", f"{day}-12-31"
+        elif len(day) == 7:
+            import calendar
+
+            y, m = int(day[:4]), int(day[5:7])
+            expression, precision = day, "month"
+            earliest, latest = f"{day}-01", f"{day}-{calendar.monthrange(y, m)[1]:02d}"
+        else:
+            date.fromisoformat(day)
+            expression, precision, earliest, latest = day, "day", day, day
+        people = [p for p in request.POST.get("people", "").split(",") if p.strip()]
+        life.recollect(settings.TOWPATH_STORE_DIR, request.POST.get("statement", ""),
+                       request.POST.get("expression", "").strip() or expression, precision, earliest, latest, people)
+    except (ValueError, TypeError):
+        return HttpResponseBadRequest("Write the memory, and when it was as a year (2009), a month (2009-05) or a "
+                                      "day (2009-05-14).")
+    return redirect("/life/?saved=memory")
+
+
+@require_POST
+def forget(request):
+    life.forget(settings.TOWPATH_STORE_DIR, request.POST.get("claim_id", ""))
+    return redirect(request.POST.get("next") or "/life/timeline")
+
+
+@require_POST
 def profile(request):
     try:
         life_groups.set_profile(settings.TOWPATH_STORE_DIR, request.POST.get("name", ""),

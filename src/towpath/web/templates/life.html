@@ -6,6 +6,15 @@
 {% if saved %}<div class="notice" role="status">Saved.</div>{% endif %}
 <p><a class="button" href="/life/today">On this day</a> <a class="button secondary" href="/life/timeline">Timeline</a> <a class="button secondary" href="/life/memories/">Memories</a> <a class="button secondary" href="/life/ask">Ask</a></p>
 
+<section class="detail-card"><h2 class="card-title">Write down a memory</h2>
+<form method="post" action="/life/remember" class="settings-form">{% csrf_token %}
+  <label>What you remember <textarea name="statement" rows="3" required placeholder="The summer we drove to the coast in the old van"></textarea></label>
+  <label>When <input name="date" required placeholder="2009, 2009-05 or 2009-05-14"><span>As precisely as you know it.</span></label>
+  <label>In your words (optional) <input name="expression" placeholder="the summer after college"></label>
+  <label>Who was there (optional) <input name="people" placeholder="Sam, Pat"><span>Names, separated by commas.</span></label>
+  <div class="form-actions"><button class="button" type="submit">Keep this memory</button></div></form>
+<p class="footnote">Kept as your memory, in your words: it appears on your timeline and in Ask, marked as remembered rather than found in a record.</p></section>
+
 <section class="detail-card"><h2 class="card-title">About you</h2>
 <form method="post" action="/life/profile" class="inline-form">{% csrf_token %}
   <label>Name <input name="name" value="{{ profile.name|default:'' }}"></label>
