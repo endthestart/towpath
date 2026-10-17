@@ -146,7 +146,8 @@ def test_days_with_many_photos_become_life_evidence_once_allowed(tmp_path):
             db.execute("INSERT INTO occurrences (occurrence_id, provider_id, native_id, root_alias, rel_path, members, "
                        "media_type, size, dates, hashes, extraction, first_seen_run, last_seen_run, updated_at) "
                        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                       (f"occ_{i}", "folders", rel, "pics", rel, "[]", "image/jpeg", 9, "[]", "{}", "{}", "r", "r", "t"))
+                       (f"occ_{i}", "folders", rel, "pics", rel, "[]", "image/jpeg", 9, "[]", "{}", "{}", "r", "r",
+                        "t"))
             db.execute("INSERT INTO photo_meta (occurrence_id, taken, extracted_at) VALUES (?, ?, 't')",
                        (f"occ_{i}", f"2009-05-15T1{i % 10}:00:00"))
         db.commit()

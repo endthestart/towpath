@@ -147,8 +147,13 @@ def digest_text(store_dir, source_id: str, since: datetime, role: str = ROLE) ->
     lines += [f"  - {t['subject'] or '(no subject)'} — {', '.join(t['participants'][:2])} "
               f"({(t['last_date'] or '')[:10]})" for t in waiting] or ["  nobody"]
     awaiting = threads.listing(store_dir, source_id, "awaiting_others", limit=10, role=role)
-    lines += ["", f"You're waiting on ({len(awaiting)}{'+' if len(awaiting) == 10 else ''}):"]
-    lines += [f"  - {t['subject'] or '(no subject)'} — {', '.join(t['participants'][:2])}" for t in awaiting] or \
+    lines += ["", f"You're waiting on ({len(awaiting)}{'+' if len(awaiting) == 10 else ''}), longest first:"]
+
+    def days(t):
+        return max(0, (now() - datetime.fromisoformat(t["last_date"])).days) if t["last_date"] else 0
+
+    lines += [f"  - {t['subject'] or '(no subject)'} — {', '.join(t['participants'][:2])}, no answer for "
+              f"{days(t)} day{'s' if days(t) != 1 else ''}" for t in sorted(awaiting, key=days, reverse=True)] or \
         ["  nothing"]
     cats = senders.categories(store_dir, source_id, role)
     counts: dict[str, int] = {}

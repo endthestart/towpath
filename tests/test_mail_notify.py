@@ -59,6 +59,7 @@ def test_the_digest_goes_into_the_inbox_once_per_period(world):
     assert len(notes) == 1
     text = message_from_bytes(notes[0].raw, policy=policy.default).get_content()
     assert "Waiting for your reply (1)" in text and "Saturday?" in text and "Deck quote" in text
+    assert "no answer for 4 days" in text
 
 
 def test_statistics_are_measured_and_shown(world, monkeypatch):
