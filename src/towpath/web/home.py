@@ -1,7 +1,7 @@
 """The Overview page's "Today" cards: what needs the owner across mail, the life story and photos."""
 
 from towpath import connections, life, life_groups, life_today, photos
-from towpath.mail import FEATURE, settings as mail_settings, threads
+from towpath.mail import FEATURE, senders, settings as mail_settings, threads
 from towpath.unified import grants
 
 
@@ -12,7 +12,9 @@ def cards(store_dir) -> dict:
         if FEATURE not in allowed.get(c["source_id"], set()):
             continue
         counts = threads.counts(store_dir, c["source_id"])
+        inbox = senders.inbox(store_dir, c["source_id"])
         accounts.append({"source_id": c["source_id"], "name": c["display_name"],
+                         "inbox": inbox["total"], "inbox_unread": inbox["unread"],
                          "to_reply": counts.get("needs_owner_reply", 0), "awaiting": counts.get("awaiting_others", 0),
                          "dry_run": mail_settings.dry_run(store_dir, c["source_id"], role="web")})
     claims = life.claims(store_dir, limit=10**6)
