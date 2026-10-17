@@ -38,7 +38,9 @@ def on_this_day(store_dir, day: date | None = None, role: str = "web", sources: 
                 "SELECT p.taken, p.model, p.occurrence_id, o.provider_id, o.root_alias, o.rel_path FROM photo_meta p "
                 "JOIN occurrences o "
                 "USING (occurrence_id) WHERE substr(p.taken, 6, 5) = ? AND substr(p.taken, 1, 4) < ? AND "
-                "o.missing_since_run IS NULL ORDER BY p.taken DESC LIMIT 60", (md, str(day.year)))
+                "o.missing_since_run IS NULL AND p.occurrence_id NOT IN (SELECT occurrence_id FROM photo_hidden) "
+                "ORDER BY "
+                "p.taken DESC LIMIT 60", (md, str(day.year)))
                 if r["provider_id"] in sources and not is_private(r["rel_path"])]
     sent = []
     if store_path(store_dir, "mail").exists():
@@ -74,7 +76,9 @@ def year_context(store_dir, role: str = "web", sources: set[str] | None = None) 
         with closing(open_store(store_dir, "files", role)) as db:
             marks = ",".join("?" for _ in sources) or "''"
             for year, n in db.execute(f"SELECT substr(p.taken, 1, 4), count(*) FROM photo_meta p JOIN occurrences o "
-                                      f"USING (occurrence_id) WHERE p.taken IS NOT NULL AND o.provider_id IN ({marks}) "
+                                      f"USING (occurrence_id) WHERE p.taken IS NOT NULL AND "
+                                      f"o.provider_id IN ({marks}) AND "
+                                      f"p.occurrence_id NOT IN (SELECT occurrence_id FROM photo_hidden) "
                                       f"GROUP BY 1", sorted(sources)):
                 out.setdefault(year, {})["photos"] = n
     if store_path(store_dir, "mail").exists():
@@ -129,6 +133,7 @@ def one_year(store_dir, year: str, role: str = "web", sources: set[str] | None =
                 only = (f" AND occurrence_id IN (SELECT occurrence_id FROM occurrences WHERE provider_id IN ({marks}) "
                         f"AND rel_path NOT LIKE '%Exports/Hidden%')")
                 args = tuple(sorted(sources))
+            only += " AND occurrence_id NOT IN (SELECT occurrence_id FROM photo_hidden)"  # hidden in Apple Photos
             for month, n in db.execute(f"SELECT substr(taken, 6, 2), count(*) FROM photo_meta WHERE substr(taken, 1, "
                                        f"4) = ?{only} GROUP BY 1", (year, *args)):
                 if month in months:

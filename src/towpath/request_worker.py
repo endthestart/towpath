@@ -68,6 +68,10 @@ def run_once(config, credentials_dir=None):
 
         indexing += photos.purge_private(config)
         indexing += photos.extract_pending(config)
+        from towpath import apple_photos, thumbs
+
+        indexing += apple_photos.mark_hidden(config)  # before previews: hidden photos never get one
+        indexing += thumbs.thumbs_pending(config)
         from towpath import space_hash
 
         indexing += space_hash.confirm_pending(config)

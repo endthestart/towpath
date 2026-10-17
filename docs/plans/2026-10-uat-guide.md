@@ -48,8 +48,8 @@ password with full IMAP and SMTP access), then on Mail → Settings tick the kin
 
 ## 3. Life story
 
-1. **Life** (`/life/`): fill in **About you** (name, birthday). Decide open questions 2 and 3 (Fastmail and finding
-   events by itself) — the Life page's account switches and *Find events by itself* do it. Allow a photo folder too:
+1. **Life** (`/life/`): fill in **About you** (name, birthday). Fastmail is now allowed for the life story and
+   *Find events by itself* is on (your answers of October 17): check what it proposes, newest year first. Allow a photo folder too:
    days with many photos become proposed events.
 2. **2025 events to review** (Life → events to review): the re-read of 2025 finished on October 15 and left 16 of
    its 101 events for you to keep or reject.
@@ -62,7 +62,8 @@ password with full IMAP and SMTP access), then on Mail → Settings tick the kin
 ## 4. Photos and files
 
 - **Photos** (`/photos/`): cameras and years from 40,000+ photos read; try "photos from my Fuji in 2019" in the
-  plain-English box. Few of your photos record a location, so place search has little to go on.
+  plain-English box. Small previews appear as they're made (each photo's own camera thumbnail; none for the private
+  export or photos hidden in Apple Photos; turn them off on the page). Few of your photos record a location.
 - **Search all**: `in:"root/folder"`, `size:>100MB`, `modified:2019`; or ask in plain English.
 - **Space**: duplicate groups now say whether copies are identical by content.
 

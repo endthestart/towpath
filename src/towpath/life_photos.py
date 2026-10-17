@@ -30,7 +30,9 @@ def propose(config) -> list[dict]:
         for provider, day, occ, alias, rel in db.execute(
                 "SELECT o.provider_id, substr(p.taken, 1, 10), p.occurrence_id, o.root_alias, o.rel_path FROM "
                 "photo_meta p JOIN occurrences o USING (occurrence_id) WHERE p.taken IS NOT NULL AND "
-                "o.missing_since_run IS NULL ORDER BY p.taken"):
+                "o.missing_since_run IS NULL AND p.occurrence_id NOT IN (SELECT occurrence_id FROM photo_hidden) "
+                "ORDER BY "
+                "p.taken"):
             # only folders still chosen, and never the private export (tested on the full path)
             if provider in allowed and not private_in(config, alias, rel):
                 days.setdefault((provider, day), []).append((occ, rel))

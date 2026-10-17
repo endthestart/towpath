@@ -6,7 +6,7 @@
 <p class="lead">What your records hold for this day in earlier years: events, photos you took, and mail you sent.</p></header>
 {% for y in years %}<section class="detail-card"><h2 class="card-title">{{ y.year }}</h2>
 {% for e in y.events %}<p><strong>{{ e.statement }}</strong> <span class="muted">· {{ e.modality }}</span>{% if e.evidence_url %} <a href="{{ e.evidence_url }}">evidence</a>{% endif %}</p>{% endfor %}
-{% if y.photos %}<p>{{ y.photos|length }} photo{{ y.photos|length|pluralize }}: {% for p in y.photos|slice:":8" %}<a href="{{ p.ref }}">{{ p.rel_path }}</a>{% if not forloop.last %} · {% endif %}{% endfor %}</p>{% endif %}
+{% if y.photos %}<p>{{ y.photos|length }} photo{{ y.photos|length|pluralize }}: {% for p in y.photos|slice:":8" %}<a href="{{ p.ref }}">{% if p.preview %}<img class="photo-preview {{ p.turn }}" src="/photos/preview/{{ p.occurrence_id }}" alt="{{ p.rel_path }}" loading="lazy" width="96" height="72">{% else %}{{ p.rel_path }}{% endif %}</a>{% if not forloop.last and not p.preview %} · {% endif %}{% endfor %}</p>{% endif %}
 {% for m in y.sent %}<p>You wrote to {{ m.to }}: <a href="/mail/m/{{ m.item_id }}/">{{ m.subject|default:'(No subject)' }}</a></p>{% endfor %}
 </section>{% empty %}<p>Nothing from this day yet. Your timeline fills in as Towpath reads your mail and photos.</p>{% endfor %}
 {% endblock %}

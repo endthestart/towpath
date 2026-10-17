@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlencode
 
 from django.conf import settings
-from django.http import Http404, HttpResponseBadRequest
+from django.http import Http404, HttpResponse, HttpResponseBadRequest
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_GET, require_POST
 
@@ -29,10 +29,39 @@ def page(request):
     for r in rows:
         r["ref"] = "/ref/?" + urlencode({"r": f"{r['provider_id']}:{r['occurrence_id']}"})
     query = urlencode({k: ("1" if v is True else v) for k, v in f.items() if v})
+    from towpath import thumbs
+
+    shown = thumbs.available(_store(), [r["occurrence_id"] for r in rows])
+    for r in rows:
+        r["preview"] = r["occurrence_id"] in shown
+        r["turn"] = {3: "rot180", 6: "rot90", 8: "rot270"}.get(shown.get(r["occurrence_id"]), "")
+
     return render(request, "photos.html", {
         "nav": "photos", "f": f, "rows": rows, "total": total, "page": number, "more": number * PAGE < total,
         "facets": photos.facets(_store()), "progress": photos.progress(_store()), "query": query,
-        "active": active})
+        "active": active, "previews": thumbs.enabled(_store(), "web"), "saved": request.GET.get("saved")})
+
+
+@require_GET
+def preview(request, occurrence_id):
+    """A photo's small preview, for the owner's own pages only (signed in), never for a hidden or private photo."""
+    from towpath import thumbs
+
+    found = thumbs.preview(_store(), occurrence_id)
+    if found is None:
+        raise Http404
+    response = HttpResponse(found["jpeg"], content_type="image/jpeg")
+    response["Cache-Control"] = "private, max-age=86400"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+@require_POST
+def previews(request):
+    from towpath import thumbs
+
+    thumbs.set_enabled(_store(), request.POST.get("on") == "1")
+    return redirect("/photos/?saved=previews")
 
 
 @require_POST

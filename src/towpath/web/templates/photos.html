@@ -18,11 +18,13 @@
 <p class="footnote">Years: {% for y in facets.years %}<a href="?after={{ y.0 }}-01-01&amp;before={{ y.0 }}-12-31">{{ y.0 }}</a> ({{ y.1 }}, <a href="/life/year/{{ y.0 }}" aria-label="The year {{ y.0 }}">year ↗</a>){% if not forloop.last %} · {% endif %}{% endfor %}</p>
 {% if facets.days %}<p class="footnote">Days with the most photos: {% for d in facets.days %}<a href="?after={{ d.0 }}&amp;before={{ d.0 }}">{{ d.0 }}</a> ({{ d.1 }}){% if not forloop.last %} · {% endif %}{% endfor %}</p>{% endif %}{% endif %}
 </section>
+{% if saved == 'previews' %}<div class="notice" role="status">Saved.{% if not previews %} Previews already made are deleted at the next check.{% endif %}</div>{% endif %}
+<form method="post" action="/photos/previews" class="inline-form">{% csrf_token %}<input type="hidden" name="on" value="{% if previews %}0{% else %}1{% endif %}"><span class="footnote">{% if previews %}Small previews come from each photo's own camera thumbnail, kept on your server and shown only to you; no AI model ever reads them. None for your private export or photos hidden in Apple Photos.{% else %}Previews are off.{% endif %}</span><button class="link-button text" type="submit">{% if previews %}Turn previews off (and delete them){% else %}Turn previews on{% endif %}</button></form>
 {% if active %}<div class="result-heading"><strong>{{ total }} photo{{ total|pluralize }}</strong><span>Newest taken first</span></div>
-<table class="space-table"><thead><tr><th>Taken</th><th>Camera and lens</th><th>File</th><th>Where</th></tr></thead><tbody>
-{% for r in rows %}<tr><td>{{ r.taken|slice:":16"|default:"undated" }}</td><td>{{ r.make|default:'' }} {{ r.model|default:'' }}{% if r.lens %}<br><span class="footnote">{{ r.lens }}</span>{% endif %}</td>
+<table class="space-table"><thead><tr>{% if previews %}<th></th>{% endif %}<th>Taken</th><th>Camera and lens</th><th>File</th><th>Where</th></tr></thead><tbody>
+{% for r in rows %}<tr>{% if previews %}<td>{% if r.preview %}<img class="photo-preview {{ r.turn }}" src="/photos/preview/{{ r.occurrence_id }}" alt="" loading="lazy" width="96" height="72">{% endif %}</td>{% endif %}<td>{{ r.taken|slice:":16"|default:"undated" }}</td><td>{{ r.make|default:'' }} {{ r.model|default:'' }}{% if r.lens %}<br><span class="footnote">{{ r.lens }}</span>{% endif %}</td>
 <td><a href="{{ r.ref }}">{{ r.rel_path }}</a><br><span class="footnote">{{ r.root_alias }} · {{ r.size|filesizeformat }}{% if r.width %} · {{ r.width }}×{{ r.height }}{% endif %}</span></td>
 <td>{% if r.lat is not None %}{{ r.lat|floatformat:4 }}, {{ r.lon|floatformat:4 }}{% else %}—{% endif %}</td></tr>
-{% empty %}<tr><td colspan="4">No photos match.</td></tr>{% endfor %}</tbody></table>
+{% empty %}<tr><td colspan="5">No photos match.</td></tr>{% endfor %}</tbody></table>
 <nav class="pagination" aria-label="Pages"><span>Page {{ page }}</span><div>{% if page > 1 %}<a href="?{{ query }}&amp;page={{ page|add:'-1' }}">← Previous</a>{% endif %}{% if more %}<a href="?{{ query }}&amp;page={{ page|add:'1' }}">Next →</a>{% endif %}</div></nav>{% endif %}
 {% endblock %}

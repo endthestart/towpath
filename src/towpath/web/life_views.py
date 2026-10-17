@@ -191,6 +191,14 @@ def today(request):
         y["events"] = [_row(c) for c in y["events"]]
         for p in y["photos"]:
             p["ref"] = "/ref/?" + urlencode({"r": f"{p['provider_id']}:{p['occurrence_id']}"})
+    from towpath import thumbs
+
+    shown = thumbs.available(settings.TOWPATH_STORE_DIR, [p["occurrence_id"] for y in found["years"]
+                                                          for p in y["photos"][:8]])
+    for y in found["years"]:
+        for p in y["photos"]:
+            p["preview"] = p["occurrence_id"] in shown
+            p["turn"] = {3: "rot180", 6: "rot90", 8: "rot270"}.get(shown.get(p["occurrence_id"]), "")
     return render(request, "life_today.html", {"nav": "life", **found})
 
 

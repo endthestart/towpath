@@ -103,6 +103,8 @@ def _record(row: dict | None) -> dict:
 
 
 PURGE_VERSION = "1"
+# Photos an Apple Photos library hides (and its own copies) are left out of every list and count.
+VISIBLE = "occurrence_id NOT IN (SELECT occurrence_id FROM photo_hidden)"
 
 
 def purge_private(config) -> list[dict]:
@@ -204,13 +206,13 @@ def facets(store_dir, role: str = "web") -> dict:
         return {
             "cameras": [tuple(r) for r in db.execute(
                 "SELECT trim(coalesce(make, '') || ' ' || model), count(*) FROM photo_meta WHERE model IS NOT NULL "
-                "GROUP BY 1 ORDER BY 2 DESC LIMIT 60")],
-            "lenses": [tuple(r) for r in db.execute("SELECT lens, count(*) FROM photo_meta WHERE lens IS NOT NULL "
-                                                    "GROUP BY 1 ORDER BY 2 DESC LIMIT 60")],
-            "years": [tuple(r) for r in db.execute("SELECT substr(taken, 1, 4), count(*) FROM photo_meta WHERE taken "
-                                                   "IS NOT NULL GROUP BY 1 ORDER BY 1 DESC")],
-            "days": [tuple(r) for r in db.execute("SELECT substr(taken, 1, 10), count(*) FROM photo_meta WHERE taken "
-                                                  "IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 12")]}
+                f"AND {VISIBLE} GROUP BY 1 ORDER BY 2 DESC LIMIT 60")],
+            "lenses": [tuple(r) for r in db.execute(f"SELECT lens, count(*) FROM photo_meta WHERE lens IS NOT NULL "
+                                                    f"AND {VISIBLE} GROUP BY 1 ORDER BY 2 DESC LIMIT 60")],
+            "years": [tuple(r) for r in db.execute(f"SELECT substr(taken, 1, 4), count(*) FROM photo_meta WHERE taken "
+                                                   f"IS NOT NULL AND {VISIBLE} GROUP BY 1 ORDER BY 1 DESC")],
+            "days": [tuple(r) for r in db.execute(f"SELECT substr(taken, 1, 10), count(*) FROM photo_meta WHERE taken "
+                                                  f"IS NOT NULL AND {VISIBLE} GROUP BY 1 ORDER BY 2 DESC LIMIT 12")]}
 
 
 def search(store_dir, f: dict, limit: int = 200, offset: int = 0, role: str = "web") -> tuple[list[dict], int]:
@@ -235,7 +237,8 @@ def search(store_dir, f: dict, limit: int = 200, offset: int = 0, role: str = "w
     if f.get("text"):
         where.append("lower(o.rel_path) LIKE ?")
         args.append(f"%{f['text'].lower()}%")
-    clause = " AND ".join(where) or "1"
+    where.append("p." + VISIBLE)
+    clause = " AND ".join(where)
     with closing(open_store(store_dir, "files", role)) as db:
         total = db.execute(f"SELECT count(*) FROM photo_meta p JOIN occurrences o USING (occurrence_id) WHERE "
                            f"{clause} AND p.problem IS NULL AND o.missing_since_run IS NULL", args).fetchone()[0]

@@ -42,15 +42,13 @@ Balanced across three areas, mail first:
 1. ~~**Attachment filing**~~ — answered October 17: a folder in Towpath's data folder, by year and sender,
    documents only, dry runs first; which file types count and how attachments connect to other things come later.
    Built: Mail → Attachments → *Filing documents*.
-2. **Fastmail for the life story and Ask:** only Gmail (`gmail_test`) is allowed for the life story today, so
-   events, memories and Ask don't use Fastmail, which Towpath now reads in full. Allow it?
-3. **Finding life events by itself:** built, and your direction of October 14 says it should run in the background
-   across allowed mail. Turn it on now (it reads Gmail through Google's paced API and uses the Mac Pro model for
-   hours), or wait for UAT?
-4. **Photo previews:** the Photos, Year and On this day pages list photos by name only. Towpath could keep each
-   photo's small embedded camera thumbnail (read by ExifTool, no new software; about 10 KB each, roughly 400 MB for
-   the library) in a store of its own, never for the hidden export or photos hidden in Apple Photos. That reverses
-   decision 17 (nothing copied or thumbnailed). Build it, off until you turn it on?
+2. ~~**Fastmail for the life story and Ask**~~ — answered October 17: allowed (the Mac Pro model only; keep-from-cloud
+   marks stay protected). Granted on Hub, recorded as the owner's answer relayed by the Project Manager session.
+3. ~~**Finding life events by itself**~~ — answered October 17: start now, Fastmail first (stored text, no Gmail
+   API use), then Gmail, the current year first. Turned on on Hub; accounts with stored text now always come first.
+4. ~~**Photo previews**~~ — answered October 17: yes, optional and on by default, as long as no cloud model reads
+   any photo; never for the private export or photos hidden in Apple Photos (by the library's own hidden flag).
+   Built with a test for each rule.
 
 ## Decisions made for review
 
@@ -120,6 +118,10 @@ Balanced across three areas, mail first:
 28. **Taking a source's life-story permission away takes its events out** of every page, answer and prompt; On
     this day, the Year pages and the timeline's yearly figures use allowed sources only, and a digest holds only
     its own account's mail.
+29. **Photo previews reverse decision 17** (as the owner chose): each photo's embedded camera thumbnail is kept in
+    a store of its own. Apple Photos libraries are judged by their own database: only originals the library shows
+    get a preview; hidden or deleted photos, the library's own copies, and every file of a library whose database
+    can't be read get none, and hidden photos are also left out of photo lists and counts.
 
 ## Progress
 
@@ -185,3 +187,6 @@ Balanced across three areas, mail first:
 - 2026-10-17: `84e4283` deployed. A privacy review found the private export could still be listed by name (Search
   all, Space) and indexed by Recoll, life-story model calls didn't name their senders, and revoked or ungranted
   accounts still fed the life pages and the digest; all fixed in `1d06040` (decisions 27 and 28).
+- 2026-10-17: `1d06040` deployed. The owner answered all four open questions through the Project Manager session:
+  attachment filing built (`44d310e`, dry run first); Fastmail allowed for the life story and finding events turned
+  on, on Hub; photo previews built (decision 29).

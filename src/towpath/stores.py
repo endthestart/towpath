@@ -38,6 +38,7 @@ WRITERS = {
     "maildecisions": {"web"},
     "mailintel": {"worker"},
     "dav": {"connect"},
+    "thumbs": {"connect"},
 }
 
 # Columns and tables added after a store was first released. Applied on every
@@ -257,6 +258,9 @@ CREATE TABLE IF NOT EXISTS photo_meta (
 CREATE INDEX IF NOT EXISTS photo_meta_taken ON photo_meta (taken);
 CREATE INDEX IF NOT EXISTS photo_meta_model ON photo_meta (model, taken);
 CREATE TABLE IF NOT EXISTS photo_progress (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL);
+-- Files in an Apple Photos library that the library marks hidden or deleted (by its own database), and the
+-- library's other files that aren't a visible original: never previewed, and left out of photo lists.
+CREATE TABLE IF NOT EXISTS photo_hidden (occurrence_id TEXT PRIMARY KEY, why TEXT NOT NULL, at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS occurrence_versions (
   occurrence_id TEXT NOT NULL, version TEXT NOT NULL, first_seen_run TEXT NOT NULL,
   PRIMARY KEY (occurrence_id, version));
@@ -459,6 +463,13 @@ CREATE TABLE IF NOT EXISTS progress (
   source_id TEXT PRIMARY KEY, watermark INTEGER NOT NULL, state TEXT NOT NULL, updated_at TEXT NOT NULL);
 """,
     # Contacts and calendar events read from CardDAV and CalDAV connections (rebuildable; references, not exports).
+    "thumbs": """
+-- Small previews of photos for the owner's pages: each photo's own embedded camera thumbnail, never for the private
+-- export or a photo hidden in Apple Photos, never read by any model. A row with no image means none is made.
+CREATE TABLE IF NOT EXISTS thumbs (
+  occurrence_id TEXT PRIMARY KEY, jpeg BLOB, orientation INTEGER, why TEXT, at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS thumb_progress (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL);
+""",
     "dav": """
 CREATE TABLE IF NOT EXISTS contacts (
   source_id TEXT NOT NULL, href TEXT NOT NULL, etag TEXT NOT NULL, uid TEXT, name TEXT, emails TEXT NOT NULL,

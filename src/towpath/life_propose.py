@@ -362,8 +362,10 @@ def _next_auto(config, clock=time.monotonic) -> dict | None:
     messages. Finished years are looked at again now and then for newly arrived mail."""
     from towpath.unified import grants
 
-    allowed = sorted(sid for sid, f in grants.granted(config.store_dir).items()
-                     if "life-evidence" in f and sid in config.sources)
+    granted = grants.granted(config.store_dir)
+    # Accounts whose text mail management already stores come first (no provider calls), then the others.
+    allowed = sorted((sid for sid, f in granted.items() if "life-evidence" in f and sid in config.sources),
+                     key=lambda sid: ("mail-manage" not in granted[sid], sid))
     done: dict[str, str] = {}
     if store_path(config.store_dir, "life").exists():
         with closing(open_store(config.store_dir, "life", "worker")) as db:
