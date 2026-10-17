@@ -210,3 +210,13 @@ def test_a_further_model_on_the_same_server_can_be_chosen_per_task(world):
     assert threads.blocked(cfg, world.sid, "mail.draft") is not None  # its own permission is needed
     decisions.grant_model(cfg, endpoint, "content", author="owner")
     assert threads.blocked(world.worker(), world.sid, "mail.draft") is None
+
+
+def test_recent_conversations_are_sorted_and_drafted_before_the_history(world, monkeypatch):
+    calls = []
+    real_classify, real_draft = threads._classify, threads._draft
+    monkeypatch.setattr(threads, "_classify", lambda *a, **k: calls.append(("classify", k.get("days"))) or
+                        real_classify(*a, **k))
+    monkeypatch.setattr(threads, "_draft", lambda *a, **k: calls.append(("draft", None)) or real_draft(*a, **k))
+    world.track()
+    assert calls == [("classify", threads.DRAFT_DAYS), ("draft", None), ("classify", None)]

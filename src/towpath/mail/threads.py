@@ -296,7 +296,8 @@ def ready(config, task: str) -> bool:
     return bool(report and report["capabilities"].get("chat"))
 
 
-def _classify(config, intel, mail, source_id: str, me: dict, deadline: float, clock) -> tuple[int, str | None]:
+def _classify(config, intel, mail, source_id: str, me: dict, deadline: float, clock,
+              days: int = OLD_DAYS) -> tuple[int, str | None]:
     from towpath.models import gateway
 
     done = 0
@@ -304,7 +305,7 @@ def _classify(config, intel, mail, source_id: str, me: dict, deadline: float, cl
     while clock() < deadline:
         rows = intel.execute("SELECT thread_key FROM threads WHERE source_id = ? AND state_by = 'rule' AND "
                              "kind = 'conversation' AND last_date >= ? ORDER BY last_date DESC LIMIT ?",
-                             (source_id, (datetime.now(timezone.utc) - timedelta(days=OLD_DAYS)).isoformat(),
+                             (source_id, (datetime.now(timezone.utc) - timedelta(days=days)).isoformat(),
                               MODEL_BATCH)).fetchall()
         if not rows:
             return done, None
@@ -421,16 +422,20 @@ def track_pending(config, slice_seconds: float = SLICE_SECONDS, clock=time.monot
             classified = drafted = 0
             stop = None
             if not (state.get("retry_at") and now() < state["retry_at"]):
-                if blocked(config, sid, TASK_STATE) is None:
-                    if ready(config, TASK_STATE):
-                        classified, stop = _classify(config, intel, mail, sid, me, deadline, clock)
-                    else:
-                        stop = "transient"
+                # Recent conversations first, then their drafts, then the rest of the history.
+                state_ok = blocked(config, sid, TASK_STATE) is None and ready(config, TASK_STATE)
+                if blocked(config, sid, TASK_STATE) is None and not state_ok:
+                    stop = "transient"
+                if state_ok:
+                    classified, stop = _classify(config, intel, mail, sid, me, deadline, clock, days=DRAFT_DAYS)
                 if stop is None and blocked(config, sid, TASK_DRAFT) is None:
                     if ready(config, TASK_DRAFT):
                         drafted, stop = _draft(config, intel, mail, sid, me, deadline, clock)
                     else:
                         stop = "transient"
+                if stop is None and state_ok:
+                    more, stop = _classify(config, intel, mail, sid, me, deadline, clock)
+                    classified += more
                 wait = {"busy": BUSY_SECONDS, "transient": RETRY_SECONDS}.get(stop)
                 state = {**{k: v for k, v in state.items() if k not in ("retry_at", "reason")},
                          **({"retry_at": (datetime.now(timezone.utc) + timedelta(seconds=wait)).isoformat(
