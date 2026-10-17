@@ -40,6 +40,10 @@ def build_connector(source, config=None, **options):
         from towpath.adapters.facebook import FacebookConnector
 
         return FacebookConnector(source.id, source.path)
+    if source.adapter == "imessage":
+        from towpath.adapters.messages_export import MessagesExportConnector
+
+        return MessagesExportConnector(source.id, source.path)
     raise ValueError(f"unknown adapter {source.adapter!r}")
 
 

@@ -153,6 +153,8 @@ def add(request, provider):
         return _dav_page(request, provider)
     if provider == "facebook":
         return _facebook_page(request)
+    if provider == "imessage":
+        return _messages_page(request)
     if provider not in connections.PROVIDERS:
         raise Http404
     preset = connections.PROVIDERS[provider]
@@ -191,6 +193,25 @@ def _flat(nodes: list[dict], depth: int = 0) -> list[dict]:
         out.append({"rel": n["rel"], "name": n["name"], "depth": depth, "readable": n["readable"]})
         out += _flat(n["children"], depth + 1)
     return out
+
+
+def _messages_page(request):
+    from towpath import folders as folder_index
+
+    error = None
+    if request.method == "POST":
+        try:
+            sid = connections.add_messages(_store(), folder_index.library() / request.POST.get("path", "").lstrip("/"),
+                                           _config_ids())
+        except ConnectionProblem as exc:
+            error = str(exc)
+        else:
+            return redirect(f"/connections/{sid}/")
+    response = render(request, "connection_messages.html", {
+        "nav": "connections", "error": error, "tree": _flat(folder_index.tree(depth=3)),
+        "preset": connections.PROVIDERS["imessage"]})
+    response.status_code = 400 if error else 200
+    return response
 
 
 def _facebook_page(request):

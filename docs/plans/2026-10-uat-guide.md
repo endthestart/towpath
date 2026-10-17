@@ -79,6 +79,7 @@ password with full IMAP and SMTP access), then on Mail → Settings tick the kin
 | Fastmail contacts and calendars | Connections → Fastmail contacts and calendars, a read-only CardDAV/CalDAV app password |
 | iCloud contacts and calendars (if you use them) | Connections → iCloud contacts and calendars, an app-specific password |
 | Facebook export | unzip a JSON export under the library; Connections → Facebook export |
+| Apple Messages | on a Mac: `brew install imessage-exporter`; give Terminal *Full Disk Access* (System Settings → Privacy & Security); then `imessage-exporter -f txt -o /Volumes/storage/exports/messages` (the `storage` share, which Towpath sees as `storage/exports/messages` in its library). Then Connections → *Apple Messages export* → that folder → *Check and add*, and *Index now*. Run the export again now and then. Allow it on the Life page only if you want messages in your life story. |
 
 
 ## 6. Rolling back

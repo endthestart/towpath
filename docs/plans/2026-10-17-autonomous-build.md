@@ -47,8 +47,9 @@ The owner chose to keep building until UAT. From the [roadmap](../roadmap.md)'s 
    without Towpath (roadmap milestone 8, "portable export").
 3. **Contradictions in the life story**: events that disagree (the same thing on different dates, or duplicates
    from different sources) shown side by side for the owner to settle (roadmap milestone 6).
-4. **Messages as a source**: import an export of Apple Messages (made with an existing exporter) as day-by-day
-   conversations, like the Facebook export. Waits on a question to the owner (which exporter and format).
+4. **Messages as a source**: built (the owner chose imessage-exporter's text format): one item per conversation
+   per day in the owner's local time, the same protections as mail, tested only on made-up conversations. The owner
+   runs the export at UAT (see the guide).
 
 ## Open questions
 

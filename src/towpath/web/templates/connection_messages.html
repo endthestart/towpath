@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block title %}Add an Apple Messages export · Towpath{% endblock %}
+{% block content %}
+<header class="page-head compact"><p class="eyebrow"><a href="/connections/">CONNECTIONS</a></p><h1>Add an Apple Messages export</h1>
+<p class="lead">Your Apple Messages, exported with <a href="{{ preset.help_url }}" target="_blank" rel="noopener noreferrer">imessage-exporter</a> in its <strong>text</strong> format into a folder on your server. Towpath reads each conversation as one item per day, for search and, once you allow it on the Life page, your life story. They get the same protections as mail: only the AI models you allowed read them, and senders you keep from cloud models stay kept. Towpath never changes the export.</p></header>
+{% if error %}<div class="notice warn" role="alert">{{ error }}</div>{% endif %}
+<section class="detail-card"><form method="post" class="settings-form">{% csrf_token %}
+  <fieldset><legend>The export's folder</legend>
+  {% for f in tree %}<label class="check indent-{{ f.depth }}"><input type="radio" name="path" value="{{ f.rel }}"{% if not f.readable %} disabled{% endif %}> {{ f.name }}{% if not f.readable %} <span class="muted">(can't be read)</span>{% endif %}</label>{% empty %}<p>No folders are visible on the server's library.</p>{% endfor %}
+  </fieldset>
+  <div class="form-actions"><button class="button" type="submit">Check and add</button></div></form>
+<p class="footnote">To make one on a Mac: <code>imessage-exporter -f txt -o &lt;a folder on the server&gt;</code>, then choose that folder here. Run it again now and then; Towpath reads what changed.</p></section>
+{% endblock %}

@@ -38,6 +38,8 @@ PROVIDERS = {
                    "help_url": "https://support.apple.com/en-us/102654"},
     "facebook": {"label": "Facebook export", "host": None, "port": None, "security": None,
                  "help_url": "https://www.facebook.com/dyi"},
+    "imessage": {"label": "Apple Messages export", "host": None, "port": None, "security": None,
+                 "help_url": "https://github.com/ReagentX/imessage-exporter"},
     "folders": {"label": "Folders on this server", "host": None, "port": None, "security": None, "help_url": None},
     "model": {"label": "AI model on your network", "host": None, "port": None, "security": None, "help_url": None},
 }
@@ -86,7 +88,7 @@ def token_path(credentials_dir: Path, c: dict) -> Path:
 
 
 def has_credential(credentials_dir: Path, c: dict) -> bool:
-    if c["adapter"] in ("recoll", "facebook"):
+    if c["adapter"] in ("recoll", "facebook", "imessage"):
         return True  # folders and exports on the server need no sign-in
     path = token_path(credentials_dir, c) if c["adapter"] == "gmail" else secret_path(credentials_dir, c["source_id"])
     return path.is_file()
@@ -428,8 +430,8 @@ def merged(config, credentials_dir: Path | None, role: str = ROLE):
         elif c["adapter"] == "gmail":
             added[sid] = config_mod.Source(sid, "mail-provider", "gmail",
                                            token=token_path(credentials_dir, c) if credentials_dir else None)
-        elif c["adapter"] == "facebook":
-            added[sid] = config_mod.Source(sid, "mail-provider", "facebook", path=Path(c["settings"]["path"]))
+        elif c["adapter"] in ("facebook", "imessage"):
+            added[sid] = config_mod.Source(sid, "mail-provider", c["adapter"], path=Path(c["settings"]["path"]))
     models = [c for c in all_connections(config.store_dir, role) if c["adapter"] == "model" and c["state"] == "ready"]
     endpoints = {e.id: e for c in models for e in model_endpoints(config.store_dir, c)}
     from towpath.decisions import task_models
@@ -444,6 +446,30 @@ def merged(config, credentials_dir: Path | None, role: str = ROLE):
     from towpath import folders
 
     return folders.with_files(config, Path(config.store_dir).parent / "index", role)
+
+
+def add_messages(store_dir: Path, path: Path, taken: set[str] = frozenset()) -> str:
+    """Record an Apple Messages export folder (imessage-exporter, text format) as a source; nothing is read yet."""
+    from towpath import folders
+    from towpath.adapters.messages_export import looks_like_export
+
+    base = folders.library().resolve()
+    path = Path(path).resolve()
+    if not folders._inside(base, path) or not path.is_dir():
+        raise ConnectionProblem("Choose a folder on the server's library.")
+    if not looks_like_export(path):
+        raise ConnectionProblem("That folder doesn't look like an imessage-exporter export in text format (no "
+                                "conversation files).")
+    sid = _new_id(store_dir, "messages", set(taken))
+    now = _now()
+    with closing(open_store(store_dir, "connections", ROLE)) as db:
+        db.execute("""INSERT INTO connections (source_id, provider, adapter, display_name, settings, folders, state,
+                      indexing, created_at, updated_at)
+                      VALUES (?, 'imessage', 'imessage', 'Apple Messages export', ?, NULL, 'ready', 'idle', ?, ?)""",
+                   (sid, json.dumps({"path": str(path), "username": path.name}), now, now))
+        db.execute("INSERT INTO connection_events (source_id, at, event) VALUES (?, ?, 'added')", (sid, now))
+        db.commit()
+    return sid
 
 
 def add_facebook(store_dir: Path, path: Path, taken: set[str] = frozenset()) -> str:

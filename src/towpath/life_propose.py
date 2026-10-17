@@ -467,7 +467,8 @@ def propose_pending(config, credentials_dir, slice_seconds: float = SLICE_SECOND
                 from towpath.mail.privacy import targets
                 from towpath.mail.threads import item_refused
 
-                sender = parseaddr(str(message.get("from") or ""))[1].lower() or None
+                raw = str(message.get("from") or "")  # an address, or a name or number from a chat export
+                sender = (parseaddr(raw)[1].lower() if "@" in raw else raw) or None
                 result = gateway.infer(config, TASK, prompt, "content", SCHEMA,
                                        targets(value["source_id"], [message["item_id"]], [sender]),
                                        prompt_version=PROMPT_VERSION)
