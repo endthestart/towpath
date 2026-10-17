@@ -271,3 +271,26 @@ def test_ask_summarizes_a_named_year_from_allowed_accounts_only(world):
     year = next(s for s in life_ask.evidence(world.worker(), question) if s["kind"] == "year")
     assert year["date"] == this_year and "dana@example.net" in year["text"] and "emails received" in year["text"]
     assert f"The year {this_year} in Towpath's records" in life_ask._sources_text([year])
+
+
+def test_ask_leaves_out_sources_kept_from_the_model(world, monkeypatch):
+    from towpath.mail import privacy
+    from towpath.models import gateway
+
+    grants.grant(world.store, world.sid, "life-evidence", author="owner")
+    privacy.keep(world.worker(), privacy.sender_target(world.sid, "sam@example.org"), True)
+    seen = []
+    real = gateway.infer
+
+    def infer(config, task, prompt, data_class, schema, item_ids=(), **kwargs):
+        seen.append(list(item_ids))
+        if privacy.sender_target(world.sid, "sam@example.org") in item_ids:  # as for a cloud model
+            return {"status": "refused", "reason": "item x is kept from cloud models and endpoint e is one"}
+        return real(config, task, prompt, data_class, schema, item_ids, **kwargs)
+
+    monkeypatch.setattr(gateway, "infer", infer)
+    life_ask.ask(world.store, "couch Saturday dinner")
+    life_ask.answer_pending(world.worker())
+    a = life_ask.questions(world.store)[0]["answer"]
+    assert len(seen) == 2 and privacy.sender_target(world.sid, "sam@example.org") in seen[0]
+    assert not any(s.get("from") == "sam@example.org" for s in a["sources"])

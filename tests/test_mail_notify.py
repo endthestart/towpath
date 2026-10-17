@@ -174,3 +174,60 @@ def test_reply_labels_follow_the_conversation_and_come_off_when_it_moves_on(worl
     assert notify.reply_labels_pending(world.worker())[0]["removed"] == 2
     executor.run_pending(world.worker(), world.credentials, pause=0)
     assert "To-reply" not in saturday.flags  # turning the labels off takes them off again
+
+
+def test_reply_labels_come_back_after_being_turned_off_and_on(world, monkeypatch):
+    from datetime import timedelta
+
+    live(world, "add_keyword", "remove_keyword")
+    notify.set_reply_labels(world.store, world.sid, True)
+    notify.reply_labels_pending(world.worker())
+    executor.run_pending(world.worker(), world.credentials, pause=0)
+    saturday = world.state.mailboxes["INBOX"].messages[1]
+    assert "To-reply" in saturday.flags
+    clock = [datetime.now(timezone.utc)]
+    monkeypatch.setattr(notify, "now", lambda: clock[0])
+    for on in (False, True):
+        clock[0] += timedelta(minutes=10)
+        notify.set_reply_labels(world.store, world.sid, on)
+        notify.reply_labels_pending(world.worker())
+        executor.run_pending(world.worker(), world.credentials, pause=0)
+    assert "To-reply" in saturday.flags  # the second add is a new change, not a repeat of the first
+
+
+def test_a_follow_up_label_comes_off_after_reminders_are_turned_off(world):
+    notify.set_follow_up(world.store, world.sid, 3)
+    threads.track_pending(world.worker())
+    notify.follow_ups_pending(world.worker())
+    live(world, "add_keyword", "remove_keyword")
+    executor.run_pending(world.worker(), world.credentials, pause=0)
+    sent = world.state.mailboxes["Sent"].messages[1]
+    assert "Follow-up" in sent.flags
+    notify.set_follow_up(world.store, world.sid, 0)
+    key = {r["subject"]: r for r in threads.listing(world.store, world.sid, "awaiting_others")}["Deck quote"]
+    threads.mark(world.store, world.sid, key["thread_key"], "done")  # the owner says it's settled
+    assert notify.follow_ups_pending(world.worker())[0]["cleared"] == 1
+    executor.run_pending(world.worker(), world.credentials, pause=0)
+    assert "Follow-up" not in sent.flags
+
+
+def test_a_follow_up_goes_to_whom_the_owner_last_wrote(world):
+    from contextlib import closing
+
+    from test_mail_threads import mail
+
+    from towpath import connect
+    from towpath.mail import analysis
+    from towpath.stores import open_store
+
+    world.state.mailboxes["INBOX"].messages[40] = mail(40, "Ann <ann@example.net>", "reader@example.com", "Intro",
+                                                       "Meet Bo, who can help with the deck.", 6)
+    world.state.mailboxes["Sent"].messages[41] = mail(41, "Reader <reader@example.com>", "bo@example.net",
+                                                      "Re: Intro", "Hi Bo, could we talk this week?", 5, reply_to=40)
+    connect.sync(world.worker(), world.sid)
+    analysis.analyze_pending(world.worker())
+    with closing(open_store(world.store, "mail", "web")) as db:
+        key = db.execute("SELECT thread_key FROM messages WHERE subject = 'Re: Intro'").fetchone()[0]
+    nudge = message_from_bytes(threads.draft_message(world.store, world.sid, key, "Just checking in.").encode(),
+                               policy=policy.default)
+    assert nudge["To"] == "bo@example.net" and nudge["In-Reply-To"] == "<c41@example.org>"

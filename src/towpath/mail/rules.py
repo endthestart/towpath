@@ -177,14 +177,20 @@ def producer(rule: dict) -> str:
     return f"rule:{rule['rule_id']}@{rule['version']}"
 
 
-def auto_approved(store_dir, body: dict, role: str = "act") -> bool:
+def auto_approved(store_dir, body: dict, role: str = "act", cache: dict | None = None) -> bool:
     """Whether a proposal came from the current version of an enabled rule the owner switched to auto, and is a
     kind of change that may run without asking."""
     found = str(body.get("producer", ""))
     if not found.startswith("rule:") or not actions.TYPES.get(body.get("type"), {}).get("auto"):
         return False
     rule_id, _, version = found[5:].partition("@")
-    rule = next((r for r in all_rules(store_dir, role=role) if r["rule_id"] == rule_id), None)
+    if cache is None or "rules" not in cache:
+        listed = {r["rule_id"]: r for r in all_rules(store_dir, role=role)}
+        if cache is not None:
+            cache["rules"] = listed
+    else:
+        listed = cache["rules"]
+    rule = listed.get(rule_id)
     return bool(rule and rule["enabled"] and rule["mode"] == "auto" and str(rule["version"]) == version)
 
 

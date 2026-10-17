@@ -37,6 +37,7 @@ class Server:
             self.items[f"/dav/calendars/user/reader@example.com/Personal/{name}"] = ("e-1", text)
         self.methods, self.multigets = [], []
         self.calendar_home = None
+        self.principal = "/principals/42/"
         outer = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -62,7 +63,7 @@ class Server:
                 base = f"http://127.0.0.1:{outer.http.server_address[1]}"
                 if path == "/" and "current-user-principal" in body:  # discovery, as iCloud does it
                     resp.append("<d:response><d:href>/</d:href><d:propstat><d:prop><d:current-user-principal>"
-                                "<d:href>/principals/42/</d:href></d:current-user-principal></d:prop></d:propstat>"
+                                f"<d:href>{outer.principal}</d:href></d:current-user-principal></d:prop></d:propstat>"
                                 "</d:response>")
                 elif path == "/principals/42/":
                     home = (f"<card:addressbook-home-set><d:href>{base}/dav/addressbooks/user/{USER}/</d:href>"
@@ -188,6 +189,16 @@ def test_icloud_style_discovery_finds_the_homes_and_stays_on_the_service(world):
         dav_sync.discover(USER, PASSWORD, {"calendars": base})
     with pytest.raises(connections.ConnectionProblem, match="rejected"):
         dav_sync.discover(USER, "wrong", {"contacts": base})
+    server.calendar_home = None
+    server.principal = "https://elsewhere.example/principals/42/"  # never sent the password
+    calls = len(server.methods)
+    with pytest.raises(connections.ConnectionProblem, match="pointed somewhere else"):
+        dav_sync.discover(USER, PASSWORD, {"contacts": base})
+    assert len(server.methods) == calls + 1
+    client = dav.DavClient(USER, PASSWORD)
+    client.request("PROPFIND", base, dav.PRINCIPAL_BODY, depth="0")
+    with pytest.raises(dav.DavViolation):
+        client.request("PROPFIND", "https://elsewhere.example/", dav.PRINCIPAL_BODY, depth="0")
     assert set(server.methods) <= {"PROPFIND", "REPORT"}  # reads only
 
 

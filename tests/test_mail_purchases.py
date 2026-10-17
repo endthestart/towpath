@@ -96,3 +96,32 @@ def test_steady_charges_look_recurring(world):
     found = purchases.recurring(world.store, world.sid)
     assert [(r["merchant"], r["every"], r["count"], r["amount"]) for r in found] == [("StreamCo", "month", 4, 9.99)]
     assert found[0]["next"] == "2026-11-01"
+
+
+def test_a_second_copy_is_not_read_again_and_impossible_dates_are_dropped(world):
+    from towpath.mail import analysis as analysis_
+
+    copy = world.state.mailboxes["INBOX"].messages[20]
+    world.state.mailboxes["Sent"].messages[30] = copy  # the same message filed in a second folder
+    connect.sync(world.worker(), world.sid)
+    analysis_.analyze_pending(world.worker())
+    purchases.read_pending(world.worker())
+    purchases.read_pending(world.worker())
+    asked = [p for p in world.model_prompts() if "Order #A100" in p and "Is it a receipt" in p]
+    assert len(asked) == 1 and len(purchases.listing(world.store, world.sid)) == 1
+    assert purchases._clean({"purchase": True, "merchant": "X", "day": "2024-02-30"})["day"] is None
+
+
+def test_a_refused_message_does_not_hold_up_the_rest(world, monkeypatch):
+    from towpath.models import gateway
+
+    real = gateway.infer
+
+    def infer(config, task, prompt, *args, **kwargs):
+        if "Order now and save" in prompt:
+            return {"status": "refused", "reason": "item x is kept from cloud models and endpoint e is one"}
+        return real(config, task, prompt, *args, **kwargs)
+
+    monkeypatch.setattr(gateway, "infer", infer)
+    found = purchases.read_pending(world.worker())[0]
+    assert found["purchases"] == 1  # the receipt after the refused message was still read

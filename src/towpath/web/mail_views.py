@@ -127,11 +127,12 @@ def _proposals() -> list[dict]:
     with closing(open_store(_store(), "mailplan", "web")) as db:
         rows = [dict(r) for r in db.execute("SELECT * FROM proposals ORDER BY created_at DESC")]
     out = []
+    cache: dict = {}
     for r in rows:
         if r["proposal_id"] in answered:
             continue
         r["body"] = json.loads(r["body"])
-        if any(m.auto_approved(_store(), r["body"], role="web") for m in (rules, archive, notify)):
+        if any(m.auto_approved(_store(), r["body"], role="web", cache=cache) for m in (rules, archive, notify)):
             continue
         r["what"] = actions.describe(r["body"])
         out.append(r)

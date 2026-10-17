@@ -296,3 +296,23 @@ def test_mail_from_companies_is_fyi_without_the_model_until_the_owner_says_its_a
     senders.mark(world.store, world.sid, "deals@shop.example", "person")
     threads.track_pending(world.worker())
     assert deal()["state_by"] == "model"  # back to the model once the owner calls the sender a person
+
+
+def test_a_sender_called_a_person_gets_the_rules_state_back_without_a_model(world):
+    from test_mail_threads import mail
+
+    from towpath import connect, decisions
+    from towpath.mail import analysis, threads
+
+    world.state.mailboxes["INBOX"].messages[11] = mail(11, "Shop Deals <deals@shop.example>", "reader@example.com",
+                                                       "For you", "Want 20% off this weekend?", 1)
+    connect.sync(world.worker(), world.sid)
+    analysis.analyze_pending(world.worker())
+    senders.categorize_pending(world.worker())
+    decisions.revoke_model(world.worker(), world.model, "content")  # rules only from here on
+    threads.track_pending(world.worker())
+    senders.mark(world.store, world.sid, "deals@shop.example", "person")
+    threads.track_pending(world.worker())
+    deal = next(t for s in threads.STATES for t in threads.listing(world.store, world.sid, s)
+                if t["subject"] == "For you")
+    assert deal["state"] == "needs_owner_reply" and deal["state_by"] == "rule"

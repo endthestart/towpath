@@ -66,15 +66,18 @@ def confirm_pending(config, slice_seconds: float = SLICE_SECONDS, clock=time.mon
         found = space.duplicates(db, folders.SID)
         if not found:
             return []
-        done = {(r[0], r[1]): r[2] for r in db.execute(
-            "SELECT root_alias, rel_path, size FROM content_hashes WHERE provider_id = ?", (folders.SID,))}
+        done = {(r[0], r[1]): (r[2], r[3]) for r in db.execute(
+            "SELECT root_alias, rel_path, size, sha256 FROM content_hashes WHERE provider_id = ?", (folders.SID,))}
         for group in found["top"]:
             for root, rel in group["places"]:
                 if clock() >= deadline:
                     break
-                if done.get((root, rel)) == group["size"] or root not in roots or PRIVATE.search(rel):
+                if root not in roots or PRIVATE.search(rel):
                     continue
                 full = group["size"] <= FULL_MAX
+                size, digest_ = done.get((root, rel), (None, None))
+                if size == group["size"] and (full or not digest_ or digest_.startswith("sampled:")):
+                    continue  # read already (a huge file hashed in full before sampling is read again, by samples)
                 if full and hashed and clock() + group["size"] / BYTES_PER_SECOND > deadline:
                     continue  # it would run past this slice: next time
                 path = roots[root] / rel

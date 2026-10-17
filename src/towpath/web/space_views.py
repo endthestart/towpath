@@ -106,7 +106,7 @@ def overview(request):
         confirmed = 0
         for g in dupes["top"]:
             g["verdict"] = space_hash.judge(g["places"], hashes)
-            if g["verdict"]["same"] > 1:
+            if g["verdict"]["same"] > 1 and "samples" not in g["verdict"]["state"]:  # exact copies only
                 confirmed += (g["verdict"]["same"] - 1) * g["size"]
             g["places"] = [{"where": f"{names[root]}/{rel}", "url": _folder_url(root, rel.rpartition("/")[0]),
                             "sha": (hashes.get((root, rel)) or "")[:12]}

@@ -196,6 +196,7 @@ def pending(store_dir, role: str = ROLE) -> list[dict]:
     from towpath.mail import archive, notify, rules
 
     answers = settings.answers(store_dir, role=role)
+    cache: dict = {}  # rules, archive requests and settings, read once for every proposal below
     with closing(open_store(store_dir, "mailplan", role)) as p:
         for r in p.execute("SELECT * FROM proposals ORDER BY created_at"):
             answer = answers.get(r["proposal_id"])
@@ -203,9 +204,9 @@ def pending(store_dir, role: str = ROLE) -> list[dict]:
                 continue
             body = json.loads(r["body"])
             if answer is None:
-                if not (rules.auto_approved(store_dir, body, role=role) or
-                        archive.auto_approved(store_dir, body, role=role) or
-                        notify.auto_approved(store_dir, body, role=role)):
+                if not (rules.auto_approved(store_dir, body, role=role, cache=cache) or
+                        archive.auto_approved(store_dir, body, role=role, cache=cache) or
+                        notify.auto_approved(store_dir, body, role=role, cache=cache)):
                     continue
                 answer = {"digest": r["digest"]}  # the owner's own rule or archive request covers it
             out.append({"key": r["proposal_id"], "source_id": r["source_id"], "body": body, "digest": r["digest"],

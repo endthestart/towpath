@@ -276,6 +276,11 @@ def _failure(result: dict) -> str | None:
     return None
 
 
+def item_refused(result: dict) -> bool:
+    """The gateway refused because of the items named (kept from cloud models, or excluded), not for every call."""
+    return result.get("status") == "refused" and str(result.get("reason", "")).startswith("item ")
+
+
 def blocked(config, source_id: str, task: str, role: str = ROLE) -> str | None:
     """Why the model can't be used for this account and task now, or None."""
     from towpath import decisions
@@ -313,7 +318,7 @@ def _owner_examples(intel, store_dir, source_id: str, limit: int = 6) -> str:
             if lines else "")
 
 
-def _settle_by_sender(config, intel, source_id: str) -> int:
+def _settle_by_sender(config, intel, mail, source_id: str, me: dict) -> int:
     """Conversations whose latest message is from a company or service: FYI by rule, not for the model. A sender the
     owner later calls a person sends theirs back to the model."""
     from towpath.mail import senders
@@ -332,9 +337,13 @@ def _settle_by_sender(config, intel, source_id: str) -> int:
             changed += 1
     for key, last_from in intel.execute("SELECT thread_key, last_from FROM threads WHERE source_id = ? AND state_by = "
                                         "'rule-sender'", (source_id,)).fetchall():
-        if cats.get(last_from or "") not in NOT_PEOPLE:
-            intel.execute("UPDATE threads SET state_by = 'rule' WHERE source_id = ? AND thread_key = ?",
-                          (source_id, key))
+        if cats.get(last_from or "") not in NOT_PEOPLE:  # the rules' own state again, then the model's turn
+            msgs = _messages(mail, source_id, key)
+            if msgs:
+                _save(intel, summarize(source_id, key, msgs, me), "rule")
+            else:
+                intel.execute("UPDATE threads SET state_by = 'rule' WHERE source_id = ? AND thread_key = ?",
+                              (source_id, key))
             changed += 1
     intel.commit()
     return changed
@@ -374,6 +383,8 @@ def _classify(config, intel, mail, source_id: str, me: dict, deadline: float, cl
             if result["status"] == "ok":
                 t["state"], t["reason"] = result["output"]["state"], result["output"]["reason"].strip()[:200]
                 _save(intel, t, "model", f"{endpoint.model}/{PROMPT_STATE}")
+            elif item_refused(result):  # kept from this model: the rules' state stands, and the rest go on
+                _save(intel, t, "rule-kept")
             elif result["status"] in ("refused", "disabled"):
                 return done, "refused"
             elif _failure(result):
@@ -455,7 +466,7 @@ def _draft(config, intel, mail, source_id: str, me: dict, deadline: float, clock
             continue
         last = msgs[-1]
         other = next((m for m in reversed(msgs) if m["from_addr"] not in me["addresses"]), None)
-        to = other["from_addr"] if other else (json.loads(last["to_addrs"] or "[]") or [None])[0]
+        to = other["from_addr"] if kind == "reply" and other else (json.loads(last["to_addrs"] or "[]") or [None])[0]
         examples = "\n\n".join(f"Example {i + 1}:\n{e}" for i, e in enumerate(
             _style_examples(mail, source_id, me, to)))
         told = f"Notes from the owner, which you may use:\n{owner_notes}\n\n" if owner_notes else ""
@@ -474,6 +485,13 @@ def _draft(config, intel, mail, source_id: str, me: dict, deadline: float, clock
                            f"{endpoint.model}/{PROMPT_DRAFT}", now()))
             intel.commit()
             done += 1
+        elif item_refused(result) or result["status"] not in ("refused", "disabled") and not _failure(result):
+            # kept from this model, or an empty or unusable answer: no draft for this version of the conversation,
+            # and the next ones go on (a new message asks again)
+            intel.execute("INSERT OR REPLACE INTO drafts VALUES (?,?,?,?,?,?,?)",
+                          (source_id, key, last["item_id"], current, "",
+                           "refused" if item_refused(result) else "no-answer", now()))
+            intel.commit()
         elif result["status"] in ("refused", "disabled"):
             return done, "refused"
         elif _failure(result):
@@ -510,7 +528,7 @@ def track_pending(config, slice_seconds: float = SLICE_SECONDS, clock=time.monot
         try:
             me = owner(config.store_dir, sid, mail)
             rebuilt = _rebuild(intel, mail, config.store_dir, sid, me, deadline, clock)
-            _settle_by_sender(config, intel, sid)
+            _settle_by_sender(config, intel, mail, sid, me)
             state = _progress(intel, sid)
             classified = drafted = 0
             stop = None
@@ -607,15 +625,18 @@ def draft_message(store_dir, source_id: str, thread_key: str, body: str, role: s
     with closing(open_store(store_dir, "mail", role)) as mail:
         msgs = _messages(mail, source_id, thread_key)
         me = owner(store_dir, source_id, mail, role)
-        other = next((m for m in reversed(msgs) if m["from_addr"] not in me["addresses"]), None)
-        last = other or msgs[-1]
+        mine = bool(msgs) and (msgs[-1]["from_addr"] in me["addresses"] or msgs[-1]["mailbox"] in me["sent"])
+        # A reply answers whoever wrote last; a follow-up (the owner wrote last) goes after the owner's own message,
+        # to whoever they wrote to.
+        last = msgs[-1] if mine else next((m for m in reversed(msgs) if m["from_addr"] not in me["addresses"]),
+                                          msgs[-1])
         detail = mail.execute("SELECT reply_to, refs FROM messages WHERE item_id = ?", (last["item_id"],)).fetchone()
     if not me["address"]:
         raise ValueError("Towpath doesn't know this account's address yet")
     m = EmailMessage()
     m["From"] = formataddr((me["name"] or "", me["address"]))
-    if other is None:  # only the owner has written: a follow-up goes to whoever they wrote to
-        m["To"] = ", ".join(json.loads(last["to_addrs"] or "[]"))
+    if mine:
+        m["To"] = ", ".join(a for a in json.loads(last["to_addrs"] or "[]") if a not in me["addresses"])
     else:
         m["To"] = (detail["reply_to"] if detail and detail["reply_to"] else last["from_addr"]) or ""
     subject = last["subject"] or ""

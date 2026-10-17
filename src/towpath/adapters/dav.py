@@ -57,13 +57,21 @@ class DavViolation(RuntimeError):
 
 
 class DavClient:
+    """Reads one service: the first address it is asked about pins the service, and the password is never sent
+    anywhere else, whatever the server's answers point to."""
+
     def __init__(self, username: str, password: str, opener=None):
         self._auth = "Basic " + base64.b64encode(f"{username}:{password}".encode()).decode()
         self._opener = opener or urllib.request.build_opener()
+        self._service: str | None = None
 
     def request(self, method: str, url: str, body: bytes, depth: str = "1") -> ET.Element:
         if method not in METHODS:
             raise DavViolation(f"{method} is not a read")
+        if self._service is None:
+            self._service = url
+        elif not same_service(self._service, url):
+            raise DavViolation("the server pointed somewhere else; Towpath only reads from the service you chose")
         parsed = urllib.parse.urlsplit(url)
         loopback = parsed.hostname in ("127.0.0.1", "localhost", "::1")
         if parsed.scheme != "https" and not (parsed.scheme == "http" and loopback):
@@ -90,6 +98,8 @@ class DavClient:
         if not principal:
             raise ServerStop("the server didn't say where this account's contacts and calendars are")
         principal = urllib.parse.urljoin(base, principal)
+        if not same_service(base, principal):  # checked before the password is sent there
+            raise DavViolation("the server pointed somewhere else; Towpath only reads from the service you chose")
         tag = "card:addressbook-home-set" if kind == "contacts" else "cal:calendar-home-set"
         home = self.request("PROPFIND", principal, HOME_BODY[kind], depth="0").findtext(f".//{tag}/d:href",
                                                                                           namespaces=NS)
@@ -108,6 +118,8 @@ class DavClient:
             if resp.find(f"d:propstat/d:prop/d:resourcetype/{tag}", NS) is None:
                 continue
             href = resp.findtext("d:href", namespaces=NS)
+            if not same_service(home, urllib.parse.urljoin(home, href)):
+                continue  # a collection elsewhere is never read
             out.append({"href": urllib.parse.urljoin(home, href),
                         "name": resp.findtext("d:propstat/d:prop/d:displayname", namespaces=NS) or href,
                         "ctag": resp.findtext("d:propstat/d:prop/cs:getctag", namespaces=NS)})

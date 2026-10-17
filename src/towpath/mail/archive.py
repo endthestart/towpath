@@ -234,13 +234,19 @@ def archive_pending(config, slice_seconds: float = SLICE_SECONDS, clock=time.mon
     return summaries
 
 
-def auto_approved(store_dir, body: dict, role: str = "act") -> bool:
+def auto_approved(store_dir, body: dict, role: str = "act", cache: dict | None = None) -> bool:
     """A Trash proposal from an archive request the owner made with removal, for a message whose copy is verified."""
     producer = str(body.get("producer", ""))
     if body.get("type") != "trash" or not producer.startswith("archive:"):
         return False
     rid = producer[len("archive:"):]
-    req = next((r for r in requests(store_dir, role=role) if r["request_id"] == rid), None)
+    if cache is not None and "archive_requests" in cache:
+        listed = cache["archive_requests"]
+    else:
+        listed = {r["request_id"]: r for r in requests(store_dir, role=role)}
+        if cache is not None:
+            cache["archive_requests"] = listed
+    req = listed.get(rid)
     item_id = body["target"].get("item_id")
     if not req or not req["remove"] or item_id not in req["item_ids"] or not store_path(store_dir, "mail").exists():
         return False

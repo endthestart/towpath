@@ -91,22 +91,34 @@ def set_reply_labels(store_dir, source_id: str, on: bool, author: str = "owner")
                   "mail-reply-labels", author)
 
 
-def auto_approved(store_dir, body: dict, role: str = "act") -> bool:
-    """An alert, digest or follow-up label the owner's current setting asked for."""
+def auto_approved(store_dir, body: dict, role: str = "act", cache: dict | None = None) -> bool:
+    """An alert, digest or follow-up label the owner's current setting asked for. ``cache`` keeps the settings read
+    for one pass over many proposals."""
     producer = str(body.get("producer", ""))
     source = body.get("source_id")
-    if producer == f"reply-labels:{source}" and body.get("params", {}).get("keyword") in REPLY_LABELS.values():
+    if not producer.startswith(("alert:", "digest:", "follow-up:", "reply-labels:")):
+        return False
+    memo = cache.setdefault("notify", {}) if cache is not None else {}
+
+    def read(fn):
+        if (fn, source) not in memo:
+            memo[(fn, source)] = fn(store_dir, source, role)
+        return memo[(fn, source)]
+
+    keyword = body.get("params", {}).get("keyword")
+    if producer == f"reply-labels:{source}" and keyword in REPLY_LABELS.values():
         # Taking off a label Towpath put on is always approved; putting one on only while the setting is on.
         return body.get("type") == "remove_keyword" or (
-            body.get("type") == "add_keyword" and reply_labels_setting(store_dir, source, role)["on"])
-    if producer == f"follow-up:{source}":
-        return body.get("type") in ("add_keyword", "remove_keyword") and \
-            body.get("params", {}).get("keyword") == FOLLOW_UP_LABEL and follow_up_days(store_dir, source, role) > 0
+            body.get("type") == "add_keyword" and read(reply_labels_setting)["on"])
+    if producer == f"follow-up:{source}" and keyword == FOLLOW_UP_LABEL:
+        # Taking the label off is always approved; putting it on only while reminders are on.
+        return body.get("type") == "remove_keyword" or (
+            body.get("type") == "add_keyword" and read(follow_up_days) > 0)
     if producer == f"alert:{source}":
-        mode = alert_setting(store_dir, source, role)["mode"]
+        mode = read(alert_setting)["mode"]
         return (mode, body.get("type")) in (("flag", "flag"), ("keyword", "add_keyword"))
     if producer.startswith(f"digest:{source}:"):
-        return body.get("type") == "inbox_note" and digest_setting(store_dir, source, role)["every"] != "off"
+        return body.get("type") == "inbox_note" and read(digest_setting)["every"] != "off"
     return False
 
 
@@ -204,16 +216,23 @@ def follow_ups_pending(config) -> list[dict]:
                     intel.execute("INSERT OR IGNORE INTO follow_ups VALUES (?,?,?,?,?,NULL)",
                                   (sid, key, item, _propose(config, body), now().isoformat(timespec="seconds")))
                     made += 1
-            # Someone answered (or the owner marked it otherwise): take the label off again.
-            for key, item in intel.execute(
-                    "SELECT f.thread_key, f.last_item FROM follow_ups f JOIN threads t USING (source_id, thread_key) "
-                    "WHERE f.source_id = ? AND f.cleared_proposal IS NULL AND t.last_from_owner = 0",
+            # Someone answered, or the conversation is no longer awaiting a reply (the owner's mark, or the model):
+            # take the label off again.
+            from towpath.mail import threads
+
+            owner_marks = threads.marks(config.store_dir, sid)
+            for key, item, state, from_owner in intel.execute(
+                    "SELECT f.thread_key, f.last_item, t.state, t.last_from_owner FROM follow_ups f JOIN threads t "
+                    "USING (source_id, thread_key) WHERE f.source_id = ? AND f.cleared_proposal IS NULL",
                     (sid,)).fetchall():
+                if from_owner and owner_marks.get(key, state) == "awaiting_others":
+                    continue
                 found = target(item)
                 if found is None:
                     continue
                 body = actions.make(sid, "remove_keyword", found, {"keyword": FOLLOW_UP_LABEL},
-                                    reason="Someone answered.", producer=f"follow-up:{sid}")
+                                    reason="Someone answered." if not from_owner else "No longer awaiting a reply.",
+                                    producer=f"follow-up:{sid}")
                 intel.execute("UPDATE follow_ups SET cleared_proposal = ? WHERE source_id = ? AND thread_key = ? AND "
                               "last_item = ?", (_propose(config, body), sid, key, item))
                 cleared += 1
@@ -254,12 +273,15 @@ def reply_labels_pending(config) -> list[dict]:
                 "SELECT thread_key, item, label FROM reply_labels WHERE source_id = ? AND cleared_proposal IS NULL",
                 (sid,))}
 
-            def propose(kind, item, label, reason, sid=sid, mail=mail):
+            stamp = now().strftime("%Y-%m-%d %H:%M:%S")
+
+            def propose(kind, item, label, reason, sid=sid, mail=mail, stamp=stamp):
                 m = mail.execute("SELECT * FROM messages WHERE item_id = ?", (item,)).fetchone()
                 if m is None:
                     return None
+                # The time makes a label put back on (or taken off again) a new change, not a repeat of one done.
                 return _propose(config, actions.make(sid, kind, actions.message_target(dict(m)), {"keyword": label},
-                                                     reason=reason, producer=f"reply-labels:{sid}"))
+                                                     reason=f"{reason} ({stamp} UTC)", producer=f"reply-labels:{sid}"))
 
             for key, item, label in sorted(active):
                 if desired.get(key) == (item, label):

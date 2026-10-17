@@ -12,7 +12,7 @@ import re
 import sqlite3
 import time
 from contextlib import closing
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from towpath.stores import open_store, store_path
 
@@ -53,13 +53,23 @@ def now() -> str:
 
 def _candidates(mail, intel, source_id: str, cats: dict, limit: int) -> list[dict]:
     """The next candidates, newest first, judged on headers first and then on whether the text names an amount.
-    A message without one is recorded as not a purchase, so it isn't looked at again."""
-    done = {r[0] for r in intel.execute("SELECT item_id FROM purchases WHERE source_id = ?", (source_id,))}
-    seen_ids: set[str] = set()
+    A message without one is recorded as not a purchase, so it isn't looked at again; so is another copy of a
+    message already looked at (the same Message-ID in a second folder). A message the model was refused for is
+    asked about again a day later."""
+    retry = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
+    done = {r[0] for r in intel.execute("SELECT item_id FROM purchases WHERE source_id = ? AND NOT (model = "
+                                        "'refused' AND at < ?)", (source_id, retry))}
+    rows = mail.execute("SELECT item_id, message_id, from_addr, from_name, subject, date_utc FROM messages "
+                        "WHERE source_id = ? AND text IS NOT NULL ORDER BY date_utc DESC, item_id",
+                        (source_id,)).fetchall()
+    seen_ids = {m["message_id"] for m in rows if m["item_id"] in done and m["message_id"]}
     out = []
-    for m in mail.execute("SELECT item_id, message_id, from_addr, from_name, subject, date_utc FROM messages "
-                          "WHERE source_id = ? AND text IS NOT NULL ORDER BY date_utc DESC", (source_id,)):
-        if m["item_id"] in done or (m["message_id"] and m["message_id"] in seen_ids):
+    for m in rows:
+        if m["item_id"] in done:
+            continue
+        if m["message_id"] and m["message_id"] in seen_ids:
+            intel.execute("INSERT OR REPLACE INTO purchases (source_id, item_id, purchase, model, at) VALUES "
+                          "(?, ?, 0, 'another-copy', ?)", (source_id, m["item_id"], now()))
             continue
         subject, category = m["subject"] or "", cats.get(m["from_addr"] or "")
         if not (category == "receipt" or ORDER_SUBJECT.search(subject)) or NOT_A_PURCHASE.search(subject) or \
@@ -79,8 +89,16 @@ def _candidates(mail, intel, source_id: str, cats: dict, limit: int) -> list[dic
     return out
 
 
+def _day(value) -> str | None:
+    try:
+        return date.fromisoformat(str(value)).isoformat() if re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(value)) \
+            else None
+    except ValueError:  # 2024-02-30 and the like
+        return None
+
+
 def _clean(out: dict) -> dict:
-    day = out.get("day") if re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(out.get("day") or "")) else None
+    day = _day(out.get("day"))
     currency = (out.get("currency") or "").upper() or None
     return {"purchase": bool(out.get("purchase")) and bool(out.get("merchant")),
             "merchant": (out.get("merchant") or "").strip() or None, "day": day,
@@ -116,6 +134,11 @@ def read_pending(config, slice_seconds: float = SLICE_SECONDS, clock=time.monoto
                           f"Date: {(m['date_utc'] or '')[:10]}\nSubject: {m['subject'] or ''}\n\n{text}\n</email>")
                 result = gateway.infer(config, TASK, prompt, "content", SCHEMA,
                                        targets(sid, [m["item_id"]], [m["from_addr"]]), prompt_version=PROMPT)
+                if threads.item_refused(result):  # this message is kept from this model: the rest may go on
+                    intel.execute("INSERT OR REPLACE INTO purchases (source_id, item_id, purchase, model, at) VALUES "
+                                  "(?, ?, 0, 'refused', ?)", (sid, m["item_id"], now()))
+                    intel.commit()
+                    continue
                 if result["status"] in ("refused", "disabled") or threads._failure(result):
                     break
                 got = _clean(result["output"]) if result["status"] == "ok" else {"purchase": False, "items": []}
@@ -182,7 +205,6 @@ def summary(store_dir, source_id: str, role: str = "web") -> dict:
 def recurring(store_dir, source_id: str, role: str = "web") -> list[dict]:
     """Merchants charging at a steady rhythm (three or more purchases about a month or a year apart): likely
     subscriptions, with the typical amount, the last charge and when the next would come."""
-    from datetime import date, timedelta
     from statistics import median
 
     by_merchant: dict[str, list[dict]] = {}
@@ -191,7 +213,7 @@ def recurring(store_dir, source_id: str, role: str = "web") -> list[dict]:
             by_merchant.setdefault(r["merchant"].strip().lower(), []).append(r)
     out = []
     for rows in by_merchant.values():
-        days = sorted({date.fromisoformat(r["day"]) for r in rows})
+        days = sorted({date.fromisoformat(d) for d in (_day(r["day"]) for r in rows) if d})
         if len(days) < 3:
             continue
         gaps = [(b - a).days for a, b in zip(days, days[1:], strict=False)]

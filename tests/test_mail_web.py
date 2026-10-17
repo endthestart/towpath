@@ -147,6 +147,6 @@ def test_a_forms_return_address_never_leads_off_towpath():
     def where(nxt):
         return local_next(RequestFactory().post("/x", {"next": nxt}), "/fallback")
 
-    assert where("/mail/fastmail/settings") == "/mail/fastmail/settings" and where("?state=done") == "?state=done"
+    assert where("/mail/fastmail/settings") == "/mail/fastmail/settings" and where("?state=done") == "/fallback"
     for bad in ("https://elsewhere.example/", "//elsewhere.example/", "/\\elsewhere.example", "javascript:x", ""):
         assert where(bad) == "/fallback"

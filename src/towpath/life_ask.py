@@ -105,7 +105,8 @@ def evidence(config, question: str, role: str = WRITER) -> list[dict]:
             if len(found) >= MAX_MESSAGES:
                 break
     for r in found[:MAX_MESSAGES]:
-        out.append({"kind": "message", "item_id": r["item_id"], "text": f"{r['subject'] or '(no subject)'} — "
+        out.append({"kind": "message", "item_id": r["item_id"], "source_id": r["source_id"],
+                    "text": f"{r['subject'] or '(no subject)'} — "
                     f"{r['snippet']}", "date": (r["date_utc"] or "")[:10], "from": r["from_addr"],
                     "ref": f"mail:{r['item_id']}"})
     out += _years(config, question, set(allowed), role)
@@ -149,7 +150,7 @@ def _purchases(config, terms: set[str], allowed: list[str], role: str) -> list[d
                 seen.add(r["item_id"])
                 total = f", {r['total']:.2f} {r['currency'] or ''}".rstrip() if r["total"] is not None else ""
                 bought = ", ".join(r["items"][:5]) or "items not named"
-                out.append({"kind": "purchase", "item_id": r["item_id"], "date": r["day"] or "",
+                out.append({"kind": "purchase", "item_id": r["item_id"], "source_id": sid, "date": r["day"] or "",
                             "text": f"Bought from {r['merchant']}{total}: {bought}", "ref": f"mail:{r['item_id']}"})
     return out[:MAX_PURCHASES]
 
@@ -166,7 +167,8 @@ def _attachments(config, terms: set[str], allowed: list[str], role: str) -> list
                 if r["ref"] in seen:
                     continue
                 seen.add(r["ref"])
-                out.append({"kind": "attachment", "text": f"{r['filename'] or '(unnamed)'} — attached to "
+                out.append({"kind": "attachment", "item_id": r["item_id"], "source_id": sid,
+                            "text": f"{r['filename'] or '(unnamed)'} — attached to "
                             f"“{r['subject'] or '(no subject)'}”", "date": (r["date_utc"] or "")[:10],
                             "from": r["from_addr"], "ref": r["ref"]})
             if len(out) >= MAX_ATTACHMENTS:
@@ -204,6 +206,18 @@ def _files(config, terms: set[str], allowed: list[str], role: str) -> list[dict]
     return out
 
 
+def _targets(sources: list[dict]) -> list[str]:
+    """What the sources name, for the gateway's checks: messages and their senders (kept from cloud models, or
+    excluded from model use, by the owner)."""
+    from towpath.mail.privacy import targets
+
+    out: list[str] = []
+    for s in sources:
+        if s.get("source_id") and s.get("item_id"):
+            out += targets(s["source_id"], [s["item_id"]], [s.get("from")])
+    return sorted(set(out))
+
+
 def _sources_text(sources: list[dict]) -> str:
     lines = []
     for i, s in enumerate(sources, start=1):
@@ -225,7 +239,8 @@ def _sources_text(sources: list[dict]) -> str:
 
 def answer_pending(config, slice_seconds: float = 120, clock=time.monotonic) -> list[dict]:
     from towpath import decisions as owner_decisions
-    from towpath.mail.threads import _failure, ready
+    from towpath.mail import privacy
+    from towpath.mail.threads import _failure, item_refused, ready
     from towpath.models import gateway
 
     pending = [q for q in questions(config.store_dir, role=WRITER) if q["answer"] is None]
@@ -244,10 +259,19 @@ def answer_pending(config, slice_seconds: float = 120, clock=time.monotonic) -> 
             sources = evidence(config, q["text"])
             body = {"sources": sources, "sentences": [], "unknown": not sources}
             status, model = "sources-only", None
-            if use_model and sources:
+            result = {"status": "skipped"}
+            for _ in range(2):  # a second time without sources kept from this model, if it refused for them
+                if not (use_model and sources):
+                    break
                 result = gateway.infer(config, TASK, f"{INSTRUCTION}\n\nQuestion: {q['text']}\n\n<sources>\n"
                                        f"{_sources_text(sources)}\n</sources>", "content", SCHEMA,
-                                       prompt_version=PROMPT)
+                                       _targets(sources), prompt_version=PROMPT)
+                if not item_refused(result):
+                    break
+                kept = privacy.kept(config.store_dir, _targets(sources), role=WRITER)
+                sources = [s for s in sources if not set(_targets([s])) & kept]
+                body = {"sources": sources, "sentences": [], "unknown": not sources}
+            if result["status"] != "skipped":
                 if result["status"] == "ok":
                     out = result["output"]
                     body["unknown"] = out["unknown"]

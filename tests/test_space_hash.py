@@ -58,3 +58,27 @@ def test_a_huge_file_is_compared_by_samples_and_says_so(tmp_path, monkeypatch):
     assert all(h.startswith("sampled:") for h in hashes.values())
     assert space_hash.judge(places[:2], hashes)["state"] == "same content (checked in samples)"
     assert space_hash.judge(places, hashes)["state"] == "some copies identical (checked in samples)"
+
+
+def test_a_huge_file_hashed_in_full_before_is_read_again_by_samples(tmp_path, monkeypatch):
+    monkeypatch.setattr(space_hash, "FULL_MAX", 1000)
+    monkeypatch.setattr(space_hash, "SAMPLE", 100)
+    lib = tmp_path / "library"
+    data = b"s" * 3000
+    for rel in ("a/disk.img", "b/disk.img"):
+        (lib / rel).parent.mkdir(parents=True, exist_ok=True)
+        (lib / rel).write_bytes(data)
+    store = tmp_path / "state"
+    places = [["pics", "a/disk.img"], ["pics", "b/disk.img"]]
+    top = [{"name": "disk.img", "size": 3000, "copies": 2, "wasted": 3000, "places": places}]
+    with open_store(store, "files", "connect") as db:
+        db.execute("INSERT INTO space_duplicates VALUES (?,?,?)",
+                   (folders.SID, json.dumps({"groups": 1, "files": 2, "wasted": 3000, "top": top}), "t"))
+        db.execute("INSERT INTO content_hashes VALUES (?,?,?,?,?,?,?)",
+                   (folders.SID, "pics", "a/disk.img", 3000, space_hash.sha256(lib / "a/disk.img"), None, "t"))
+        db.commit()
+    config = SimpleNamespace(store_dir=store, files=SimpleNamespace(roots={"pics": SimpleNamespace(path=lib)}))
+    assert space_hash.confirm_pending(config)[0]["hashed"] == 2  # the full hash is replaced by samples
+    with open_store(store, "files", "web") as db:
+        hashes = space_hash.verdicts(db, folders.SID)
+    assert space_hash.judge(places, hashes)["state"] == "same content (checked in samples)"

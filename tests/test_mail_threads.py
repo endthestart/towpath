@@ -155,6 +155,10 @@ def test_a_draft_is_written_in_the_owners_voice_and_saved_to_drafts_through_the_
         from urllib.parse import quote
 
         listing = client.get(f"/mail/{world.sid}/conversations").content.decode()
+        back = f"/mail/{world.sid}/conversations?state=needs_owner_reply"
+        assert f'name="next" value="{back}"' in listing  # a full path: a bare ?query can't be redirected to
+        assert client.post("/mail/mark", {"source_id": world.sid, "thread_key": row["thread_key"], "state": "",
+                                          "next": back})["Location"] == back
         assert f"/mail/{world.sid}/conversation?t={quote(row['thread_key'], safe='')}" in listing
         page = client.get(f"/mail/{world.sid}/conversation", {"t": row["thread_key"]}).content.decode()
         assert "move a couch on Saturday" in page and "Draft reply" in page and "[time]" in page
@@ -256,3 +260,22 @@ def test_a_sender_kept_from_cloud_models_still_reaches_a_model_on_the_network(wo
     assert gateway.check_policy(cloud_cfg, threads.TASK_STATE, "content", ["itm_x"])[0] == "ok"
     privacy.keep(cfg, privacy.sender_target(world.sid, "sam@example.org"), False)
     assert gateway.check_policy(cloud_cfg, threads.TASK_STATE, "content", ids)[0] == "ok"
+
+
+def test_an_empty_or_refused_draft_is_not_asked_for_again_until_the_conversation_changes(world, monkeypatch):
+    from towpath.models import gateway
+
+    real = gateway.infer
+    asked = []
+
+    def infer(config, task, prompt, *args, **kwargs):
+        if task == threads.TASK_DRAFT:
+            asked.append(prompt)
+            return {"status": "refused", "reason": "item x is kept from cloud models and endpoint e is one"}
+        return real(config, task, prompt, *args, **kwargs)
+
+    monkeypatch.setattr(gateway, "infer", infer)
+    world.track()
+    world.track()
+    assert len(asked) == 1  # recorded, not asked again every poll
+    assert not world.by_subject("needs_owner_reply")["Saturday?"]["draft"]

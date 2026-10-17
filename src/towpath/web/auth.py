@@ -127,11 +127,9 @@ def _start_session(request, response, record: dict):
 
 
 def local_next(request, default: str) -> str:
-    """Where a form asked to go next, if it is a page of this site (a path or a query on this page), else
-    ``default``: a form's return address never leads off Towpath."""
+    """Where a form asked to go next, if it is a path on this site, else ``default``: a form's return address
+    never leads off Towpath."""
     target = request.POST.get("next") or ""
-    if target.startswith("?") and "\\" not in target:
-        return target
     if target.startswith("/") and url_has_allowed_host_and_scheme(target, allowed_hosts=None) and \
             not target.startswith("//") and "\\" not in target:
         return target
