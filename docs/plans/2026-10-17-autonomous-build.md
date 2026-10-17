@@ -17,8 +17,9 @@ the scope to the rest of Towpath.
   4B and Mac Pro 35B (through Poundlock, with the token Towpath already stores) with made-up prompts first; the
   owner allowed recording content grants for both on their behalf. Carbonio is busy with another project.
 - **Archives** (archive-then-delete) are written under `archive/mail/` in Towpath's data folder.
-- **Open questions** are collected below. When six are open, stop and ask them one at a time, each with a
-  recommendation, then continue.
+- **Open questions** are collected below and sent as they come up, each with context, options and a
+  recommendation, to the owner's Project Manager session, which asks the owner one at a time and sends the answers
+  back (changed October 17: no longer held until six are open). Building continues meanwhile.
 - Keep disk use in check on the Mac: one virtual environment, scratch files deleted when done.
 
 ## Order
