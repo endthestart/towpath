@@ -423,6 +423,13 @@ CREATE TABLE IF NOT EXISTS digests (
   PRIMARY KEY (source_id, period));
 -- Per source: mail statistics (volume by week, response times, correspondents), measured by the worker.
 CREATE TABLE IF NOT EXISTS stats (source_id TEXT PRIMARY KEY, body TEXT NOT NULL, updated_at TEXT NOT NULL);
+-- Purchases read from receipts and order confirmations by the model: one row per message looked at (purchase = 0
+-- for a message that turned out not to be one).
+CREATE TABLE IF NOT EXISTS purchases (
+  source_id TEXT NOT NULL, item_id TEXT NOT NULL, purchase INTEGER NOT NULL, merchant TEXT, day TEXT, total REAL,
+  currency TEXT, items TEXT NOT NULL DEFAULT '[]', order_no TEXT, model TEXT, at TEXT NOT NULL,
+  PRIMARY KEY (source_id, item_id));
+CREATE INDEX IF NOT EXISTS purchases_day ON purchases (source_id, purchase, day);
 -- Per source: where the mail's space goes (by year, mailbox, category, largest messages), measured by the worker.
 CREATE TABLE IF NOT EXISTS space (source_id TEXT PRIMARY KEY, body TEXT NOT NULL, updated_at TEXT NOT NULL);
 -- Which messages each rule version has looked at (rowid watermark), and what it decided for each.

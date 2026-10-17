@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block title %}Purchases · {{ account.name }} · Mail · Towpath{% endblock %}
+{% block content %}
+<a class="back-link" href="/mail/">← Mail</a>
+<header class="page-head compact"><p class="eyebrow">MAIL · {{ account.name|upper }}</p><h1>Purchases</h1>
+<p class="lead">What you bought, read from receipts and order confirmations by the AI model, newest first. {{ summary.count }} found in {{ summary.looked }} messages looked at so far; an order told about in several emails is listed once. Totals are as the emails state them.</p></header>
+<form method="get" class="search" role="search"><label for="q" class="sr-only">Merchant or item</label><input id="q" name="q" value="{{ q }}" placeholder="Merchant or item: tent, Apple, glasses"><label>Year <input name="year" value="{{ year }}" inputmode="numeric" maxlength="4" size="5"></label><button class="button" type="submit">Show</button></form>
+{% if not q and not year and summary.years %}<section class="detail-card"><h2 class="card-title">By year</h2>
+<table class="space-table"><thead><tr><th>Year</th><th>Purchases</th><th>Total</th></tr></thead><tbody>
+{% for y in summary.years %}<tr><td><a href="?year={{ y.0 }}">{{ y.0 }}</a></td><td>{{ y.2 }}</td><td>{{ y.3|floatformat:2 }} {{ y.1 }}</td></tr>{% endfor %}</tbody></table>
+<details><summary>Where you buy most</summary><table class="space-table"><tbody>
+{% for m in summary.merchants %}<tr><td><a href="?q={{ m.0|urlencode }}">{{ m.0 }}</a></td><td>{{ m.2 }}</td><td>{{ m.3|floatformat:2 }} {{ m.1 }}</td></tr>{% endfor %}</tbody></table></details></section>{% endif %}
+<section class="detail-card">
+{% for r in rows %}<p><a href="/mail/m/{{ r.item_id }}/"><strong>{{ r.merchant }}</strong></a> <span class="muted">· {{ r.day|default:'date unknown' }}{% if r.total is not None %} · {{ r.total|floatformat:2 }} {{ r.currency|default:'' }}{% endif %}{% if r.order_no %} · order {{ r.order_no }}{% endif %}</span>{% if r.items %}<br><span class="footnote">{{ r.items|join:", " }}</span>{% endif %}</p>
+{% empty %}<p>{% if q or year %}No purchases match.{% else %}None found yet. The AI model reads receipts a little at a time, after conversations and senders.{% endif %}</p>{% endfor %}
+</section>
+{% endblock %}

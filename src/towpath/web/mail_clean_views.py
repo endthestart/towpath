@@ -66,6 +66,17 @@ def attachments_page(request, sid):
                                                              ("largest", "Largest")]})
 
 
+@require_GET
+def purchases_page(request, sid):
+    from towpath.mail import purchases
+
+    account = _managed(sid)
+    q, year = request.GET.get("q", "").strip(), request.GET.get("year", "").strip()
+    return render(request, "mail_purchases.html", {
+        "nav": "mail", "account": account, "q": q, "year": year,
+        "rows": purchases.listing(_store(), sid, q, year), "summary": purchases.summary(_store(), sid)})
+
+
 # -- clean-up -----------------------------------------------------------------------------------------------------
 
 def _criteria(source) -> dict:

@@ -26,6 +26,9 @@ Decisions I made for you to confirm or reverse are listed in the
 | Notes for drafts | Mail → *Drafting replies* | when you're free, phone number, sign-off; new drafts use them |
 | Follow-up reminders | Mail → *Remind you to follow up* | after 3/7/14 days unanswered: a *Follow-up* label (dry run) and a drafted nudge under *Awaiting reply* |
 | Attachments | Mail → Attachments | every file by kind, year and sender; search names; each message once |
+| Purchases | Mail → Purchases | what you bought, by year and merchant, read from receipts (fills in slowly); try Ask "when did I buy …?" |
+| Search operators | Mail → Search | `from:`, `in:Archive`, `after:2019`, `has:attachment`, `is:unread`, `larger:5MB` |
+| Year pages | Life → Timeline → a year | month by month: photos, mail, events; busiest photo days; people first written to |
 | Search | Mail → Search | full text, including archived mail |
 | Space | Mail → Space | by category, year, folder, sender, largest |
 | Clean up | Mail → Clean up | old marketing/newsletters: counts and examples; *Move to Archive* (dry run) |
