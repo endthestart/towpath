@@ -90,6 +90,8 @@ Balanced across three areas, mail first:
     anything under `Exports/Hidden` (the owner's private export), not even metadata. No thumbnails: the web service
     can't see the library. A plain-English request is turned into filters by a local model that sees the request
     and the camera and lens names, never a photo.
+18. **Duplicates are confirmed by content** only for the Space page's top groups (largest waste first), reading
+    each candidate once; groups touching the private export are shown as not compared.
 
 ## Progress
 
@@ -111,6 +113,8 @@ Balanced across three areas, mail first:
 - 2026-10-17: contacts and calendars built (Fastmail CardDAV/CalDAV, read-only); connecting them waits for an app
   password. The photo-search release failed CI (ExifTool missing on the CI runner); fixed so photo reading skips
   where ExifTool isn't installed.
+- 2026-10-17: duplicate candidates on the Space page confirmed by content (SHA-256 of the largest groups, never the
+  private export); `3d63e3f` deployed.
 - 2026-10-17: People pages (correspondents and contacts, mail by year, conversations, life events); Overview
   Today cards.
 - 2026-10-17: Search all filters by folder, size and month modified; plain-English search (the model writes the

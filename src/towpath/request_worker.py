@@ -51,6 +51,9 @@ def run_once(config, credentials_dir=None):
         from towpath import photos  # photo headers for photo search, and plain-English photo requests
 
         indexing += photos.extract_pending(config)
+        from towpath import space_hash
+
+        indexing += space_hash.confirm_pending(config)
         indexing += photos.translate_pending(config)
         from towpath import search_translate
 

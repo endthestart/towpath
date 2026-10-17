@@ -234,6 +234,10 @@ CREATE TABLE IF NOT EXISTS space_summary (
 -- Files that are probably copies of each other (same name and size, across all roots), measured with the space.
 CREATE TABLE IF NOT EXISTS space_duplicates (
   provider_id TEXT PRIMARY KEY, body TEXT NOT NULL, updated_at TEXT NOT NULL);
+-- SHA-256 of files that share a name and size with another (duplicate candidates), to confirm exact copies.
+CREATE TABLE IF NOT EXISTS content_hashes (
+  provider_id TEXT NOT NULL, root_alias TEXT NOT NULL, rel_path TEXT NOT NULL, size INTEGER NOT NULL,
+  sha256 TEXT, problem TEXT, hashed_at TEXT NOT NULL, PRIMARY KEY (provider_id, root_alias, rel_path));
 -- Photo metadata read from image headers with ExifTool (camera, lens, when taken, where), for photo search.
 CREATE TABLE IF NOT EXISTS photo_meta (
   occurrence_id TEXT PRIMARY KEY, taken TEXT, make TEXT, model TEXT, lens TEXT, lat REAL, lon REAL, width INTEGER,
