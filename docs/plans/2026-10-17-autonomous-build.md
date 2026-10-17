@@ -37,6 +37,19 @@ Balanced across three areas, mail first:
 8. More sources: Fastmail contacts and calendars (CardDAV/CalDAV); import how-tos for Apple and Facebook exports.
 9. Mail milestone 6: Gmail over IMAP (built against the synthetic server; connecting it waits for the owner).
 
+## Next items (October 17, after the plan was built)
+
+The owner chose to keep building until UAT. From the [roadmap](../roadmap.md)'s unbuilt parts, one at a time:
+
+1. **Previews on the Year pages and in Your story**: a few previews for each of the year's busiest photo days.
+2. **Export package**: download everything Towpath has learned and decided (life story, memories, recollections,
+   people, rules, sender categories, purchases, decisions) as one archive of plain JSON and Markdown, readable
+   without Towpath (roadmap milestone 8, "portable export").
+3. **Contradictions in the life story**: events that disagree (the same thing on different dates, or duplicates
+   from different sources) shown side by side for the owner to settle (roadmap milestone 6).
+4. **Messages as a source**: import an export of Apple Messages (made with an existing exporter) as day-by-day
+   conversations, like the Facebook export. Waits on a question to the owner (which exporter and format).
+
 ## Open questions
 
 1. ~~**Attachment filing**~~ — answered October 17: a folder in Towpath's data folder, by year and sender,
