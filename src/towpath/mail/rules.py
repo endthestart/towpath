@@ -144,7 +144,9 @@ def save(store_dir, source_id: str, body: dict, rule_id: str | None = None, enab
     mode = mode or (current or {}).get("mode") or "propose"
     if mode not in MODES:
         raise RuleError("Unknown mode.")
-    if mode == "auto" and any(not actions.TYPES[a["type"]]["auto"] for a in clean["actions"]):
+    to_trash = any(a["type"] == "move" and str(a["params"].get("mailbox", "")).strip().lower() in actions.TRASH_NAMES
+                   for a in clean["actions"])
+    if mode == "auto" and (to_trash or any(not actions.TYPES[a["type"]]["auto"] for a in clean["actions"])):
         raise RuleError("A rule that moves mail to Trash always asks you first.")
     with closing(open_store(store_dir, "maildecisions", "web")) as db:
         if current is None:

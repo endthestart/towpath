@@ -13,7 +13,7 @@
 {% for r in rows %}<tr><td>{% if r.method and not r.asked %}<input type="checkbox" name="address" value="{{ r.address }}" aria-label="Unsubscribe from {{ r.address }}">{% endif %}</td>
 <td><a href="/mail/{{ account.source_id }}/?from={{ r.address|urlencode }}">{{ r.name|default:r.address }}</a><br><span class="footnote">{{ r.address }} · {{ r.label }}</span></td>
 <td>{{ r.messages }}</td><td>{{ r.unread }}</td><td>{{ r.last_date|slice:":10" }}</td>
-<td>{% if r.asked %}Asked{% elif r.method.0 == 'post' %}One click{% elif r.method.0 == 'mail' %}By email{% elif r.page %}<a href="{{ r.page }}" rel="noopener noreferrer" target="_blank">Their page</a>{% else %}—{% endif %}</td></tr>
+<td>{% if r.asked %}Asked{% elif r.method.0 == 'post' %}One click{% elif r.method.0 == 'mail' %}By email to {{ r.mail_to }}{% elif r.page %}<a href="{{ r.page }}" rel="noopener noreferrer" target="_blank">Their page</a>{% else %}—{% endif %}</td></tr>
 {% empty %}<tr><td colspan="6">No senders offer unsubscribing yet.</td></tr>{% endfor %}</tbody></table>
 </form>
 {% endblock %}

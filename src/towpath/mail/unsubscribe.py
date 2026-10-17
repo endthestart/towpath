@@ -6,12 +6,12 @@ server with its write password. A header offering only a web page can't be done 
 link instead. Requests go only to public addresses over HTTPS, without following redirects.
 """
 
+import http.client
 import ipaddress
 import re
 import smtplib
 import socket
 import ssl
-import urllib.error
 import urllib.parse
 import urllib.request
 from email.message import EmailMessage
@@ -44,76 +44,120 @@ def options(list_unsubscribe: str | None, list_unsubscribe_post: str | None) -> 
     return found
 
 
-def best(found: dict) -> tuple[str, str] | None:
-    """The method Towpath can carry out, one-click first."""
+def best(found: dict, sender: str | None = None, list_id: str | None = None) -> tuple[str, str] | None:
+    """The method Towpath can carry out, one-click first. An email goes only to an address in the domain of the
+    sender (or of the List-Id), so it is offered only then."""
     if found.get("post"):
         return "post", found["post"]
-    if found.get("mail"):
-        return "mail", found["mail"]
+    mailto = found.get("mail")
+    if mailto and (sender is None or _domain(urllib.parse.unquote(urllib.parse.urlsplit(mailto).path))
+                   in {_domain(sender), _domain((list_id or "").strip("<>"))}):
+        return "mail", mailto
     return None
 
 
-def _public(host: str) -> None:
+def _plain(url: str) -> str:
+    """The address as given, refused if it holds spaces or control characters (header or request smuggling)."""
+    if not url or any(ord(ch) < 33 or ord(ch) == 127 for ch in url):
+        raise UnsubscribeError("the unsubscribe address has spaces or control characters")
+    return url
+
+
+def _public(host: str) -> str:
+    """One public address for the host; every address it resolves to must be public."""
     try:
         infos = socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP)
     except socket.gaierror:
         raise UnsubscribeError(f"couldn't find {host}") from None
-    for info in infos:
-        address = ipaddress.ip_address(info[4][0].split("%")[0])
-        if not address.is_global:
+    addresses = [info[4][0].split("%")[0] for info in infos]
+    for address in addresses:
+        if not ipaddress.ip_address(address).is_global:
             raise UnsubscribeError(f"{host} isn't a public address")
+    if not addresses:
+        raise UnsubscribeError(f"couldn't find {host}")
+    return addresses[0]
 
 
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, *args, **kwargs):
-        return None
+class _PinnedHTTPS(http.client.HTTPSConnection):
+    """HTTPS to the address that was checked (so a second lookup can't send it elsewhere), with the certificate
+    checked for the host name. No proxy, and http.client never follows a redirect."""
+
+    def __init__(self, host: str, address: str, timeout: float):
+        super().__init__(host, 443, timeout=timeout, context=ssl.create_default_context())
+        self._address = address
+
+    def connect(self):
+        sock = socket.create_connection((self._address, 443), self.timeout)
+        self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
 
 
 def one_click(url: str, opener=None) -> str:
-    parsed = urllib.parse.urlsplit(url)
+    """RFC 8058 one-click: POST to the https address on port 443. Only a 2xx answer counts as unsubscribed."""
+    parsed = urllib.parse.urlsplit(_plain(url))
     if parsed.scheme != "https" or not parsed.hostname:
         raise UnsubscribeError("one-click unsubscribing needs an https address")
-    if opener is None:
-        _public(parsed.hostname)
-        opener = urllib.request.build_opener(_NoRedirect)
-    request = urllib.request.Request(url, data=b"List-Unsubscribe=One-Click", method="POST",
-                                     headers={"Content-Type": "application/x-www-form-urlencoded",
-                                              "User-Agent": "Towpath (RFC 8058 one-click unsubscribe)"})
-    try:
+    if parsed.port not in (None, 443) or parsed.username or parsed.password:
+        raise UnsubscribeError("one-click unsubscribing goes only to an ordinary https address")
+    body = b"List-Unsubscribe=One-Click"
+    headers = {"Content-Type": "application/x-www-form-urlencoded",
+               "User-Agent": "Towpath (RFC 8058 one-click unsubscribe)"}
+    if opener is not None:  # tests: a stand-in for the network
+        request = urllib.request.Request(url, data=body, method="POST", headers=headers)
         with opener.open(request, timeout=TIMEOUT) as response:
             status = response.status
-    except urllib.error.HTTPError as exc:
-        if 300 <= exc.code < 400:
-            status = exc.code
-        else:
-            raise UnsubscribeError(f"{parsed.hostname} answered {exc.code}") from None
-    except (urllib.error.URLError, TimeoutError, OSError):
-        raise UnsubscribeError(f"couldn't reach {parsed.hostname}") from None
+    else:
+        connection = _PinnedHTTPS(parsed.hostname, _public(parsed.hostname), TIMEOUT)
+        try:
+            path = (parsed.path or "/") + (f"?{parsed.query}" if parsed.query else "")
+            connection.request("POST", path, body=body, headers=headers)
+            status = connection.getresponse().status
+        except (OSError, http.client.HTTPException):
+            raise UnsubscribeError(f"couldn't reach {parsed.hostname}") from None
+        finally:
+            connection.close()
+    if not 200 <= status < 300:
+        raise UnsubscribeError(f"{parsed.hostname} answered {status}")
     return f"{parsed.hostname} answered {status}"
 
 
-def mail_message(mailto: str, sender: str) -> EmailMessage:
-    parsed = urllib.parse.urlsplit(mailto)
+def _domain(address_or_host: str | None) -> str:
+    """The last two labels of a host or an address's domain (an approximation of the registered domain)."""
+    host = (address_or_host or "").rpartition("@")[2].strip("<> ").lower()
+    return ".".join(host.split(".")[-2:])
+
+
+def mail_message(mailto: str, sender: str, list_from: str | None = None, list_id: str | None = None) -> EmailMessage:
+    """The unsubscribe email. It goes only to an address in the domain of the mail's sender (or of its List-Id),
+    so a header can't make the owner's account write to anyone else; subject and body are short plain text."""
+    parsed = urllib.parse.urlsplit(_plain(mailto))
     query = urllib.parse.parse_qs(parsed.query)
     to = urllib.parse.unquote(parsed.path)
-    if to.count("@") != 1:
+    if to.count("@") != 1 or any(ord(ch) < 33 for ch in to):
         raise UnsubscribeError("the mailto address isn't an email address")
+    if list_from is not None and _domain(to) not in {_domain(list_from), _domain((list_id or "").strip("<>"))}:
+        raise UnsubscribeError(f"{to} isn't in the sender's own domain; unsubscribe on their page instead")
+
+    def short(values, default):
+        text = (values or [default])[0]
+        return text if len(text) <= 200 and not any(ord(ch) < 32 for ch in text) else default
+
     m = EmailMessage()
     m["From"] = sender
     m["To"] = to
-    m["Subject"] = (query.get("subject") or ["unsubscribe"])[0]
+    m["Subject"] = short(query.get("subject"), "unsubscribe")
     m["Date"] = format_datetime(datetime.now(timezone.utc))
     m["Message-ID"] = make_msgid(domain=sender.split("@")[-1])
-    m.set_content((query.get("body") or ["unsubscribe"])[0])
+    m.set_content(short(query.get("body"), "unsubscribe"))
     return m
 
 
-def send_mail(source, password: str, mailto: str, smtp_factory=None) -> str:
+def send_mail(source, password: str, mailto: str, smtp_factory=None, list_from: str | None = None,
+              list_id: str | None = None) -> str:
     """Send the unsubscribe email from the account's own address over its SMTP server."""
     host, port = SMTP.get(source.host, (None, None))
     if smtp_factory is None and host is None:
         raise UnsubscribeError("Towpath doesn't know this provider's SMTP server yet")
-    message = mail_message(mailto, source.username)
+    message = mail_message(mailto, source.username, list_from=list_from or "", list_id=list_id)
     factory = smtp_factory or (lambda: smtplib.SMTP_SSL(host, port, timeout=TIMEOUT,
                                                          context=ssl.create_default_context()))
     try:

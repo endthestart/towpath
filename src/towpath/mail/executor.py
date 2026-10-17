@@ -71,6 +71,7 @@ class ActSession:
         self._caps: set[str] | None = None
         self._folders: list[tuple[str, list[str]]] | None = None
         self._selected: str | None = None
+        self.sent = False  # whether a changing command has been sent since this was last cleared
 
     def login(self, username: str, password: str) -> None:
         self._client.login(username, password)
@@ -101,10 +102,15 @@ class ActSession:
         return int(info[b"UIDVALIDITY"])
 
     def read(self, uid: int) -> dict | None:
-        rows = self._client.fetch([uid], list(READ_ITEMS))
+        """The message's flags (with its labels, on Gmail, where labels aren't flags) and Message-ID."""
+        gmail = "X-GM-EXT-1" in self.capabilities()
+        rows = self._client.fetch([uid], list(READ_ITEMS) + (["X-GM-LABELS"] if gmail else []))
         if uid not in rows:
             return None
-        return {"flags": sorted(_text(f) for f in rows[uid].get(b"FLAGS", ())), "message_id": _message_id(rows[uid])}
+        flags = {_text(f) for f in rows[uid].get(b"FLAGS", ())}
+        if gmail:
+            flags |= {_text(label) for label in rows[uid].get(b"X-GM-LABELS", ())}
+        return {"flags": sorted(flags), "message_id": _message_id(rows[uid])}
 
     def find(self, message_id: str) -> list[int]:
         return sorted(int(u) for u in self._client.search(["HEADER", "Message-ID", message_id]))
@@ -112,6 +118,7 @@ class ActSession:
     def store(self, uid: int, sign: str, flag: str) -> None:
         if flag not in SYSTEM_FLAGS and not actions.KEYWORD.match(flag):
             raise WriteViolation(f"STORE of {flag!r} is not allowed")
+        self.sent = True
         if flag not in SYSTEM_FLAGS and "X-GM-EXT-1" in self.capabilities():  # Gmail: a label, not a keyword
             (self._client.add_gmail_labels if sign == "+" else self._client.remove_gmail_labels)([uid], [flag])
             return
@@ -125,8 +132,10 @@ class ActSession:
         if "X-GM-EXT-1" in self.capabilities() and self._selected == self.special("\\All") and \
                 mailbox != self.special("\\Trash"):
             # Gmail: taking a message out of All Mail deletes it. Putting it in a folder is adding that label.
+            self.sent = True
             self._client.add_gmail_labels([uid], ["\\Inbox" if mailbox.upper() == "INBOX" else mailbox])
             return
+        self.sent = True
         self._client.move([uid], mailbox)
 
     def append(self, role: str, raw: str, flags: tuple[str, ...]) -> str:
@@ -135,6 +144,7 @@ class ActSession:
             raise TargetChanged("the account has no Drafts mailbox")
         if set(flags) - APPEND_FLAGS:
             raise WriteViolation(f"APPEND with flags {sorted(flags)} is not allowed")
+        self.sent = True
         self._client.append(mailbox, raw.encode("utf-8"), flags=flags)
         return mailbox
 
@@ -208,10 +218,10 @@ def pending(store_dir, role: str = ROLE) -> list[dict]:
                         archive.auto_approved(store_dir, body, role=role, cache=cache) or
                         notify.auto_approved(store_dir, body, role=role, cache=cache)):
                     continue
-                answer = {"digest": r["digest"]}  # the owner's own rule or archive request covers it
+                answer = {"digest": r["digest"], "auto": True}  # the owner's own rule or archive request covers it
             out.append({"key": r["proposal_id"], "source_id": r["source_id"], "body": body, "digest": r["digest"],
                         "created_at": r["created_at"], "approved_digest": answer["digest"],
-                        "approved": answer["digest"] == r["digest"]})
+                        "approved": answer["digest"] == r["digest"], "auto": bool(answer.get("auto"))})
     return out
 
 
@@ -263,16 +273,21 @@ def _check(item: dict) -> str | None:
 
 def _locate(read_uid, find, target: dict) -> int:
     """The UID the change applies to in the selected or examined mailbox."""
-    if isinstance(target.get("uid"), int):
+    if isinstance(target.get("uid"), int) and isinstance(target.get("uidvalidity"), int):
         found = read_uid(target["uid"])
         if found is None:
             raise TargetChanged("the message is no longer in that mailbox")
-        if target.get("message_id") and found["message_id"] and found["message_id"] != target["message_id"]:
+        if target.get("message_id") and found["message_id"] != target["message_id"]:
             raise TargetChanged("a different message now has that number")
         return target["uid"]
+    if not target.get("message_id"):
+        raise TargetChanged("the message can't be identified")
     uids = find(target["message_id"])
     if len(uids) != 1:
         raise TargetChanged("the message wasn't found" if not uids else "more than one message has that Message-ID")
+    found = read_uid(uids[0])
+    if found is None or found["message_id"] != target["message_id"]:
+        raise TargetChanged("the message wasn't found")
     return uids[0]
 
 
@@ -299,7 +314,9 @@ def _dry_run(connector, body: dict) -> tuple[str, dict]:
     return f"Dry run: would {what[0].lower()}{what[1:]}; the message was checked and left unchanged.", before
 
 
-def _execute(act: ActSession, body: dict) -> tuple[str, dict, dict]:
+def _execute(act: ActSession, body: dict, trash_ok: bool = True) -> tuple[str, dict, dict]:
+    """Carry one change out. ``trash_ok``: whether a move into Trash may happen (the owner turned on "Move to Trash"
+    and approved this change themselves); a move is a Trash in all but name when it goes there."""
     kind, target, params = body["type"], body["target"], body["params"]
     if kind in APPEND_TYPES:
         flags = ("\\Draft", "\\Seen") if kind == "draft" else ()
@@ -323,6 +340,9 @@ def _execute(act: ActSession, body: dict) -> tuple[str, dict, dict]:
                     "trash": lambda: act.special("\\Trash"), "move": lambda: params["mailbox"]}[kind]()
             if dest is None:
                 raise TargetChanged(f"the account has no {'Archive' if kind == 'archive' else 'Trash'} mailbox")
+            if kind == "move" and not trash_ok and (dest == act.special("\\Trash") or
+                                                    dest.strip().lower() in actions.TRASH_NAMES):
+                raise TargetChanged("moving to Trash needs “Move to Trash” turned on, and your own approval")
             act.move(uid, dest)
             after = {"mailbox": dest, "message_id": before["message_id"]}
     finally:
@@ -345,9 +365,13 @@ def _unsubscribe(db, item: dict, source, secret: Path, enabled: bool) -> str:
         return "dry-run"
     try:
         detail = (unsubscribe.one_click(params["url"]) if params["method"] == "post" else
-                  unsubscribe.send_mail(source, secret.read_text().strip(), params["url"]))
+                  unsubscribe.send_mail(source, secret.read_text().strip(), params["url"],
+                                        list_from=item["body"]["target"]["sender"], list_id=params.get("list_id")))
     except unsubscribe.UnsubscribeError as exc:
         _receipt(db, item, "failed", f"Not unsubscribed: {exc}.")
+        return "failed"
+    except Exception as exc:  # noqa: BLE001 - recorded, never retried: a send may have happened
+        _receipt(db, item, "failed", f"Not unsubscribed: stopped on an error ({type(exc).__name__}).")
         return "failed"
     _receipt(db, item, "done", f"Unsubscribed: {detail}.")
     return "done"
@@ -370,12 +394,13 @@ def run_pending(config, credentials_dir, limit: int = LIMIT, pause: float = PAUS
     try:
         for sid, items in by_source.items():
             source = config.sources[sid]
-            dry = settings.dry_run(config.store_dir, sid)
-            enabled = set() if dry else settings.enabled_types(config.store_dir, sid)
             secret = password_path(credentials_dir, sid)
             reader, act, counts = None, None, {}
             try:
                 for item in items[:limit]:
+                    # read for every change, so turning dry runs back on takes effect at once
+                    dry = settings.dry_run(config.store_dir, sid)
+                    enabled = set() if dry else settings.enabled_types(config.store_dir, sid)
                     problem = _check(item)
                     if problem:
                         _receipt(db, item, "refused", problem)
@@ -386,13 +411,23 @@ def run_pending(config, credentials_dir, limit: int = LIMIT, pause: float = PAUS
                         counts_key = _unsubscribe(db, item, source, secret, body["type"] in enabled)
                         counts[counts_key] = counts.get(counts_key, 0) + 1
                         continue
+                    if body["type"] == "trash" and str(body.get("producer", "")).startswith("archive:"):
+                        from towpath.mail import archive
+
+                        problem = archive.check_copy(config.store_dir, body["target"].get("item_id"))
+                        if problem:  # read back again now: no copy, no removal
+                            _receipt(db, item, "skipped", f"Not removed: {problem}.")
+                            counts["skipped"] = counts.get("skipped", 0) + 1
+                            continue
                     live = body["type"] in enabled and secret.is_file()
                     try:
                         with _mapped_errors():
                             if live:
                                 if act is None:
                                     act = connect_act(source, secret.read_text().strip())
-                                detail, before, after = _execute(act, body)
+                                act.sent = False
+                                detail, before, after = _execute(
+                                    act, body, trash_ok="trash" in enabled and not item.get("auto"))
                                 inverse = actions.inverse(body, before, after)
                                 _receipt(db, item, "done", detail, before, after, inverse)
                                 counts["done"] = counts.get("done", 0) + 1
@@ -406,7 +441,10 @@ def run_pending(config, credentials_dir, limit: int = LIMIT, pause: float = PAUS
                         _receipt(db, item, "skipped", f"Not done: {exc}.")
                         counts["skipped"] = counts.get("skipped", 0) + 1
                     except SyncStop:
-                        raise  # the account or network stopped: this change waits for the next poll
+                        if act is not None and act.sent:  # the command went out, then the connection dropped
+                            _receipt(db, item, "uncertain", "The connection dropped while this change was being made; "
+                                     "check the message in your mail app. It won't be tried again.")
+                        raise  # the account or network stopped: what wasn't sent waits for the next poll
                     except Exception as exc:  # noqa: BLE001 - recorded once, then the account's batch stops
                         reason = str(exc) if isinstance(exc, WriteViolation) else type(exc).__name__
                         _receipt(db, item, "failed",

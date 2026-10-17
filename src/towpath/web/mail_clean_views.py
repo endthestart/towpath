@@ -215,11 +215,14 @@ def _offers(sid: str) -> list[dict]:
         return []
     with closing(open_store(_store(), "mail", "web")) as db:
         for r in rows:
-            latest = db.execute("SELECT list_unsubscribe, list_unsubscribe_post FROM messages WHERE source_id = ? AND "
-                                "from_addr = ? AND list_unsubscribe IS NOT NULL ORDER BY date_utc DESC LIMIT 1",
-                                (sid, r["address"])).fetchone()
+            latest = db.execute("SELECT list_unsubscribe, list_unsubscribe_post, list_id FROM messages WHERE "
+                                "source_id = ? AND from_addr = ? AND list_unsubscribe IS NOT NULL ORDER BY date_utc "
+                                "DESC LIMIT 1", (sid, r["address"])).fetchone()
             found = unsubscribe.options(latest[0], latest[1]) if latest else {}
-            r["method"] = unsubscribe.best(found)
+            r["method"] = unsubscribe.best(found, r["address"], latest[2] if latest else None)
+            r["list_id"] = latest[2] if latest else None
+            r["mail_to"] = (r["method"][1][len("mailto:"):].split("?")[0]
+                            if r["method"] and r["method"][0] == "mail" else None)
             r["page"] = found.get("page")
     return rows
 
@@ -255,7 +258,7 @@ def unsubscribe_ask(request, sid):
     for address, r in offers.items():
         method, url = r["method"]
         mail_settings.ask(_store(), sid, actions.make(sid, "unsubscribe", {"sender": address},
-                                                      {"method": method, "url": url},
+                                                      {"method": method, "url": url, "list_id": r.get("list_id")},
                                                       reason="Asked for on the Unsubscribe page"))
         if request.POST.get("archive_existing") == "1":
             found = candidates(_store(), sid, {"mailbox": "INBOX", "categories": [], "older_than": 0,

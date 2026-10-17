@@ -375,7 +375,7 @@ def test_the_write_session_offers_only_allowed_commands():
             session.store(1, "+", flag)
     with pytest.raises(WriteViolation):
         session.move(1, "Archive")  # no MOVE capability: never copy and expunge instead
-    public = {n for n in dir(session) if not n.startswith("_")}
+    public = {n for n in dir(session) if not n.startswith("_") and callable(getattr(session, n))}
     assert public == {"login", "capabilities", "folders", "special", "select", "read", "find", "store", "move",
                       "append", "unselect", "logout"}
 

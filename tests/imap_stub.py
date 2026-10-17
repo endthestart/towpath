@@ -516,6 +516,8 @@ class Handler(socketserver.StreamRequestHandler):
                     pieces.append(f"FLAGS ({' '.join(sorted(msg.flags))})")
                 elif name == "MODSEQ":
                     pieces.append(f"MODSEQ ({msg.modseq})")
+                elif name == "X-GM-LABELS" and self.state.gmail:
+                    pieces.append(f"X-GM-LABELS ({' '.join(sorted(msg.labels))})")
                 elif name == "X-GM-THRID" and self.state.gmail:
                     root = (parsed["References"] or parsed["In-Reply-To"] or parsed["Message-ID"] or "").split()[0]
                     pieces.append(f"X-GM-THRID {abs(hash(root)) % 10**12}")

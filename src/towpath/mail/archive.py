@@ -94,12 +94,32 @@ def progress(store_dir, request_id: str, role: str = "web") -> dict:
 
 # -- the file -----------------------------------------------------------------------------------------------------
 
+def _lines(data: bytes) -> list[bytes]:
+    """Lines ending at LF only (mbox readers split there; a lone CR is part of a line)."""
+    parts = data.split(b"\n")
+    return [p + b"\n" for p in parts[:-1]] + ([parts[-1]] if parts[-1] else [])
+
+
 def escape(raw: bytes) -> bytes:
-    return b"".join(b">" + line if FROM_LINE.match(line) else line for line in raw.splitlines(keepends=True))
+    return b"".join(b">" + line if FROM_LINE.match(line) else line for line in _lines(raw))
 
 
 def unescape(data: bytes) -> bytes:
-    return b"".join(line[1:] if ESCAPED.match(line) else line for line in data.splitlines(keepends=True))
+    return b"".join(line[1:] if ESCAPED.match(line) else line for line in _lines(data))
+
+
+def _sync(f) -> None:
+    """Flush to the disk itself (on macOS fsync alone leaves it in the drive's cache)."""
+    f.flush()
+    try:
+        import fcntl
+
+        if hasattr(fcntl, "F_FULLFSYNC"):
+            fcntl.fcntl(f.fileno(), fcntl.F_FULLFSYNC)
+            return
+    except OSError:
+        pass
+    os.fsync(f.fileno())
 
 
 def append(path: Path, raw: bytes) -> tuple[int, int]:
@@ -112,8 +132,7 @@ def append(path: Path, raw: bytes) -> tuple[int, int]:
         offset = f.tell()
         f.write(body)
         f.write(b"\n" if body.endswith(b"\n") else b"\n\n")
-        f.flush()
-        os.fsync(f.fileno())
+        _sync(f)
     return offset, len(body)
 
 
@@ -137,11 +156,28 @@ def verify(path: Path, offset: int, length: int, sha256: str, size: int | None, 
     return None
 
 
+def check_copy(store_dir, item_id: str, role: str = "act") -> str | None:
+    """Why a message's archived copy can't be relied on now (re-read from its file), or None."""
+    if not store_path(store_dir, "mail").exists():
+        return "there is no record of an archive copy"
+    with closing(open_store(store_dir, "mail", role)) as db:
+        row = db.execute("SELECT path, offset, length, sha256, message_id FROM archived WHERE item_id = ?",
+                         (item_id,)).fetchone()
+    if row is None:
+        return "there is no record of an archive copy"
+    try:
+        return verify(Path(row[0]), row[1], row[2], row[3], None, row[4])
+    except OSError as exc:
+        return f"the archive file couldn't be read ({type(exc).__name__})"
+
+
 # -- the connector's slice --------------------------------------------------------------------------------------
 
-def _propose_trash(config, request_id: str, source_id: str, record: dict) -> None:
-    body = actions.make(source_id, "trash", actions.message_target(record), {},
-                        reason="Archived to a file and verified; you asked to remove it from the server.",
+def _propose_trash(config, request_id: str, source_id: str, record: dict, again: bool = False) -> None:
+    reason = "Archived to a file and verified; you asked to remove it from the server."
+    if again:  # a new change: the first was carried out as a dry run
+        reason += " Proposed again now that dry runs are off."
+    body = actions.make(source_id, "trash", actions.message_target(record), {}, reason=reason,
                         producer=f"archive:{request_id}")
     with closing(open_store(config.store_dir, "mailplan", "worker")) as plan:
         plan.execute("INSERT OR IGNORE INTO proposals (proposal_id, source_id, body, digest, created_at) "
@@ -166,14 +202,30 @@ def archive_pending(config, slice_seconds: float = SLICE_SECONDS, clock=time.mon
         mail = open_store(config.store_dir, "mail", ROLE)
         connector = None
         try:
-            done = {r[0] for r in mail.execute("SELECT item_id FROM archived WHERE request_id = ?",
-                                               (req["request_id"],))}
-            todo = [i for i in req["item_ids"] if i not in done]
             state = json.loads((mail.execute("SELECT state FROM archive_progress WHERE request_id = ?",
                                              (req["request_id"],)).fetchone() or ["{}"])[0])
+            if req["remove"]:
+                _repropose_after_dry_runs(config, mail, req)
+            # Archived already, by this request or an earlier one: one copy is enough; the removal still applies.
+            done = set()
+            for start in range(0, len(req["item_ids"]), 900):
+                chunk = req["item_ids"][start:start + 900]
+                done |= {r[0] for r in mail.execute(
+                    f"SELECT item_id FROM archived WHERE item_id IN ({','.join('?' for _ in chunk)})", chunk)}
+            earlier = sorted(done - set(state.get("counted", [])))
+            if earlier and req["remove"]:
+                for r in mail.execute(f"SELECT item_id, mailbox, uidvalidity, uid, message_id FROM messages WHERE "
+                                      f"item_id IN ({','.join('?' for _ in earlier[:900])})", earlier[:900]):
+                    if check_copy(config.store_dir, r["item_id"], role=ROLE) is None:
+                        _propose_trash(config, req["request_id"], sid, dict(r))
+            state["counted"] = sorted(set(state.get("counted", [])) | set(earlier[:900]))
+            todo = [i for i in req["item_ids"] if i not in done]
             skipped = set(state.get("skipped", []))
             todo = [i for i in todo if i not in skipped]
             if not todo:
+                mail.execute("INSERT OR REPLACE INTO archive_progress VALUES (?,?,?)",
+                             (req["request_id"], json.dumps(state), now()))
+                mail.commit()
                 continue
             path = root(config.store_dir) / sid / f"{req['request_id']}.mbox"
             archived = 0
@@ -211,10 +263,11 @@ def archive_pending(config, slice_seconds: float = SLICE_SECONDS, clock=time.mon
                                 state.setdefault("problems", []).append({"item_id": r["item_id"], "problem": problem})
                                 skipped.add(r["item_id"])
                                 continue
-                            mail.execute("INSERT INTO archived VALUES (?,?,?,?,?,?,?,?,?)",
+                            mail.execute("INSERT OR IGNORE INTO archived VALUES (?,?,?,?,?,?,?,?,?)",
                                          (r["item_id"], sid, req["request_id"], str(path), offset, length, sha,
                                           r["message_id"], now()))
                             mail.commit()
+                            state["counted"] = sorted(set(state.get("counted", [])) | {r["item_id"]})
                             archived += 1
                             if req["remove"]:
                                 _propose_trash(config, req["request_id"], sid, r)
@@ -251,6 +304,31 @@ def auto_approved(store_dir, body: dict, role: str = "act", cache: dict | None =
     if not req or not req["remove"] or item_id not in req["item_ids"] or not store_path(store_dir, "mail").exists():
         return False
     with closing(open_store(store_dir, "mail", role)) as db:
-        row = db.execute("SELECT message_id FROM archived WHERE item_id = ? AND request_id = ?",
-                         (item_id, rid)).fetchone()
-    return row is not None and row[0] == body["target"].get("message_id")
+        copy = db.execute("SELECT message_id FROM archived WHERE item_id = ?", (item_id,)).fetchone()
+        message = db.execute("SELECT * FROM messages WHERE item_id = ?", (item_id,)).fetchone()
+    # The change must aim at exactly the message that was copied: the same mailbox, number and Message-ID. The copy
+    # itself is read back again just before the change is carried out.
+    return copy is not None and message is not None and copy[0] == message["message_id"] and \
+        actions.message_target(dict(message)) == body["target"]
+
+
+def _repropose_after_dry_runs(config, mail, req: dict) -> None:
+    """Removals that ran as dry runs are proposed again once the account is live and Trash is turned on."""
+    from towpath.mail import settings
+
+    sid = req["source_id"]
+    if settings.dry_run(config.store_dir, sid, role=ROLE) or \
+            "trash" not in settings.enabled_types(config.store_dir, sid, role=ROLE) or \
+            not store_path(config.store_dir, "mailact").exists():
+        return
+    producer = f"archive:{req['request_id']}"
+    with closing(open_store(config.store_dir, "mailact", ROLE)) as act:
+        tried = [json.loads(r[0]) for r in act.execute("SELECT body FROM receipts WHERE outcome = 'dry-run' AND "
+                                                         "body LIKE ?", (f'%"{producer}"%',))]
+    for body in tried:
+        if body.get("producer") != producer or body.get("type") != "trash" or "again" in body.get("reason", ""):
+            continue
+        row = mail.execute("SELECT item_id, mailbox, uidvalidity, uid, message_id FROM messages WHERE item_id = ?",
+                           (body["target"].get("item_id"),)).fetchone()
+        if row is not None:
+            _propose_trash(config, req["request_id"], sid, dict(row), again=True)

@@ -38,6 +38,7 @@ FLAG_TYPES = {"mark_read": ("+", "\\Seen"), "mark_unread": ("-", "\\Seen"), "fla
               "unflag": ("-", "\\Flagged")}
 MOVE_TYPES = {"archive", "move", "trash"}
 APPEND_TYPES = {"draft": "drafts", "inbox_note": "inbox"}
+TRASH_NAMES = {"trash", "deleted items", "deleted messages", "bin", "[gmail]/trash", "[google mail]/trash"}
 SENDER_TYPES = {"unsubscribe"}  # aimed at a sender, not at a message in a mailbox
 
 
@@ -78,6 +79,8 @@ def validate(body: dict) -> None:
         method, url = params.get("method"), str(params.get("url") or "")
         if not ((method == "post" and url.startswith("https://")) or (method == "mail" and url.startswith("mailto:"))):
             raise ActionError("an unsubscribe is a one-click https request or a mailto address")
+        if any(ord(ch) < 33 or ord(ch) == 127 for ch in url):
+            raise ActionError("an unsubscribe address can't hold spaces or control characters")
         return
     if kind in APPEND_TYPES:
         raw = params.get("message")
@@ -122,8 +125,9 @@ def inverse(body: dict, before: dict, after: dict) -> dict | None:
         if (flag in before.get("flags", ())) == (sign == "+"):
             return None  # it already was that way: undoing must not change it
         return make(body["source_id"], undo, target, {}, f"Undo: {describe(body)}", producer)
-    if kind in ("add_keyword", "remove_keyword"):
-        if (body["params"]["keyword"] in before.get("flags", ())) == (kind == "add_keyword"):
+    if kind in ("add_keyword", "remove_keyword"):  # keywords compare without case, as IMAP does
+        had = body["params"]["keyword"].lower() in {str(f).lower() for f in before.get("flags", ())}
+        if had == (kind == "add_keyword"):
             return None
         return make(body["source_id"], undo, target, dict(body["params"]), f"Undo: {describe(body)}", producer)
     if kind in MOVE_TYPES:
