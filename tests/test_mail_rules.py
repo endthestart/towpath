@@ -154,7 +154,9 @@ def test_the_pages_for_senders_rules_and_batch_answers(world, monkeypatch):
         client.post("/login", {"username": "owner", "password": OWNER})
         found = senders.inbox(world.store, world.sid)
         assert found["total"] == 3 and {c["category"] for c in found["categories"]} >= {"marketing"}
-        assert f"/mail/{world.sid}/clean?categories=marketing&amp;older_than=0" in client.get("/mail/").content.decode()
+        assert f"/mail/{world.sid}/?box=INBOX&amp;category=marketing" in client.get("/mail/").content.decode()
+        listed = client.get(f"/mail/{world.sid}/", {"box": "INBOX", "category": "marketing"}).content.decode()
+        assert "Big sale" in listed and "Saturday?" not in listed and "Clean these up" in listed
         rules_page = client.get(f"/mail/{world.sid}/rules").content.decode()
         assert "· would look at 1 message in your inbox now" in rules_page.split("Archive marketing")[1][:80]
         page = client.get(f"/mail/{world.sid}/senders").content.decode()

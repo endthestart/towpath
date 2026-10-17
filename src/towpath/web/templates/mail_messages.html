@@ -2,7 +2,8 @@
 {% block title %}{{ account.name }} · Mail · Towpath{% endblock %}
 {% block content %}
 <a class="back-link" href="/mail/">← Mail</a>
-<header class="page-head compact"><p class="eyebrow">MAIL · {{ account.name|upper }}</p><h1>{% if sender %}From {{ sender }}{% else %}{{ box }}{% endif %}</h1></header>
+<header class="page-head compact"><p class="eyebrow">MAIL · {{ account.name|upper }}</p><h1>{% if sender %}From {{ sender }}{% else %}{{ box }}{% if category %}: {{ category_label }}{% endif %}{% endif %}</h1>
+{% if category %}<p><a href="/mail/{{ account.source_id }}/clean?categories={{ category }}&amp;older_than=0&amp;mailbox={{ box|urlencode }}">Clean these up</a> · <a href="?box={{ box|urlencode }}">All of {{ box }}</a></p>{% endif %}</header>
 {% if sender %}<p><a href="/mail/{{ account.source_id }}/senders">← Senders</a></p>{% elif boxes|length > 1 %}<nav class="tabs" aria-label="Mailboxes">{% for b in boxes %}<a href="?box={{ b|urlencode }}"{% if b == box %} aria-current="page"{% endif %}>{{ b }}</a>{% endfor %}</nav>{% endif %}
 <section class="mail-list" aria-label="Messages">
 {% for r in rows %}
@@ -14,5 +15,5 @@
   </a>
 {% empty %}<div class="empty"><h2>No messages read here yet.</h2><p>Towpath reads new mail first, then the history. Check the Mail page for progress.</p></div>{% endfor %}
 </section>
-{% if next_before %}<nav class="pagination" aria-label="Older messages"><span></span><div><a href="?{% if sender %}from={{ sender|urlencode }}{% else %}box={{ box|urlencode }}{% endif %}&amp;before={{ next_before|urlencode }}">Older →</a></div></nav>{% endif %}
+{% if next_before %}<nav class="pagination" aria-label="Older messages"><span></span><div><a href="?{% if sender %}from={{ sender|urlencode }}{% else %}box={{ box|urlencode }}{% if category %}&amp;category={{ category }}{% endif %}{% endif %}&amp;before={{ next_before|urlencode }}">Older →</a></div></nav>{% endif %}
 {% endblock %}

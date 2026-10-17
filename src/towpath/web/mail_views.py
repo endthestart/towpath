@@ -372,18 +372,28 @@ def messages(request, sid):
         return redirect("/mail/")
     box = request.GET.get("box") or "INBOX"
     sender = (request.GET.get("from") or "").lower() or None
+    category = request.GET.get("category") if request.GET.get("category") in senders.CATEGORIES else None
     before = request.GET.get("before") or "9999"
     rows = []
     boxes = []
     if store_path(_store(), "mail").exists():
+        cats = senders.categories(_store(), sid) if category else {}
         with closing(open_store(_store(), "mail", "web")) as db:
             boxes = [r[0] for r in db.execute("SELECT DISTINCT mailbox FROM messages WHERE source_id = ? ORDER BY 1",
                                               (sid,))]
             where, args = ("from_addr = ?", sender) if sender else ("mailbox = ?", box)
-            rows = [dict(r) for r in db.execute(
-                "SELECT item_id, subject, from_name, from_addr, date_utc, flags, has_attachments, list_unsubscribe, "
-                f"mailbox FROM messages WHERE source_id = ? AND {where} AND coalesce(date_utc, '') < ? "
-                "ORDER BY date_utc DESC LIMIT ?", (sid, args, before, PAGE + 1))]
+            cursor = before
+            for _ in range(40):  # a category is picked out of the folder a chunk at a time
+                chunk = [dict(r) for r in db.execute(
+                    "SELECT item_id, subject, from_name, from_addr, date_utc, flags, has_attachments, "
+                    f"list_unsubscribe, list_id, mailbox FROM messages WHERE source_id = ? AND {where} AND "
+                    "coalesce(date_utc, '') < ? ORDER BY date_utc DESC LIMIT ?",
+                    (sid, args, cursor, (PAGE + 1) if not category else 500))]
+                rows += [r for r in chunk if not category or
+                         senders.message_category(r, cats.get(r["from_addr"])) == category]
+                if not category or len(rows) > PAGE or len(chunk) < 500:
+                    break
+                cursor = chunk[-1]["date_utc"] or ""
     present = _present([r["item_id"] for r in rows])
     rows = [r for r in rows if r["item_id"] in present]
     more = len(rows) > PAGE
@@ -392,6 +402,7 @@ def messages(request, sid):
         r["unread"] = "\\Seen" not in json.loads(r["flags"])
     return render(request, "mail_messages.html", {
         "nav": "mail", "account": account, "box": box, "boxes": boxes, "rows": rows, "sender": sender,
+        "category": category, "category_label": senders.CATEGORIES.get(category),
         "next_before": rows[-1]["date_utc"] if more and rows else None})
 
 
