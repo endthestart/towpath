@@ -52,6 +52,11 @@ can do everything; there are no other users.
 Open **Connections** and add Fastmail, Gmail or another mail account. Each page explains what to do at the
 provider. Nothing is indexed until you choose **Start indexing**.
 
+To let Towpath manage an IMAP account's mail, open **Mail** and choose **Manage this account**: Towpath reads all of
+its mail and shows what it would change, as dry runs. To let it change mail, add a second app password that can
+change mail on the account's Connections page (**Add a write password**), then turn on the kinds of change you want
+on the Mail page. See [mail management](../mail-management.md#towpath-native-mail-management).
+
 ## 6. Index folders (optional)
 
 Towpath can index folders on the same server: names, types, sizes and dates of every file, and the text of

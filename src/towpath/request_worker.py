@@ -1,5 +1,6 @@
-"""Single connector process for explicitly queued requests and owner-started indexing; never schedules
-sync or models on its own."""
+"""Single connector process for explicitly queued requests, owner-started indexing, and mail management for the
+accounts the owner chose (reading, watching for new mail, carrying out approved changes); never schedules sync or
+models on its own."""
 
 import fcntl
 import json
@@ -47,6 +48,11 @@ def run_once(config, credentials_dir=None):
         from towpath import life_propose  # life-story proposals, only once the owner allowed them
 
         indexing += life_propose.propose_pending(config, credentials_dir)
+        from towpath.mail import analysis, executor, watch  # mail management, for accounts the owner chose
+
+        watch.ensure(config, analysis.eligible(config))
+        indexing += executor.run_pending(config, credentials_dir)
+        indexing += analysis.analyze_pending(config)
     return {"searches": search["searches_run"], "fetched": fetched["fetched"],
             "failed": fetched["failed"], "presence_checked": fetched.get("presence_checked", 0),
             "termination": fetched["termination"], "indexing": indexing}
@@ -75,5 +81,8 @@ def run(config, poll_seconds=10, once=False, credentials_dir=None):
                 while not stopping and time.monotonic() < deadline:
                     time.sleep(min(1, max(0, deadline - time.monotonic())))
     finally:
+        from towpath.mail import watch
+
+        watch.stop_all()
         for sig, handler in previous.items():
             signal.signal(sig, handler)

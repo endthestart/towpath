@@ -1,6 +1,6 @@
 from django.urls import path
 
-from towpath.web import auth, life_views, space_views, unified_views, views
+from towpath.web import auth, life_views, mail_views, space_views, unified_views, views
 
 urlpatterns = [
     path("", views.overview, name="overview"),
@@ -24,6 +24,15 @@ urlpatterns = [
     path("life/start", life_views.start, name="life-start"),
     path("life/pause", life_views.pause, name="life-pause"),
     path("life/review", life_views.review, name="life-review"),
+    path("mail/", mail_views.overview, name="mail"),
+    path("mail/manage", mail_views.manage, name="mail-manage"),
+    path("mail/pause", mail_views.pause, name="mail-pause"),
+    path("mail/writes", mail_views.writes, name="mail-writes"),
+    path("mail/answer", mail_views.answer, name="mail-answer"),
+    path("mail/undo", mail_views.undo, name="mail-undo"),
+    path("mail/act", mail_views.act, name="mail-act"),
+    path("mail/m/<str:item_id>/", mail_views.reader, name="mail-reader"),
+    path("mail/<str:sid>/", mail_views.messages, name="mail-messages"),
     path("collections/", unified_views.collection_list, name="collections"),
     path("connections/", views.connections_elsewhere, name="connections-elsewhere"),
     path("collections/new", unified_views.collection_create, name="collection-create"),

@@ -76,3 +76,6 @@ code.copyable{display:inline-block;margin-top:6px;padding:6px 10px;background:va
 .live-region{display:block}
 
 .life-claim{border-top:1px solid var(--line);padding:14px 0}.life-claim blockquote{margin:6px 0 8px;padding-left:12px;border-left:3px solid var(--line);color:var(--muted);font-size:13px}.life-claim details{margin-top:6px;font-size:13px}
+.mail-account{border-top:1px solid var(--line);padding:16px 0}.mail-account:first-of-type{border-top:0;padding-top:0}
+.mail-account h3{font-size:17px;margin:0 0 8px}.mail-account h4{font-size:14px;margin:18px 0 4px}
+.warn-text{color:#7a5a1c}.mail-row.unread .mail-title strong{font-weight:800}

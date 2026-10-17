@@ -102,6 +102,7 @@ def _view(c: dict) -> dict:
         return {**c, "status": {"text": "Disconnected" if gone else "Connected", "tone": "warn" if gone else "ok",
                                 "busy": False},
                 "address": c["settings"]["base_url"], "indexed": None, "model": c["settings"]["model"],
+                "cloud": c["settings"].get("destination") == "third-party",
                 "tested_text": (f"answered in {tested['seconds']} s, {tested['at'][:16].replace('T', ' ')} UTC"
                                 if tested else None)}
     progress = c["progress"] or {}
@@ -111,7 +112,7 @@ def _view(c: dict) -> dict:
             "indexed": progress.get("indexed"),
             "indexed_text": f"{progress['indexed']:,}" if progress.get("indexed") is not None else None,
             "rate": round(rate) if rate else None, "updated": when[:16].replace("T", " ") + " UTC" if when else None,
-            "folders_chosen": c["settings"].get("mailboxes") or []}
+            "folders_chosen": c["settings"].get("mailboxes") or [], "write": c["settings"].get("write")}
 
 
 def _get(sid: str) -> dict:
@@ -178,7 +179,8 @@ def add(request, provider):
 
 
 def _model_page(request):
-    form = {"base_url": request.POST.get("base_url", "").strip(), "model": request.POST.get("model", "").strip()}
+    form = {"base_url": request.POST.get("base_url", "").strip(), "model": request.POST.get("model", "").strip(),
+            "destination": request.POST.get("destination", "self-hosted")}
     error = None
     if request.method == "POST":
         token = request.POST.get("password", "").strip()
@@ -193,7 +195,8 @@ def _model_page(request):
             return redirect(f"/connections/{sid}/")
         finally:
             token = None  # noqa: F841 - drop the only reference as soon as it is stored or rejected
-    response = render(request, "connection_model.html", {"nav": "connections", "form": form, "error": error})
+    response = render(request, "connection_model.html", {"nav": "connections", "form": form, "error": error,
+                                                          "destinations": connections.MODEL_DESTINATIONS})
     response.status_code = 400 if error else 200
     return response
 
@@ -313,6 +316,40 @@ def password(request, sid):
                                                             "preset": connections.PROVIDERS[c["provider"]]})
     response.status_code = 400 if error else 200
     return response
+
+
+@sensitive_post_parameters("password")
+@require_http_methods(["GET", "POST"])
+def write_password(request, sid):
+    """A second app password, used only by mail management's action runner to change mail you approved."""
+    c = _get(sid)
+    if c["adapter"] != "imap":
+        raise Http404
+    error = None
+    if request.method == "POST":
+        new = _typed_password(request, c["provider"])
+        try:
+            tested = connections.test_write_imap({k: v for k, v in c["settings"].items()
+                                                  if k not in ("mailboxes", "write")}, new)
+            connections.save_write_password(_store(), _creds(), sid, new, tested)
+        except ConnectionProblem as exc:
+            error = str(exc)
+        else:
+            return redirect(f"/connections/{sid}/?saved=write")
+        finally:
+            new = None  # noqa: F841
+    response = render(request, "connection_write_password.html", {
+        "nav": "connections", "c": _view(c), "error": error, "preset": connections.PROVIDERS[c["provider"]]})
+    response.status_code = 400 if error else 200
+    return response
+
+
+@require_POST
+def remove_write_password(request, sid):
+    if _get(sid)["adapter"] != "imap":
+        raise Http404
+    connections.remove_write_password(_store(), _creds(), sid)
+    return redirect(f"/connections/{sid}/?saved=write-removed")
 
 
 @require_http_methods(["GET", "POST"])

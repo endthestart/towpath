@@ -249,6 +249,20 @@ def test_an_ai_model_connection_is_tested_saved_and_handed_to_the_gateway(env, o
     assert connections.start_scheduled(env.store, env.credentials) == []  # a model is never indexed
 
 
+def test_a_cloud_model_is_marked_as_one_and_reads_nothing_without_a_grant(env, openai_stub):
+    from towpath.models import gateway
+
+    stub = openai_stub(model="cloud-model")
+    form = {"base_url": f"http://127.0.0.1:{stub.port}/v1", "model": "cloud-model", "destination": "third-party"}
+    with pytest.raises(connections.ConnectionProblem, match="where the model runs"):
+        connections.add_model(env.store, env.credentials, {**form, "destination": "anywhere"}, "t", {})
+    sid = connections.add_model(env.store, env.credentials, form, "token-1", connections.test_model(form, "token-1"))
+    worker = connections.merged(env.config, env.credentials)
+    assert worker.endpoints[sid].destination == "third-party"
+    status, reason, _ = gateway.check_policy(worker, "life.propose", "content", [])
+    assert status == "refused" and "no grant" in reason
+
+
 def test_an_expired_sign_in_is_explained_not_reported_as_an_unexpected_error(env, monkeypatch):
     from towpath import connect
     from towpath.adapters.errors import AuthStop

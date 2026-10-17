@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from towpath.stores import open_store
 from towpath.unified.contracts import check_source_id
 
-FEATURES = ("agent-context", "life-evidence", "excerpt")
+FEATURES = ("agent-context", "life-evidence", "excerpt", "mail-manage")
 PURPOSES = ("agent-context", "life-evidence")
 WRITER = "web"
 READER = "connect"

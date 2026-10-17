@@ -3,6 +3,11 @@
 It records every command (passwords masked), refuses anything outside the read-only allow-list,
 and models the one side effect read-only access must avoid: a non-PEEK body fetch sets ``\\Seen``.
 Mailbox contents are invented messages built with the standard library.
+
+``State(..., writable=True)`` also accepts the commands mail management's action runner uses (SELECT, UID STORE,
+UID MOVE, APPEND, UNSELECT) and advertises the extensions Fastmail offers (MOVE, UIDPLUS, UNSELECT, IDLE, CONDSTORE,
+SPECIAL-USE, OBJECTID). The read-only connector must still never send them: tests check ``violations`` and the
+transcript per connection.
 """
 
 import re
@@ -16,6 +21,9 @@ from imapclient.imap_utf7 import decode as utf7_decode
 from imapclient.imap_utf7 import encode as utf7_encode
 
 READ_ONLY_COMMANDS = {"CAPABILITY", "LOGIN", "LIST", "EXAMINE", "SEARCH", "FETCH", "LOGOUT", "NOOP"}
+EXTENSION_COMMANDS = {"ENABLE", "IDLE"}  # read-only, but offered only by the extended server
+WRITE_COMMANDS = {"SELECT", "STORE", "MOVE", "APPEND", "UNSELECT"}
+EXTENSIONS = "MOVE UIDPLUS UNSELECT IDLE CONDSTORE ENABLE SPECIAL-USE OBJECTID"
 
 
 @dataclass
@@ -23,6 +31,7 @@ class Message:
     raw: bytes
     internaldate: str = "02-Apr-2009 10:15:00 +0000"
     flags: set = field(default_factory=set)
+    modseq: int = 1
 
 
 @dataclass
@@ -38,9 +47,15 @@ class Mailbox:
 
 
 class State:
-    def __init__(self, mailboxes: dict, username: str = "reader@example.com", password: str = "synthetic-only"):
+    def __init__(self, mailboxes: dict, username: str = "reader@example.com", password: str = "synthetic-only",
+                 writable: bool = False, write_password: str | None = None):
         self.mailboxes = mailboxes
         self.username, self.password = username, password
+        self.writable = writable
+        self.write_password = write_password  # a second app password that may change mail; the first may not
+        self.modseq = 1
+        self.idle_events: list[str] = []  # untagged responses to send to clients in IDLE, such as "3 EXISTS"
+        self.writes: list[str] = []  # state-changing commands accepted, by connection's password kind
         self.transcript: list[str] = []
         self.violations: list[str] = []
         self.literal_plus = False
@@ -50,6 +65,10 @@ class State:
         self.fail_examine: set = set()
         self.fetch_commands = 0
         self.lock = threading.Lock()
+
+    def bump(self, msg: Message) -> None:
+        self.modseq += 1
+        msg.modseq = self.modseq
 
     def flags(self) -> dict:
         return {(name, uid): frozenset(m.flags) for name, box in self.mailboxes.items()
@@ -203,10 +222,17 @@ class Handler(socketserver.StreamRequestHandler):
                 self.send("+ go ahead\r\n")
             data += self.rfile.read(int(match.group(1)))
 
+    def caps(self) -> str:
+        return ("IMAP4rev1 AUTH=PLAIN" + (" LITERAL+" if self.state.literal_plus else "")
+                + (f" {EXTENSIONS}" if self.state.writable else ""))
+
     def handle(self) -> None:
-        caps = "IMAP4rev1 AUTH=PLAIN" + (" LITERAL+" if self.state.literal_plus else "")
-        self.send(f"* OK [CAPABILITY {caps}] synthetic stub ready\r\n")
+        self.send(f"* OK [CAPABILITY {self.caps()}] synthetic stub ready\r\n")
         self.selected: str | None = None
+        self.read_write = False
+        self.may_write = False
+        self.condstore = False
+        allowed = READ_ONLY_COMMANDS | (EXTENSION_COMMANDS | WRITE_COMMANDS if self.state.writable else set())
         while True:
             data = self.read_command()
             if data is None:
@@ -221,7 +247,8 @@ class Handler(socketserver.StreamRequestHandler):
             logged = f"{tag} LOGIN <masked>" if command == "LOGIN" else data.decode("utf-8", "replace").strip()
             with self.state.lock:
                 self.state.transcript.append(logged)
-            if command not in READ_ONLY_COMMANDS or (command in {"SEARCH", "FETCH"} and not uid):
+            if command not in allowed or (command in {"SEARCH", "FETCH", "STORE", "MOVE"} and not uid) or (
+                    command in WRITE_COMMANDS - {"UNSELECT"} and not self.may_write):
                 with self.state.lock:
                     self.state.violations.append(command)
                 self.send(f"{tag} NO [CANNOT] this synthetic server is read-only\r\n")
@@ -230,15 +257,17 @@ class Handler(socketserver.StreamRequestHandler):
                 return
 
     def cmd_capability(self, tag, args):
-        caps = "IMAP4rev1 AUTH=PLAIN" + (" LITERAL+" if self.state.literal_plus else "")
-        self.send(f"* CAPABILITY {caps}\r\n{tag} OK done\r\n")
+        self.send(f"* CAPABILITY {self.caps()}\r\n{tag} OK done\r\n")
 
     def cmd_noop(self, tag, args):
         self.send(f"{tag} OK done\r\n")
 
     def cmd_login(self, tag, args):
         user, password = (a.decode() for a in args[:2])
-        if (user, password) != (self.state.username, self.state.password):
+        if user == self.state.username and self.state.write_password and password == self.state.write_password:
+            self.may_write = True
+            self.send(f"{tag} OK logged in\r\n")
+        elif (user, password) != (self.state.username, self.state.password):
             self.send(f"{tag} NO [AUTHENTICATIONFAILED] invalid credentials\r\n")
         else:
             self.send(f"{tag} OK logged in\r\n")
@@ -267,10 +296,120 @@ class Handler(socketserver.StreamRequestHandler):
             self.send(f"{tag} NO [NONEXISTENT] no such mailbox\r\n")
             return
         self.selected = name
+        self.read_write = False
         mode = "READ-WRITE" if self.state.grant_read_write else "READ-ONLY"
+        self._opened(tag, box, mode, "EXAMINE")
+
+    def _opened(self, tag, box, mode, verb):
+        modseq = max((m.modseq for m in box.messages.values()), default=1)
+        highest = f"* OK [HIGHESTMODSEQ {modseq}] modseq\r\n" if self.condstore else ""
         self.send(f"* {len(box.messages)} EXISTS\r\n* 0 RECENT\r\n* FLAGS (\\Seen \\Answered \\Flagged)\r\n"
                   f"* OK [UIDVALIDITY {box.uidvalidity}] UIDs valid\r\n* OK [UIDNEXT {box.uidnext}] next\r\n"
-                  f"{tag} OK [{mode}] EXAMINE completed\r\n")
+                  f"{highest}{tag} OK [{mode}] {verb} completed\r\n")
+
+    # -- extensions and writes (State(writable=True) only) ---------------------------------------------------
+
+    def cmd_enable(self, tag, args):
+        names = [a.decode().upper() for a in args]
+        if "CONDSTORE" in names:
+            self.condstore = True
+        self.send(f"* ENABLED {' '.join(n for n in names if n == 'CONDSTORE')}\r\n{tag} OK done\r\n")
+
+    def cmd_select(self, tag, args):
+        name = utf7_decode(args[0])
+        box = self.state.mailboxes.get(name)
+        if box is None or box.noselect:
+            self.selected = None
+            self.send(f"{tag} NO [NONEXISTENT] no such mailbox\r\n")
+            return
+        self.selected, self.read_write = name, True
+        self._opened(tag, box, "READ-WRITE", "SELECT")
+
+    def cmd_unselect(self, tag, args):
+        self.selected, self.read_write = None, False
+        self.send(f"{tag} OK unselected, nothing expunged\r\n")
+
+    def _writable_box(self, tag):
+        box = self._box(tag)
+        if box is not None and not self.read_write:
+            self.send(f"{tag} NO [READ-ONLY] mailbox is open read-only\r\n")
+            return None
+        return box
+
+    def cmd_store(self, tag, args):
+        box = self._writable_box(tag)
+        if box is None:
+            return
+        uids = _uidset(args[0].decode(), sorted(box.messages))
+        op = args[1].decode().upper()
+        flags = {f.decode() for f in (args[2] if isinstance(args[2], list) else [args[2]])}
+        with self.state.lock:
+            self.state.writes.append(f"STORE {op} {' '.join(sorted(flags))} {self.selected} {uids}")
+        seqs = {u: i + 1 for i, u in enumerate(sorted(box.messages))}
+        for u in uids:
+            msg = box.messages[u]
+            msg.flags = msg.flags | flags if op.startswith("+") else msg.flags - flags
+            self.state.bump(msg)
+            if not op.endswith(".SILENT"):
+                self.send(f"* {seqs[u]} FETCH (UID {u} FLAGS ({' '.join(sorted(msg.flags))}))\r\n")
+        self.send(f"{tag} OK STORE completed\r\n")
+
+    def cmd_move(self, tag, args):
+        box = self._writable_box(tag)
+        if box is None:
+            return
+        dest = self.state.mailboxes.get(utf7_decode(args[1]))
+        if dest is None:
+            self.send(f"{tag} NO [TRYCREATE] no such mailbox\r\n")
+            return
+        uids = _uidset(args[0].decode(), sorted(box.messages))
+        with self.state.lock:
+            self.state.writes.append(f"MOVE {self.selected} {uids} -> {utf7_decode(args[1])}")
+        new = []
+        for u in uids:
+            nu = dest.uidnext
+            dest.messages[nu] = box.messages[u]
+            self.state.bump(dest.messages[nu])
+            new.append(nu)
+        self.send(f"* OK [COPYUID {dest.uidvalidity} {','.join(map(str, uids))} {','.join(map(str, new))}] moved\r\n")
+        for u in sorted(uids, reverse=True):
+            seq = sorted(box.messages).index(u) + 1
+            del box.messages[u]
+            self.send(f"* {seq} EXPUNGE\r\n")
+        self.send(f"{tag} OK MOVE completed\r\n")
+
+    def cmd_append(self, tag, args):
+        name = utf7_decode(args[0])
+        box = self.state.mailboxes.get(name)
+        if box is None:
+            self.send(f"{tag} NO [TRYCREATE] no such mailbox\r\n")
+            return
+        flags = set()
+        for a in args[1:-1]:
+            if isinstance(a, list):
+                flags = {f.decode() for f in a}
+        uid = box.uidnext
+        box.messages[uid] = Message(args[-1], flags=flags)
+        self.state.bump(box.messages[uid])
+        with self.state.lock:
+            self.state.writes.append(f"APPEND {name} {' '.join(sorted(flags))}")
+        self.send(f"{tag} OK [APPENDUID {box.uidvalidity} {uid}] APPEND completed\r\n")
+
+    def cmd_idle(self, tag, args):
+        import select
+
+        self.send("+ idling\r\n")
+        while True:
+            with self.state.lock:
+                events, self.state.idle_events = self.state.idle_events, []
+            for event in events:
+                self.send(f"* {event}\r\n")
+            ready, _, _ = select.select([self.request], [], [], 0.05)
+            if ready:
+                line = self.rfile.readline()
+                if not line or line.strip().upper() == b"DONE":
+                    break
+        self.send(f"{tag} OK IDLE terminated\r\n")
 
     def _box(self, tag) -> Mailbox | None:
         box = self.state.mailboxes.get(self.selected) if self.selected else None
@@ -300,6 +439,11 @@ class Handler(socketserver.StreamRequestHandler):
             elif key == "UID":
                 uids = [u for u in uids if u in _uidset(args[i + 1].decode(), uids)]
                 i += 2
+            elif key == "HEADER":
+                field_name, needle = args[i + 1].decode(), args[i + 2].decode(charset)
+                uids = [u for u in uids if needle.lower() in str(
+                    message_from_bytes(box.messages[u].raw, policy=policy.default)[field_name] or "").lower()]
+                i += 3
             else:
                 self.send(f"{tag} BAD unsupported search key\r\n")
                 return
@@ -327,6 +471,10 @@ class Handler(socketserver.StreamRequestHandler):
         if self.state.drop_after_fetches is not None and self.state.fetch_commands > self.state.drop_after_fetches:
             return False  # connection lost mid-run
         uids = _uidset(args[0].decode(), sorted(box.messages))
+        changedsince = None
+        if len(args) > 2 and isinstance(args[2], list) and args[2][:1] == [b"CHANGEDSINCE"]:
+            changedsince = int(args[2][1])
+            uids = [u for u in uids if box.messages[u].modseq > changedsince]
         if self.state.max_fetch_ids is not None and len(uids) > self.state.max_fetch_ids:
             self.send(f"{tag} BAD [LIMIT] too many messages in one FETCH\r\n")
             return
@@ -349,6 +497,11 @@ class Handler(socketserver.StreamRequestHandler):
                     continue
                 if name == "FLAGS":
                     pieces.append(f"FLAGS ({' '.join(sorted(msg.flags))})")
+                elif name == "MODSEQ":
+                    pieces.append(f"MODSEQ ({msg.modseq})")
+                elif name == "THREADID" and self.state.writable:
+                    root = (parsed["References"] or parsed["In-Reply-To"] or parsed["Message-ID"] or "").split()[0]
+                    pieces.append(f"THREADID (T{abs(hash(root)) % 10**8})")
                 elif name == "RFC822.SIZE":
                     pieces.append(f"RFC822.SIZE {len(msg.raw)}")
                 elif name == "INTERNALDATE":
@@ -364,6 +517,8 @@ class Handler(socketserver.StreamRequestHandler):
                     data = self._section(parsed, msg.raw, section)
                     label = f"BODY[{section}]" if "[" in name else name
                     literals.append((label, data))
+            if changedsince is not None and not any(p.startswith("MODSEQ") for p in pieces):
+                pieces.append(f"MODSEQ ({msg.modseq})")
             text = " ".join(pieces)
             self.send(f"* {seqs[u]} FETCH ({text}")
             for label, data in literals:

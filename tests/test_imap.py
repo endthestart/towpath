@@ -228,9 +228,16 @@ def test_session_facade_refuses_state_changing_fetches_and_hides_the_client():
     for item in ("BODY[1]", "BODY[]", "RFC822", "RFC822.TEXT", "BODY.PEEK[1] FLAGS"):
         with pytest.raises(ReadOnlyViolation):
             session.fetch([1], (item,))
+    for modifiers in (("UNCHANGEDSINCE 5",), ("CHANGEDSINCE 5 VANISHED",)):
+        with pytest.raises(ReadOnlyViolation):
+            session.fetch([1], ("FLAGS",), modifiers)
+    with pytest.raises(ReadOnlyViolation):
+        session.fetch("1:5", ("FLAGS",))
+    with pytest.raises(ReadOnlyViolation):
+        session.enable("QRESYNC")
     public = {n for n in dir(session) if not n.startswith("_")}
     assert public == {"login", "capabilities", "mailboxes", "folders", "examine", "search_all", "search_text",
-                      "fetch", "logout"}
+                      "fetch", "logout", "enable", "search_message_id", "wait_for_changes"}
 
 
 def test_selected_content_goes_through_the_queue_and_reads_with_peek(env):

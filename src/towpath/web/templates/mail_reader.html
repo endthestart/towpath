@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}{{ m.subject|default:'Message' }} · Mail · Towpath{% endblock %}
+{% block content %}
+<a class="back-link" href="/mail/{{ m.source_id }}/?box={{ m.mailbox|urlencode }}">← {{ m.mailbox }}</a>
+<header class="page-head compact"><p class="eyebrow">{{ account.name|upper }} · {{ m.mailbox|upper }}</p><h1 class="message-subject">{{ m.subject|default:'(No subject)' }}</h1>
+<p class="lead">{{ m.from_name|default:'' }} &lt;{{ m.from_addr|default:'unknown' }}&gt; · {{ m.date_utc|slice:":16"|default:'date unknown' }} UTC</p></header>
+{% if saved == 'asked' %}<div class="notice" role="status">Asked. Towpath carries it out within a minute or two{% if not account.write %}, as a dry run until you add a write password{% endif %}.</div>{% endif %}
+{% if not here %}<div class="notice warn" role="status">This message has moved or been deleted since Towpath read it.</div>{% endif %}
+<section class="detail-card">
+{% if here %}<div class="form-actions">{% for key, label in choices %}<form method="post" action="/mail/act">{% csrf_token %}<input type="hidden" name="item_id" value="{{ m.item_id }}"><button class="button secondary" name="type" value="{{ key }}" type="submit">{{ label }}</button></form>{% endfor %}</div>
+<p class="footnote">{% for label in account.enabled_labels %}{% if forloop.first %}Turned on for this account: {% endif %}{{ label }}{% if not forloop.last %}, {% endif %}{% empty %}Every change is a dry run for this account: Towpath checks the message and records what it would do.{% endfor %}{% if account.enabled_labels and not account.write %}. Without a write password these are dry runs too.{% endif %}</p>{% endif %}
+<dl><div><dt>To</dt><dd>{{ m.to_addrs|join:", "|default:'—' }}</dd></div>
+{% if m.cc_addrs %}<div><dt>Cc</dt><dd>{{ m.cc_addrs|join:", " }}</dd></div>{% endif %}
+{% if m.list_id or m.list_unsubscribe %}<div><dt>Mailing list</dt><dd>{{ m.list_id|default:'' }}{% if m.list_unsubscribe_post %} · one-click unsubscribe offered{% elif m.list_unsubscribe %} · unsubscribe offered{% endif %}</dd></div>{% endif %}
+<div><dt>Flags</dt><dd>{% if m.unread %}Unread{% else %}Read{% endif %}{% if m.flagged %} · Flagged{% endif %}</dd></div></dl>
+<div class="content-text">{{ m.text|default:'(No text part.)' }}</div>
+{% if m.quoted_removed or m.text_truncated %}<p class="footnote">{% if m.quoted_removed %}Quoted earlier messages are left out.{% endif %}{% if m.text_truncated %} Only the start of a long message is shown.{% endif %} Open it in your mail app for everything, including formatting and attachments.</p>{% endif %}
+</section>
+{% if thread %}<section class="detail-card"><h2 class="card-title">This conversation</h2>
+{% for t in thread %}<p>{% if t.item_id == m.item_id %}<strong>{% else %}<a href="/mail/m/{{ t.item_id }}/">{% endif %}{{ t.date_utc|slice:":10" }} · {{ t.from_name|default:t.from_addr }} · {{ t.subject|default:'(No subject)' }}{% if t.item_id == m.item_id %}</strong>{% else %}</a>{% endif %} <span class="muted">· {{ t.mailbox }}</span></p>{% endfor %}
+</section>{% endif %}
+{% if activity %}<section class="detail-card"><h2 class="card-title">Changes to this message</h2>
+{% for r in activity %}<div class="inline-form"><span><span class="muted">{{ r.outcome_text }}{% if r.at %} · {{ r.at|slice:":16" }}{% endif %}</span> · {{ r.what }}{% if r.detail %}<br><span class="footnote">{{ r.detail }}</span>{% endif %}</span>
+{% if r.can_undo %}<form method="post" action="/mail/undo">{% csrf_token %}<input type="hidden" name="key" value="{{ r.key }}"><input type="hidden" name="next" value="/mail/m/{{ m.item_id }}/?saved=asked"><button class="button secondary" type="submit">Undo</button></form>{% endif %}</div>{% endfor %}
+</section>{% endif %}
+{% endblock %}

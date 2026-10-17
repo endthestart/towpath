@@ -1,6 +1,6 @@
 # Mail management
 
-Status: **design; read-only pieces built.** Towpath's read-only Gmail connector and the read-only Inbox Zero adapter exist and are tested against fakes and stubs only. Nothing in this repository can change a mailbox.
+Status: **changing, per [ADR 0002](adrs/0002-towpath-native-mail-management.md) (proposed 2026-10-16).** Towpath is building its own mail management over IMAP, Fastmail first, following the [build plan](plans/2026-10-16-native-mail-management.md). Inbox Zero keeps the owner's Gmail until Towpath reaches parity there. The foundation (milestone 1) is described [below](#towpath-native-mail-management); the rest of this page records the Inbox Zero integration that applies until then.
 
 ## Approach
 
@@ -73,6 +73,23 @@ If Inbox Zero stops fitting, or a Towpath-native feature replaces part of it, th
 - While acting: rate-limit; stop the batch on an unexpected error class; never retry a non-idempotent action without a fresh recheck.
 - After acting: write a receipt per item; generate an inverse proposal where one exists; return changed or failed items for review.
 - If it ever holds a Gmail write token: allow only specific API calls, with tests asserting that no send or delete call exists in its code path ([R16](decisions.md#recommendations-in-this-design)).
+
+## Towpath-native mail management
+
+Built in milestone 1 of the [build plan](plans/2026-10-16-native-mail-management.md); qualification on the owner's server is pending.
+
+| Piece | Role and store | What it does |
+| --- | --- | --- |
+| Managed accounts | web → decisions (`mail-manage` grant) | Nothing below runs for an account until the owner turns management on for it on the Mail page. IMAP accounts only, for now. |
+| Reading | connect → `mail` | Every message's headers, flags, thread (the server's `THREADID` where offered, otherwise `References`), list headers and new text (quotes removed, at most 20,000 characters), read with EXAMINE and `BODY.PEEK` in resumable slices: new mail first, then the whole history. Flags that changed are read with CONDSTORE. |
+| Watching | connect | IDLE on each managed inbox; new mail starts indexing, then reading. |
+| Owner's decisions | web → `maildecisions` | Changes asked for on a message (and Undo), and answers to proposals, each tied to the digest of exactly what was asked. Which kinds of change may run, per account (decisions store); all start off. |
+| Proposals | worker → `mailplan` | Changes Towpath's features propose (from milestone 2). Immutable. |
+| Action runner | act → `mailact` | The only code with the write password. Checks the digest, approval, type and the message itself, then carries the change out, or, for a kind not turned on or an account without a write password, checks the message read-only and records a **dry run**. One receipt per request, with the inverse change for Undo. |
+
+The write session (`towpath.mail.executor.ActSession`) offers only SELECT, UID STORE of `\Seen`, `\Flagged` and labels (never `\Deleted`), UID MOVE to an existing mailbox, APPEND to Drafts or the inbox, and UNSELECT (or EXAMINE, never CLOSE). There is no EXPUNGE, DELETE, COPY, CREATE or RENAME. Moving to Trash is the furthest a change goes; the provider's own Trash retention deletes. The write password is a second app password, entered on the account's Connections page, refused if it is the read-only one or can only read.
+
+Cloud models: an AI model connection is marked as running on the owner's network (the default) or at a cloud service. Either way nothing personal reaches it without the owner's grant.
 
 ## Prompt injection and model output
 

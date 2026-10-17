@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block title %}Mail · Towpath{% endblock %}
+{% block content %}
+<header class="page-head compact"><h1>Mail</h1>
+<p class="lead">Towpath reads all of the mail in the accounts you choose, across its whole history, so it can help you sort, answer and clean up. It changes mail only in the ways you turn on below; everything else is a dry run, recorded but not done.</p></header>
+{% if saved %}<div class="notice" role="status">{% if saved == 'writes' %}Saved. Kinds of change that are off stay dry runs.{% elif saved == 'undo' %}Undo requested. Towpath carries it out within a minute or two.{% else %}Saved.{% endif %}</div>{% endif %}
+
+<section class="detail-card"><h2 class="card-title">Accounts</h2>
+{% for a in accounts %}<article class="mail-account">
+  <h3>{{ a.name }}{% if a.address %} <span class="muted">· {{ a.address }}</span>{% endif %}</h3>
+  {% if not a.supported %}<p>Towpath manages mail over IMAP. Gmail joins later, over IMAP; until then Inbox Zero manages this account.</p>
+  {% else %}
+  <form method="post" action="/mail/manage" class="inline-form">{% csrf_token %}<input type="hidden" name="source_id" value="{{ a.source_id }}"><input type="hidden" name="manage" value="{% if a.managed %}0{% else %}1{% endif %}">
+    <span>{% if a.managed %}<strong>Managed.</strong> Towpath reads this account's mail.{% else %}Not managed. Towpath only indexes this account for search.{% endif %}</span>
+    <button class="button{% if a.managed %} secondary{% endif %}" type="submit">{% if a.managed %}Stop managing{% else %}Manage this account{% endif %}</button></form>
+  {% if a.managed %}
+  <p>{% if a.progress %}Read {{ a.progress.read }} of {{ a.progress.indexed }} indexed messages{% if a.progress.history_done %}, the whole history{% else %}, newest first{% endif %}.{% if a.progress.reason %} <span class="warn-text">{{ a.progress.reason }}</span>{% endif %}{% else %}Reading starts with the next check, after the account is indexed.{% endif %}
+  {% if a.watch %}{% if a.watch.state == 'watching' %}New mail is noticed as it arrives.{% elif a.watch.state == 'stopped' %}Watching for new mail stopped ({{ a.watch.detail }}).{% elif a.watch.state == 'unsupported' %}This server can't tell Towpath about new mail; it is found at each scheduled check.{% endif %}{% endif %}
+  <a href="/mail/{{ a.source_id }}/">Messages</a></p>
+  <form method="post" action="/mail/pause" class="inline-form">{% csrf_token %}<input type="hidden" name="source_id" value="{{ a.source_id }}"><input type="hidden" name="pause" value="{% if a.paused %}0{% else %}1{% endif %}"><button class="button secondary" type="submit">{% if a.paused %}Resume reading{% else %}Pause reading{% endif %}</button></form>
+
+  <h4>What Towpath may change</h4>
+  {% if not a.write %}<p>Towpath has only a read-only password for this account, so every change is a dry run. <a href="/connections/{{ a.source_id }}/write-password">Add a write password</a> on the Connections page to let it change mail.</p>{% endif %}
+  <form method="post" action="/mail/writes" class="settings-form">{% csrf_token %}<input type="hidden" name="source_id" value="{{ a.source_id }}">
+    <fieldset><legend>Carry out these kinds of change (off: dry run only)</legend>
+    {% for t in types %}<label class="check"><input type="checkbox" name="types" value="{{ t.key }}"{% if t.key in a.enabled %} checked{% endif %}> {{ t.label }}{% if not t.auto %} <span class="muted">· always asks you first</span>{% endif %}</label>{% endfor %}
+    </fieldset>
+    <div class="form-actions"><button class="button" type="submit">Save</button></div></form>
+  {% endif %}{% endif %}
+</article>{% empty %}<p>No mail accounts yet. <a href="/connections/">Connect one</a>.</p>{% endfor %}
+</section>
+
+{% if proposals %}<section class="detail-card"><h2 class="card-title">Waiting for your answer</h2>
+{% for p in proposals %}<form method="post" action="/mail/answer" class="inline-form">{% csrf_token %}<input type="hidden" name="proposal_id" value="{{ p.proposal_id }}">
+  <span><strong>{{ p.what }}</strong> · {{ p.body.reason }}</span>
+  <button class="button" name="approve" value="1">Approve</button><button class="button secondary" name="approve" value="0">Reject</button></form>{% endfor %}
+</section>{% endif %}
+
+<section class="detail-card"><h2 class="card-title">What Towpath did</h2>
+{% for w in waiting %}<p><span class="muted">Waiting</span> · {{ w.what }} · {{ w.message.subject|default:"(no subject)" }}</p>{% endfor %}
+{% for r in receipts %}<div class="inline-form"><span><span class="muted">{{ r.outcome_text }} · {{ r.at|slice:":16" }}</span> · {{ r.what }} · {% if r.body.target.item_id %}<a href="/mail/m/{{ r.body.target.item_id }}/">{{ r.message.subject|default:"(no subject)" }}</a>{% else %}{{ r.message.subject }}{% endif %}<br><span class="footnote">{{ r.detail }}</span></span>
+  {% if r.can_undo %}<form method="post" action="/mail/undo">{% csrf_token %}<input type="hidden" name="key" value="{{ r.key }}"><button class="button secondary" type="submit">Undo</button></form>{% endif %}</div>
+{% empty %}{% if not waiting %}<p>Nothing yet.</p>{% endif %}{% endfor %}
+</section>
+{% endblock %}

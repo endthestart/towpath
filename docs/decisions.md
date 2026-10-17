@@ -36,6 +36,8 @@ These are built into the current documents. The owner can accept or overturn eac
 
 **Revised 2026-10-01 (with D15).** Mail management needs write access; the life stream does not. Mailbox changes (labels, archive, unsubscribe, drafts, rules) are carried out by the integrated mail-management tool under its own settings, starting with Inbox Zero ([mail management](mail-management.md)). `towpath-act` executes approved deliveries to destinations such as a document system or photo library, under the [action runner contract](mail-management.md#if-towpath-builds-its-own-features-later). If Towpath later builds its own mailbox actions, they go through `towpath-act` with a call allowlist ([R16](#recommendations-in-this-design)). Permanent deletion is never a Towpath action.
 
+*Proposed revision 2026-10-16 ([ADR 0002](adrs/0002-towpath-native-mail-management.md)):* `towpath-act` also carries out mailbox changes the owner asked for or approved, over IMAP, through an allow-listed write session with its own app password. Permanent deletion is still never a Towpath action.
+
 *Earlier version (accepted the same day):* `towpath-act` would also execute tier 1 mailbox changes itself.
 
 ### D2. Implementation language and storage

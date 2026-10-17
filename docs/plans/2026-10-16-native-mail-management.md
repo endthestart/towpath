@@ -25,6 +25,11 @@ Branch `claude/native-mail-management`, cut from the deployed head `9cbc7f9`.
 | 5 | **Alerts, digest, statistics, filing** | Important mail is flagged or placed where Fastmail notifies. A digest message is APPENDed to the inbox on the owner's schedule. Statistics for volume, senders, rule actions and response times. Attachment filing through the existing destinations. |
 | 6 | **Gmail over IMAP and parity** | Gmail connected over IMAP with labels and thread IDs. Dry run alongside Inbox Zero, with a feature-by-feature comparison recorded. The owner decides whether to retire Inbox Zero; D15 is marked superseded. |
 
+## Status
+
+- Milestone 0: approved by the owner on 2026-10-16.
+- Milestone 1: built and tested against a synthetic server with Fastmail's extensions ([mail management](../mail-management.md#towpath-native-mail-management)). Next: release, then qualify on Hub against the owner's Fastmail in dry run (management turned on, history read, a few dry-run changes checked), and then, with the owner, the write password and one kind of change turned on.
+
 ## Facts to verify before the milestone that needs them
 
 | Claim | Milestone |

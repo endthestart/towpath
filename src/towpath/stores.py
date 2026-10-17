@@ -10,6 +10,10 @@
 | quota     | connect | connect        |
 | files     | connect | worker, web    |
 | connections | connect | worker, web  |
+| mail      | connect | worker, act, web |
+| mailplan  | worker  | act, web       |
+| mailact   | act     | worker, web    |
+| maildecisions | web | act            |
 
 Readers open with ``mode=ro`` so the database itself refuses writes.
 """
@@ -27,6 +31,10 @@ WRITERS = {
     "files": {"connect"},
     "life": {"worker"},
     "connections": {"connect"},
+    "mail": {"connect"},
+    "mailplan": {"worker"},
+    "mailact": {"act"},
+    "maildecisions": {"web"},
 }
 
 # Columns and tables added after a store was first released. Applied on every
@@ -234,6 +242,58 @@ CREATE TABLE IF NOT EXISTS runs (
 CREATE TABLE IF NOT EXISTS examined (
   run_id TEXT NOT NULL, item_id TEXT NOT NULL, outcome TEXT NOT NULL, at TEXT NOT NULL,
   PRIMARY KEY (run_id, item_id));
+""",
+    # Mail management (towpath.mail): what Towpath has read of each message it manages. Rebuildable from the
+    # mailbox; written only by the connector, which holds the read-only connection.
+    "mail": """
+CREATE TABLE IF NOT EXISTS messages (
+  item_id TEXT PRIMARY KEY, source_id TEXT NOT NULL, mailbox TEXT NOT NULL, uidvalidity INTEGER NOT NULL,
+  uid INTEGER NOT NULL, message_id TEXT, in_reply_to TEXT, refs TEXT NOT NULL DEFAULT '[]', thread_key TEXT NOT NULL,
+  from_name TEXT, from_addr TEXT, to_addrs TEXT NOT NULL DEFAULT '[]', cc_addrs TEXT NOT NULL DEFAULT '[]',
+  reply_to TEXT, subject TEXT, date_utc TEXT, size INTEGER, flags TEXT NOT NULL DEFAULT '[]', list_id TEXT,
+  list_unsubscribe TEXT, list_unsubscribe_post TEXT, auto_submitted TEXT, precedence TEXT,
+  has_attachments INTEGER NOT NULL DEFAULT 0, text TEXT, text_truncated INTEGER NOT NULL DEFAULT 0,
+  quoted_removed INTEGER NOT NULL DEFAULT 0, problems TEXT NOT NULL DEFAULT '[]', analyzed_at TEXT NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS messages_identity ON messages (source_id, mailbox, uidvalidity, uid);
+CREATE INDEX IF NOT EXISTS messages_thread ON messages (source_id, thread_key);
+CREATE INDEX IF NOT EXISTS messages_box ON messages (source_id, mailbox, date_utc);
+CREATE INDEX IF NOT EXISTS messages_sender ON messages (source_id, from_addr);
+CREATE INDEX IF NOT EXISTS messages_message_id ON messages (source_id, message_id);
+-- Per source: how far the analysis has read the source index (rowids), and its progress for the Mail page.
+CREATE TABLE IF NOT EXISTS analysis (
+  source_id TEXT PRIMARY KEY, high INTEGER NOT NULL, low INTEGER NOT NULL, progress TEXT NOT NULL,
+  updated_at TEXT NOT NULL);
+-- Per mailbox: the flag state Towpath last read, so later reads ask only for what changed (CONDSTORE).
+CREATE TABLE IF NOT EXISTS mailbox_state (
+  source_id TEXT NOT NULL, mailbox TEXT NOT NULL, uidvalidity INTEGER NOT NULL, modseq INTEGER,
+  flags_read_at TEXT NOT NULL, PRIMARY KEY (source_id, mailbox));
+-- Per source: what the new-mail watcher last saw (no message data).
+CREATE TABLE IF NOT EXISTS watch (
+  source_id TEXT PRIMARY KEY, state TEXT NOT NULL, detail TEXT, at TEXT NOT NULL);
+""",
+    # Mailbox changes Towpath's own features propose. Immutable: approvals live in the decisions store and
+    # results in the mailact store, both keyed by proposal ID and digest.
+    "mailplan": """
+CREATE TABLE IF NOT EXISTS proposals (
+  proposal_id TEXT PRIMARY KEY, source_id TEXT NOT NULL, body TEXT NOT NULL, digest TEXT NOT NULL,
+  created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS proposals_source ON proposals (source_id, created_at);
+""",
+    # What the action runner did with each approved change: one receipt per request, never replaced.
+    "mailact": """
+CREATE TABLE IF NOT EXISTS receipts (
+  key TEXT PRIMARY KEY, source_id TEXT NOT NULL, body TEXT NOT NULL, digest TEXT NOT NULL, outcome TEXT NOT NULL,
+  detail TEXT, before TEXT, after TEXT, inverse TEXT, at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS receipts_source ON receipts (source_id, at);
+""",
+    # The owner's mailbox decisions: changes asked for directly on the Mail pages (approved by being asked for,
+    # including Undo), and answers to proposals, each tied to the digest of exactly what was proposed.
+    "maildecisions": """
+CREATE TABLE IF NOT EXISTS requests (
+  seq INTEGER PRIMARY KEY AUTOINCREMENT, source_id TEXT NOT NULL, body TEXT NOT NULL, digest TEXT NOT NULL,
+  author TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS answers (
+  proposal_id TEXT PRIMARY KEY, digest TEXT NOT NULL, decision TEXT NOT NULL, author TEXT NOT NULL, at TEXT NOT NULL);
 """,
     "ledger": """
 CREATE TABLE IF NOT EXISTS capability_reports (

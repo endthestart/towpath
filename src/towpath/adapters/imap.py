@@ -10,6 +10,8 @@ Read-only by construction:
   READ-WRITE is refused.
 - FETCH items are checked against an allow-list. Body sections must use ``BODY.PEEK``, which does
   not set ``\\Seen`` (RFC 9051 section 6.4.5); ``BODY[...]``, ``RFC822`` and ``RFC822.TEXT`` are refused.
+- Mail management also uses ENABLE CONDSTORE, FETCH with ``CHANGEDSINCE`` (only flags that changed), SEARCH for one
+  Message-ID, and IDLE to learn of new mail. None of them changes a message.
 
 Identity is mailbox + UIDVALIDITY + UID (RFC 9051 section 2.3.1.1). When UIDVALIDITY changes,
 old references are not mapped onto new UIDs: the mailbox is listed afresh, and the old items are
@@ -36,7 +38,11 @@ from towpath.unified.contracts import ContractError, imap_native, parse_imap_nat
 HEADER_ITEM = "BODY.PEEK[HEADER.FIELDS (DATE SUBJECT FROM MESSAGE-ID)]"
 METADATA_ITEMS = ("RFC822.SIZE", "INTERNALDATE", "BODYSTRUCTURE", HEADER_ITEM)
 ALLOWED_FETCH = re.compile(
-    r"^(UID|FLAGS|INTERNALDATE|RFC822\.SIZE|BODYSTRUCTURE|ENVELOPE|BODY\.PEEK\[[A-Z0-9 .()\-]*\](<\d+\.\d+>)?)$")
+    r"^(UID|FLAGS|INTERNALDATE|RFC822\.SIZE|BODYSTRUCTURE|ENVELOPE|MODSEQ|THREADID|EMAILID|X-GM-THRID|X-GM-MSGID|"
+    r"X-GM-LABELS|BODY\.PEEK\[[A-Z0-9 .()\-]*\](<\d+\.\d+>)?)$")
+ALLOWED_MODIFIER = re.compile(r"^CHANGEDSINCE \d+$")
+ALLOWED_ENABLE = {"CONDSTORE"}
+CHANGE_RESPONSES = {b"EXISTS", b"EXPUNGE", b"FETCH", b"VANISHED"}
 LOOPBACK = {"127.0.0.1", "localhost", "::1"}
 FETCH_BATCH = 100
 MAX_PART_BYTES = 50_000_000
@@ -83,8 +89,30 @@ class ReadOnlySession:
         info = self._client.select_folder(mailbox, readonly=True)
         if b"READ-WRITE" in info:
             raise ReadOnlyViolation("the server opened an EXAMINEd mailbox read-write; refusing to continue")
+        modseq = info.get(b"HIGHESTMODSEQ")
         return {"uidvalidity": int(info[b"UIDVALIDITY"]), "uidnext": info.get(b"UIDNEXT"),
-                "exists": info.get(b"EXISTS")}
+                "exists": info.get(b"EXISTS"), "highestmodseq": int(modseq) if modseq is not None else None}
+
+    def enable(self, capability: str) -> bool:
+        """ENABLE an extension that changes only what the server reports (CONDSTORE adds MODSEQ to responses)."""
+        if capability not in ALLOWED_ENABLE:
+            raise ReadOnlyViolation(f"ENABLE {capability!r} is not used")
+        if capability.encode() not in {c.upper() for c in self._client.capabilities()}:
+            return False
+        return capability.encode() in {c.upper() for c in self._client.enable(capability)}
+
+    def search_message_id(self, message_id: str) -> list[int]:
+        """UID SEARCH for one Message-ID header value (a value, never a search key)."""
+        return sorted(int(u) for u in self._client.search(["HEADER", "Message-ID", message_id]))
+
+    def wait_for_changes(self, timeout: float) -> bool:
+        """IDLE (RFC 2177) on the examined mailbox until the server reports a change or ``timeout`` passes."""
+        self._client.idle()
+        try:
+            responses = self._client.idle_check(timeout=timeout)
+        finally:
+            self._client.idle_done()
+        return any(len(r) > 1 and isinstance(r[1], bytes) and r[1].upper() in CHANGE_RESPONSES for r in responses)
 
     def search_all(self) -> list[int]:
         return sorted(int(u) for u in self._client.search(["ALL"]))
@@ -97,11 +125,19 @@ class ReadOnlySession:
         charset = None if all(w.isascii() for w in words) else "UTF-8"
         return sorted(int(u) for u in self._client.search(criteria, charset=charset))
 
-    def fetch(self, uids: list[int], items: tuple[str, ...]) -> dict:
+    def fetch(self, uids: list[int], items: tuple[str, ...], modifiers: tuple[str, ...] = ()) -> dict:
+        """UID FETCH of allowed items, with ``CHANGEDSINCE`` as the only modifier."""
         for item in items:
             if not ALLOWED_FETCH.match(item):
                 raise ReadOnlyViolation(f"FETCH item {item!r} could change message state; only PEEK reads are used")
-        return self._client.fetch(uids, list(items)) if uids else {}
+        for modifier in modifiers:
+            if not ALLOWED_MODIFIER.match(modifier):
+                raise ReadOnlyViolation(f"FETCH modifier {modifier!r} is not used")
+        if isinstance(uids, str):
+            raise ReadOnlyViolation("FETCH takes a list of UIDs")
+        if not uids:
+            return {}
+        return self._client.fetch(uids, list(items), modifiers=list(modifiers) or None)
 
     def logout(self) -> None:
         try:

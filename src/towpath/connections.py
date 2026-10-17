@@ -33,6 +33,9 @@ PROVIDERS = {
     "folders": {"label": "Folders on this server", "host": None, "port": None, "security": None, "help_url": None},
     "model": {"label": "AI model on your network", "host": None, "port": None, "security": None, "help_url": None},
 }
+# Where an AI model connection runs: on the owner's network (the default) or at a cloud service the owner chose.
+# Either way nothing personal reaches it without the owner's grant; mail marked restricted never reaches a cloud one.
+MODEL_DESTINATIONS = {"self-hosted": "On your network", "third-party": "A cloud service"}
 # What an AI model connection is used for. Personal content reaches it only after the owner allows it on the Life
 # page (a grant in the decisions store, tied to this endpoint's address, model and token file).
 MODEL_TASKS = ("life.propose",)
@@ -54,6 +57,11 @@ def _now() -> str:
 
 def secret_path(credentials_dir: Path, source_id: str) -> Path:
     return Path(credentials_dir) / f"{source_id}.password"
+
+
+def write_secret_path(credentials_dir: Path, source_id: str) -> Path:
+    """The second app password that mail management's action runner uses to change mail (towpath.mail.executor)."""
+    return Path(credentials_dir) / f"{source_id}.act-password"
 
 
 GOOGLE_CLIENT_FILE = "google-web-client.json"
@@ -150,6 +158,70 @@ def test_imap(settings: dict, password: str) -> list[dict]:
     if not folders:
         raise ConnectionProblem("The account has no folders Towpath can read.")
     return folders
+
+
+def test_write_imap(settings: dict, password: str) -> dict:
+    """Check a password meant for changing mail: it must open the inbox read-write, and the server must offer
+    MOVE. Opens the inbox and leaves it again without changing or expunging anything (UNSELECT, or EXAMINE)."""
+    from towpath.mail.executor import ActSession, WriteViolation, connect_act
+
+    try:
+        from imapclient.exceptions import IMAPClientAbortError, IMAPClientError, LoginError
+    except ImportError:
+        raise ConnectionProblem("This image lacks IMAP support.") from None
+    if not password:
+        raise ConnectionProblem("Enter the app password.")
+    source = _imap_source("setup-test", {**settings, "timeout_seconds": 20}, "none")
+    where = f"{source.host}:{source.port}"
+    try:
+        session: ActSession = connect_act(source, password)
+    except LoginError:
+        raise ConnectionProblem("The server rejected that password. For Fastmail, make a new app password.") from None
+    except (OSError, IMAPClientError):
+        raise ConnectionProblem(f"Couldn't connect to {where}.") from None
+    try:
+        inbox = next((n for n, _ in session.folders() if n.upper() == "INBOX"), None)
+        if inbox is None:
+            raise ConnectionProblem("The account has no inbox.")
+        try:
+            session.select(inbox)
+        except IMAPClientAbortError:
+            raise
+        except (WriteViolation, IMAPClientError):  # opened read-only, or refused outright
+            raise ConnectionProblem("That password can only read mail. Make an app password that can change mail "
+                                    "too (for Fastmail: Mail, with full access).") from None
+        session.unselect()
+        caps = sorted(session.capabilities())
+        if "MOVE" not in caps:
+            raise ConnectionProblem("The server doesn't offer MOVE, which Towpath needs to archive mail safely.")
+        specials = {use: session.special(f"\\{use}") for use in ("Archive", "Trash", "Drafts")}
+    except (OSError, IMAPClientError):
+        raise ConnectionProblem(f"The connection to {where} failed while checking the password. Try again.") from None
+    finally:
+        session.logout()
+    return {"tested_at": _now(), "capabilities": [c for c in caps if c in ("MOVE", "UIDPLUS", "UNSELECT", "IDLE",
+                                                                          "CONDSTORE", "OBJECTID", "SPECIAL-USE")],
+            "mailboxes": specials}
+
+
+def save_write_password(store_dir: Path, credentials_dir: Path, source_id: str, password: str, tested: dict) -> None:
+    """Store a tested write password. It must differ from the read-only one, which must stay read-only."""
+    c = _require(store_dir, source_id)
+    if c["adapter"] != "imap":
+        raise ConnectionProblem("Only email accounts reached over IMAP take a write password.")
+    read = secret_path(credentials_dir, source_id)
+    if read.is_file() and read.read_text() == password:
+        raise ConnectionProblem("That's the same password Towpath reads mail with. Use a separate app password, so "
+                                "the reading connection can never change mail.")
+    _write_secret(write_secret_path(credentials_dir, source_id), password)
+    _update(store_dir, source_id, "write-password-added", settings={**c["settings"], "write": tested})
+
+
+def remove_write_password(store_dir: Path, credentials_dir: Path, source_id: str) -> None:
+    c = _require(store_dir, source_id)
+    write_secret_path(credentials_dir, source_id).unlink(missing_ok=True)
+    _update(store_dir, source_id, "write-password-removed",
+            settings={k: v for k, v in c["settings"].items() if k != "write"})
 
 
 # -- the connections store ------------------------------------------------------------------------------
@@ -316,7 +388,9 @@ def disconnect(store_dir: Path, credentials_dir: Path, source_id: str) -> None:
     c = _require(store_dir, source_id)
     (token_path(credentials_dir, c) if c["adapter"] == "gmail" else secret_path(credentials_dir, source_id)).unlink(
         missing_ok=True)
-    _update(store_dir, source_id, "disconnected", state="disconnected", indexing="idle")
+    write_secret_path(credentials_dir, source_id).unlink(missing_ok=True)
+    _update(store_dir, source_id, "disconnected", state="disconnected", indexing="idle",
+            settings={k: v for k, v in c["settings"].items() if k != "write"})
 
 
 def merged(config, credentials_dir: Path | None, role: str = ROLE):
@@ -358,7 +432,8 @@ def model_endpoint(store_dir: Path, c: dict):
 
     s = c["settings"]
     ref = f"file:{secret_path(Path(store_dir).parent / 'credentials', c['source_id'])}"
-    return config_mod.Endpoint(c["source_id"], s["base_url"].rstrip("/"), ref, s["model"], "chat", "self-hosted",
+    destination = s.get("destination") if s.get("destination") in MODEL_DESTINATIONS else "self-hosted"
+    return config_mod.Endpoint(c["source_id"], s["base_url"].rstrip("/"), ref, s["model"], "chat", destination,
                                ("synthetic", "metadata", "content"), MODEL_TIMEOUT_SECONDS)
 
 
@@ -396,7 +471,11 @@ def add_model(store_dir: Path, credentials_dir: Path, settings: dict, token: str
     """Record a tested AI model connection and keep its token in the credentials folder."""
     sid = _new_id(store_dir, "model", set(taken))
     _write_secret(secret_path(credentials_dir, sid), token)
-    settings = {"base_url": settings["base_url"].rstrip("/"), "model": settings["model"], "tested": tested}
+    destination = settings.get("destination") or "self-hosted"
+    if destination not in MODEL_DESTINATIONS:
+        raise ConnectionProblem("Choose where the model runs.")
+    settings = {"base_url": settings["base_url"].rstrip("/"), "model": settings["model"], "tested": tested,
+                "destination": destination}
     now = _now()
     with closing(open_store(store_dir, "connections", ROLE)) as db:
         db.execute("""INSERT INTO connections (source_id, provider, adapter, display_name, settings, folders,
