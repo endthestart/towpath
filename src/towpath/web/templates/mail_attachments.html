@@ -4,14 +4,14 @@
 <a class="back-link" href="/mail/">← Mail</a>
 <header class="page-head compact"><p class="eyebrow">MAIL · {{ account.name|upper }}</p><h1>Attachments</h1>
 <p class="lead">Files sent in this account's mail, from what Towpath has indexed. A message in several folders counts once; small pictures inside messages (logos, signatures) are left out.</p></header>
-<form method="get" class="search" role="search">
+<form method="get" class="search filters" role="search">
   <label for="q" class="sr-only">Words in the file name or subject</label><input id="q" name="q" value="{{ f.q }}" placeholder="File name or subject: invoice, lease, passport">
   <label>Kind <select name="kind"><option value="">All but signatures</option>{% for key, label in kinds %}<option value="{{ key }}"{% if key == f.kind %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
   <label>Year <input name="year" value="{{ f.year }}" inputmode="numeric" maxlength="4" size="5"></label>
   <label>From <input name="sender" value="{{ f.sender }}" size="16"></label>
   <label>Order <select name="order">{% for key, label in orders %}<option value="{{ key }}"{% if key == f.order %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
   <button class="button" type="submit">Show</button></form>
-{% if summary %}<section class="detail-card"><h2 class="card-title">{{ summary.total.0 }} attachments, {{ summary.total.1|filesizeformat }}</h2>
+{% if summary %}<section class="detail-card"><h2 class="card-title">{{ summary.total.0 }} attachment{{ summary.total.0|pluralize }}, {{ summary.total.1|filesizeformat }}</h2>
 <table class="space-table"><thead><tr><th>Kind</th><th>Files</th><th>Space</th></tr></thead><tbody>
 {% for k in summary.kinds %}<tr><td><a href="?kind={{ k.0 }}">{{ k.1 }}</a></td><td>{{ k.2 }}</td><td>{{ k.3|filesizeformat }}</td></tr>{% endfor %}</tbody></table>
 <details><summary>By year and sender</summary>

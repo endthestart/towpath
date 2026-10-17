@@ -2,7 +2,7 @@
 {% block title %}Mail · Towpath{% endblock %}
 {% block content %}
 <header class="page-head compact"><h1>Mail</h1>
-<p class="lead">Towpath reads all of the mail in the accounts you choose, across its whole history, so it can help you sort, answer and clean up. It changes mail only in the ways you turn on below; everything else is a dry run, recorded but not done.</p></header>
+<p class="lead">Towpath reads all of the mail in the accounts you choose, across its whole history, so it can help you sort, answer and clean up. It changes mail only in the ways you turn on in each account's Settings; everything else is a dry run, recorded but not done.</p></header>
 {% if saved %}<div class="notice" role="status">{% if saved == 'writes' %}Saved. Kinds of change that are off stay dry runs.{% elif saved == 'dry-run' %}Saved.{% elif saved == 'undo' %}Undo requested. Towpath carries it out within a minute or two.{% else %}Saved.{% endif %}</div>{% endif %}
 
 <section class="detail-card"><h2 class="card-title">Accounts</h2>

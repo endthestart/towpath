@@ -58,6 +58,8 @@ def serve(store_dir: Path = typer.Option(None, "--store-dir", help="Folder holdi
             loaded = config_mod.for_data(layout)
     except (config_mod.ConfigError, OSError) as exc:
         raise typer.BadParameter(str(exc)) from None
+    if loaded is None:  # a bare stores folder: every setting has its default, accounts come from Connections
+        loaded = config_mod.Config(root=store_dir.parent.resolve(), store_dir=store_dir.resolve())
     try:
         from towpath.web.application import launch
     except ModuleNotFoundError as exc:
