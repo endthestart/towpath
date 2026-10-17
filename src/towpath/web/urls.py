@@ -37,6 +37,7 @@ urlpatterns = [
     path("life/forget", life_views.forget, name="life-forget"),
     path("life/timeline", life_views.timeline, name="life-timeline"),
     path("life/today", life_views.today, name="life-today"),
+    path("life/year/<str:year>", life_views.year, name="life-year"),
     path("life/story", life_views.story, name="life-story"),
     path("life/ask", life_views.ask, name="life-ask"),
     path("life/memories/", life_views.memories, name="life-memories"),

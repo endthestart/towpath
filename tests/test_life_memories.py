@@ -5,6 +5,7 @@ import json
 import re
 import sys
 from contextlib import closing
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -136,6 +137,13 @@ def test_the_pages(world, monkeypatch):
         client.post("/login", {"username": "owner", "password": OWNER})
         page = client.get("/life/timeline").content.decode()
         assert "Reader's timeline" in page and "age 35" in page and "Trip to Example Junction" in page
+        assert 'href="/life/year/2009"' in page
+        page = client.get("/life/year/2009").content.decode()
+        assert "Booked a trip to Example Junction" in page and "AGE 29" in page and "2010 →" in page
+        this_year = str(datetime.now(timezone.utc).year)
+        page = client.get(f"/life/year/{this_year}").content.decode()
+        assert "First wrote to" in page and "dana@example.net" in page and "emails received" in page
+        assert client.get("/life/year/later").status_code == 404
         page = client.get("/life/memories/").content.decode()
         assert "With Sam" in page and "To review" in page
         gid = next(g["group_id"] for g in life_groups.groups(world.store) if g["kind"] == "trip")

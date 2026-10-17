@@ -4,7 +4,7 @@
 <a class="back-link" href="/life/">← Life</a>
 <header class="page-head compact"><h1>{% if profile.name %}{{ profile.name }}'s timeline{% else %}Your timeline{% endif %}</h1>
 <p class="lead">Memories and events, newest first. Each event quotes the record it came from. {% if show_minor %}<a href="?">Hide everyday events</a>{% else %}<a href="?minor=1">Show everyday events too</a>{% endif %}.</p></header>
-{% for y in years %}<section class="detail-card"><h2 class="card-title">{{ y.year }}{% if y.age is not None %} <span class="muted">· age {{ y.age }}</span>{% endif %}</h2>
+{% for y in years %}<section class="detail-card"><h2 class="card-title">{% if y.year != 'Undated' %}<a href="/life/year/{{ y.year }}">{{ y.year }}</a>{% else %}{{ y.year }}{% endif %}{% if y.age is not None %} <span class="muted">· age {{ y.age }}</span>{% endif %}</h2>
 {% if y.context %}<p class="footnote">{% if y.context.photos %}<a href="/photos/?after={{ y.year }}-01-01&amp;before={{ y.year }}-12-31">{{ y.context.photos }} photos</a>{% endif %}{% if y.context.received or y.context.sent %}{% if y.context.photos %} · {% endif %}{{ y.context.received|default:0 }} emails received, {{ y.context.sent|default:0 }} sent{% endif %}{% if y.context.people %} · wrote most to {{ y.context.people|join:", " }}{% endif %}</p>{% endif %}
 {% for g in y.groups %}<article class="life-claim"><p><a href="/life/memories/{{ g.group_id }}/"><strong>{{ g.title }}</strong></a> <span class="muted">· {{ g.label }}{% if g.state == 'kept' %} · kept{% endif %} · {{ g.events|length }} event{{ g.events|length|pluralize }}</span></p>
 {% if g.summary %}<p class="footnote">{{ g.summary }}</p>{% endif %}

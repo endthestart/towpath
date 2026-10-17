@@ -161,6 +161,22 @@ def timeline(request):
 
 
 @require_GET
+def year(request, year):
+    store = settings.TOWPATH_STORE_DIR
+    if not (year.isdigit() and len(year) == 4):
+        raise Http404
+    found = life_today.one_year(store, year)
+    for m in found["months"]:
+        m["events"] = [_row(c) for c in m["events"]]
+    found["year_events"] = [_row(c) for c in found["year_events"]]
+    peak = max((m["photos"] for m in found["months"]), default=0)
+    mail_peak = max((m["received"] + m["sent"] for m in found["months"]), default=0)
+    return render(request, "life_year.html", {
+        "nav": "life", "y": found, "age": _age(life_groups.profile(store).get("birthday"), year),
+        "previous": str(int(year) - 1), "next": str(int(year) + 1), "peak": peak or 1, "mail_peak": mail_peak or 1})
+
+
+@require_GET
 def today(request):
     from datetime import date as date_
 

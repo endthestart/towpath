@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block title %}{{ y.year }} · Life · Towpath{% endblock %}
+{% block content %}
+<a class="back-link" href="/life/timeline">← Timeline</a>
+<header class="page-head compact"><p class="eyebrow">LIFE{% if age is not None %} · AGE {{ age }}{% endif %}</p><h1>{{ y.year }}</h1>
+<p class="lead">{% if y.totals.photos %}<a href="/photos/?after={{ y.year }}-01-01&amp;before={{ y.year }}-12-31">{{ y.totals.photos }} photos</a> · {% endif %}{{ y.totals.received }} emails received, {{ y.totals.sent }} sent · {{ y.events|length }} event{{ y.events|length|pluralize }}</p>
+<p><a href="/life/year/{{ previous }}">← {{ previous }}</a> · <a href="/life/year/{{ next }}">{{ next }} →</a></p></header>
+{% if y.year_events %}<section class="detail-card"><h2 class="card-title">During the year</h2>
+{% for e in y.year_events %}<p>{{ e.statement }} <span class="muted">· {{ e.when }} · {{ e.state }}</span>{% if e.evidence_url %} <a href="{{ e.evidence_url }}">source</a>{% endif %}</p>{% endfor %}</section>{% endif %}
+<section class="detail-card"><h2 class="card-title">Month by month</h2>
+<table class="space-table"><thead><tr><th>Month</th><th>Photos</th><th>Mail in</th><th>Mail out</th><th>Events</th></tr></thead><tbody>
+{% for m in y.months %}<tr><td>{{ m.label }}</td><td>{{ m.photos|default:"" }}</td><td>{{ m.received|default:"" }}</td><td>{{ m.sent|default:"" }}</td>
+<td>{% for e in m.events %}{{ e.statement }}{% if e.evidence_url %} <a href="{{ e.evidence_url }}" aria-label="Source for {{ e.statement }}">↗</a>{% endif %}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td></tr>{% endfor %}</tbody></table></section>
+{% if y.days %}<section class="detail-card"><h2 class="card-title">Days with the most photos</h2>
+{% for d in y.days %}<p><a href="/photos/?after={{ d.0 }}&amp;before={{ d.0 }}">{{ d.0 }}</a> <span class="muted">· {{ d.1 }} photos</span></p>{% endfor %}
+{% if y.cameras %}<p class="footnote">Cameras: {% for c in y.cameras %}{{ c.0 }} ({{ c.1 }}){% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}</section>{% endif %}
+{% if y.people %}<section class="detail-card"><h2 class="card-title">People you wrote to most</h2>
+{% for p in y.people %}<p><a href="/people/{{ p.0|urlencode }}/">{{ p.0 }}</a> <span class="muted">· {{ p.1 }} message{{ p.1|pluralize }}</span></p>{% endfor %}</section>{% endif %}
+{% if y.first %}<section class="detail-card"><h2 class="card-title">First wrote to</h2>
+{% for f in y.first %}<p><a href="/people/{{ f.1|urlencode }}/">{{ f.1 }}</a> <span class="muted">· {{ f.0 }}</span></p>{% endfor %}</section>{% endif %}
+{% endblock %}
