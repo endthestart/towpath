@@ -29,6 +29,8 @@ PROVIDERS = {
               "help_url": "https://myaccount.google.com/connections"},
     "fastmail": {"label": "Fastmail", "host": "imap.fastmail.com", "port": 993, "security": "tls",
                  "help_url": "https://www.fastmail.help/hc/en-us/articles/360058752854-App-passwords"},
+    "gmail_imap": {"label": "Gmail (IMAP)", "host": "imap.gmail.com", "port": 993, "security": "tls",
+                   "help_url": "https://myaccount.google.com/apppasswords"},
     "imap": {"label": "Email (IMAP)", "host": None, "port": 993, "security": "tls", "help_url": None},
     "folders": {"label": "Folders on this server", "host": None, "port": None, "security": None, "help_url": None},
     "model": {"label": "AI model on your network", "host": None, "port": None, "security": None, "help_url": None},
@@ -113,9 +115,14 @@ def _imap_source(sid: str, settings: dict, credential: str):
         raise ConnectionProblem(str(exc).split(": ", 1)[-1].capitalize() + ".") from None
 
 
-def _default_include(name: str, flags: list[str]) -> bool:
+GMAIL_DEFAULTS = {"inbox", "[gmail]/all mail", "[google mail]/all mail"}
+
+
+def _default_include(name: str, flags: list[str], gmail: bool = False) -> bool:
     if {f.lower() for f in flags} & SKIP_SPECIAL:
         return False
+    if gmail:  # every label is a folder in Gmail: All Mail holds everything once, the inbox shows what's in it
+        return name.lower() in GMAIL_DEFAULTS or "\\all" in {f.lower() for f in flags}
     return name.rsplit("/", 1)[-1].rsplit(".", 1)[-1].lower() not in SKIP_NAMES
 
 
@@ -153,7 +160,7 @@ def test_imap(settings: dict, password: str) -> list[dict]:
                                                                "\\archive", "\\all", "\\flagged"}), None)
             folders.append({"name": name, "messages": int(info["exists"] or 0),
                             "special": special.lstrip("\\") if special else None,
-                            "include": _default_include(name, flags)})
+                            "include": _default_include(name, flags, gmail=source.host == "imap.gmail.com")})
     except ReadOnlyViolation:
         raise ConnectionProblem("The server would not open folders read-only, so Towpath won't use it.") from None
     except (OSError, IMAPClientError):

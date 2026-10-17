@@ -37,7 +37,7 @@ from towpath.unified.contracts import ContractError, imap_native, parse_imap_nat
 
 HEADER_ITEM = "BODY.PEEK[HEADER.FIELDS (DATE SUBJECT FROM MESSAGE-ID)]"
 METADATA_ITEMS = ("RFC822.SIZE", "INTERNALDATE", "BODYSTRUCTURE", HEADER_ITEM)
-ALLOWED_FETCH = re.compile(
+ALLOWED_FETCH = re.compile(  # X-GM-* are Gmail's thread and label items (X-GM-EXT-1)
     r"^(UID|FLAGS|INTERNALDATE|RFC822\.SIZE|BODYSTRUCTURE|ENVELOPE|MODSEQ|THREADID|EMAILID|X-GM-THRID|X-GM-MSGID|"
     r"X-GM-LABELS|BODY\.PEEK\[[A-Z0-9 .()\-]*\](<\d+\.\d+>)?)$")
 ALLOWED_MODIFIER = re.compile(r"^CHANGEDSINCE \d+$")

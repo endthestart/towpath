@@ -112,6 +112,9 @@ class ActSession:
     def store(self, uid: int, sign: str, flag: str) -> None:
         if flag not in SYSTEM_FLAGS and not actions.KEYWORD.match(flag):
             raise WriteViolation(f"STORE of {flag!r} is not allowed")
+        if flag not in SYSTEM_FLAGS and "X-GM-EXT-1" in self.capabilities():  # Gmail: a label, not a keyword
+            (self._client.add_gmail_labels if sign == "+" else self._client.remove_gmail_labels)([uid], [flag])
+            return
         (self._client.add_flags if sign == "+" else self._client.remove_flags)([uid], [flag])
 
     def move(self, uid: int, mailbox: str) -> None:
@@ -119,6 +122,11 @@ class ActSession:
             raise WriteViolation("the server lacks MOVE; Towpath doesn't copy and expunge instead")
         if mailbox not in {n for n, _ in self.folders()} or mailbox == self._selected:
             raise TargetChanged(f"can't move to {mailbox}")
+        if "X-GM-EXT-1" in self.capabilities() and self._selected == self.special("\\All") and \
+                mailbox != self.special("\\Trash"):
+            # Gmail: taking a message out of All Mail deletes it. Putting it in a folder is adding that label.
+            self._client.add_gmail_labels([uid], ["\\Inbox" if mailbox.upper() == "INBOX" else mailbox])
+            return
         self._client.move([uid], mailbox)
 
     def append(self, role: str, raw: str, flags: tuple[str, ...]) -> str:
@@ -310,8 +318,8 @@ def _execute(act: ActSession, body: dict) -> tuple[str, dict, dict]:
             act.store(uid, "+" if kind == "add_keyword" else "-", params["keyword"])
             after = {**act.read(uid), "mailbox": target["mailbox"], "uid": uid}
         else:
-            dest = {"archive": lambda: act.special("\\Archive"), "trash": lambda: act.special("\\Trash"),
-                    "move": lambda: params["mailbox"]}[kind]()
+            dest = {"archive": lambda: act.special("\\Archive") or act.special("\\All"),  # Gmail: All Mail
+                    "trash": lambda: act.special("\\Trash"), "move": lambda: params["mailbox"]}[kind]()
             if dest is None:
                 raise TargetChanged(f"the account has no {'Archive' if kind == 'archive' else 'Trash'} mailbox")
             act.move(uid, dest)

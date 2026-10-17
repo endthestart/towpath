@@ -13,10 +13,20 @@
 <p class="footnote">Towpath only reads: it never changes, moves, deletes or marks mail as read, and a read-only password means Fastmail enforces that too. You can revoke the password in Fastmail at any time. <a href="{{ preset.help_url }}" target="_blank" rel="noopener noreferrer">Fastmail's help on app passwords</a></p>
 </section>
 {% endif %}
+{% if provider == 'gmail_imap' %}
+<section class="detail-card steps"><h2 class="card-title">First, make an app password in Google</h2>
+<ol>
+  <li>App passwords need 2-Step Verification on your Google account. Then open <a href="{{ preset.help_url }}" target="_blank" rel="noopener noreferrer">Google's app passwords page</a>.</li>
+  <li>Name it <strong>Towpath (reading)</strong>, create it, and paste the 16 letters below.</li>
+  <li>In Gmail's settings, under <strong>Forwarding and POP/IMAP</strong>, IMAP must be on.</li>
+</ol>
+<p class="footnote">Google's app passwords can't be limited to reading, so Towpath's own code enforces it: the reading connection only examines folders and reads with peeks, and nothing is changed. Towpath reads <strong>All Mail</strong> (every message once) and the <strong>Inbox</strong> by default. Mail management can later use a second app password to change mail.</p>
+</section>
+{% endif %}
 <section class="detail-card">
 <form method="post" class="auth-form" autocomplete="off">{% csrf_token %}
   <label>Email address <input type="email" name="username" value="{{ form.username }}" required autocomplete="username"></label>
-  <label>{% if provider == 'fastmail' %}App password{% else %}Password{% endif %} <input type="password" name="password" required autocomplete="new-password"></label>
+  <label>{% if provider == 'fastmail' or provider == 'gmail_imap' %}App password{% else %}Password{% endif %} <input type="password" name="password" required autocomplete="new-password"></label>
   {% if not preset.host %}
   <label>Server <input name="host" value="{{ form.host }}" required placeholder="imap.example.com"></label>
   <label>Port <input name="port" value="{{ form.port }}" inputmode="numeric" required></label>

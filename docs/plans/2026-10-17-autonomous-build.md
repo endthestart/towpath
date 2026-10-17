@@ -103,3 +103,5 @@ Balanced across three areas, mail first:
 - 2026-10-17: life story layers built: finding events by itself, memories, profile, timeline, Ask.
 - 2026-10-17: `a6b182e` deployed (mail milestones 2–5). Photo search built (EXIF fields, Photos page,
   plain-English requests).
+- 2026-10-17: mail milestone 6 built: Gmail over IMAP (preset, All Mail and Inbox, Gmail threads and labels, safe
+  archive and Undo). Running it next to Inbox Zero waits for the owner to add a Gmail app password.

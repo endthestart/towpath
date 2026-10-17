@@ -32,6 +32,7 @@ class Message:
     internaldate: str = "02-Apr-2009 10:15:00 +0000"
     flags: set = field(default_factory=set)
     modseq: int = 1
+    labels: set = field(default_factory=set)  # Gmail labels (State(gmail=True))
 
 
 @dataclass
@@ -48,10 +49,11 @@ class Mailbox:
 
 class State:
     def __init__(self, mailboxes: dict, username: str = "reader@example.com", password: str = "synthetic-only",
-                 writable: bool = False, write_password: str | None = None):
+                 writable: bool = False, write_password: str | None = None, gmail: bool = False):
         self.mailboxes = mailboxes
         self.username, self.password = username, password
         self.writable = writable
+        self.gmail = gmail
         self.write_password = write_password  # a second app password that may change mail; the first may not
         self.modseq = 1
         self.idle_events: list[str] = []  # untagged responses to send to clients in IDLE, such as "3 EXISTS"
@@ -223,8 +225,10 @@ class Handler(socketserver.StreamRequestHandler):
             data += self.rfile.read(int(match.group(1)))
 
     def caps(self) -> str:
-        return ("IMAP4rev1 AUTH=PLAIN" + (" LITERAL+" if self.state.literal_plus else "")
-                + (f" {EXTENSIONS}" if self.state.writable else ""))
+        extensions = ""
+        if self.state.writable:  # Gmail offers its own thread and label extension instead of OBJECTID
+            extensions = " " + (EXTENSIONS.replace("OBJECTID", "X-GM-EXT-1") if self.state.gmail else EXTENSIONS)
+        return "IMAP4rev1 AUTH=PLAIN" + (" LITERAL+" if self.state.literal_plus else "") + extensions
 
     def handle(self) -> None:
         self.send(f"* OK [CAPABILITY {self.caps()}] synthetic stub ready\r\n")
@@ -343,6 +347,15 @@ class Handler(socketserver.StreamRequestHandler):
         uids = _uidset(args[0].decode(), sorted(box.messages))
         op = args[1].decode().upper()
         flags = {f.decode() for f in (args[2] if isinstance(args[2], list) else [args[2]])}
+        if op.lstrip("+-").startswith("X-GM-LABELS") and self.state.gmail:
+            with self.state.lock:
+                self.state.writes.append(f"LABELS {op} {' '.join(sorted(flags))} {self.selected} {uids}")
+            for u in uids:
+                m = box.messages[u]
+                m.labels = m.labels | flags if op.startswith("+") else m.labels - flags
+                self.state.bump(m)
+            self.send(f"{tag} OK STORE completed\r\n")
+            return
         with self.state.lock:
             self.state.writes.append(f"STORE {op} {' '.join(sorted(flags))} {self.selected} {uids}")
         seqs = {u: i + 1 for i, u in enumerate(sorted(box.messages))}
@@ -367,6 +380,10 @@ class Handler(socketserver.StreamRequestHandler):
             self.state.writes.append(f"MOVE {self.selected} {uids} -> {utf7_decode(args[1])}")
         new = []
         for u in uids:
+            already = next((k for k, m in dest.messages.items() if m.raw == box.messages[u].raw), None)
+            if self.state.gmail and dest.special == "\\All" and already is not None:
+                new.append(already)  # Gmail: All Mail already holds it; moving there only drops the source label
+                continue
             nu = dest.uidnext
             dest.messages[nu] = box.messages[u]
             self.state.bump(dest.messages[nu])
@@ -499,6 +516,9 @@ class Handler(socketserver.StreamRequestHandler):
                     pieces.append(f"FLAGS ({' '.join(sorted(msg.flags))})")
                 elif name == "MODSEQ":
                     pieces.append(f"MODSEQ ({msg.modseq})")
+                elif name == "X-GM-THRID" and self.state.gmail:
+                    root = (parsed["References"] or parsed["In-Reply-To"] or parsed["Message-ID"] or "").split()[0]
+                    pieces.append(f"X-GM-THRID {abs(hash(root)) % 10**12}")
                 elif name == "THREADID" and self.state.writable:
                     root = (parsed["References"] or parsed["In-Reply-To"] or parsed["Message-ID"] or "").split()[0]
                     pieces.append(f"THREADID (T{abs(hash(root)) % 10**8})")

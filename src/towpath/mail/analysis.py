@@ -64,6 +64,7 @@ class _Reader:
         self.session = connector.session
         caps = {c.upper() for c in self.session.capabilities()}
         self.objectid = "OBJECTID" in caps
+        self.gmail = "X-GM-EXT-1" in caps
         self.condstore = "CONDSTORE" in caps and self.session.enable("CONDSTORE")
         self.current: str | None = None
         self.info: dict = {}
@@ -94,7 +95,8 @@ def _read_batch(reader: _Reader, source_id: str, rows) -> list[dict]:
             continue
         by_box.setdefault((mailbox, uidvalidity), []).append((uid, row["item_id"]))
     records = []
-    items = ("FLAGS", "RFC822.SIZE", "BODYSTRUCTURE", HEADER_ITEM) + (("THREADID",) if reader.objectid else ())
+    items = ("FLAGS", "RFC822.SIZE", "BODYSTRUCTURE", HEADER_ITEM) + (("THREADID",) if reader.objectid else ()) + (
+        ("X-GM-THRID",) if reader.gmail else ())
     for (mailbox, uidvalidity), wanted in by_box.items():
         if mailbox not in reader.connector._mailboxes():
             continue
@@ -153,6 +155,8 @@ def _record(source_id, mailbox, uidvalidity, uid, item_id, data, parts_by_uid, b
     if isinstance(thread, (tuple, list)):
         thread = thread[0] if thread else None
     thread = thread.decode() if isinstance(thread, bytes) else thread
+    if thread is None and data.get(b"X-GM-THRID") is not None:  # Gmail's own thread ID
+        thread = f"gm{data[b'X-GM-THRID']}"
     body_text, truncated, removed = None, False, False
     if uid in bodies:
         raw, part = bodies[uid]

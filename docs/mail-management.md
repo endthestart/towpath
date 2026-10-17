@@ -97,6 +97,12 @@ Built in milestone 1 of the [build plan](plans/2026-10-16-native-mail-management
 
 The write session (`towpath.mail.executor.ActSession`) offers only SELECT, UID STORE of `\Seen`, `\Flagged` and labels (never `\Deleted`), UID MOVE to an existing mailbox, APPEND to Drafts or the inbox, and UNSELECT (or EXAMINE, never CLOSE). There is no EXPUNGE, DELETE, COPY, CREATE or RENAME. Moving to Trash is the furthest a change goes; the provider's own Trash retention deletes. The write password is a second app password, entered on the account's Connections page, refused if it is the read-only one or can only read.
 
+Gmail over IMAP (milestone 6, built 2026-10-17; connecting it waits for the owner's app password): a *Gmail (IMAP)*
+connection reads All Mail and the Inbox by default; threads come from `X-GM-THRID`, labels are Gmail labels
+(`X-GM-LABELS`), archiving moves to All Mail, and nothing is ever moved out of All Mail except to Trash (in Gmail that
+would delete it): putting a message back in a folder, as Undo does, adds the label instead. Sender totals count a
+message filed in two folders once.
+
 Models: an AI model connection is marked as running on the owner's network (the default) or at a cloud service, and can offer further models on the same server and token (*Other models on this server*). The Mail page chooses the model for each mail feature (`mail.thread`, `mail.draft`, `mail.classify`) and whether it may read email text; nothing personal reaches any model without that grant. A whole account can be set to *Dry runs only* (the default), whatever kinds of change are ticked.
 
 ## Prompt injection and model output

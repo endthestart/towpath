@@ -424,3 +424,59 @@ def test_the_watcher_asks_for_indexing_when_new_mail_arrives(env, monkeypatch):
     w.join(5)
     assert calls == [SID]
     assert env.state.writes == [] and env.state.violations == []
+
+
+def test_gmail_over_imap_threads_labels_archive_and_undo(tmp_path, monkeypatch):
+    """Gmail: threads from X-GM-THRID, labels instead of keywords, archive to All Mail, and nothing ever leaves All
+    Mail except to Trash (in Gmail, taking a message out of All Mail deletes it)."""
+    boxes = mailboxes()
+    boxes["[Gmail]/All Mail"] = stub.Mailbox(45, {1: stub.Message(boxes["INBOX"].messages[3].raw)}, special="\\All")
+    del boxes["Archive"]
+    state = stub.State(boxes, writable=True, write_password=WRITE_PASSWORD, gmail=True)
+    env = Env.__new__(Env)
+    env.state, env.server = state, stub.Server(state).__enter__()
+    try:
+        monkeypatch.setenv("TOWPATH_TEST_IMAP_PASSWORD", state.password)
+        env.path = tmp_path / "towpath.toml"
+        env.path.write_text(f"""
+[stores]
+dir = "state"
+
+[[sources]]
+id = "{SID}"
+kind = "mail-provider"
+adapter = "imap"
+host = "127.0.0.1"
+port = {env.server.port}
+security = "plain-loopback"
+username = "{state.username}"
+password = "env:TOWPATH_TEST_IMAP_PASSWORD"
+timeout_seconds = 5
+mailboxes = ["INBOX", "[Gmail]/All Mail"]
+""")
+        env.config = config_mod.load(env.path)
+        env.store = env.config.store_dir
+        env.credentials = tmp_path / "credentials"
+        env.credentials.mkdir()
+        env.index()
+        env.manage()
+        env.analyze()
+        lunch = env.messages()["Lunch on Friday?"]
+        assert lunch["thread_key"].startswith("t:gm")
+        env.give_write_password()
+        settings.set_enabled_types(env.store, SID, {"archive", "add_keyword", "move"})
+        settings.set_dry_run(env.store, SID, False)
+        env.ask("add_keyword", "Lunch on Friday?", keyword="Friends")
+        env.ask("archive", "October offers")
+        env.run()
+        assert any(w.startswith("LABELS +X-GM-LABELS Friends") for w in state.writes)
+        assert 3 not in state.mailboxes["INBOX"].messages  # archived: out of the inbox, still in All Mail
+        undo = next(r for r in executor.receipts(env.store) if r["body"]["type"] == "archive")["inverse"]
+        assert undo["target"]["mailbox"] == "[Gmail]/All Mail" and undo["params"]["mailbox"] == "INBOX"
+        settings.ask(env.store, SID, undo)
+        env.run()
+        all_mail = state.mailboxes["[Gmail]/All Mail"].messages
+        assert len(all_mail) == 1 and next(iter(all_mail.values())).labels == {"\\Inbox"}
+        assert not any(w.startswith("MOVE [Gmail]/All Mail") for w in state.writes)
+    finally:
+        env.server.__exit__(None, None, None)

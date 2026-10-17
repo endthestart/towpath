@@ -110,11 +110,15 @@ def rebuild(intel, mail, source_id: str, me: dict) -> int:
     wrote = _owner_wrote(mail, source_id, me["sent"])
     sent = sorted(me["sent"])
     marks_ = ",".join("?" for _ in sent)
-    rows = mail.execute(
-        f"""SELECT from_addr, max(from_name), count(*), sum(flags NOT LIKE '%\\Seen%'), sum(coalesce(size, 0)),
-                   min(date_utc), max(date_utc), max(list_id), max(list_unsubscribe),
-                   max(list_unsubscribe_post IS NOT NULL), sum(upper(mailbox) = 'INBOX')
-            FROM messages WHERE source_id = ? AND from_addr IS NOT NULL AND mailbox NOT IN ({marks_})
+    rows = mail.execute(  # each message once, though Gmail files it under All Mail and the Inbox
+        f"""SELECT from_addr, max(from_name), count(*), sum(unread), sum(size), min(date_utc), max(date_utc),
+                   max(list_id), max(list_unsubscribe), max(one_click), sum(in_inbox)
+            FROM (SELECT from_addr, max(from_name) AS from_name, max(flags NOT LIKE '%\\Seen%') AS unread,
+                         max(coalesce(size, 0)) AS size, max(date_utc) AS date_utc, max(list_id) AS list_id,
+                         max(list_unsubscribe) AS list_unsubscribe,
+                         max(list_unsubscribe_post IS NOT NULL) AS one_click, max(upper(mailbox) = 'INBOX') AS in_inbox
+                  FROM messages WHERE source_id = ? AND from_addr IS NOT NULL AND mailbox NOT IN ({marks_})
+                  GROUP BY coalesce(message_id, item_id))
             GROUP BY from_addr""", (source_id, *sent)).fetchall()
     old = {r[0]: r for r in intel.execute("SELECT address, category, category_by, reason, input_digest FROM senders "
                                           "WHERE source_id = ?", (source_id,))}

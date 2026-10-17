@@ -59,7 +59,7 @@ def status(c: dict) -> dict:
 def _typed_password(request, provider: str) -> str:
     """Exactly what was typed, except that Fastmail's grouped app passwords lose their spaces."""
     typed = request.POST.get("password", "")
-    return typed.replace(" ", "").strip() if provider == "fastmail" else typed
+    return typed.replace(" ", "").strip() if provider in ("fastmail", "gmail_imap") else typed
 
 
 def _redirect_uri(request) -> str:
@@ -163,8 +163,8 @@ def add(request, provider):
                      "security": preset["security"] if preset["host"] else form["security"]}
         try:
             settings_["port"] = preset["port"] if preset["host"] else int(form["port"])
-            if "@" not in form["username"] and provider == "fastmail":
-                raise ConnectionProblem("Enter your full Fastmail address.")
+            if "@" not in form["username"] and provider in ("fastmail", "gmail_imap"):
+                raise ConnectionProblem(f"Enter your full {preset['label'].split(' ')[0]} address.")
             folders = connections.test_imap(settings_, password)
             sid = connections.add_imap(_store(), _creds(), provider, settings_, password, folders, _config_ids())
         except ValueError:
