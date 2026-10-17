@@ -27,8 +27,8 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
-| `4ff5d30` | Reply labels, Year pages, Ask cites attachments, company mail FYI without the model, senders sorted eight to a call | `towpath@sha256:3f195303…`, `towpath-recoll@sha256:c7d9308a…` |
-| `8c42865` | Follow-up reminders, notes for drafts, Attachments page, mail search operators, rules in plain English | `towpath@sha256:798787f7…`, `towpath-recoll@sha256:ed1b0216…` |
+| `4ff5d30` | Mail search operators, reply labels, Year pages, Ask cites attachments, company mail FYI without the model, senders sorted eight to a call | `towpath@sha256:3f195303…`, `towpath-recoll@sha256:c7d9308a…` |
+| `8c42865` | Rules in plain English, follow-up reminders, notes for drafts, Attachments page, impossible photo dates dropped | `towpath@sha256:798787f7…`, `towpath-recoll@sha256:ed1b0216…` |
 | `131fabe` | Learned sender categories, the owner's marks as model examples, Ask cites file names | `towpath@sha256:b68983cf…`, `towpath-recoll@sha256:7d6e28db…` |
 | `00060df` | Recollections, Your story, days with many photos as life events, how long awaited replies have taken | `towpath@sha256:4d7c2937…`, `towpath-recoll@sha256:6f2fa103…` |
 | `b14b7d8` | People pages, Overview Today cards, plain-English Search all, duplicates confirmed by content | `towpath@sha256:a4a5893d…`, `towpath-recoll@sha256:5cd5c906…` |
