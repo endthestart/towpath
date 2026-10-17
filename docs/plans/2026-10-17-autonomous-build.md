@@ -42,6 +42,9 @@ Balanced across three areas, mail first:
    (its consume folder or API), Immich for photos, a NAS folder, or Google Drive? Building it waits for this.
 2. **Fastmail for the life story and Ask:** only Gmail (`gmail_test`) is allowed for the life story today, so
    events, memories and Ask don't use Fastmail, which Towpath now reads in full. Allow it?
+3. **Finding life events by itself:** built, and your direction of October 14 says it should run in the background
+   across allowed mail. Turn it on now (it reads Gmail through Google's paced API and uses the Mac Pro model for
+   hours), or wait for UAT?
 
 ## Decisions made for review
 
