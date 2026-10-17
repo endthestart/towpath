@@ -91,7 +91,7 @@ def validate(body: dict) -> dict:
     for a in body.get("actions") or []:
         if not a or not a.get("type"):
             continue
-        if a["type"] not in actions.TYPES or a["type"] in actions.APPEND_TYPES:
+        if a["type"] not in actions.TYPES or a["type"] in actions.APPEND_TYPES or a["type"] in actions.SENDER_TYPES:
             raise RuleError("Choose actions from the list.")
         params = {k: str(v).strip() for k, v in (a.get("params") or {}).items() if str(v).strip()}
         actions.validate({"schema": actions.SCHEMA, "source_id": "x", "type": a["type"],

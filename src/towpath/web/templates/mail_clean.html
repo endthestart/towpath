@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}Clean up · {{ account.name }} · Mail · Towpath{% endblock %}
+{% block content %}
+<a class="back-link" href="/mail/">← Mail</a>
+<header class="page-head compact"><p class="eyebrow">MAIL · {{ account.name|upper }}</p><h1>Clean up</h1>
+<p class="lead">Choose which mail, check the list, then move it to the Archive folder, or archive it to a file on your server, with or without removing it from the server. A file's copies are checked one by one before anything is removed, and they stay searchable in Towpath.</p></header>
+{% if saved == 'archive' %}<div class="notice" role="status">Asked to archive {{ saved_n }} messages. Towpath works through them a few minutes at a time{% if account.dry_run %}, as dry runs while dry runs only is on{% endif %}.</div>{% endif %}
+<section class="detail-card"><form method="get" class="settings-form">
+  <label>Folder <input name="mailbox" value="{{ c.mailbox }}"><span>INBOX, another folder's name, or * for every folder.</span></label>
+  <label>Older than (days) <input name="older_than" inputmode="numeric" value="{{ c.older_than }}"></label>
+  <label>From (optional) <input name="sender" value="{{ c.sender }}" placeholder="news@shop.example"></label>
+  <div>Categories (none: any) {% for key, label in categories %}<label class="check"><input type="checkbox" name="categories" value="{{ key }}"{% if key in c.categories %} checked{% endif %}> {{ label }}</label>{% endfor %}</div>
+  <label class="check"><input type="checkbox" name="read_only" value="1"{% if c.read_only %} checked{% endif %}> Only mail I've read</label>
+  <div class="form-actions"><button class="button secondary" type="submit">Show what matches</button></div></form></section>
+<section class="detail-card"><h2 class="card-title">{{ summary.count }} message{{ summary.count|pluralize }}, {{ summary.bytes|filesizeformat }}</h2>
+{% if summary.count %}<table class="space-table"><tbody>{% for c2 in summary.categories %}<tr><td>{{ c2.0 }}</td><td>{{ c2.1 }}</td><td>{{ c2.2|filesizeformat }}</td></tr>{% endfor %}</tbody></table>
+<h3>Top senders</h3>{% for s in summary.senders %}<p>{{ s.0 }} <span class="muted">· {{ s.1 }} · {{ s.2|filesizeformat }}</span></p>{% endfor %}
+<h3>For example</h3>{% for m in summary.examples %}<p><a href="/mail/m/{{ m.item_id }}/">{{ m.subject|default:'(No subject)' }}</a> <span class="muted">· {{ m.from_addr }} · {{ m.date_utc|slice:":10" }}</span></p>{% endfor %}
+<form method="post" action="/mail/{{ account.source_id }}/clean?{{ query }}" class="form-actions">{% csrf_token %}
+  <input type="hidden" name="mailbox" value="{{ c.mailbox }}"><input type="hidden" name="older_than" value="{{ c.older_than }}"><input type="hidden" name="sender" value="{{ c.sender }}">{% if c.read_only %}<input type="hidden" name="read_only" value="1">{% endif %}{% for x in c.categories %}<input type="hidden" name="categories" value="{{ x }}">{% endfor %}
+  <button class="button" name="do" value="archive">Move to the Archive folder</button>
+  <button class="button secondary" name="do" value="file">Archive to a file, keep on the server</button>
+  <button class="button secondary" name="do" value="file_remove">Archive to a file, then remove from the server</button></form>
+<p class="footnote">Removing moves each verified message to Trash at your provider, which empties it on its own schedule. It is a dry run until you turn on “Move to Trash” and turn dry runs off.</p>{% endif %}
+</section>
+{% endblock %}

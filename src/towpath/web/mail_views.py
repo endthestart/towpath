@@ -96,15 +96,17 @@ def _activity(source_id: str | None = None) -> dict:
     for r in rows + waiting:
         target = r["body"]["target"]
         r["what"] = actions.describe(r["body"])
-        r["message"] = names.get(target.get("item_id")) or {"subject": target.get("message_id") or "a new message"}
+        r["message"] = names.get(target.get("item_id")) or {
+            "subject": target.get("sender") or target.get("message_id") or "a new message"}
         r["outcome_text"] = OUTCOMES.get(r.get("outcome"), "Waiting")
         r["can_undo"] = r.get("outcome") == "done" and r.get("inverse") and r["key"] not in undone
     return {"receipts": rows, "waiting": waiting}
 
 
 def _proposals() -> list[dict]:
-    """Proposals waiting for the owner: those without an answer that no automatic rule covers, newest first."""
-    from towpath.mail import rules
+    """Proposals waiting for the owner: those without an answer that no automatic rule or archive request covers,
+    newest first."""
+    from towpath.mail import archive, rules
 
     if not store_path(_store(), "mailplan").exists():
         return []
@@ -116,7 +118,7 @@ def _proposals() -> list[dict]:
         if r["proposal_id"] in answered:
             continue
         r["body"] = json.loads(r["body"])
-        if rules.auto_approved(_store(), r["body"], role="web"):
+        if rules.auto_approved(_store(), r["body"], role="web") or archive.auto_approved(_store(), r["body"], "web"):
             continue
         r["what"] = actions.describe(r["body"])
         out.append(r)

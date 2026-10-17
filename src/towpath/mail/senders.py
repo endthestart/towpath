@@ -216,6 +216,7 @@ def categorize_pending(config, slice_seconds: float = SLICE_SECONDS, clock=time.
             rebuilt = 0
             if state.get("senders_rowid") != top:
                 rebuilt = rebuild(intel, mail, sid, threads.owner(config.store_dir, sid, mail))
+                measure(intel, mail, sid)
                 state = {**threads._progress(intel, sid), "senders_rowid": top}
                 threads._set_progress(intel, sid, state)
             done, stop = 0, None
@@ -237,6 +238,37 @@ def categorize_pending(config, slice_seconds: float = SLICE_SECONDS, clock=time.
             intel.close()
             mail.close()
     return summaries
+
+
+def measure(intel, mail, source_id: str) -> dict:
+    """Where the account's mail space goes, from the mail store; stored for the Space page."""
+    def rows(sql, *args):
+        return [list(r) for r in mail.execute(sql, (source_id, *args))]
+
+    body = {
+        "total": rows("SELECT count(*), coalesce(sum(size), 0) FROM messages WHERE source_id = ?")[0],
+        "by_year": rows("SELECT coalesce(substr(date_utc, 1, 4), 'undated'), count(*), coalesce(sum(size), 0) "
+                        "FROM messages WHERE source_id = ? GROUP BY 1 ORDER BY 1 DESC"),
+        "by_mailbox": rows("SELECT mailbox, count(*), coalesce(sum(size), 0) FROM messages WHERE source_id = ? "
+                           "GROUP BY 1 ORDER BY 3 DESC"),
+        "largest": rows("SELECT item_id, subject, from_addr, date_utc, size, mailbox FROM messages WHERE "
+                        "source_id = ? ORDER BY size DESC LIMIT 50"),
+        "attachments": rows("SELECT count(*), coalesce(sum(size), 0) FROM messages WHERE source_id = ? AND "
+                            "has_attachments = 1")[0],
+    }
+    intel.execute("INSERT OR REPLACE INTO space VALUES (?,?,?)", (source_id, json.dumps(body), now()))
+    intel.commit()
+    return body
+
+
+def space(store_dir, source_id: str, role: str = "web") -> dict | None:
+    if not store_path(store_dir, "mailintel").exists():
+        return None
+    with closing(open_store(store_dir, "mailintel", role)) as db:
+        row = db.execute("SELECT body, updated_at FROM space WHERE source_id = ?", (source_id,)).fetchone()
+    if row is None:
+        return None
+    return {**json.loads(row[0]), "updated_at": row[1], "by_category": totals(store_dir, source_id, role)}
 
 
 # -- reading for pages and rules --------------------------------------------------------------------------------

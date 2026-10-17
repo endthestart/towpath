@@ -1,6 +1,7 @@
 from django.urls import path
 
-from towpath.web import auth, life_views, mail_rules_views, mail_views, space_views, unified_views, views
+from towpath.web import (auth, life_views, mail_clean_views, mail_rules_views, mail_views, space_views, unified_views,
+                         views)
 
 urlpatterns = [
     path("", views.overview, name="overview"),
@@ -38,6 +39,12 @@ urlpatterns = [
     path("mail/rules/change", mail_rules_views.rule_change, name="mail-rule-change"),
     path("mail/answer-batch", mail_views.answer_batch, name="mail-answer-batch"),
     path("mail/<str:sid>/senders", mail_rules_views.sender_list, name="mail-senders"),
+    path("mail/<str:sid>/search", mail_clean_views.search_page, name="mail-search"),
+    path("mail/<str:sid>/space", mail_clean_views.space_page, name="mail-space"),
+    path("mail/<str:sid>/clean", mail_clean_views.clean, name="mail-clean"),
+    path("mail/<str:sid>/unsubscribe", mail_clean_views.unsubscribe_page, name="mail-unsubscribe"),
+    path("mail/<str:sid>/unsubscribe/ask", mail_clean_views.unsubscribe_ask, name="mail-unsubscribe-ask"),
+    path("mail/<str:sid>/archives", mail_clean_views.archives_page, name="mail-archives"),
     path("mail/<str:sid>/rules", mail_rules_views.rule_list, name="mail-rules"),
     path("mail/<str:sid>/rules/new", mail_rules_views.rule_edit, name="mail-rule-new"),
     path("mail/<str:sid>/rules/<str:rule_id>/edit", mail_rules_views.rule_edit, name="mail-rule-edit"),

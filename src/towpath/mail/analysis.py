@@ -174,10 +174,29 @@ JSON_COLUMNS = {"refs", "to_addrs", "cc_addrs", "flags", "problems"}
 
 
 def _save(db, record: dict) -> None:
+    """Insert or update in place (an upsert, not REPLACE, so the row keeps its rowid and the search index's
+    triggers see an update rather than a silent delete)."""
     values = [text.dumps(record[c]) if c in JSON_COLUMNS else record.get(c) for c in COLUMNS[:-1]] + [now()]
     values = [int(v) if isinstance(v, bool) else v for v in values]
-    db.execute(f"INSERT OR REPLACE INTO messages ({', '.join(COLUMNS)}) VALUES ({', '.join('?' for _ in COLUMNS)})",
-               values)
+    updates = ", ".join(f"{c} = excluded.{c}" for c in COLUMNS if c != "item_id")
+    db.execute(f"INSERT INTO messages ({', '.join(COLUMNS)}) VALUES ({', '.join('?' for _ in COLUMNS)}) "
+               f"ON CONFLICT (item_id) DO UPDATE SET {updates}", values)
+
+
+def build_search(config) -> list[dict]:
+    """Fill the search index once for a mail store written before it existed (a worker job, not at startup)."""
+    out = []
+    if not store_path(config.store_dir, "mail").exists():
+        return out
+    with closing(open_store(config.store_dir, "mail", ROLE)) as db:
+        has_rows = db.execute("SELECT 1 FROM messages LIMIT 1").fetchone()
+        indexed = db.execute("SELECT 1 FROM messages_text_docsize LIMIT 1").fetchone()
+        if has_rows and not indexed:
+            started = time.monotonic()
+            db.execute("INSERT INTO messages_text (messages_text) VALUES ('rebuild')")
+            db.commit()
+            out.append({"step": "mail-search-index", "seconds": round(time.monotonic() - started, 1)})
+    return out
 
 
 def _refresh_flags(db, reader: _Reader, source_id: str, clock_now: datetime) -> int:

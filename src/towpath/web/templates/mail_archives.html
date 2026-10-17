@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block title %}Archives · {{ account.name }} · Mail · Towpath{% endblock %}
+{% block content %}
+<a class="back-link" href="/mail/">← Mail</a>
+<header class="page-head compact"><p class="eyebrow">MAIL · {{ account.name|upper }}</p><h1>Archives</h1>
+<p class="lead">Mail archived to files in Towpath's data folder on your server. Each message is read back from the file and checked before it counts as archived; removal from the server follows only for checked copies.</p></header>
+{% if saved %}<div class="notice" role="status">Archive started. Towpath works through it a few minutes at a time.</div>{% endif %}
+{% for r in rows %}<section class="detail-card"><h2 class="card-title">{{ r.label }}</h2>
+<p>{{ r.progress.archived }} of {{ r.total }} archived and checked ({{ r.progress.bytes|filesizeformat }}){% if r.skipped %}; {{ r.skipped }} skipped (no longer on the server, or the copy didn't check out){% endif %}.
+{% if r.remove %}Removed from the server: {{ r.removed }}{% if r.dry %}; {{ r.dry }} as dry runs{% endif %}.{% else %}Kept on the server.{% endif %}</p>
+<p class="footnote">Asked {{ r.at|slice:":16" }} UTC · {% if r.progress.file %}{{ r.progress.file }}{% else %}not started yet{% endif %}</p>
+{% for p in r.problems|slice:":5" %}<p class="footnote warn-text">A copy didn't check out: {{ p.problem }}.</p>{% endfor %}
+</section>{% empty %}<p>No archives yet. Start one from <a href="/mail/{{ account.source_id }}/clean">Clean up</a>.</p>{% endfor %}
+{% endblock %}

@@ -32,11 +32,13 @@ TYPES = {
     "draft": {"label": "Save a draft", "tier": 1, "auto": True, "inverse": "trash"},
     "inbox_note": {"label": "Put a note in the inbox", "tier": 1, "auto": True, "inverse": "trash"},
     "trash": {"label": "Move to Trash", "tier": 4, "auto": False, "inverse": "move"},
+    "unsubscribe": {"label": "Unsubscribe", "tier": 3, "auto": False, "inverse": None},
 }
 FLAG_TYPES = {"mark_read": ("+", "\\Seen"), "mark_unread": ("-", "\\Seen"), "flag": ("+", "\\Flagged"),
               "unflag": ("-", "\\Flagged")}
 MOVE_TYPES = {"archive", "move", "trash"}
 APPEND_TYPES = {"draft": "drafts", "inbox_note": "inbox"}
+SENDER_TYPES = {"unsubscribe"}  # aimed at a sender, not at a message in a mailbox
 
 
 class ActionError(ValueError):
@@ -70,6 +72,13 @@ def validate(body: dict) -> None:
     target, params = body.get("target"), body.get("params")
     if not isinstance(target, dict) or not isinstance(params, dict) or not body.get("source_id"):
         raise ActionError("an action needs a source, a target and parameters")
+    if kind in SENDER_TYPES:
+        if not str(target.get("sender") or "").count("@") == 1:
+            raise ActionError("an unsubscribe names the sender's address")
+        method, url = params.get("method"), str(params.get("url") or "")
+        if not ((method == "post" and url.startswith("https://")) or (method == "mail" and url.startswith("mailto:"))):
+            raise ActionError("an unsubscribe is a one-click https request or a mailto address")
+        return
     if kind in APPEND_TYPES:
         raw = params.get("message")
         if not isinstance(raw, str) or not raw.strip() or len(raw.encode("utf-8")) > MAX_APPEND_BYTES:
@@ -94,6 +103,8 @@ def describe(body: dict) -> str:
         return f"{TYPES[kind]['label']} “{params['keyword']}”"
     if kind == "move":
         return f"Move to {params['mailbox']}"
+    if kind == "unsubscribe":
+        return f"Unsubscribe from {body['target']['sender']}"
     return TYPES[kind]["label"]
 
 

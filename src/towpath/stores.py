@@ -261,6 +261,33 @@ CREATE INDEX IF NOT EXISTS messages_thread ON messages (source_id, thread_key);
 CREATE INDEX IF NOT EXISTS messages_box ON messages (source_id, mailbox, date_utc);
 CREATE INDEX IF NOT EXISTS messages_sender ON messages (source_id, from_addr);
 CREATE INDEX IF NOT EXISTS messages_message_id ON messages (source_id, message_id);
+-- Full-text search over what Towpath read of each message, kept in step by triggers; it stays searchable after
+-- the message leaves the server. Filled for older stores by a worker job ("rebuild"), never at startup.
+CREATE VIRTUAL TABLE IF NOT EXISTS messages_text USING fts5(subject, from_name, from_addr, text, content='messages',
+  content_rowid='rowid', tokenize='unicode61 remove_diacritics 2');
+CREATE TRIGGER IF NOT EXISTS messages_text_insert AFTER INSERT ON messages BEGIN
+  INSERT INTO messages_text (rowid, subject, from_name, from_addr, text)
+  VALUES (new.rowid, new.subject, new.from_name, new.from_addr, new.text);
+END;
+CREATE TRIGGER IF NOT EXISTS messages_text_delete AFTER DELETE ON messages BEGIN
+  INSERT INTO messages_text (messages_text, rowid, subject, from_name, from_addr, text)
+  VALUES ('delete', old.rowid, old.subject, old.from_name, old.from_addr, old.text);
+END;
+CREATE TRIGGER IF NOT EXISTS messages_text_update AFTER UPDATE OF subject, from_name, from_addr, text ON messages
+WHEN old.subject IS NOT new.subject OR old.from_name IS NOT new.from_name OR old.from_addr IS NOT new.from_addr
+  OR old.text IS NOT new.text BEGIN
+  INSERT INTO messages_text (messages_text, rowid, subject, from_name, from_addr, text)
+  VALUES ('delete', old.rowid, old.subject, old.from_name, old.from_addr, old.text);
+  INSERT INTO messages_text (rowid, subject, from_name, from_addr, text)
+  VALUES (new.rowid, new.subject, new.from_name, new.from_addr, new.text);
+END;
+-- Messages archived to a file before leaving the server: where each one is and the hash that was verified.
+CREATE TABLE IF NOT EXISTS archived (
+  item_id TEXT PRIMARY KEY, source_id TEXT NOT NULL, request_id TEXT NOT NULL, path TEXT NOT NULL,
+  offset INTEGER NOT NULL, length INTEGER NOT NULL, sha256 TEXT NOT NULL, message_id TEXT, verified_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS archived_request ON archived (source_id, request_id);
+CREATE TABLE IF NOT EXISTS archive_progress (
+  request_id TEXT PRIMARY KEY, state TEXT NOT NULL, updated_at TEXT NOT NULL);
 -- Per source: how far the analysis has read the source index (rowids), and its progress for the Mail page.
 CREATE TABLE IF NOT EXISTS analysis (
   source_id TEXT PRIMARY KEY, high INTEGER NOT NULL, low INTEGER NOT NULL, progress TEXT NOT NULL,
@@ -302,6 +329,10 @@ CREATE TABLE IF NOT EXISTS rules (
   rule_id TEXT NOT NULL, revision INTEGER NOT NULL, source_id TEXT NOT NULL, version INTEGER NOT NULL,
   body TEXT NOT NULL, enabled INTEGER NOT NULL, mode TEXT NOT NULL, position INTEGER NOT NULL,
   deleted INTEGER NOT NULL DEFAULT 0, author TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (rule_id, revision));
+-- Mail the owner asked to archive to a file (and, if asked, remove from the server once each copy is verified).
+CREATE TABLE IF NOT EXISTS archive_requests (
+  request_id TEXT PRIMARY KEY, source_id TEXT NOT NULL, item_ids TEXT NOT NULL, remove INTEGER NOT NULL,
+  label TEXT NOT NULL, author TEXT NOT NULL, at TEXT NOT NULL);
 -- The owner's category for a sender; it applies to all of that sender's mail and outranks rules and models.
 CREATE TABLE IF NOT EXISTS sender_marks (
   source_id TEXT NOT NULL, address TEXT NOT NULL, category TEXT NOT NULL, author TEXT NOT NULL, at TEXT NOT NULL,
@@ -330,6 +361,8 @@ CREATE TABLE IF NOT EXISTS senders (
   category_by TEXT NOT NULL, reason TEXT, input_digest TEXT NOT NULL, updated_at TEXT NOT NULL,
   PRIMARY KEY (source_id, address));
 CREATE INDEX IF NOT EXISTS senders_category ON senders (source_id, category, messages);
+-- Per source: where the mail's space goes (by year, mailbox, category, largest messages), measured by the worker.
+CREATE TABLE IF NOT EXISTS space (source_id TEXT PRIMARY KEY, body TEXT NOT NULL, updated_at TEXT NOT NULL);
 -- Which messages each rule version has looked at (rowid watermark), and what it decided for each.
 CREATE TABLE IF NOT EXISTS rule_runs (
   source_id TEXT NOT NULL, rule_id TEXT NOT NULL, version INTEGER NOT NULL, watermark INTEGER NOT NULL,

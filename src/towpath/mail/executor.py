@@ -185,7 +185,7 @@ def pending(store_dir, role: str = ROLE) -> list[dict]:
             if key not in done:
                 out.append({"key": key, "source_id": r["source_id"], "body": json.loads(r["body"]),
                             "digest": r["digest"], "created_at": r["created_at"], "approved": True})
-    from towpath.mail import rules
+    from towpath.mail import archive, rules
 
     answers = settings.answers(store_dir, role=role)
     with closing(open_store(store_dir, "mailplan", role)) as p:
@@ -195,9 +195,10 @@ def pending(store_dir, role: str = ROLE) -> list[dict]:
                 continue
             body = json.loads(r["body"])
             if answer is None:
-                if not rules.auto_approved(store_dir, body, role=role):
+                if not (rules.auto_approved(store_dir, body, role=role) or
+                        archive.auto_approved(store_dir, body, role=role)):
                     continue
-                answer = {"digest": r["digest"]}  # the owner set the rule that proposed it to run by itself
+                answer = {"digest": r["digest"]}  # the owner's own rule or archive request covers it
             out.append({"key": r["proposal_id"], "source_id": r["source_id"], "body": body, "digest": r["digest"],
                         "created_at": r["created_at"], "approved_digest": answer["digest"],
                         "approved": answer["digest"] == r["digest"]})
@@ -319,6 +320,29 @@ def _execute(act: ActSession, body: dict) -> tuple[str, dict, dict]:
     return f"Done: {actions.describe(body)}.", before, after
 
 
+def _unsubscribe(db, item: dict, source, secret: Path, enabled: bool) -> str:
+    """Carry out (or dry-run) one unsubscribe; recorded either way, never raised."""
+    from urllib.parse import urlsplit
+
+    from towpath.mail import unsubscribe
+
+    params = item["body"]["params"]
+    where = urlsplit(params["url"]).hostname if params["method"] == "post" else params["url"][len("mailto:"):]
+    if not enabled or (params["method"] == "mail" and not secret.is_file()):
+        what = f"send a one-click unsubscribe request to {where}" if params["method"] == "post" else \
+            f"email {where.split('?')[0]} to unsubscribe"
+        _receipt(db, item, "dry-run", f"Dry run: would {what}.")
+        return "dry-run"
+    try:
+        detail = (unsubscribe.one_click(params["url"]) if params["method"] == "post" else
+                  unsubscribe.send_mail(source, secret.read_text().strip(), params["url"]))
+    except unsubscribe.UnsubscribeError as exc:
+        _receipt(db, item, "failed", f"Not unsubscribed: {exc}.")
+        return "failed"
+    _receipt(db, item, "done", f"Unsubscribed: {detail}.")
+    return "done"
+
+
 def run_pending(config, credentials_dir, limit: int = LIMIT, pause: float = PAUSE_SECONDS) -> list[dict]:
     """Carry out what is waiting, account by account. Never raises for a mailbox problem."""
     from towpath.adapters import build_connector
@@ -348,6 +372,10 @@ def run_pending(config, credentials_dir, limit: int = LIMIT, pause: float = PAUS
                         counts["refused"] = counts.get("refused", 0) + 1
                         continue
                     body = item["body"]
+                    if body["type"] in actions.SENDER_TYPES:
+                        counts_key = _unsubscribe(db, item, source, secret, body["type"] in enabled)
+                        counts[counts_key] = counts.get(counts_key, 0) + 1
+                        continue
                     live = body["type"] in enabled and secret.is_file()
                     try:
                         with _mapped_errors():

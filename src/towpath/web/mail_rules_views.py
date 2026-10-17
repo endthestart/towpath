@@ -11,7 +11,8 @@ from towpath.mail import actions, rules, senders
 from towpath.web.mail_views import _account, _config
 
 PAGE = 200
-RULE_ACTIONS = [(k, v["label"]) for k, v in actions.TYPES.items() if k not in actions.APPEND_TYPES]
+RULE_ACTIONS = [(k, v["label"]) for k, v in actions.TYPES.items()
+                if k not in actions.APPEND_TYPES and k not in actions.SENDER_TYPES]
 
 
 def _store():

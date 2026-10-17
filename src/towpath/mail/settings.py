@@ -101,6 +101,21 @@ def answers(store_dir, role: str = "act") -> dict[str, dict]:
         return {r["proposal_id"]: dict(r) for r in db.execute("SELECT * FROM answers")}
 
 
+def ask_many(store_dir, source_id: str, bodies: list[dict], author: str = "owner") -> int:
+    """Append many changes the owner asked for at once (a clean-up). Returns how many."""
+    from towpath.mail.actions import validate
+
+    for body in bodies:
+        validate(body)
+        if body["source_id"] != source_id:
+            raise ValueError("a change names a different account")
+    with closing(open_store(store_dir, "maildecisions", WRITER)) as db:
+        db.executemany("INSERT INTO requests (source_id, body, digest, author, created_at) VALUES (?,?,?,?,?)",
+                       [(source_id, json.dumps(b, sort_keys=True), digest(b), author, now()) for b in bodies])
+        db.commit()
+    return len(bodies)
+
+
 def ask(store_dir, source_id: str, body: dict, author: str = "owner") -> int:
     """Append a change the owner asked for (approved by being asked for). Returns its sequence number."""
     from towpath.mail.actions import validate

@@ -65,6 +65,13 @@ None yet.
    value. A rule with a condition in words waits (rather than skipping mail) while no model may read mail text.
 9. **A message Towpath can't read** (malformed headers) is kept with its identity and the problem named, so one
    message can't stop reading again (this stopped reading Fastmail at 55,650 messages on 2026-10-17).
+10. **Archive files** are `archive/mail/<account>/<request>.mbox` (mboxrd) in the data folder, as agreed. The web
+    service sees only `state/`, so the pages show where a file is but can't offer it as a download yet.
+11. **Unsubscribing** uses one-click where offered, else email over Fastmail's SMTP with the write password; a
+    sender offering only a web page gets a link to open yourself. Unsubscribing never runs from a rule.
+12. **Clean-up defaults:** newsletters, marketing, notifications and social mail older than 30 days in the inbox.
+13. **Mail search is its own index** (full text over Towpath's copy of each message) on the Mail pages; joining it
+    to *Search all* comes with the life-story work.
 
 ## Progress
 
@@ -74,3 +81,4 @@ None yet.
 - 2026-10-17: fixed reading stopping on an 8-bit header (`75f606a`, deploying); milestone 3 built (senders,
   categories, rules with templates, batch approval, automatic rules); the connector now updates the worker's stores
   at start too.
+- 2026-10-17: milestone 4 built (mail search, space, clean-up, archives verified before removal, unsubscribe).

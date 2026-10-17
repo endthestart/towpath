@@ -52,6 +52,7 @@ def run_once(config, credentials_dir=None):
 
         watch.ensure(config, analysis.eligible(config))
         indexing += executor.run_pending(config, credentials_dir)
+        indexing += analysis.build_search(config)
         indexing += analysis.analyze_pending(config)
         from towpath.mail import threads
 
@@ -60,6 +61,9 @@ def run_once(config, credentials_dir=None):
 
         indexing += senders.categorize_pending(config)
         indexing += rules.evaluate_pending(config)
+        from towpath.mail import archive
+
+        indexing += archive.archive_pending(config)
     return {"searches": search["searches_run"], "fetched": fetched["fetched"],
             "failed": fetched["failed"], "presence_checked": fetched.get("presence_checked", 0),
             "termination": fetched["termination"], "indexing": indexing}
