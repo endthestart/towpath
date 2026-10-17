@@ -20,7 +20,7 @@ from towpath.stores import open_store, store_path
 WRITER = "worker"
 TASK = "ask.answer"
 PROMPT = "ask.answer/1"
-MAX_CLAIMS, MAX_MESSAGES, MAX_FILES = 20, 12, 8
+MAX_CLAIMS, MAX_MESSAGES, MAX_FILES, MAX_ATTACHMENTS = 20, 12, 8, 6
 STOP = set("a an and are at be did do does for from had has have how i in is it me my of on or our the to was we "
            "were what when where which who why with you your".split())
 
@@ -108,7 +108,28 @@ def evidence(config, question: str, role: str = WRITER) -> list[dict]:
         out.append({"kind": "message", "item_id": r["item_id"], "text": f"{r['subject'] or '(no subject)'} — "
                     f"{r['snippet']}", "date": (r["date_utc"] or "")[:10], "from": r["from_addr"],
                     "ref": f"mail:{r['item_id']}"})
+    out += _attachments(config, terms, allowed, role)
     out += _files(config, terms, allowed, role)
+    return out
+
+
+def _attachments(config, terms: set[str], allowed: list[str], role: str) -> list[dict]:
+    """Attachments in allowed accounts whose names (or their message's subject) match the question."""
+    from towpath.mail import attachments
+
+    words = [w for w in sorted(terms, key=len, reverse=True) if len(w) >= 4][:3]
+    out, seen = [], set()
+    for sid in allowed:
+        for q in ([" ".join(words)] if len(words) > 1 else []) + words:  # all words first, then each
+            for r in attachments.listing(config.store_dir, sid, {"q": q}, limit=MAX_ATTACHMENTS, role=role):
+                if r["ref"] in seen:
+                    continue
+                seen.add(r["ref"])
+                out.append({"kind": "attachment", "text": f"{r['filename'] or '(unnamed)'} — attached to "
+                            f"“{r['subject'] or '(no subject)'}”", "date": (r["date_utc"] or "")[:10],
+                            "from": r["from_addr"], "ref": r["ref"]})
+            if len(out) >= MAX_ATTACHMENTS:
+                return out[:MAX_ATTACHMENTS]
     return out
 
 
@@ -150,6 +171,8 @@ def _sources_text(sources: list[dict]) -> str:
             lines.append(f"[{i}] Event ({s['date']}): {s['text']}{quote}")
         elif s["kind"] == "file":
             lines.append(f"[{i}] File ({s['date'] or 'undated'}): {s['text']}")
+        elif s["kind"] == "attachment":
+            lines.append(f"[{i}] Attachment ({s['date']}, from {s['from']}): {s['text']}")
         else:
             lines.append(f"[{i}] Email ({s['date']}, from {s['from']}): {s['text']}")
     return "\n".join(lines)

@@ -238,3 +238,17 @@ def test_the_story_holds_only_what_the_owner_kept(world, monkeypatch):
         assert "Learned to swim" in client.get("/life/story").content.decode()
         md = client.get("/life/story?format=md")
         assert md["Content-Disposition"].startswith("attachment") and b"Started a new job" in md.content
+
+
+def test_ask_cites_attachments_in_allowed_accounts(world):
+    from test_mail_attachments import with_files
+
+    from towpath import connect
+
+    world.state.mailboxes["INBOX"].messages[30] = with_files(
+        30, "Signed papers", [("apartment-lease-signed.pdf", b"%PDF synthetic", "application/pdf")])
+    connect.sync(world.worker(), world.sid)
+    assert not any(s["kind"] == "attachment" for s in life_ask.evidence(world.worker(), "my lease"))  # not allowed
+    grants.grant(world.store, world.sid, "life-evidence", author="owner")
+    found = [s for s in life_ask.evidence(world.worker(), "When did I sign my lease?") if s["kind"] == "attachment"]
+    assert found and found[0]["text"].startswith("apartment-lease-signed.pdf") and "#part=" in found[0]["ref"]
