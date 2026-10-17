@@ -252,6 +252,7 @@ def _ask_view(q: dict) -> dict:
     sources = []
     for i, s in enumerate(a["sources"], start=1):
         url = (f"/mail/m/{s['item_id']}/" if s["kind"] in ("message", "purchase") else
+               f"/life/year/{s['date']}" if s["kind"] == "year" else
                "/ref/?" + urlencode({"r": s["ref"]}) if s.get("ref") else None)
         sources.append({**s, "n": i, "url": url})
     return {**q, "sources": sources, "sentences": a["sentences"], "unknown": a["unknown"], "status": a["status"]}

@@ -108,9 +108,31 @@ def evidence(config, question: str, role: str = WRITER) -> list[dict]:
         out.append({"kind": "message", "item_id": r["item_id"], "text": f"{r['subject'] or '(no subject)'} — "
                     f"{r['snippet']}", "date": (r["date_utc"] or "")[:10], "from": r["from_addr"],
                     "ref": f"mail:{r['item_id']}"})
+    out += _years(config, question, set(allowed), role)
     out += _purchases(config, terms, allowed, role)
     out += _attachments(config, terms, allowed, role)
     out += _files(config, terms, allowed, role)
+    return out
+
+
+def _years(config, question: str, allowed: set[str], role: str) -> list[dict]:
+    """For a question naming a year: that year's photos, mail, the people written to most and first, as one source."""
+    from towpath import life_today
+
+    out = []
+    for year in sorted(set(re.findall(r"\b(19[5-9]\d|20\d\d)\b", question)))[:2]:
+        y = life_today.one_year(config.store_dir, year, role=role, sources=allowed)
+        t = y["totals"]
+        if not (t["photos"] or t["received"] or t["sent"]):
+            continue
+        bits = [f"{t['photos']} photos taken", f"{t['received']} emails received and {t['sent']} sent"]
+        if y["people"]:
+            bits.append("wrote most to " + ", ".join(f"{a} ({n})" for a, n in y["people"][:5]))
+        if y["first"]:
+            bits.append("first wrote to " + ", ".join(f"{a} ({d})" for d, a in y["first"][:5]))
+        if y["days"]:
+            bits.append("most photos on " + ", ".join(f"{d} ({n})" for d, n in y["days"][:3]))
+        out.append({"kind": "year", "text": "; ".join(bits), "date": year, "ref": None})
     return out
 
 
@@ -190,6 +212,8 @@ def _sources_text(sources: list[dict]) -> str:
             lines.append(f"[{i}] Event ({s['date']}): {s['text']}{quote}")
         elif s["kind"] == "file":
             lines.append(f"[{i}] File ({s['date'] or 'undated'}): {s['text']}")
+        elif s["kind"] == "year":
+            lines.append(f"[{i}] The year {s['date']} in Towpath's records: {s['text']}")
         elif s["kind"] == "purchase":
             lines.append(f"[{i}] Purchase ({s['date']}): {s['text']}")
         elif s["kind"] == "attachment":

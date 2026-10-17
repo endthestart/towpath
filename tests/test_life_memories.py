@@ -260,3 +260,13 @@ def test_ask_cites_attachments_in_allowed_accounts(world):
     grants.grant(world.store, world.sid, "life-evidence", author="owner")
     found = [s for s in life_ask.evidence(world.worker(), "When did I sign my lease?") if s["kind"] == "attachment"]
     assert found and found[0]["text"].startswith("apartment-lease-signed.pdf") and "#part=" in found[0]["ref"]
+
+
+def test_ask_summarizes_a_named_year_from_allowed_accounts_only(world):
+    this_year = str(datetime.now(timezone.utc).year)
+    question = f"Who did I write to in {this_year}?"
+    assert not any(s["kind"] == "year" for s in life_ask.evidence(world.worker(), question))  # not allowed yet
+    grants.grant(world.store, world.sid, "life-evidence", author="owner")
+    year = next(s for s in life_ask.evidence(world.worker(), question) if s["kind"] == "year")
+    assert year["date"] == this_year and "dana@example.net" in year["text"] and "emails received" in year["text"]
+    assert f"The year {this_year} in Towpath's records" in life_ask._sources_text([year])

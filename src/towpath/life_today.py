@@ -85,9 +85,10 @@ def year_context(store_dir, role: str = "web") -> dict[str, dict]:
 MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
 
-def one_year(store_dir, year: str, role: str = "web") -> dict:
+def one_year(store_dir, year: str, role: str = "web", sources: set[str] | None = None) -> dict:
     """A year in full: events by month, photos and mail per month, the busiest photo days, cameras, the people
-    written to most, and the people written to for the first time."""
+    written to most, and the people written to for the first time. ``sources`` limits photos and mail to those
+    connections (Ask uses only what the owner allowed for the life story)."""
     months = {f"{m:02d}": {"label": MONTHS[m - 1], "events": [], "photos": 0, "received": 0, "sent": 0}
               for m in range(1, 13)}
     events = sorted((c for c in life.claims(store_dir, limit=10**6, role=role)
@@ -100,16 +101,22 @@ def one_year(store_dir, year: str, role: str = "web") -> dict:
     days, cameras = [], []
     if store_path(store_dir, "files").exists():
         with closing(open_store(store_dir, "files", role)) as db:
-            for month, n in db.execute("SELECT substr(taken, 6, 2), count(*) FROM photo_meta WHERE substr(taken, 1, 4) "
-                                       "= ? GROUP BY 1", (year,)):
+            only, args = "", ()
+            if sources is not None:
+                marks = ",".join("?" for _ in sources) or "''"
+                only = (f" AND occurrence_id IN (SELECT occurrence_id FROM occurrences WHERE provider_id IN ({marks}) "
+                        f"AND rel_path NOT LIKE '%Exports/Hidden%')")
+                args = tuple(sorted(sources))
+            for month, n in db.execute(f"SELECT substr(taken, 6, 2), count(*) FROM photo_meta WHERE substr(taken, 1, "
+                                       f"4) = ?{only} GROUP BY 1", (year, *args)):
                 if month in months:
                     months[month]["photos"] = n
             days = [tuple(r) for r in db.execute(
-                "SELECT substr(taken, 1, 10), count(*) FROM photo_meta WHERE substr(taken, 1, 4) = ? GROUP BY 1 "
-                "ORDER BY 2 DESC LIMIT 8", (year,))]
+                f"SELECT substr(taken, 1, 10), count(*) FROM photo_meta WHERE substr(taken, 1, 4) = ?{only} GROUP BY 1 "
+                "ORDER BY 2 DESC LIMIT 8", (year, *args))]
             cameras = [tuple(r) for r in db.execute(
                 "SELECT trim(coalesce(make, '') || ' ' || model), count(*) FROM photo_meta WHERE substr(taken, 1, 4) "
-                "= ? AND model IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 5", (year,))]
+                f"= ? AND model IS NOT NULL{only} GROUP BY 1 ORDER BY 2 DESC LIMIT 5", (year, *args))]
     people: dict[str, int] = {}
     first: list[tuple[str, str]] = []
     if store_path(store_dir, "mail").exists():
@@ -117,6 +124,8 @@ def one_year(store_dir, year: str, role: str = "web") -> dict:
 
         with closing(open_store(store_dir, "mail", role)) as db:
             for sid in [r[0] for r in db.execute("SELECT DISTINCT source_id FROM messages")]:
+                if sources is not None and sid not in sources:
+                    continue
                 boxes = sorted(threads.sent_mailboxes(store_dir, sid, role))
                 marks = ",".join("?" for _ in boxes)
                 for month, is_sent, n in db.execute(
