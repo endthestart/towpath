@@ -412,6 +412,12 @@ CREATE TABLE IF NOT EXISTS alerts (
 CREATE TABLE IF NOT EXISTS follow_ups (
   source_id TEXT NOT NULL, thread_key TEXT NOT NULL, last_item TEXT NOT NULL, proposal_id TEXT NOT NULL,
   at TEXT NOT NULL, cleared_proposal TEXT, PRIMARY KEY (source_id, thread_key, last_item));
+-- Reply labels: the latest message of a conversation waiting on the owner, or on someone else, carries "To-reply" or
+-- "Awaiting-reply" in the mailbox; when the conversation moves on, the label moves or comes off.
+CREATE TABLE IF NOT EXISTS reply_labels (
+  source_id TEXT NOT NULL, thread_key TEXT NOT NULL, item TEXT NOT NULL, label TEXT NOT NULL,
+  proposal_id TEXT NOT NULL, at TEXT NOT NULL, cleared_proposal TEXT,
+  PRIMARY KEY (source_id, thread_key, item, label));
 CREATE TABLE IF NOT EXISTS digests (
   source_id TEXT NOT NULL, period TEXT NOT NULL, proposal_id TEXT NOT NULL, at TEXT NOT NULL,
   PRIMARY KEY (source_id, period));

@@ -9,6 +9,10 @@
 - **Follow-up reminders.** When the owner wrote last and nobody has answered after a few days, the owner's message
   gets the label "Follow-up" (and the worker drafts a nudge); the label comes off when someone answers. Only
   conversations the owner wrote in during the month before the reminder would be due.
+- **Reply labels.** Optionally, the latest message of each conversation waiting on the owner carries the label
+  "To-reply", and of each conversation the owner is waiting on, "Awaiting-reply", so the mail app shows the same lists
+  as Towpath; when a conversation moves on, the label moves or comes off. Conversations with mail in the month before
+  the labels were turned on, and everything after.
 - **Statistics.** Mail received and sent per week, how quickly the owner replies, and the people they write to most.
 
 Alerts and digests are ordinary mail changes proposed by the worker and approved by the owner's own setting, so they
@@ -34,6 +38,8 @@ DIGEST_EVERY = {"off": "Off", "daily": "Every morning", "weekly": "Monday mornin
 FOLLOW_UP_DAYS = {0: "Off", 3: "After 3 days", 7: "After a week", 14: "After two weeks"}
 FOLLOW_UP_LABEL = "Follow-up"
 FOLLOW_UP_WINDOW_DAYS = 30
+REPLY_LABELS = {"needs_owner_reply": "To-reply", "awaiting_others": "Awaiting-reply"}
+REPLY_LABELS_WINDOW_DAYS = 30
 TIMEZONE = "America/Chicago"
 DIGEST_HOUR = 7
 
@@ -76,10 +82,23 @@ def set_follow_up(store_dir, source_id: str, days: int, author: str = "owner") -
     settings._set(store_dir, source_id, "follow_up", {"days": days}, "mail-follow-up", author)
 
 
+def reply_labels_setting(store_dir, source_id: str, role: str = ROLE) -> dict:
+    return settings._get(store_dir, source_id, "reply_labels", role) or {"on": False}
+
+
+def set_reply_labels(store_dir, source_id: str, on: bool, author: str = "owner") -> None:
+    settings._set(store_dir, source_id, "reply_labels", {"on": bool(on), "since": now().isoformat(timespec="seconds")},
+                  "mail-reply-labels", author)
+
+
 def auto_approved(store_dir, body: dict, role: str = "act") -> bool:
     """An alert, digest or follow-up label the owner's current setting asked for."""
     producer = str(body.get("producer", ""))
     source = body.get("source_id")
+    if producer == f"reply-labels:{source}" and body.get("params", {}).get("keyword") in REPLY_LABELS.values():
+        # Taking off a label Towpath put on is always approved; putting one on only while the setting is on.
+        return body.get("type") == "remove_keyword" or (
+            body.get("type") == "add_keyword" and reply_labels_setting(store_dir, source, role)["on"])
     if producer == f"follow-up:{source}":
         return body.get("type") in ("add_keyword", "remove_keyword") and \
             body.get("params", {}).get("keyword") == FOLLOW_UP_LABEL and follow_up_days(store_dir, source, role) > 0
@@ -204,6 +223,66 @@ def follow_ups_pending(config) -> list[dict]:
             mail.close()
         if made or cleared:
             out.append({"source_id": sid, "step": "mail-follow-ups", "labelled": made, "cleared": cleared})
+    return out
+
+
+# -- reply labels -------------------------------------------------------------------------------------------------
+
+def reply_labels_pending(config) -> list[dict]:
+    from towpath.mail import analysis, threads
+
+    out = []
+    for sid in analysis.eligible(config):
+        if not store_path(config.store_dir, "mailintel").exists():
+            continue
+        setting = reply_labels_setting(config.store_dir, sid)
+        intel = open_store(config.store_dir, "mailintel", ROLE)
+        mail = open_store(config.store_dir, "mail", ROLE)
+        added = removed = 0
+        try:
+            desired = {}
+            if setting["on"]:
+                since = (datetime.fromisoformat(setting["since"]) - timedelta(days=REPLY_LABELS_WINDOW_DAYS))
+                owner_marks = threads.marks(config.store_dir, sid)
+                for key, state, item in intel.execute(
+                        "SELECT thread_key, state, last_item FROM threads WHERE source_id = ? AND kind = "
+                        "'conversation' AND last_date >= ?", (sid, since.isoformat())):
+                    label = REPLY_LABELS.get(owner_marks.get(key, state))
+                    if label:
+                        desired[key] = (item, label)
+            active = {(r[0], r[1], r[2]) for r in intel.execute(
+                "SELECT thread_key, item, label FROM reply_labels WHERE source_id = ? AND cleared_proposal IS NULL",
+                (sid,))}
+
+            def propose(kind, item, label, reason, sid=sid, mail=mail):
+                m = mail.execute("SELECT * FROM messages WHERE item_id = ?", (item,)).fetchone()
+                if m is None:
+                    return None
+                return _propose(config, actions.make(sid, kind, actions.message_target(dict(m)), {"keyword": label},
+                                                     reason=reason, producer=f"reply-labels:{sid}"))
+
+            for key, item, label in sorted(active):
+                if desired.get(key) == (item, label):
+                    continue
+                pid = propose("remove_keyword", item, label, "The conversation moved on.")
+                intel.execute("UPDATE reply_labels SET cleared_proposal = ? WHERE source_id = ? AND thread_key = ? AND "
+                              "item = ? AND label = ?", (pid or "gone", sid, key, item, label))
+                removed += 1
+            for key, (item, label) in desired.items():
+                if (key, item, label) in active:
+                    continue
+                pid = propose("add_keyword", item, label, "Waiting for your reply." if label == "To-reply" else
+                              "You're waiting for an answer.")
+                if pid:
+                    intel.execute("INSERT OR REPLACE INTO reply_labels VALUES (?,?,?,?,?,?,NULL)",
+                                  (sid, key, item, label, pid, now().isoformat(timespec="seconds")))
+                    added += 1
+            intel.commit()
+        finally:
+            intel.close()
+            mail.close()
+        if added or removed:
+            out.append({"source_id": sid, "step": "mail-reply-labels", "added": added, "removed": removed})
     return out
 
 

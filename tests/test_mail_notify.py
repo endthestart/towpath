@@ -77,8 +77,9 @@ def test_statistics_are_measured_and_shown(world, monkeypatch):
         assert notify.alert_setting(world.store, world.sid)["mode"] == "keyword"
         assert notify.digest_setting(world.store, world.sid)["every"] == "weekly"
         assert client.post("/mail/tell-me", {"source_id": world.sid, "alerts": "loud"}).status_code == 400
-        client.post("/mail/tell-me", {"source_id": world.sid, "follow_up": "7"})
+        client.post("/mail/tell-me", {"source_id": world.sid, "follow_up": "7", "reply_labels": "1"})
         assert notify.follow_up_days(world.store, world.sid) == 7
+        assert notify.reply_labels_setting(world.store, world.sid)["on"]
         client.post("/mail/draft-notes", {"source_id": world.sid, "notes": "Sign off with just M."})
         page = client.get("/mail/").content.decode()
         assert "Sign off with just M." in page and '<option value="7" selected>' in page
@@ -124,3 +125,37 @@ def test_a_follow_up_reminder_labels_the_unanswered_message_drafts_a_nudge_and_c
     assert "Follow-up" not in sent.flags
     with pytest.raises(ValueError):
         notify.set_follow_up(world.store, world.sid, 5)
+
+
+def test_reply_labels_follow_the_conversation_and_come_off_when_it_moves_on(world):
+    import json
+
+    from test_mail_threads import answer, mail
+
+    from towpath import connect
+    from towpath.mail import analysis
+
+    world.model_stub.respond = lambda p: json.dumps({"state": "needs_owner_reply", "reason": "A question."}) \
+        if "Any questions?" in p else answer(p)
+    assert notify.reply_labels_pending(world.worker()) == []  # off
+    notify.set_reply_labels(world.store, world.sid, True)
+    assert notify.reply_labels_pending(world.worker())[0]["added"] == 2  # Saturday? and Deck quote
+    assert notify.reply_labels_pending(world.worker()) == []
+    live(world, "add_keyword", "remove_keyword")
+    executor.run_pending(world.worker(), world.credentials, pause=0)
+    saturday = world.state.mailboxes["INBOX"].messages[1]
+    deck = world.state.mailboxes["Sent"].messages[1]
+    assert "To-reply" in saturday.flags and "Awaiting-reply" in deck.flags
+    world.state.mailboxes["INBOX"].messages[4] = mail(7, "Dana <dana@example.net>", "reader@example.com",
+                                                      "Re: Deck quote", "Here it is. Any questions?", 0, reply_to=2)
+    connect.sync(world.worker(), world.sid)
+    analysis.analyze_pending(world.worker())
+    threads.track_pending(world.worker())
+    moved = notify.reply_labels_pending(world.worker())[0]
+    assert moved["removed"] == 1 and moved["added"] == 1  # Awaiting-reply off the sent message, To-reply on Dana's
+    executor.run_pending(world.worker(), world.credentials, pause=0)
+    assert "Awaiting-reply" not in deck.flags and "To-reply" in world.state.mailboxes["INBOX"].messages[4].flags
+    notify.set_reply_labels(world.store, world.sid, False)
+    assert notify.reply_labels_pending(world.worker())[0]["removed"] == 2
+    executor.run_pending(world.worker(), world.credentials, pause=0)
+    assert "To-reply" not in saturday.flags  # turning the labels off takes them off again

@@ -58,6 +58,7 @@ def _accounts(config) -> list[dict]:
             "alerts": notify.alert_setting(_store(), sid, "web")["mode"],
             "digest": notify.digest_setting(_store(), sid, "web")["every"],
             "follow_up": notify.follow_up_days(_store(), sid, "web"),
+            "reply_labels": notify.reply_labels_setting(_store(), sid, "web")["on"],
             "notes": threads.notes(_store(), sid, "web") if managed else ""})
     return out
 
@@ -245,6 +246,10 @@ def tell_me(request):
             notify.set_digest(_store(), sid, request.POST["digest"])
         if "follow_up" in request.POST:
             notify.set_follow_up(_store(), sid, int(request.POST["follow_up"]))
+        if "reply_labels" in request.POST and request.POST["reply_labels"] in ("0", "1"):
+            on = request.POST["reply_labels"] == "1"
+            if on != notify.reply_labels_setting(_store(), sid, "web")["on"]:
+                notify.set_reply_labels(_store(), sid, on)
     except ValueError:
         return HttpResponseBadRequest("Choose one of the listed options.")
     return redirect("/mail/?saved=1")
