@@ -8,6 +8,7 @@ from django.shortcuts import redirect, render
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from towpath.mail import actions, rules, senders
+from towpath.web.auth import local_next
 from towpath.web.mail_views import _account, _config
 
 PAGE = 200
@@ -62,7 +63,7 @@ def sender_privacy(request):
     if not target:
         return HttpResponseBadRequest("Choose a sender or a message.")
     privacy.keep(_config(), target, request.POST.get("keep") == "1")
-    return redirect(request.POST.get("next") or f"/mail/{sid}/senders?saved=1")
+    return redirect(local_next(request, f"/mail/{sid}/senders?saved=1"))
 
 
 @require_POST
@@ -73,7 +74,7 @@ def sender_category(request):
         senders.mark(_store(), sid, address, request.POST.get("category") or None)
     except ValueError:
         return HttpResponseBadRequest("Choose one of the listed categories.")
-    return redirect(request.POST.get("next") or f"/mail/{sid}/senders?saved=1")
+    return redirect(local_next(request, f"/mail/{sid}/senders?saved=1"))
 
 
 # -- rules ------------------------------------------------------------------------------------------------------

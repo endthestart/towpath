@@ -15,6 +15,7 @@ from urllib.parse import urlencode
 
 from towpath import connections, decisions, life, life_ask, life_groups, life_propose, life_today, stores
 from towpath.unified import grants
+from towpath.web.auth import local_next
 
 LIFE_STORES = ("decisions", "connections")
 FEATURE = "life-evidence"
@@ -242,7 +243,7 @@ def memory_decide(request):
         life_groups.decide(store, g, "dismissed")
     else:
         return HttpResponseBadRequest("Unknown action.")
-    return redirect(request.POST.get("next") or f"/life/memories/{g['group_id']}/")
+    return redirect(local_next(request, f"/life/memories/{g['group_id']}/"))
 
 
 def _ask_view(q: dict) -> dict:
@@ -317,7 +318,7 @@ def remember(request):
 @require_POST
 def forget(request):
     life.forget(settings.TOWPATH_STORE_DIR, request.POST.get("claim_id", ""))
-    return redirect(request.POST.get("next") or "/life/timeline")
+    return redirect(local_next(request, "/life/timeline"))
 
 
 @require_POST

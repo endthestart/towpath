@@ -238,9 +238,9 @@ def dry_run(request):
 
 def _back(request, default: str):
     """Back to the Mail page a form came from (only pages under /mail/), else ``default``."""
-    nxt = request.POST.get("next") or ""
-    local = (nxt.startswith("/mail/") or nxt.startswith("?")) and "//" not in nxt and "\\" not in nxt
-    return redirect(nxt if local else default)
+    from towpath.web.auth import local_next
+
+    return redirect(local_next(request, default))
 
 
 @require_GET
@@ -334,7 +334,7 @@ def undo(request):
     if found is None or found["outcome"] != "done" or not found["inverse"] or key in _undone(rows, waiting):
         return HttpResponseBadRequest("That change can't be undone from here.")
     mail_settings.ask(_store(), found["source_id"], found["inverse"])
-    return redirect(request.POST.get("next") or "/mail/?saved=undo")
+    return _back(request, "/mail/?saved=undo")
 
 
 # -- messages and the reader ------------------------------------------------------------------------------------

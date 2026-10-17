@@ -137,3 +137,16 @@ def test_stopping_management_stops_reading_and_acting(mail):
     client.post("/mail/manage", {"source_id": sid, "manage": "0"})
     assert analysis.analyze_pending(worker) == []
     assert client.get(f"/mail/{sid}/").status_code == 302
+
+
+def test_a_forms_return_address_never_leads_off_towpath():
+    from django.test import RequestFactory
+
+    from towpath.web.auth import local_next
+
+    def where(nxt):
+        return local_next(RequestFactory().post("/x", {"next": nxt}), "/fallback")
+
+    assert where("/mail/fastmail/settings") == "/mail/fastmail/settings" and where("?state=done") == "?state=done"
+    for bad in ("https://elsewhere.example/", "//elsewhere.example/", "/\\elsewhere.example", "javascript:x", ""):
+        assert where(bad) == "/fallback"
