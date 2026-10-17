@@ -257,6 +257,20 @@ def ask(request):
         "model_ok": bool(endpoint_id) and decisions.model_granted(config, endpoint_id, "content")})
 
 
+@require_GET
+def story(request):
+    from django.http import HttpResponse
+
+    from towpath import life_story
+
+    found = life_story.story(settings.TOWPATH_STORE_DIR)
+    if request.GET.get("format") == "md":
+        response = HttpResponse(life_story.markdown(found), content_type="text/markdown; charset=utf-8")
+        response["Content-Disposition"] = 'attachment; filename="my-story.md"'
+        return response
+    return render(request, "life_story.html", {"nav": "life", **found})
+
+
 @require_POST
 def remember(request):
     """Write down a memory in the owner's own words."""

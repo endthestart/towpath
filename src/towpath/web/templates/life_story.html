@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block title %}{% if name %}{{ name }}'s story{% else %}Your story{% endif %} · Towpath{% endblock %}
+{% block content %}
+<a class="back-link" href="/life/">← Life</a>
+<header class="page-head compact"><h1>{% if name %}{{ name }}'s story{% else %}Your story{% endif %}</h1>
+<p class="lead">Only what you kept: memories, the events you accepted and your own recollections, in order. <a href="?format=md">Download as Markdown</a>, or print this page.</p></header>
+{% for name, entries in chapters %}<section class="detail-card"><h2 class="card-title">{{ name }}</h2>
+{% for e in entries %}{% if e.title %}<h3>{{ e.title }}{% if e.year %} <span class="muted">· {{ e.year }}</span>{% endif %}</h3>{% if e.summary %}<p>{{ e.summary }}</p>{% endif %}{% endif %}
+<ul>{% for l in e.lines %}<li>{{ l.statement }} <span class="muted">· {{ l.when }}</span>{% if l.note %} <a href="#note-{{ l.note }}"><sup>{{ l.note }}</sup></a>{% elif l.remembered %} <span class="muted">(remembered)</span>{% endif %}</li>{% endfor %}</ul>
+{% endfor %}</section>{% empty %}<p>Nothing kept yet. Keep events on the <a href="/life/">Life</a> page, keep <a href="/life/memories/">memories</a>, or write down your own.</p>{% endfor %}
+{% if notes %}<section class="detail-card"><h2 class="card-title">Sources</h2>{% for n in notes %}<p id="note-{{ n.n }}" class="footnote">{{ n.n }}. {{ n.ref }}{% if n.quote %} — “{{ n.quote }}”{% endif %}</p>{% endfor %}</section>{% endif %}
+{% endblock %}

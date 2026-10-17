@@ -209,3 +209,32 @@ def test_the_owners_own_memories(world, monkeypatch):
         assert "First day at school" in page and "your memory" in page
         client.post("/life/forget", {"claim_id": remembered.claim_id})
     assert remembered.claim_id not in {c.claim_id for c in life.claims(world.store, limit=1000)}
+
+
+def test_the_story_holds_only_what_the_owner_kept(world, monkeypatch):
+    from towpath import life_story
+
+    life_groups.set_profile(world.store, "Reader", "1980-06-01")
+    life_groups.propose_groups(world.worker())
+    trip = next(g for g in life_groups.groups(world.store) if g["kind"] == "trip")
+    life_groups.decide(world.store, trip, "kept")
+    job = next(c for c in life.claims(world.store) if c.statement == "Started a new job")
+    life.review(world.store, job.claim_id, "accept")
+    life.recollect(world.store, "Learned to swim", "1987", "year", "1987-01-01", "1987-12-31")
+    found = life_story.story(world.store)
+    names = [n for n, _ in found["chapters"]]
+    assert names == ["Childhood", "Your 20s", "Your 30s"]
+    text = life_story.markdown(found)
+    assert "# Reader's story" in text and "Trip to Example Junction" in text
+    assert "Learned to swim, 1987 (remembered)" in text
+    assert "Helped Sam move" not in text  # proposed, never accepted
+    assert "[^1]:" in text
+    monkeypatch.setattr(auth, "_setup_codes", {})
+    configure(world.store)
+    auth.create_account(world.store, "owner", OWNER)
+    with override_settings(TOWPATH_STORE_DIR=world.store, TOWPATH_CONFIG=world.config, ALLOWED_HOSTS=["testserver"]):
+        client = Client()
+        client.post("/login", {"username": "owner", "password": OWNER})
+        assert "Learned to swim" in client.get("/life/story").content.decode()
+        md = client.get("/life/story?format=md")
+        assert md["Content-Disposition"].startswith("attachment") and b"Started a new job" in md.content
