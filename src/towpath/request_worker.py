@@ -29,10 +29,10 @@ def singleton(store_dir):
 
 
 def _owner_facing(config, credentials_dir) -> list[dict]:
-    """What the owner is waiting on, quick when nothing is queued: changes they asked for (and approved ones), and
-    plain-English searches, photo requests and rule drafts. Run between the long model slices so none waits for a
-    whole poll."""
-    from towpath import photos, search_translate
+    """What the owner is waiting on, quick when nothing is queued: changes they asked for (and approved ones),
+    plain-English searches, photo requests, rule drafts and questions asked on the Life page. Run between the long
+    model slices so none waits for a whole poll."""
+    from towpath import life_ask, photos, search_translate
     from towpath.mail import executor, rule_drafts, search_ask
 
     out = executor.run_pending(config, credentials_dir)
@@ -40,6 +40,7 @@ def _owner_facing(config, credentials_dir) -> list[dict]:
     out += search_ask.translate_pending(config)
     out += photos.translate_pending(config)
     out += rule_drafts.draft_pending(config)
+    out += life_ask.answer_pending(config)
     return out
 
 
