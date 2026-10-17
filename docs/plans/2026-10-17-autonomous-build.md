@@ -109,6 +109,10 @@ Balanced across three areas, mail first:
     service than the one asked is refused.
 24. **Duplicates over 2 GB are compared by samples** (the first, middle and last 64 MB, with the size), and the
     Space page says so: hashing a 77 GB file in full held up the connector for minutes each poll.
+25. **Unsubscribing by email goes only to the sender's own domain** (or its List-Id's); otherwise only their page
+    is offered. The address is shown before you tick.
+26. **A move into a Trash folder counts as Move to Trash**: it needs that switch on and your own approval, never a
+    rule's automatic one.
 
 ## Progress
 
@@ -166,3 +170,8 @@ Balanced across three areas, mail first:
   keep-from-cloud marks; labels put back after removal were dropped; follow-up labels stayed after reminders were
   turned off; some forms failed after acting; purchases could be read twice; one refusal stalled drafts or purchases;
   sampled duplicates counted as exact.
+- 2026-10-17: `d05ca6f` deployed. A second review, of the code that changes or removes mail, found eight problems,
+  fixed in `84e4283`: a move into Trash bypassed the Trash switch; unsubscribing could reach a private address after a
+  second DNS lookup, count a redirect as done, email any address a header named, and jam the queue on a bad
+  address; archiving the same mail twice crashed the connector; a Trash approval didn't re-check its copy or target;
+  a dropped connection could repeat a change; Gmail labels were missed for Undo.
