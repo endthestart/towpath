@@ -96,6 +96,17 @@ Balanced across three areas, mail first:
     and the camera and lens names, never a photo.
 18. **Duplicates are confirmed by content** only for the Space page's top groups (largest waste first), reading
     each candidate once; groups touching the private export are shown as not compared.
+19. **Mail from companies and services is FYI without the model.** A conversation whose latest message is from a
+    sender categorized as notifications, receipts, banking, travel, accounts, social, calendar, newsletters or
+    marketing is FYI by rule; calling the sender a person hands it back to the model.
+20. **Senders are sorted eight to a model call**; any the model leaves out are asked about alone.
+21. **Purchases** are read from receipt senders' mail, or mail with an order-like subject and an amount in the
+    text, never shipping notices; 30 seconds of model time per poll, after conversations and senders.
+22. **Mailbox labels** are `To-reply`, `Awaiting-reply` and `Follow-up` (IMAP keywords can't hold spaces).
+    Follow-ups and reply labels apply to conversations from the month before you turn them on, and everything
+    after.
+23. **iCloud contacts and calendars** are found the standard way (principal, then home sets); a home on another
+    service than the one asked is refused.
 
 ## Progress
 
