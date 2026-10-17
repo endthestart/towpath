@@ -83,3 +83,4 @@ code.copyable{display:inline-block;margin-top:6px;padding:6px 10px;background:va
 .search input:not([type]),.search input[type=text]{flex:1;min-width:0;border:1px solid #cdd7cc;border-radius:7px;background:white;padding:15px 19px;color:var(--ink)}.search label:not(.sr-only){display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}.search label input:not([type]),.search label select{flex:0 1 auto;min-width:0;padding:10px 12px;border:1px solid #cdd7cc;border-radius:7px;background:white;color:var(--ink)}
 .search.filters>input:not([type]){flex:1 1 100%}
 .link-button.text{font-size:12px;padding:0;text-decoration:underline;text-align:left}
+.page-head p a{text-decoration:underline;text-underline-offset:2px}
