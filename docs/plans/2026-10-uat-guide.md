@@ -54,10 +54,12 @@ password with full IMAP and SMTP access), then on Mail → Settings tick the kin
 2. **2025 events to review** (Life → events to review): the re-read of 2025 finished on October 15 and left 16 of
    its 101 events for you to keep or reject.
 3. **Memories**: keep, rename or dismiss what Towpath gathered (people, decades, trips and occasions).
-4. **Write down a memory**: a few of your own; they appear on the timeline as remembered.
-5. **Timeline**, **On this day**, **Your story** (print or download as Markdown), **Ask** (try "When did I first go
+4. **Export**: Your story → *Download everything Towpath knows*: a zip of plain JSON and Markdown (events,
+   memories, people, rules, sender categories, purchases, decisions; no mail text or passwords).
+5. **Write down a memory**: a few of your own; they appear on the timeline as remembered.
+6. **Timeline**, **On this day**, **Your story** (print or download as Markdown), **Ask** (try "When did I first go
    to …?").
-6. **People** (`/people/`): a person's mail by year, conversations and events.
+7. **People** (`/people/`): a person's mail by year, conversations and events.
 
 ## 4. Photos and files
 

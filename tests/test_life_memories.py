@@ -309,3 +309,34 @@ def test_events_name_their_mail_for_the_gateway_and_revoked_accounts_drop_out(wo
     assert life_today.on_this_day(world.store, today, sources=set())["years"] == []
     grants.revoke(world.store, world.sid, "life-evidence", author="owner")
     assert life.claims(world.store) == [] and life_today.year_context(world.store) == {}
+
+
+def test_the_export_package_holds_what_towpath_learned_and_no_mail_text(world, monkeypatch):
+    import io
+    import zipfile
+
+    from towpath.mail import senders as mail_senders
+
+    grants.grant(world.store, world.sid, "mail-manage", author="owner")
+    mail_senders.mark(world.store, world.sid, "sam@example.org", "person")
+    monkeypatch.setattr(auth, "_setup_codes", {})
+    configure(world.store)
+    auth.create_account(world.store, "owner", OWNER)
+    with override_settings(TOWPATH_STORE_DIR=world.store, TOWPATH_CONFIG=world.config, ALLOWED_HOSTS=["testserver"]):
+        client = Client()
+        client.post("/login", {"username": "owner", "password": OWNER})
+        response = client.get("/export")
+    assert response["Content-Type"] == "application/zip" and "towpath-export-" in response["Content-Disposition"]
+    z = zipfile.ZipFile(io.BytesIO(response.content))
+    names = set(z.namelist())
+    assert {"README.md", "life/events.json", "life/story.md", "people.json", "decisions.json",
+            f"mail/{world.sid}/senders.json"} <= names
+    events = json.loads(z.read("life/events.json"))
+    assert "Helped Sam move" in {e["statement"] for e in events}
+    sam = next(s for s in json.loads(z.read(f"mail/{world.sid}/senders.json")) if s["address"] == "sam@example.org")
+    assert sam["chosen_by_you"] is True
+    everything = b"".join(z.read(n) for n in names)
+    from test_mail_threads import PASSWORD
+
+    assert b"move a couch" not in everything  # no mail text
+    assert PASSWORD.encode() not in everything and OWNER.encode() not in everything  # no secrets

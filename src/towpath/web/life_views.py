@@ -292,6 +292,19 @@ def ask(request):
 
 
 @require_GET
+def export(request):
+    """Everything Towpath learned and the owner decided, as one zip to keep."""
+    from django.http import HttpResponse
+
+    from towpath import export as export_mod
+
+    name, data = export_mod.build(settings.TOWPATH_STORE_DIR)
+    response = HttpResponse(data, content_type="application/zip")
+    response["Content-Disposition"] = f'attachment; filename="{name}"'
+    return response
+
+
+@require_GET
 def story(request):
     from django.http import HttpResponse
 
