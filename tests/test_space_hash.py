@@ -33,3 +33,28 @@ def test_candidates_are_hashed_and_judged(tmp_path):
     assert space_hash.judge(top[1]["places"], hashes)["state"] == "not compared (a private folder)"
     assert space_hash.judge([["pics", "a/IMG.jpg"], ["pics", "b/IMG.jpg"]], hashes) == \
         {"state": "same content", "same": 2}
+
+
+def test_a_huge_file_is_compared_by_samples_and_says_so(tmp_path, monkeypatch):
+    monkeypatch.setattr(space_hash, "FULL_MAX", 1000)  # anything over 1 KB counts as huge here
+    monkeypatch.setattr(space_hash, "SAMPLE", 100)
+    lib = tmp_path / "library"
+    same = b"start" + b"z" * 2990 + b"end!!"
+    files = {"a/disk.img": same, "b/disk.img": same, "c/disk.img": b"start" + b"q" * 2990 + b"end!!"}
+    for rel, data in files.items():
+        (lib / rel).parent.mkdir(parents=True, exist_ok=True)
+        (lib / rel).write_bytes(data)
+    store = tmp_path / "state"
+    places = [["pics", "a/disk.img"], ["pics", "b/disk.img"], ["pics", "c/disk.img"]]
+    top = [{"name": "disk.img", "size": 3000, "copies": 3, "wasted": 6000, "places": places}]
+    with open_store(store, "files", "connect") as db:
+        db.execute("INSERT INTO space_duplicates VALUES (?,?,?)",
+                   (folders.SID, json.dumps({"groups": 1, "files": 3, "wasted": 6000, "top": top}), "t"))
+        db.commit()
+    config = SimpleNamespace(store_dir=store, files=SimpleNamespace(roots={"pics": SimpleNamespace(path=lib)}))
+    assert space_hash.confirm_pending(config)[0]["hashed"] == 3
+    with open_store(store, "files", "web") as db:
+        hashes = space_hash.verdicts(db, folders.SID)
+    assert all(h.startswith("sampled:") for h in hashes.values())
+    assert space_hash.judge(places[:2], hashes)["state"] == "same content (checked in samples)"
+    assert space_hash.judge(places, hashes)["state"] == "some copies identical (checked in samples)"

@@ -107,6 +107,8 @@ Balanced across three areas, mail first:
     after.
 23. **iCloud contacts and calendars** are found the standard way (principal, then home sets); a home on another
     service than the one asked is refused.
+24. **Duplicates over 2 GB are compared by samples** (the first, middle and last 64 MB, with the size), and the
+    Space page says so: hashing a 77 GB file in full held up the connector for minutes each poll.
 
 ## Progress
 
