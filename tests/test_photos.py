@@ -159,3 +159,26 @@ def test_days_with_many_photos_become_life_evidence_once_allowed(tmp_path):
     assert claim.statement == "Took 18 photos (2009 Example Junction)"  # the private export isn't counted
     assert claim.citations[0].ref == "folders:occ_0" and claim.when.earliest.startswith("2009-05-15")
     assert life_photos.propose(config) == []
+
+
+def test_ask_finds_file_names_in_allowed_folders(tmp_path):
+    from towpath import life_ask
+    from towpath.unified import grants
+
+    store = tmp_path / "state"
+    with open_store(store, "files", "connect") as db:
+        for i, rel in enumerate(["letters/wedding vows draft.docx", "Exports/Hidden/wedding secret.jpg",
+                                 "taxes/2019.pdf"]):
+            db.execute("INSERT INTO occurrences (occurrence_id, provider_id, native_id, root_alias, rel_path, members, "
+                       "media_type, size, dates, hashes, extraction, first_seen_run, last_seen_run, updated_at) "
+                       "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                       (f"occ_{i}", "folders", rel, "docs", rel, "[]", "application/octet-stream", 9,
+                        '[{"meaning": "file-modified", "value": "2009-05-01T10:00:00+00:00"}]', "{}", "{}", "r", "r",
+                        "t"))
+        db.commit()
+    config = SimpleNamespace(store_dir=store)
+    assert life_ask.evidence(config, "When was the wedding?") == []  # folders not allowed for the life story
+    grants.grant(store, "folders", "life-evidence", author="owner")
+    found = life_ask.evidence(config, "When was the wedding?")
+    assert [s["text"] for s in found] == ["docs/letters/wedding vows draft.docx"]  # never the private export
+    assert found[0]["ref"] == "folders:occ_0" and found[0]["date"] == "2009-05-01"
