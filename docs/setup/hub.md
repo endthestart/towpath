@@ -27,6 +27,10 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `84e4283` | Fixes from a review of the code that changes mail: Trash only as the owner allows, safe unsubscribing, archive edge cases | `towpath@sha256:d7c6ac81…`, `towpath-recoll@sha256:bbf0eef6…` |
+| `d05ca6f` | Fixes from a review of the day's work: DAV password pinned to its service, Ask honours keep-from-cloud, label and purchase fixes | `towpath@sha256:8c806b4c…`, `towpath-recoll@sha256:b0b32847…` |
+| `b310977` | Huge duplicate files compared by samples; inbox by category, Accounts, recurring purchases, Year and Search all additions | `towpath@sha256:e76f71ee…`, `towpath-recoll@sha256:b3cef664…` |
+| `1a9f7c5` | Purchases, plain-English mail search, conversation page, mail Settings, iCloud contacts and calendars | `towpath@sha256:58f6d9f6…`, `towpath-recoll@sha256:51fb407c…` |
 | `4ff5d30` | Mail search operators, reply labels, Year pages, Ask cites attachments, company mail FYI without the model, senders sorted eight to a call | `towpath@sha256:3f195303…`, `towpath-recoll@sha256:c7d9308a…` |
 | `8c42865` | Rules in plain English, follow-up reminders, notes for drafts, Attachments page, impossible photo dates dropped | `towpath@sha256:798787f7…`, `towpath-recoll@sha256:ed1b0216…` |
 | `131fabe` | Learned sender categories, the owner's marks as model examples, Ask cites file names | `towpath@sha256:b68983cf…`, `towpath-recoll@sha256:7d6e28db…` |

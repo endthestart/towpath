@@ -55,7 +55,8 @@ def _rows(db, source_id: str, where: str = "", args: tuple = (), order: str = "d
     return [dict(r) for r in db.execute(
         f"""SELECT * FROM (
               SELECT p.item_id, p.part_id, p.filename, p.mime_type, p.size, i.native_id, i.subject, i.from_addr,
-                     i.date_utc, towpath_kind(p.mime_type, p.filename) AS kind
+                     i.date_utc, towpath_kind(p.mime_type, p.filename) AS kind,
+                     coalesce(i.rfc_message_id, i.item_id) AS message_key
               FROM parts p JOIN items i USING (item_id)
               WHERE i.source_id = ? AND i.absent_since_run IS NULL AND (p.disposition = 'attachment' OR
                     (coalesce(p.filename, '') != '' AND coalesce(p.size, 0) >= {INLINE_MIN_BYTES}))

@@ -11,6 +11,14 @@
   <label>From <input name="sender" value="{{ f.sender }}" size="16"></label>
   <label>Order <select name="order">{% for key, label in orders %}<option value="{{ key }}"{% if key == f.order %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
   <button class="button" type="submit">Show</button></form>
+{% if saved == 'filing' %}<div class="notice" role="status">Saved. Towpath takes this up at its next check, a few minutes from now.</div>{% endif %}
+{% if filing %}<section class="detail-card"><h2 class="card-title">Filing documents</h2>
+<p>Towpath can copy the documents sent to you (PDFs, Word files, text, presentations) into <code>{{ filing.folder }}</code> on your server, in a folder per year and per sender. Each copy is read back and checked; your mail doesn't change.</p>
+<form method="post" action="/mail/{{ account.source_id }}/attachments/filing" class="inline-form">{% csrf_token %}<label>Filing <select name="mode">{% for key, label in filing.modes %}<option value="{{ key }}"{% if key == filing.mode %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label><button class="button secondary" type="submit">Save</button></form>
+<p class="footnote">{% if filing.counts.filed %}{{ filing.counts.filed }} filed{% endif %}{% if filing.counts.same %} · {{ filing.counts.same }} the same as one already filed{% endif %}{% if filing.counts.planned %}{% if filing.counts.filed or filing.counts.same %} · {% endif %}{{ filing.counts.planned }} would be filed{% endif %}{% if filing.counts.failed %} · {{ filing.counts.failed }} couldn't be filed{% endif %}{% if not filing.counts %}Nothing listed yet: Towpath takes this up at its next check.{% endif %}</p>
+{% if filing.latest %}<details><summary>{% if filing.mode == 'on' %}Latest{% else %}What would be filed, and where{% endif %}</summary>
+{% for r in filing.latest %}<p class="footnote"><code>{{ r.path }}</code> <span class="muted">· {% if r.status == 'planned' %}would be filed{% elif r.status == 'same' %}the same as this file{% elif r.status == 'failed' %}{{ r.detail }}{% else %}filed{% endif %}</span></p>{% endfor %}</details>{% endif %}
+</section>{% endif %}
 {% if summary %}<section class="detail-card"><h2 class="card-title">{{ summary.total.0 }} attachment{{ summary.total.0|pluralize }}, {{ summary.total.1|filesizeformat }}</h2>
 <table class="space-table"><thead><tr><th>Kind</th><th>Files</th><th>Space</th></tr></thead><tbody>
 {% for k in summary.kinds %}<tr><td><a href="?kind={{ k.0 }}">{{ k.1 }}</a></td><td>{{ k.2 }}</td><td>{{ k.3|filesizeformat }}</td></tr>{% endfor %}</tbody></table>

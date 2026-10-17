@@ -80,3 +80,42 @@ def test_the_attachments_page(world, monkeypatch):
         item = attachments.listing(world.store, world.sid, {"q": "budget"})[0]["item_id"]
         page = client.get(f"/mail/m/{item}/").content.decode()
         assert "Attachments" in page and "budget.xlsx" in page and "signature.asc" in page
+
+
+def test_documents_are_planned_as_a_dry_run_then_filed_and_checked(world):
+    from towpath.mail import analysis, filing
+
+    analysis.analyze_pending(world.worker())
+    assert filing.mode(world.store, world.sid) == "dry-run"
+    assert filing.file_pending(world.worker())[0]["planned"] == 1  # the PDF only, once for both folders
+    base = filing.root(world.store)
+    assert not base.exists()  # a dry run writes nothing
+    planned = filing.summary(world.store, world.sid)["latest"][0]["path"]
+    assert planned.startswith(f"{world.sid}/") and planned.endswith("lease-2026.pdf")
+    assert "landlord@example.org" in planned
+    filing.set_mode(world.store, world.sid, "on")
+    assert filing.file_pending(world.worker())[0]["filed"] == 1
+    copy = base / planned
+    assert copy.read_bytes() == b"%PDF synthetic" and world.state.writes == []  # mail itself never changes
+    assert filing.file_pending(world.worker()) == []  # once
+    world.state.mailboxes["INBOX"].messages[21] = with_files(21, "Same lease again",
+                                                             [("lease copy.pdf", b"%PDF synthetic", "application/pdf")])
+    connect.sync(world.worker(), world.sid)
+    assert filing.file_pending(world.worker())[0]["same"] == 1  # identical content isn't copied again
+    assert filing.planned_path("s", {"filename": "../../etc/passwd", "from_addr": "a/b@x", "date_utc": None}) == \
+        "s/undated/a_b@x/undated passwd"
+
+
+def test_the_filing_controls(world, monkeypatch):
+    from towpath.mail import filing
+
+    monkeypatch.setattr(auth, "_setup_codes", {})
+    configure(world.store)
+    auth.create_account(world.store, "owner", OWNER)
+    with override_settings(TOWPATH_STORE_DIR=world.store, TOWPATH_CONFIG=world.config, ALLOWED_HOSTS=["testserver"]):
+        client = Client()
+        client.post("/login", {"username": "owner", "password": OWNER})
+        assert "Filing documents" in client.get(f"/mail/{world.sid}/attachments").content.decode()
+        client.post(f"/mail/{world.sid}/attachments/filing", {"mode": "off"})
+        assert filing.mode(world.store, world.sid) == "off"
+        assert client.post(f"/mail/{world.sid}/attachments/filing", {"mode": "loud"}).status_code == 400

@@ -39,8 +39,9 @@ Balanced across three areas, mail first:
 
 ## Open questions
 
-1. **Attachment filing** (kept in scope at the start): where should Towpath file attachments from mail — Paperless
-   (its consume folder or API), Immich for photos, a NAS folder, or Google Drive? Building it waits for this.
+1. ~~**Attachment filing**~~ — answered October 17: a folder in Towpath's data folder, by year and sender,
+   documents only, dry runs first; which file types count and how attachments connect to other things come later.
+   Built: Mail → Attachments → *Filing documents*.
 2. **Fastmail for the life story and Ask:** only Gmail (`gmail_test`) is allowed for the life story today, so
    events, memories and Ask don't use Fastmail, which Towpath now reads in full. Allow it?
 3. **Finding life events by itself:** built, and your direction of October 14 says it should run in the background

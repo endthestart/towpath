@@ -29,6 +29,7 @@ Decisions I made for you to confirm or reverse are listed in the
 | Notes for drafts | Mail → Settings → *Drafting replies* | when you're free, phone number, sign-off; new drafts use them |
 | Follow-up reminders | Mail → Settings → *Remind you to follow up* | after 3/7/14 days unanswered: a *Follow-up* label (dry run) and a drafted nudge under *Awaiting reply* |
 | Attachments | Mail → Attachments | every file by kind, year and sender; search names; each message once |
+| Filing documents | Mail → Attachments → *Filing documents* | a dry run lists what would be copied to `files/attachments/` on the NAS, and where; switch to *File them* when the list looks right |
 | Purchases | Mail → Purchases | what you bought, by year and merchant, read from receipts (fills in slowly); try Ask "when did I buy …?" |
 | Search operators | Mail → Search | `from:`, `in:Archive`, `after:2019`, `has:attachment`, `is:unread`, `larger:5MB` |
 | Year pages | Life → Timeline → a year | month by month: photos, mail, events; busiest photo days; people first written to |
@@ -73,7 +74,7 @@ password with full IMAP and SMTP access), then on Mail → Settings tick the kin
 | Fastmail contacts and calendars | Connections → Fastmail contacts and calendars, a read-only CardDAV/CalDAV app password |
 | iCloud contacts and calendars (if you use them) | Connections → iCloud contacts and calendars, an app-specific password |
 | Facebook export | unzip a JSON export under the library; Connections → Facebook export |
-| Attachment filing | open question 1 |
+
 
 ## 6. Rolling back
 

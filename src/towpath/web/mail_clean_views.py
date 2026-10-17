@@ -89,11 +89,28 @@ def attachments_page(request, sid):
     page = max(1, int(request.GET["page"])) if request.GET.get("page", "").isdigit() else 1
     rows = attachments.listing(_store(), sid, f, limit=101, offset=(page - 1) * 100)
     filtered = any(f[k] for k in ("kind", "q", "year", "sender"))
+    from towpath.mail import filing
+
     return render(request, "mail_attachments.html", {
+        "filing": {**filing.summary(_store(), sid), "mode": filing.mode(_store(), sid, "web"),
+                   "modes": list(filing.MODES.items())} if not filtered and page == 1 else None,
+        "saved": request.GET.get("saved"),
         "nav": "mail", "account": account, "f": f, "rows": rows[:100], "more": len(rows) > 100, "page": page,
         "summary": None if filtered or page > 1 else attachments.summary(_store(), sid),
         "kinds": list(attachments.LABELS.items()), "orders": [("newest", "Newest"), ("oldest", "Oldest"),
                                                              ("largest", "Largest")]})
+
+
+@require_POST
+def filing_mode(request, sid):
+    from towpath.mail import filing
+
+    _managed(sid)
+    try:
+        filing.set_mode(_store(), sid, request.POST.get("mode", ""))
+    except ValueError:
+        return HttpResponseBadRequest("Choose one of the listed options.")
+    return redirect(f"/mail/{sid}/attachments?saved=filing")
 
 
 @require_GET

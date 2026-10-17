@@ -111,6 +111,9 @@ def run_once(config, credentials_dir=None):
         from towpath.mail import archive
 
         indexing += archive.archive_pending(config)
+        from towpath.mail import filing
+
+        indexing += filing.file_pending(config)
         from towpath.mail import notify
 
         indexing += notify.alerts_pending(config)

@@ -329,6 +329,13 @@ WHEN old.subject IS NOT new.subject OR old.from_name IS NOT new.from_name OR old
   INSERT INTO messages_text (rowid, subject, from_name, from_addr, text)
   VALUES (new.rowid, new.subject, new.from_name, new.from_addr, new.text);
 END;
+-- Attachments filed into Towpath's data folder (documents only): planned while filing is a dry run, then filed,
+-- each copy read back and checked against the hash of what the server sent.
+CREATE TABLE IF NOT EXISTS filed (
+  source_id TEXT NOT NULL, message_key TEXT NOT NULL, part_id TEXT NOT NULL, item_id TEXT NOT NULL, filename TEXT,
+  path TEXT NOT NULL, size INTEGER, sha256 TEXT, status TEXT NOT NULL, detail TEXT, at TEXT NOT NULL,
+  PRIMARY KEY (source_id, message_key, part_id));
+CREATE INDEX IF NOT EXISTS filed_status ON filed (source_id, status, at);
 -- Messages archived to a file before leaving the server: where each one is and the hash that was verified.
 CREATE TABLE IF NOT EXISTS archived (
   item_id TEXT PRIMARY KEY, source_id TEXT NOT NULL, request_id TEXT NOT NULL, path TEXT NOT NULL,
