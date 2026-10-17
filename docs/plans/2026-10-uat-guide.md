@@ -14,15 +14,17 @@ Decisions I made for you to confirm or reverse are listed in the
    everything you set: what Towpath may change (all off, **Dry runs only** on), alerts, follow-ups, reply labels,
    the digest, notes for drafts, pausing.
 3. **To reply** and **Awaiting reply**: are the conversations right? Mark any that aren't; your mark always wins.
-   Open one with a draft: is the voice yours? Edit and **Save to Drafts** (a dry run: check the receipt on Mail).
+   Open one: the whole conversation is on one page with its draft. Is the voice yours? Edit and **Save to Drafts**
+   (a dry run: check the receipt on Mail). The Mail page's **Inbox** line shows what's in the inbox by category;
+   each links to cleaning it up.
 
 ## 2. Mail management, one feature at a time
 
 | Try | Where | What to look for |
 | --- | --- | --- |
 | Reader and changes | open any message; Archive, Mark read | a dry-run receipt saying what would happen |
-| Senders | Mail → Senders | categories by people, newsletters, marketing…; change one and it sticks, and other senders from that company's domain follow (not gmail.com and the like) |
-| Rules | Mail → Rules → a template | Preview on recent mail; save; proposals appear under *Waiting for your answer*; approve per rule |
+| Senders | Mail → Senders | categories by people, newsletters, marketing…; change one (or tick several) and it sticks, and other senders from that company's domain follow (not gmail.com and the like) |
+| Rules | Mail → Rules → a template | each template says how much inbox mail it would look at; preview, save; proposals appear under *Waiting for your answer*; approve per rule |
 | Rules in your words | Mail → Rules → *Describe a rule* | e.g. "label receipts and archive them"; the model fills in the rule form; check, preview, save |
 | Notes for drafts | Mail → Settings → *Drafting replies* | when you're free, phone number, sign-off; new drafts use them |
 | Follow-up reminders | Mail → Settings → *Remind you to follow up* | after 3/7/14 days unanswered: a *Follow-up* label (dry run) and a drafted nudge under *Awaiting reply* |
@@ -67,6 +69,7 @@ password with full IMAP and SMTP access), then on Mail → Settings tick the kin
 | --- | --- |
 | Gmail over IMAP (milestone 6), to compare with Inbox Zero | Connections → Gmail (IMAP), with a Google app password |
 | Fastmail contacts and calendars | Connections → Fastmail contacts and calendars, a read-only CardDAV/CalDAV app password |
+| iCloud contacts and calendars (if you use them) | Connections → iCloud contacts and calendars, an app-specific password |
 | Facebook export | unzip a JSON export under the library; Connections → Facebook export |
 | Attachment filing | open question 1 |
 
