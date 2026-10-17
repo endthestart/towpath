@@ -175,8 +175,11 @@ class MailAdapter(SourceAdapter):
 
         if not words:
             return []
-        found = mail_search.search(self.config.store_dir, self.source_id, " ".join(words), limit=MAX_TEXT_IDS,
-                                   role=READ_ROLE)
+        try:
+            found = mail_search.search(self.config.store_dir, self.source_id, " ".join(words), limit=MAX_TEXT_IDS,
+                                       role=READ_ROLE)
+        except mail_search.QueryError:  # a word that looks like an operator mail search doesn't take
+            return []
         return [r["item_id"] for r in found]
 
     def _catalog(self, filters: Filters, cursor: str | None, limit: int) -> SourcePage:

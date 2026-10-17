@@ -205,3 +205,4 @@ def test_search_all_finds_words_in_message_text(world):
     assert [r.title for r in page.results] == ["Saturday?"]
     assert "text" in page.results[0].match.fields and "message text" in page.notes[0]
     assert [r.title for r in adapter.search(Filters.parse("Saturday"), None, 20).results] == ["Saturday?"]
+    assert adapter.search(Filters.parse("couch is:sleepy"), None, 20).results == ()  # no crash, and no match
