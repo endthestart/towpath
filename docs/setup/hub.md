@@ -6,13 +6,13 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `1b29e1e` (life-story proposals skip marketing and spam, rate each event's significance and keep
-everyday events under Minor; a busy model is waited for), publishing run
-[38679907267](https://github.com/endthestart/towpath/actions/runs/38679907267). The connect service joins the
-proxy network too, so the worker reaches a model server there.
+Revision `6147799` (mail management foundation: a Mail page to manage IMAP accounts, reading their mail in full,
+watching for new mail, and an action runner with a separate write password; every change a dry run until turned
+on), publishing run [39001398080](https://github.com/endthestart/towpath/actions/runs/39001398080). It adds new
+stores only (`mail`, `mailplan`, `mailact`, `maildecisions`), so rolling back to `1b29e1e` needs no data change.
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:73c8a3f75236d78da7b002b303290bbed3ad8f666110f4112d2d7bfd516b8f23`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:a3348cc83c46a62155eac4f3ae6d411f5bb4f02632f4adae63d02373a8afa840`
+- `web`: `ghcr.io/endthestart/towpath@sha256:301cccb8f0a0e73da7ab55332df63180f37923a56d03b8f0f83bbc95ce9e4d82`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:f349f184aee1ae65659365b653bf220df5ee812811c5b8bf0c5505b3101d1b88`
 
 Towpath's data folder (stores, sign-ins and the Recoll index) lives on a mirrored SSD pool since 2026-10-08,
 with hourly snapshots replicated to the main pool: Recoll's index writes had saturated the spinning disks. The
@@ -27,6 +27,7 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `1b29e1e` | Proposals skip marketing and spam, rate significance and wait for a busy model | `towpath@sha256:73c8a3f7…`, `towpath-recoll@sha256:a3348cc8…` |
 | `216cc2c` | Proposals skip marketing and spam and rate significance; a busy model failed each email instead of waiting | `towpath@sha256:9f018712…`, `towpath-recoll@sha256:90c796ee…` |
 | `96d67a7` | Proposals stop cleanly on source or model problems; expired sign-ins explained; Gmail sign-in page reachable | `towpath@sha256:a7650b01…`, `towpath-recoll@sha256:98461545…` |
 | `0269418` | Life story foundation with the model libraries in the images | `towpath@sha256:f21b860a…`, `towpath-recoll@sha256:6b1fb565…` |
@@ -120,7 +121,10 @@ Images are referenced by tested, published digest, never by moving tag. All thre
   and indexes an account only after the owner presses *Start indexing* or *Check for new mail*, in bounded,
   pausable, resumable slices. Idle polls contact no provider; receipts prevent repeats after restart; a
   filesystem lock excludes a second worker; quota, auth and server stops wait at least five minutes before the
-  next poll. It never schedules syncs, models, source changes or NAS crawling on its own.
+  next poll. It never schedules syncs, models, source changes or NAS crawling on its own. For an account the
+  owner chose to manage on the Mail page it also reads that account's mail, watches its inbox for new mail
+  (which starts indexing), and carries out mailbox changes the owner asked for or approved: dry runs unless the
+  owner turned that kind of change on and added a write password ([mail management](../mail-management.md)).
 - `web`: the UI on the proxy's network (alias `towpath-web`), port 8790 inside the container, no published
   port. It mounts only `state/`, so it can't read `credentials/`; it never resolves a credential. On first start
   its log shows the setup code for the single account.
