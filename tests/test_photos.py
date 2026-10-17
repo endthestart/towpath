@@ -77,6 +77,7 @@ def test_filters_and_facets(library):
     assert photos.search(config.store_dir, {"text": "trip"})[1] == 2
     f = photos.facets(config.store_dir)
     assert f["cameras"][0] == ("FUJIFILM X100V", 2) and dict(f["years"]) == {"2019": 2, "2021": 1}
+    assert sum(n for _, n in f["days"]) == 3 and all(len(d) == 10 for d, _ in f["days"])
 
 
 def test_a_plain_english_request_becomes_filters(library, tmp_path, openai_stub, monkeypatch):

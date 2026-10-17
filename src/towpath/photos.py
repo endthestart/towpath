@@ -148,9 +148,9 @@ FILTERS = ("camera", "lens", "after", "before", "located", "text")
 
 
 def facets(store_dir, role: str = "web") -> dict:
-    """Cameras and lenses with how many photos each, and the years photos were taken."""
+    """Cameras and lenses with how many photos each, the years photos were taken, and the days with the most."""
     if not store_path(store_dir, "files").exists():
-        return {"cameras": [], "lenses": [], "years": []}
+        return {"cameras": [], "lenses": [], "years": [], "days": []}
     with closing(open_store(store_dir, "files", role)) as db:
         return {
             "cameras": [tuple(r) for r in db.execute(
@@ -159,7 +159,9 @@ def facets(store_dir, role: str = "web") -> dict:
             "lenses": [tuple(r) for r in db.execute("SELECT lens, count(*) FROM photo_meta WHERE lens IS NOT NULL "
                                                     "GROUP BY 1 ORDER BY 2 DESC LIMIT 60")],
             "years": [tuple(r) for r in db.execute("SELECT substr(taken, 1, 4), count(*) FROM photo_meta WHERE taken "
-                                                   "IS NOT NULL GROUP BY 1 ORDER BY 1 DESC")]}
+                                                   "IS NOT NULL GROUP BY 1 ORDER BY 1 DESC")],
+            "days": [tuple(r) for r in db.execute("SELECT substr(taken, 1, 10), count(*) FROM photo_meta WHERE taken "
+                                                  "IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 12")]}
 
 
 def search(store_dir, f: dict, limit: int = 200, offset: int = 0, role: str = "web") -> tuple[list[dict], int]:

@@ -15,7 +15,8 @@
 <datalist id="cameras">{% for c in facets.cameras %}<option value="{{ c.0 }}">{% endfor %}</datalist>
 <datalist id="lenses">{% for l in facets.lenses %}<option value="{{ l.0 }}">{% endfor %}</datalist>
 {% if not active %}<p class="footnote">Cameras: {% for c in facets.cameras|slice:":12" %}<a href="?camera={{ c.0|urlencode }}">{{ c.0 }}</a> ({{ c.1 }}){% if not forloop.last %} · {% endif %}{% empty %}none read yet{% endfor %}</p>
-<p class="footnote">Years: {% for y in facets.years %}<a href="?after={{ y.0 }}-01-01&amp;before={{ y.0 }}-12-31">{{ y.0 }}</a> ({{ y.1 }}){% if not forloop.last %} · {% endif %}{% endfor %}</p>{% endif %}
+<p class="footnote">Years: {% for y in facets.years %}<a href="?after={{ y.0 }}-01-01&amp;before={{ y.0 }}-12-31">{{ y.0 }}</a> ({{ y.1 }}, <a href="/life/year/{{ y.0 }}" aria-label="The year {{ y.0 }}">year ↗</a>){% if not forloop.last %} · {% endif %}{% endfor %}</p>
+{% if facets.days %}<p class="footnote">Days with the most photos: {% for d in facets.days %}<a href="?after={{ d.0 }}&amp;before={{ d.0 }}">{{ d.0 }}</a> ({{ d.1 }}){% if not forloop.last %} · {% endif %}{% endfor %}</p>{% endif %}{% endif %}
 </section>
 {% if active %}<div class="result-heading"><strong>{{ total }} photo{{ total|pluralize }}</strong><span>Newest taken first</span></div>
 <table class="space-table"><thead><tr><th>Taken</th><th>Camera and lens</th><th>File</th><th>Where</th></tr></thead><tbody>
