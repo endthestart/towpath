@@ -113,6 +113,11 @@ Balanced across three areas, mail first:
     is offered. The address is shown before you tick.
 26. **A move into a Trash folder counts as Move to Trash**: it needs that switch on and your own approval, never a
     rule's automatic one.
+27. **The private photo export is left out of the catalog and Recoll entirely**, not just skipped by the photo
+    and life features: it no longer appears in Search all or Space, and Space's totals don't count it.
+28. **Taking a source's life-story permission away takes its events out** of every page, answer and prompt; On
+    this day, the Year pages and the timeline's yearly figures use allowed sources only, and a digest holds only
+    its own account's mail.
 
 ## Progress
 
@@ -175,3 +180,6 @@ Balanced across three areas, mail first:
   second DNS lookup, count a redirect as done, email any address a header named, and jam the queue on a bad
   address; archiving the same mail twice crashed the connector; a Trash approval didn't re-check its copy or target;
   a dropped connection could repeat a change; Gmail labels were missed for Undo.
+- 2026-10-17: `84e4283` deployed. A privacy review found the private export could still be listed by name (Search
+  all, Space) and indexed by Recoll, life-story model calls didn't name their senders, and revoked or ungranted
+  accounts still fed the life pages and the digest; all fixed in `1d06040` (decisions 27 and 28).
