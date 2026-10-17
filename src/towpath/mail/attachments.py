@@ -6,6 +6,7 @@ text (logos, signature images) are left out; pictures pasted into a message are 
 """
 
 import re
+import time
 from contextlib import closing
 
 from towpath.stores import open_store, store_path
@@ -32,6 +33,8 @@ KINDS = {
 LABELS = {**{k: v[0] for k, v in KINDS.items()}, "other": "Other"}
 ORDERS = {"newest": "date_utc DESC", "oldest": "date_utc", "largest": "size DESC"}
 HIDDEN_BY_DEFAULT = ("signatures",)
+SUMMARY_SECONDS = 600  # the summary reads every attachment row (seconds on a large account): kept this long
+_summaries: dict[tuple, tuple[float, dict]] = {}
 
 
 def kind_of(mime_type: str | None, filename: str | None) -> str:
@@ -109,9 +112,13 @@ def of_message(store_dir, source_id: str, item_id: str, role: str = "web") -> li
 
 
 def summary(store_dir, source_id: str, role: str = "web") -> dict:
-    """Counts and space by kind and by year, and the senders who sent the most."""
+    """Counts and space by kind and by year, and the senders who sent the most (computed at most every ten
+    minutes per account)."""
     if not store_path(store_dir, "source").exists():
         return {"kinds": [], "years": [], "senders": [], "total": (0, 0)}
+    key = (str(store_dir), source_id)
+    if key in _summaries and time.monotonic() - _summaries[key][0] < SUMMARY_SECONDS:
+        return _summaries[key][1]
     with closing(open_store(store_dir, "source", role)) as db:
         rows = _rows(db, source_id)
     kinds: dict[str, list] = {}
@@ -123,7 +130,9 @@ def summary(store_dir, source_id: str, role: str = "web") -> dict:
             got = bucket.setdefault(key, [0, 0])
             got[0] += 1
             got[1] += r["size"] or 0
-    return {"kinds": [(k, LABELS[k], *v) for k, v in sorted(kinds.items(), key=lambda x: -x[1][1])],
-            "years": sorted(((y, *v) for y, v in years.items()), reverse=True),
-            "senders": [(s, *v) for s, v in sorted(senders.items(), key=lambda x: -x[1][1])[:15]],
-            "total": (len(rows), sum(r["size"] or 0 for r in rows))}
+    found = {"kinds": [(k, LABELS[k], *v) for k, v in sorted(kinds.items(), key=lambda x: -x[1][1])],
+             "years": sorted(((y, *v) for y, v in years.items()), reverse=True),
+             "senders": [(s, *v) for s, v in sorted(senders.items(), key=lambda x: -x[1][1])[:15]],
+             "total": (len(rows), sum(r["size"] or 0 for r in rows))}
+    _summaries[key] = (time.monotonic(), found)
+    return found
