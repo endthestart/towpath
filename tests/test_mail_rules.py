@@ -160,6 +160,14 @@ def test_the_pages_for_senders_rules_and_batch_answers(world, monkeypatch):
         client.post("/mail/sender-category", {"source_id": world.sid, "address": "news@shop.example",
                                               "category": "newsletter"})
         assert senders.categories(world.store, world.sid)["news@shop.example"] == "newsletter"
+        client.post("/mail/sender-category-many", {"source_id": world.sid, "category": "person",
+                                                   "address": ["news@shop.example", "dana@example.net"]})
+        cats = senders.categories(world.store, world.sid)
+        assert cats["news@shop.example"] == "person" and cats["dana@example.net"] == "person"
+        assert client.post("/mail/sender-category-many", {"source_id": world.sid, "category": "person"}
+                           ).status_code == 400
+        client.post("/mail/sender-category", {"source_id": world.sid, "address": "news@shop.example",
+                                              "category": "newsletter"})
         form = {"name": "Shop", "from": "*@shop.example", "mailbox": "INBOX", "action_0": "add_keyword",
                 "param_0": "Shop", "scope": "all"}
         preview = client.post(f"/mail/{world.sid}/rules/new", {**form, "preview": "1"}).content.decode()

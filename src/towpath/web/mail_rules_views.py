@@ -77,6 +77,22 @@ def sender_category(request):
     return redirect(local_next(request, f"/mail/{sid}/senders?saved=1"))
 
 
+@require_POST
+def sender_category_many(request):
+    """One category for every ticked sender."""
+    sid = request.POST.get("source_id", "")
+    _managed(sid)
+    addresses = [a.lower() for a in request.POST.getlist("address") if a][:PAGE]
+    if not addresses:
+        return HttpResponseBadRequest("Tick the senders to change.")
+    try:
+        for address in addresses:
+            senders.mark(_store(), sid, address, request.POST.get("category") or None)
+    except ValueError:
+        return HttpResponseBadRequest("Choose one of the listed categories.")
+    return redirect(local_next(request, f"/mail/{sid}/senders?saved=1"))
+
+
 # -- rules ------------------------------------------------------------------------------------------------------
 
 def _row(rule: dict, runs: dict) -> dict:
