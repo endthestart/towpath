@@ -38,9 +38,27 @@ def _ids(value: str | None) -> list[str]:
     return MESSAGE_ID.findall(value or "")
 
 
+class _Fields:
+    """Header access that always yields text: the parser returns a ``Header`` object, not a string, for a field
+    carrying raw 8-bit bytes."""
+
+    def __init__(self, message):
+        self._m = message
+
+    def get(self, name):
+        value = self._m.get(name)
+        return None if value is None else str(value)
+
+    def get_all(self, name, default=()):
+        return [str(v) for v in self._m.get_all(name, [])] or list(default)
+
+    def __getitem__(self, name):
+        return self.get(name)
+
+
 def headers(raw: bytes) -> dict:
     """The header fields mail management uses, decoded, with a list of problems instead of exceptions."""
-    h = BytesHeaderParser().parsebytes(raw or b"")
+    h = _Fields(BytesHeaderParser().parsebytes(raw or b""))
     problems = []
     date_utc = None
     if h.get("Date"):

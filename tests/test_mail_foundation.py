@@ -184,6 +184,31 @@ def test_changed_flags_are_picked_up_with_condstore(env, monkeypatch):
     assert any("CHANGEDSINCE" in c for c in env.state.transcript)
 
 
+def test_one_message_that_cant_be_read_doesnt_stop_the_others(env, monkeypatch):
+    env.index()
+    env.manage()
+    real = text.headers
+
+    def picky(raw):
+        if b"October offers" in raw:
+            raise TypeError("synthetic")
+        return real(raw)
+
+    monkeypatch.setattr(text, "headers", picky)
+    assert env.analyze()[0]["read"] == 3
+    got = env.messages()
+    assert {"Lunch on Friday?", "Re: Lunch on Friday?", None} == set(got)
+    assert json.loads(got[None]["problems"]) == ["unreadable (TypeError)"]
+
+
+def test_headers_with_raw_8bit_bytes_are_read_as_text():
+    raw = (b"From: Jos\xe9 <jose@example.org>\r\nSubject: Caf\xe9\r\nMessage-ID: <a@x>\r\n"
+           b"References: <r1@x> \xe9 <r2@x>\r\nIn-Reply-To: <r2@x>\r\nDate: Thu, 01 Oct 2026 10:00:00 +0000\r\n\r\n")
+    fields = text.headers(raw)
+    assert fields["refs"] == ["<r1@x>", "<r2@x>"] and fields["in_reply_to"] == "<r2@x>"
+    assert fields["from_addr"] == "jose@example.org" and fields["subject"]
+
+
 def test_quote_removal_and_html_text():
     text_, removed = text.without_quotes("Thanks!\n\nFrom: Someone\nSent: Monday\nTo: me\n\nold text")
     assert text_.strip() == "Thanks!" and removed

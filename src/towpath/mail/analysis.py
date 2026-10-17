@@ -125,24 +125,45 @@ def _read_batch(reader: _Reader, source_id: str, rows) -> list[dict]:
         for uid, item_id in wanted:
             if uid not in meta:
                 continue  # expunged since indexing
-            data = meta[uid]
-            fields = text.headers(_key(data, b"BODY[HEADER.FIELDS") or b"")
-            thread = data.get(b"THREADID")
-            if isinstance(thread, (tuple, list)):
-                thread = thread[0] if thread else None
-            thread = thread.decode() if isinstance(thread, bytes) else thread
-            body_text, truncated, removed = None, False, False
-            if uid in bodies:
-                raw, part = bodies[uid]
-                body_text, truncated, removed = text.message_text(raw, part, part["size"] > TEXT_BYTES)
-            records.append({
-                **fields, "item_id": item_id, "source_id": source_id, "mailbox": mailbox,
-                "uidvalidity": uidvalidity, "uid": uid, "thread_key": text.thread_key(fields, thread, item_id),
-                "size": data.get(b"RFC822.SIZE"),
-                "flags": sorted(f.decode() if isinstance(f, bytes) else str(f) for f in data.get(b"FLAGS", ())),
-                "has_attachments": any(p["disposition"] == "attachment" for p in parts_by_uid.get(uid, ())),
-                "text": body_text, "text_truncated": truncated, "quoted_removed": removed})
+            try:
+                records.append(_record(source_id, mailbox, uidvalidity, uid, item_id, meta[uid], parts_by_uid,
+                                       bodies))
+            except (TypeError, ValueError, LookupError, UnicodeError, IndexError) as exc:
+                records.append(_unreadable(source_id, mailbox, uidvalidity, uid, item_id, meta[uid], exc))
     return records
+
+
+def _unreadable(source_id, mailbox, uidvalidity, uid, item_id, data, exc) -> dict:
+    """A message whose headers or text couldn't be made sense of: kept with its identity, size and flags, and the
+    problem named (its type only), so one odd message never stops reading."""
+    return {"item_id": item_id, "source_id": source_id, "mailbox": mailbox, "uidvalidity": uidvalidity, "uid": uid,
+            "thread_key": f"i:{item_id}", "message_id": None, "in_reply_to": None, "refs": [], "from_name": None,
+            "from_addr": None, "to_addrs": [], "cc_addrs": [], "reply_to": None, "subject": None, "date_utc": None,
+            "size": data.get(b"RFC822.SIZE"), "list_id": None, "list_unsubscribe": None,
+            "list_unsubscribe_post": None, "auto_submitted": None, "precedence": None,
+            "flags": sorted(f.decode() if isinstance(f, bytes) else str(f) for f in data.get(b"FLAGS", ())),
+            "has_attachments": False, "text": None, "text_truncated": False, "quoted_removed": False,
+            "problems": [f"unreadable ({type(exc).__name__})"]}
+
+
+def _record(source_id, mailbox, uidvalidity, uid, item_id, data, parts_by_uid, bodies) -> dict:
+    """One message's record from its fetched headers, flags, structure and text."""
+    fields = text.headers(_key(data, b"BODY[HEADER.FIELDS") or b"")
+    thread = data.get(b"THREADID")
+    if isinstance(thread, (tuple, list)):
+        thread = thread[0] if thread else None
+    thread = thread.decode() if isinstance(thread, bytes) else thread
+    body_text, truncated, removed = None, False, False
+    if uid in bodies:
+        raw, part = bodies[uid]
+        body_text, truncated, removed = text.message_text(raw, part, part["size"] > TEXT_BYTES)
+    return {
+        **fields, "item_id": item_id, "source_id": source_id, "mailbox": mailbox,
+        "uidvalidity": uidvalidity, "uid": uid, "thread_key": text.thread_key(fields, thread, item_id),
+        "size": data.get(b"RFC822.SIZE"),
+        "flags": sorted(f.decode() if isinstance(f, bytes) else str(f) for f in data.get(b"FLAGS", ())),
+        "has_attachments": any(p["disposition"] == "attachment" for p in parts_by_uid.get(uid, ())),
+        "text": body_text, "text_truncated": truncated, "quoted_removed": removed}
 
 
 COLUMNS = ("item_id", "source_id", "mailbox", "uidvalidity", "uid", "message_id", "in_reply_to", "refs",
