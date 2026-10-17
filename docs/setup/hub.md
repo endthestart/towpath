@@ -6,13 +6,14 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `1a9f7c5` (purchases from receipts, plain-English mail search, a whole-conversation page, per-account
-mail Settings, iCloud contacts and calendars), publishing run
-[39051578566](https://github.com/endthestart/towpath/actions/runs/39051578566). New stores and tables only; the web
-service and connector add their own tables at start.
+Revision `ffae7c4` (photo previews, never for the private export or photos hidden in Apple Photos; finding life
+events starts with stored mail), publishing run
+[39069314340](https://github.com/endthestart/towpath/actions/runs/39069314340). New stores and tables only; the web
+service and connector add their own tables at start. On Hub, Fastmail is allowed for the life story and finding
+events by itself is on (the owner's answers of October 17).
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:58f6d9f6daee3ccff263aff6ac337d3d21d5336e986d2c3a271ca6a0fd444b6c`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:51fb407cd26deebdb97042e36e487fac54bcdfb8653b06866bd16b4d583c37c2`
+- `web`: `ghcr.io/endthestart/towpath@sha256:9aa88615786802be12760c58c550c4361621a1bd41a6bb7cb240e8dbb1a6203a`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:9623d91eb0a5cfe22fa012a939a138c765ad82ba51b09a3f55dd599eee6cc12b`
 
 Towpath's data folder (stores, sign-ins and the Recoll index) lives on a mirrored SSD pool since 2026-10-08,
 with hourly snapshots replicated to the main pool: Recoll's index writes had saturated the spinning disks. The
@@ -27,6 +28,8 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `44d310e` | Filing documents from mail into the data folder, as a dry run first | `towpath@sha256:3def2759…`, `towpath-recoll@sha256:f384e8e9…` |
+| `1d06040` | Fixes from a privacy review: the private export kept out of the catalog and Recoll, model calls name their mail, grants honoured | `towpath@sha256:df03a081…`, `towpath-recoll@sha256:8ce94950…` |
 | `84e4283` | Fixes from a review of the code that changes mail: Trash only as the owner allows, safe unsubscribing, archive edge cases | `towpath@sha256:d7c6ac81…`, `towpath-recoll@sha256:bbf0eef6…` |
 | `d05ca6f` | Fixes from a review of the day's work: DAV password pinned to its service, Ask honours keep-from-cloud, label and purchase fixes | `towpath@sha256:8c806b4c…`, `towpath-recoll@sha256:b0b32847…` |
 | `b310977` | Huge duplicate files compared by samples; inbox by category, Accounts, recurring purchases, Year and Search all additions | `towpath@sha256:e76f71ee…`, `towpath-recoll@sha256:b3cef664…` |
