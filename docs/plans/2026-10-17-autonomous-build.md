@@ -190,3 +190,7 @@ Balanced across three areas, mail first:
 - 2026-10-17: `1d06040` deployed. The owner answered all four open questions through the Project Manager session:
   attachment filing built (`44d310e`, dry run first); Fastmail allowed for the life story and finding events turned
   on, on Hub; photo previews built (decision 29).
+- 2026-10-17: `ffae7c4` deployed. On Hub the Apple Photos check read the main library (91,083 files: about 18,500
+  visible originals, 9,567 photos hidden or deleted) and left out every file of the libraries it couldn't read
+  (mostly libraries' own copies in backups); 137 previews were made in the first pass. Finding life events by
+  itself is reading Fastmail's 2026 mail.
