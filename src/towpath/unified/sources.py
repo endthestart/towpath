@@ -498,6 +498,19 @@ class FilesAdapter(SourceAdapter):
         if filters.media_types:
             where.append(_any("lower(coalesce(o.media_type, '')) LIKE ?", len(filters.media_types)))
             args += [f"{m}%" for m in filters.media_types]
+        if filters.within:
+            root, _, folder = filters.within.partition("/")
+            where.append("o.root_alias = ?")
+            args.append(root)
+            if folder:
+                where.append("(o.rel_path = ? OR o.rel_path LIKE ? ESCAPE '\\')")
+                args += [folder, folder.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "/%"]
+        if filters.min_size is not None:
+            where.append("o.size >= ?")
+            args.append(filters.min_size)
+        if filters.max_size is not None:
+            where.append("o.size <= ?")
+            args.append(filters.max_size)
         # Catalog order (the import's, which is path order for a first import). With a query the trigram index
         # drives: it yields rows in that order, so a page stops after its rows instead of sorting every match.
         match = _fts_query(filters.words, filters.extensions)

@@ -364,3 +364,17 @@ def test_demo_command_is_synthetic_and_reports_states():
         "gmail-fixture": "ok", "imap-fixture": "unavailable", "files-fixture": "partial"}
     bad = CliRunner().invoke(app, ["search", "demo", "extension:n.e.f"])
     assert bad.exit_code == 2 and json.loads(bad.output)["error"]["code"] == "invalid-request"
+
+
+def test_folder_size_and_modified_filters_parse():
+    f = Filters.parse('in:"photos/2019 trip" size:10MB..2GB modified:2019-02 canal')
+    assert f.within == "photos/2019 trip" and (f.min_size, f.max_size) == (10_000_000, 2_000_000_000)
+    assert (f.after, f.before) == ("2019-02-01", "2019-02-28") and "file-modified" in f.date_meanings
+    assert f.text == "canal"
+    assert Filters.parse("size:>500KB").min_size == 500_000 and Filters.parse("size:<1k").max_size == 1000
+    assert Filters.parse("in:photos").metadata_only
+    assert Filters.from_dict(f.to_dict()) == f
+    with pytest.raises(ContractError):
+        Filters.parse("size:lots")
+    with pytest.raises(ContractError):
+        Filters.parse("modified:2019-13")

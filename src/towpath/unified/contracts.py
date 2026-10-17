@@ -176,7 +176,42 @@ class TypedDate:
 # -- filters --------------------------------------------------------------------------------------
 
 
-FILTER_KEYS = {"source", "kind", "ext", "extension", "type", "name", "after", "before", "date"}
+FILTER_KEYS = {"source", "kind", "ext", "extension", "type", "name", "after", "before", "date", "in", "size",
+               "modified"}
+SIZE_UNITS = {"": 1, "b": 1, "kb": 1000, "k": 1000, "mb": 1000**2, "m": 1000**2, "gb": 1000**3, "g": 1000**3,
+              "tb": 1000**4}
+TOKENS = re.compile(r'(\w+:"[^"]*"|"[^"]*"|\S+)')
+
+
+def parse_size(text: str) -> int:
+    m = re.fullmatch(r"(\d+(?:\.\d+)?)\s*([a-zA-Z]*)", text.strip())
+    if not m or m.group(2).lower() not in SIZE_UNITS:
+        raise ContractError(f"size {text!r} is a number with an optional unit (KB, MB, GB)")
+    return int(float(m.group(1)) * SIZE_UNITS[m.group(2).lower()])
+
+
+def size_bounds(value: str) -> tuple[int | None, int | None]:
+    """``>10MB``, ``<1KB``, ``10MB..2GB`` or ``10MB`` (at least) as byte bounds."""
+    if ".." in value:
+        low, high = value.split("..", 1)
+        return (parse_size(low) if low else None), (parse_size(high) if high else None)
+    if value.startswith((">", "<")):
+        bound = parse_size(value.lstrip("<>="))
+        return (bound, None) if value.startswith(">") else (None, bound)
+    return parse_size(value), None
+
+
+def month_bounds(value: str) -> tuple[str, str]:
+    """``2019`` or ``2019-05`` as first and last day."""
+    import calendar
+
+    if re.fullmatch(r"\d{4}", value):
+        return f"{value}-01-01", f"{value}-12-31"
+    m = re.fullmatch(r"(\d{4})-(\d{2})", value)
+    if not m or not 1 <= int(m.group(2)) <= 12:
+        raise ContractError(f"modified {value!r} is a year (2019) or a month (2019-05)")
+    last = calendar.monthrange(int(m.group(1)), int(m.group(2)))[1]
+    return f"{value}-01", f"{value}-{last:02d}"
 
 
 @dataclass(frozen=True)
@@ -197,6 +232,9 @@ class Filters:
     after: str | None = None
     before: str | None = None
     date_meanings: tuple[str, ...] = EVIDENCE_DATES
+    within: str | None = None  # ``in:"root/folder"``: a root alias, or a folder inside one
+    min_size: int | None = None
+    max_size: int | None = None
 
     def __post_init__(self):
         for source_id in self.sources:
@@ -214,7 +252,8 @@ class Filters:
         if len(self.text) > 512:
             raise ContractError("query text is limited to 512 characters")
         if not self.text.strip() and not (self.extensions or self.media_types or self.name or self.kinds
-                                          or self.after or self.before):
+                                          or self.after or self.before or self.within or self.min_size is not None
+                                          or self.max_size is not None):
             raise ContractError("give query text or at least one metadata filter")
 
     @property
@@ -230,12 +269,23 @@ class Filters:
         """``extension:nef kind:file after:2004-01-01 canal`` -> typed filters plus keyword text."""
         fields: dict = {"sources": [], "kinds": [], "extensions": [], "media_types": []}
         words = []
-        for token in (query or "").split():
+        for token in TOKENS.findall(query or ""):
             key, sep, value = token.partition(":")
+            value = value.strip('"')
             if not sep or key.lower() not in FILTER_KEYS or not value:
-                words.append(token)
+                words.append(token.strip('"'))
                 continue
             key = key.lower()
+            if key == "in":
+                fields["within"] = value.strip("/")
+                continue
+            if key == "size":
+                fields["min_size"], fields["max_size"] = size_bounds(value)
+                continue
+            if key == "modified":
+                fields["after"], fields["before"] = month_bounds(value)
+                fields["date_meanings"] = ("file-modified", "member-modified", "document-modified")
+                continue
             if key == "source":
                 fields["sources"].append(value)
             elif key == "kind":
@@ -265,16 +315,21 @@ class Filters:
         parts += [f"name:{self.name}"] if self.name else []
         parts += [f"after:{self.after}"] if self.after else []
         parts += [f"before:{self.before}"] if self.before else []
+        parts += [f'in:"{self.within}"'] if self.within else []
+        if self.min_size is not None or self.max_size is not None:
+            parts.append(f"size:{self.min_size or ''}..{self.max_size if self.max_size is not None else ''}")
         return " ".join(parts + ([self.text] if self.text else []))
 
     def to_dict(self) -> dict:
         return {"text": self.text, "sources": list(self.sources), "kinds": list(self.kinds),
                 "extensions": list(self.extensions), "media_types": list(self.media_types), "name": self.name,
-                "after": self.after, "before": self.before, "date_meanings": list(self.date_meanings)}
+                "after": self.after, "before": self.before, "date_meanings": list(self.date_meanings),
+                "within": self.within, "min_size": self.min_size, "max_size": self.max_size}
 
     @classmethod
     def from_dict(cls, data: dict) -> "Filters":
-        known = {"text", "sources", "kinds", "extensions", "media_types", "name", "after", "before", "date_meanings"}
+        known = {"text", "sources", "kinds", "extensions", "media_types", "name", "after", "before", "date_meanings",
+                 "within", "min_size", "max_size"}
         unknown = set(data) - known
         if unknown:
             raise ContractError(f"unknown filter field(s): {', '.join(sorted(unknown))}")
@@ -290,6 +345,15 @@ class Filters:
             return False
         if self.name and self.name.lower() not in (result.title or "").lower():
             return False
+        if self.min_size is not None and (result.size is None or result.size < self.min_size):
+            return False
+        if self.max_size is not None and (result.size is None or result.size > self.max_size):
+            return False
+        if self.within:
+            loc = result.locator
+            here = f"{loc['root']}/{loc.get('path') or ''}" if loc.get("root") else (loc.get("mailbox") or "")
+            if not (here == self.within or here.startswith(self.within + "/")):
+                return False
         if self.after or self.before:
             days = [d.day() for d in result.dates if d.meaning in self.date_meanings]
             days = [d for d in days if d]

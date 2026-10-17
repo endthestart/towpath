@@ -203,3 +203,17 @@ def test_search_commands_emit_json(uni):
     assert [s["source_id"] for s in data["sources"]] == ["files-inventory"] and len(data["results"]) == 3
     out = runner.invoke(app, ["search", "describe", "gmail-fixture:nope", "--config", str(uni.path), "--local"])
     assert out.exit_code == 1 and json.loads(out.output)["error"]["code"] == "not-found"
+
+
+def test_folder_and_size_filters_narrow_file_results(uni):
+    everything = [r for r in uni.search("extension:nef", connect_mode=False)["results"]
+                  if r["source_id"] == "files-inventory"]
+    root = everything[0]["locator"]["root"]
+    folder = next(r["locator"]["path"].rsplit("/", 1)[0] for r in everything if "/" in r["locator"]["path"])
+    inside = [r for r in uni.search(f'extension:nef in:"{root}/{folder}"', connect_mode=False)["results"]
+              if r["source_id"] == "files-inventory"]
+    assert inside and all(r["locator"]["path"].startswith(folder + "/") for r in inside)
+    assert len(inside) < len(everything)
+    big = [r for r in uni.search("extension:nef size:>1TB", connect_mode=False)["results"]
+           if r["source_id"] == "files-inventory"]
+    assert big == []
