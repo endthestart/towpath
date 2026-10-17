@@ -93,6 +93,21 @@ def listing(store_dir, source_id: str, f: dict, limit: int = 100, offset: int = 
     return rows
 
 
+def of_message(store_dir, source_id: str, item_id: str, role: str = "web") -> list[dict]:
+    """One message's attachments (signatures and logos included: the owner is looking at that message)."""
+    if not store_path(store_dir, "source").exists():
+        return []
+    with closing(open_store(store_dir, "source", role)) as db:
+        rows = [dict(r) for r in db.execute(
+            "SELECT p.part_id, p.filename, p.mime_type, p.size, i.native_id FROM parts p JOIN items i USING (item_id) "
+            "WHERE p.item_id = ? AND i.source_id = ? AND (p.disposition = 'attachment' OR coalesce(p.filename, '') "
+            "!= '') ORDER BY p.part_id", (item_id, source_id))]
+    for r in rows:
+        r["ref"] = f"{source_id}:{r['native_id']}#part={r['part_id']}"
+        r["label"] = LABELS[kind_of(r["mime_type"], r["filename"])]
+    return rows
+
+
 def summary(store_dir, source_id: str, role: str = "web") -> dict:
     """Counts and space by kind and by year, and the senders who sent the most."""
     if not store_path(store_dir, "source").exists():

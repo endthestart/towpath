@@ -392,7 +392,11 @@ def reader(request, item_id):
     from towpath.mail import privacy
 
     kept = privacy.kept(_store(), [m["item_id"], privacy.sender_target(m["source_id"], m["from_addr"])])
+    from towpath.mail import attachments
+
+    files = attachments.of_message(_store(), m["source_id"], m["item_id"])
     return render(request, "mail_reader.html", {
+        "attachments": files,
         "nav": "mail", "m": m, "account": account, "thread": thread if len(thread) > 1 else [],
         "conversation": {**conversation, "label": threads.LABELS[conversation["state"]]} if conversation else None,
         "kept_item": m["item_id"] in kept, "kept_sender": len(kept - {m["item_id"]}) > 0,

@@ -74,3 +74,9 @@ def test_the_attachments_page(world, monkeypatch):
         assert "lease-2026.pdf" in page and "Spreadsheets" in page and "logo.png" not in page
         page = client.get(f"/mail/{world.sid}/attachments?kind=documents&order=largest").content.decode()
         assert "lease-2026.pdf" in page and "budget.xlsx" not in page
+        from towpath.mail import analysis
+
+        analysis.analyze_pending(world.worker())
+        item = attachments.listing(world.store, world.sid, {"q": "budget"})[0]["item_id"]
+        page = client.get(f"/mail/m/{item}/").content.decode()
+        assert "Attachments" in page and "budget.xlsx" in page and "signature.asc" in page
