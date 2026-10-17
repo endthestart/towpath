@@ -29,6 +29,7 @@ from towpath.unified.federation import SourceAdapter, SourceDenied, SourceUnavai
 READ_ROLE = "web"  # a reader of the source and files stores: opened read-only (mode=ro)
 SCAN_BATCH = 200
 MAX_SCAN = 5000
+MAX_TEXT_IDS = 500  # messages matched by text that a catalog page considers, newest first
 FILE_DEPTH = {"recoll": "content-index", "fixture": "content-index", "manifest": "catalog", "sist2": None}
 
 
@@ -168,8 +169,19 @@ class MailAdapter(SourceAdapter):
                          (item_id,)).fetchone()
         return json.loads(row["labels"]) if row else None
 
+    def _text_matches(self, words: list[str]) -> list[str]:
+        """Messages whose text (as mail management read it) has every word, newest first, at most MAX_TEXT_IDS."""
+        from towpath.mail import search as mail_search
+
+        if not words:
+            return []
+        found = mail_search.search(self.config.store_dir, self.source_id, " ".join(words), limit=MAX_TEXT_IDS,
+                                   role=READ_ROLE)
+        return [r["item_id"] for r in found]
+
     def _catalog(self, filters: Filters, cursor: str | None, limit: int) -> SourcePage:
         words = filters.words
+        text_ids = self._text_matches(words) if words else []
         want_messages = ((not filters.kinds or "mail-message" in filters.kinds)
                          and not filters.extensions and not filters.media_types)
         want_parts = not filters.kinds or "mail-part" in filters.kinds
@@ -177,10 +189,16 @@ class MailAdapter(SourceAdapter):
         if want_messages:
             where = ["i.source_id = ?", "i.absent_since_run IS NULL"]
             args.append(self.source_id)
+            header = []
             for w in words:
-                where.append("(lower(coalesce(i.subject, '')) LIKE ? ESCAPE '\\' "
-                             "OR lower(coalesce(i.from_addr, '')) LIKE ? ESCAPE '\\')")
+                header.append("(lower(coalesce(i.subject, '')) LIKE ? ESCAPE '\\' "
+                              "OR lower(coalesce(i.from_addr, '')) LIKE ? ESCAPE '\\')")
                 args += [_like(w), _like(w)]
+            if header and text_ids:  # every word in the subject or sender, or every word in the message's text
+                where.append(f"(({' AND '.join(header)}) OR i.item_id IN ({','.join('?' for _ in text_ids)}))")
+                args += text_ids
+            else:
+                where += header
             selects.append("SELECT 'm' AS k, i.item_id, '' AS part_id, coalesce(i.date_utc, '') AS d FROM items i "
                            f"WHERE {' AND '.join(where)}")
         if want_parts:
@@ -211,6 +229,8 @@ class MailAdapter(SourceAdapter):
                 if row["k"] == "m":
                     matched = tuple(f for f, v in (("subject", item["subject"]), ("from", item["from_addr"]))
                                     if words and any(w in (v or "").lower() for w in words))
+                    if item["item_id"] in text_ids:
+                        matched += ("text",)
                     result = envelopes.mail_result(self.source_id, self.source_type, dict(item), "catalog", matched,
                                                    labels=self._labels(db, item["item_id"]))
                 else:
@@ -223,7 +243,8 @@ class MailAdapter(SourceAdapter):
             results, next_offset, bounded = _scan(fetch, accept, limit, _offset(cursor))
         finally:
             db.close()
-        notes = ["catalog: subject, sender and attachment names only"]
+        notes = ["catalog: subject, sender and attachment names" +
+                 (", and message text where mail management has read it" if text_ids else " only")]
         if bounded:
             notes.append(f"stopped after scanning {MAX_SCAN} index rows; continue with the cursor")
         return SourcePage(self.source_id, "ok", "catalog", tuple(results),

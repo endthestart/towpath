@@ -177,3 +177,14 @@ def test_the_pages_clean_up_and_unsubscribe_as_dry_runs(world, monkeypatch):
 def _inbox(world):
     with open_store(world.store, "mail", "web") as db:
         return [dict(r) for r in db.execute("SELECT * FROM messages WHERE mailbox = 'INBOX'")]
+
+
+def test_search_all_finds_words_in_message_text(world):
+    from towpath.unified.contracts import Filters
+    from towpath.unified.sources import MailAdapter
+
+    adapter = MailAdapter(world.worker(), world.worker().sources[world.sid])
+    page = adapter.search(Filters.parse("couch"), None, 20)  # only in the body of "Saturday?"
+    assert [r.title for r in page.results] == ["Saturday?"]
+    assert "text" in page.results[0].match.fields and "message text" in page.notes[0]
+    assert [r.title for r in adapter.search(Filters.parse("Saturday"), None, 20).results] == ["Saturday?"]
