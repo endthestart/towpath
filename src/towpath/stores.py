@@ -110,6 +110,9 @@ CREATE TABLE IF NOT EXISTS content_requests (
 CREATE TABLE IF NOT EXISTS search_requests (
   seq INTEGER PRIMARY KEY AUTOINCREMENT, request_key TEXT NOT NULL, filters TEXT NOT NULL,
   requested_by TEXT NOT NULL, created_at TEXT NOT NULL);
+-- Plain-English photo requests the owner typed on the Photos page, for the worker to turn into filters.
+CREATE TABLE IF NOT EXISTS photo_questions (
+  seq INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT NOT NULL, author TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS presence_requests (
   seq INTEGER PRIMARY KEY AUTOINCREMENT, destination_id TEXT NOT NULL, algorithm TEXT NOT NULL,
   checksum TEXT NOT NULL, requested_by TEXT NOT NULL, created_at TEXT NOT NULL,
@@ -126,6 +129,8 @@ CREATE TABLE IF NOT EXISTS scan_matches (
 CREATE TABLE IF NOT EXISTS proposals (
   proposal_id TEXT PRIMARY KEY, match_key TEXT NOT NULL, digest TEXT NOT NULL, body TEXT NOT NULL,
   state TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS photo_answers (
+  seq INTEGER PRIMARY KEY, filters TEXT NOT NULL, status TEXT NOT NULL, at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS model_input_queue (
   item_id TEXT NOT NULL, part_id TEXT NOT NULL, task TEXT NOT NULL, status TEXT NOT NULL,
   endpoint_fingerprint TEXT, detail TEXT, PRIMARY KEY (item_id, part_id, task));
@@ -223,6 +228,13 @@ CREATE TABLE IF NOT EXISTS space_summary (
 -- Files that are probably copies of each other (same name and size, across all roots), measured with the space.
 CREATE TABLE IF NOT EXISTS space_duplicates (
   provider_id TEXT PRIMARY KEY, body TEXT NOT NULL, updated_at TEXT NOT NULL);
+-- Photo metadata read from image headers with ExifTool (camera, lens, when taken, where), for photo search.
+CREATE TABLE IF NOT EXISTS photo_meta (
+  occurrence_id TEXT PRIMARY KEY, taken TEXT, make TEXT, model TEXT, lens TEXT, lat REAL, lon REAL, width INTEGER,
+  height INTEGER, problem TEXT, extracted_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS photo_meta_taken ON photo_meta (taken);
+CREATE INDEX IF NOT EXISTS photo_meta_model ON photo_meta (model, taken);
+CREATE TABLE IF NOT EXISTS photo_progress (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS occurrence_versions (
   occurrence_id TEXT NOT NULL, version TEXT NOT NULL, first_seen_run TEXT NOT NULL,
   PRIMARY KEY (occurrence_id, version));

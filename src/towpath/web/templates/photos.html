@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block title %}Photos · Towpath{% endblock %}
+{% block content %}
+<header class="page-head compact"><h1>Photos</h1>
+<p class="lead">Find photos by camera, lens, and when or where they were taken, read from the photos' own details. {% if progress.read %}{{ progress.read }} photos read so far ({{ progress.dated }} dated, {{ progress.located }} with a location; {{ progress.share }}% of your folders looked through).{% else %}Towpath reads photo details from the folders you index, a little at a time.{% endif %}</p></header>
+<form class="search" method="post" action="/photos/ask">{% csrf_token %}<label for="question" class="sr-only">Describe the photos</label><input id="question" name="question" maxlength="300" placeholder="Photos from my Fuji in Italy in 2019"><button class="button" type="submit">Find →</button></form>
+<section class="detail-card"><form method="get" class="inline-form">
+  <label>Camera <input name="camera" value="{{ f.camera }}" list="cameras"></label>
+  <label>Lens <input name="lens" value="{{ f.lens }}" list="lenses"></label>
+  <label>Taken from <input type="date" name="after" value="{{ f.after }}"></label>
+  <label>to <input type="date" name="before" value="{{ f.before }}"></label>
+  <label>Folder or name <input name="text" value="{{ f.text }}"></label>
+  <label class="check"><input type="checkbox" name="located" value="1"{% if f.located %} checked{% endif %}> With a location</label>
+  <button class="button secondary" type="submit">Show</button></form>
+<datalist id="cameras">{% for c in facets.cameras %}<option value="{{ c.0 }}">{% endfor %}</datalist>
+<datalist id="lenses">{% for l in facets.lenses %}<option value="{{ l.0 }}">{% endfor %}</datalist>
+{% if not active %}<p class="footnote">Cameras: {% for c in facets.cameras|slice:":12" %}<a href="?camera={{ c.0|urlencode }}">{{ c.0 }}</a> ({{ c.1 }}){% if not forloop.last %} · {% endif %}{% empty %}none read yet{% endfor %}</p>
+<p class="footnote">Years: {% for y in facets.years %}<a href="?after={{ y.0 }}-01-01&amp;before={{ y.0 }}-12-31">{{ y.0 }}</a> ({{ y.1 }}){% if not forloop.last %} · {% endif %}{% endfor %}</p>{% endif %}
+</section>
+{% if active %}<div class="result-heading"><strong>{{ total }} photo{{ total|pluralize }}</strong><span>Newest taken first</span></div>
+<table class="space-table"><thead><tr><th>Taken</th><th>Camera and lens</th><th>File</th><th>Where</th></tr></thead><tbody>
+{% for r in rows %}<tr><td>{{ r.taken|slice:":16"|default:"undated" }}</td><td>{{ r.make|default:'' }} {{ r.model|default:'' }}{% if r.lens %}<br><span class="footnote">{{ r.lens }}</span>{% endif %}</td>
+<td><a href="{{ r.ref }}">{{ r.rel_path }}</a><br><span class="footnote">{{ r.root_alias }} · {{ r.size|filesizeformat }}{% if r.width %} · {{ r.width }}×{{ r.height }}{% endif %}</span></td>
+<td>{% if r.lat is not None %}{{ r.lat|floatformat:4 }}, {{ r.lon|floatformat:4 }}{% else %}—{% endif %}</td></tr>
+{% empty %}<tr><td colspan="4">No photos match.</td></tr>{% endfor %}</tbody></table>
+<nav class="pagination" aria-label="Pages"><span>Page {{ page }}</span><div>{% if page > 1 %}<a href="?{{ query }}&amp;page={{ page|add:'-1' }}">← Previous</a>{% endif %}{% if more %}<a href="?{{ query }}&amp;page={{ page|add:'1' }}">Next →</a>{% endif %}</div></nav>{% endif %}
+{% endblock %}

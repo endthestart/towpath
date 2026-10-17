@@ -83,6 +83,10 @@ Balanced across three areas, mail first:
 16. **Memories:** a person needs three or more events to get a memory; chapters are decades of age; the model
     groups each month's events with ten days either side; the life-story, grouping and Ask tasks run on the Mac
     Pro 35B on Hub (Carbonio is busy), logged as the owner's chat permission.
+17. **Photo search reads headers only** (ExifTool `-fast2`), stores camera, lens, when and where, and never reads
+    anything under `Exports/Hidden` (the owner's private export), not even metadata. No thumbnails: the web service
+    can't see the library. A plain-English request is turned into filters by a local model that sees the request
+    and the camera and lens names, never a photo.
 
 ## Progress
 
@@ -97,3 +101,5 @@ Balanced across three areas, mail first:
   the three mail tasks and allowed to read mail text, logged as the owner's chat permission. Milestone 5 built
   (alerts, digest, statistics); attachment filing waits on open question 1.
 - 2026-10-17: life story layers built: finding events by itself, memories, profile, timeline, Ask.
+- 2026-10-17: `a6b182e` deployed (mail milestones 2–5). Photo search built (EXIF fields, Photos page,
+  plain-English requests).

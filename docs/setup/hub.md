@@ -6,13 +6,13 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `6147799` (mail management foundation: a Mail page to manage IMAP accounts, reading their mail in full,
-watching for new mail, and an action runner with a separate write password; every change a dry run until turned
-on), publishing run [39001398080](https://github.com/endthestart/towpath/actions/runs/39001398080). It adds new
-stores only (`mail`, `mailplan`, `mailact`, `maildecisions`), so rolling back to `1b29e1e` needs no data change.
+Revision `a6b182e` (mail milestones 2–5: reply tracking and drafts, senders and rules, search, clean-up,
+verified archives, unsubscribing, alerts, digest, statistics; models per task; reading past 8-bit headers),
+publishing run [39038163169](https://github.com/endthestart/towpath/actions/runs/39038163169). New stores and
+tables only; the web service and connector add their own tables at start.
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:301cccb8f0a0e73da7ab55332df63180f37923a56d03b8f0f83bbc95ce9e4d82`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:f349f184aee1ae65659365b653bf220df5ee812811c5b8bf0c5505b3101d1b88`
+- `web`: `ghcr.io/endthestart/towpath@sha256:90f49c4ef552bcbded0d12fe34563291a3e57c759d81b5876663f065562d4394`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:7d328a8ea0534daf77bf83f8cb91ad8ca2a960ae4995909e807060c06ff4e9b3`
 
 Towpath's data folder (stores, sign-ins and the Recoll index) lives on a mirrored SSD pool since 2026-10-08,
 with hourly snapshots replicated to the main pool: Recoll's index writes had saturated the spinning disks. The
@@ -27,6 +27,8 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `75f606a` | Reading past an 8-bit header; reply tracking and drafts; further models per connection | `towpath@sha256:f7e130aa…`, `towpath-recoll@sha256:f8d8d660…` |
+| `6147799` | Mail management foundation (dry runs, write password, Mail page) | `towpath@sha256:301cccb8…`, `towpath-recoll@sha256:f349f184…` |
 | `1b29e1e` | Proposals skip marketing and spam, rate significance and wait for a busy model | `towpath@sha256:73c8a3f7…`, `towpath-recoll@sha256:a3348cc8…` |
 | `216cc2c` | Proposals skip marketing and spam and rate significance; a busy model failed each email instead of waiting | `towpath@sha256:9f018712…`, `towpath-recoll@sha256:90c796ee…` |
 | `96d67a7` | Proposals stop cleanly on source or model problems; expired sign-ins explained; Gmail sign-in page reachable | `towpath@sha256:a7650b01…`, `towpath-recoll@sha256:98461545…` |

@@ -1,7 +1,7 @@
 from django.urls import path
 
-from towpath.web import (auth, life_views, mail_clean_views, mail_rules_views, mail_views, space_views, unified_views,
-                         views)
+from towpath.web import (auth, life_views, mail_clean_views, mail_rules_views, mail_views, photo_views, space_views,
+                         unified_views, views)
 
 urlpatterns = [
     path("", views.overview, name="overview"),
@@ -18,6 +18,9 @@ urlpatterns = [
     path("space/folder", space_views.folder_page, name="space-folder"),
     path("space/keep", space_views.keep, name="space-keep"),
     path("space/status", space_views.status, name="space-status"),
+    path("photos/", photo_views.page, name="photos"),
+    path("photos/ask", photo_views.ask, name="photos-ask"),
+    path("photos/ask/<int:seq>", photo_views.asked, name="photos-asked"),
     path("life/", life_views.overview, name="life"),
     path("life/account", life_views.account, name="life-account"),
     path("life/model", life_views.model, name="life-model"),
