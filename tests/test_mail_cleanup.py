@@ -206,3 +206,28 @@ def test_search_all_finds_words_in_message_text(world):
     assert "text" in page.results[0].match.fields and "message text" in page.notes[0]
     assert [r.title for r in adapter.search(Filters.parse("Saturday"), None, 20).results] == ["Saturday?"]
     assert adapter.search(Filters.parse("couch is:sleepy"), None, 20).results == ()  # no crash, and no match
+
+
+def test_a_plain_english_mail_search_becomes_checked_operators(world, monkeypatch):
+    import json as json_
+
+    from test_mail_threads import answer as thread_answer
+
+    from towpath.mail import search_ask
+
+    replies = iter(["from:sam after:2020", "is:sleepy"])
+    world.model_stub.respond = lambda p: json_.dumps({"query": next(replies)}) \
+        if "Turn the owner's question into one mail search" in p else thread_answer(p)
+    monkeypatch.setattr(auth, "_setup_codes", {})
+    configure(world.store)
+    auth.create_account(world.store, "owner", OWNER)
+    with override_settings(TOWPATH_STORE_DIR=world.store, TOWPATH_CONFIG=world.config, ALLOWED_HOSTS=["testserver"]):
+        client = Client()
+        client.post("/login", {"username": "owner", "password": OWNER})
+        asked = client.post(f"/mail/{world.sid}/search/ask", {"question": "what did Sam send me lately?"})
+        assert "is turning this into a mail search" in client.get(asked["Location"]).content.decode()
+        bad = search_ask.ask(world.store, world.sid, "sleepy mail")
+        assert search_ask.translate_pending(world.worker()) == [{"step": "mail-search-questions", "translated": 2}]
+        results = client.get(client.get(asked["Location"])["Location"]).content.decode()
+        assert "Saturday?" in results and "Towpath searched for <code>from:sam after:2020</code>" in results
+        assert search_ask.answer(world.store, bad) == {"query": "sleepy mail", "status": "words-after-invalid"}

@@ -5,6 +5,8 @@
 <header class="page-head compact"><p class="eyebrow">MAIL · {{ account.name|upper }}</p><h1>Search mail</h1>
 <p class="lead">Searches the text Towpath has read of every message, including mail archived to a file and removed from the server. All words must appear; end a word with * to match its start. Narrow it with <code>from:</code>, <code>to:</code>, <code>in:Archive</code>, <code>after:2019</code>, <code>before:2020-06</code>, <code>has:attachment</code>, <code>is:unread</code>, <code>is:flagged</code> or <code>larger:5MB</code>.</p></header>
 <form class="search" method="get"><label for="q" class="sr-only">Search</label><input id="q" name="q" value="{{ query }}" maxlength="200" type="search" placeholder="Words from the subject, sender or text…"><button class="button" type="submit">Search →</button></form>
+<form class="search" method="post" action="/mail/{{ account.source_id }}/search/ask">{% csrf_token %}<label for="question" class="sr-only">Ask in plain English</label><input id="question" name="question" maxlength="300" placeholder="Or ask: emails from the landlord with attachments last year"><button class="button secondary" type="submit">Ask</button></form>
+{% if asked %}<p class="footnote">You asked “{{ asked }}”; Towpath searched for <code>{{ query }}</code>. Edit it above if it isn't what you meant.</p>{% endif %}
 {% if error %}<div class="notice warn" role="alert">{{ error }}.</div>{% elif query %}<section class="mail-list" aria-label="Results">
 {% for r in rows %}<a class="mail-row" href="/mail/m/{{ r.item_id }}/"><span class="sender">{{ r.from_name|default:r.from_addr|default:'Unknown sender' }}</span>
 <span class="mail-title"><strong>{{ r.subject|default:'(No subject)' }}</strong><span class="row-context">{{ r.snippet }}</span>

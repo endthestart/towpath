@@ -58,6 +58,9 @@ def run_once(config, credentials_dir=None):
         from towpath import search_translate
 
         indexing += search_translate.translate_pending(config)
+        from towpath.mail import search_ask
+
+        indexing += search_ask.translate_pending(config)
         from towpath import life_propose  # life-story proposals, only once the owner allowed them
 
         indexing += life_propose.propose_pending(config, credentials_dir)

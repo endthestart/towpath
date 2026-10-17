@@ -111,6 +111,10 @@ CREATE TABLE IF NOT EXISTS content_requests (
 CREATE TABLE IF NOT EXISTS search_requests (
   seq INTEGER PRIMARY KEY AUTOINCREMENT, request_key TEXT NOT NULL, filters TEXT NOT NULL,
   requested_by TEXT NOT NULL, created_at TEXT NOT NULL);
+-- Mail searches the owner asked in plain English on an account's Search page.
+CREATE TABLE IF NOT EXISTS mail_search_questions (
+  seq INTEGER PRIMARY KEY AUTOINCREMENT, source_id TEXT NOT NULL, text TEXT NOT NULL, author TEXT NOT NULL,
+  created_at TEXT NOT NULL);
 -- Rules the owner described in plain English on the Rules page, for the worker's model to draft.
 CREATE TABLE IF NOT EXISTS rule_requests (
   seq INTEGER PRIMARY KEY AUTOINCREMENT, source_id TEXT NOT NULL, text TEXT NOT NULL, author TEXT NOT NULL,
@@ -137,6 +141,8 @@ CREATE TABLE IF NOT EXISTS scan_matches (
 CREATE TABLE IF NOT EXISTS proposals (
   proposal_id TEXT PRIMARY KEY, match_key TEXT NOT NULL, digest TEXT NOT NULL, body TEXT NOT NULL,
   state TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS mail_search_answers (
+  seq INTEGER PRIMARY KEY, query TEXT NOT NULL, status TEXT NOT NULL, at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS rule_drafts (
   seq INTEGER PRIMARY KEY, body TEXT, status TEXT NOT NULL, at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS search_answers (

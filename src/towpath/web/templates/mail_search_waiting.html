@@ -1,0 +1,8 @@
+{% extends 'base.html' %}
+{% block title %}Searching · {{ account.name }} · Mail · Towpath{% endblock %}
+{% block head %}<meta http-equiv="refresh" content="4">{% endblock %}
+{% block content %}
+<a class="back-link" href="/mail/{{ account.source_id }}/search">← Search mail</a>
+<header class="page-head compact"><h1>“{{ text }}”</h1>
+<p class="lead">The AI model on your network is turning this into a mail search; this page moves on by itself. Without a model allowed to help, the question's own words are searched.</p></header>
+{% endblock %}

@@ -38,8 +38,38 @@ def search_page(request, sid):
     more = len(rows) > 100
     rows = rows[:100]
     return render(request, "mail_search.html", {"nav": "mail", "account": account, "query": query, "rows": rows,
-                                                "error": error,
+                                                "error": error, "asked": request.GET.get("asked", "")[:300],
                                                 "next_before": rows[-1]["date_utc"] if more and rows else None})
+
+
+@require_POST
+def search_ask(request, sid):
+    from towpath.mail import search_ask as asking
+
+    _managed(sid)
+    try:
+        seq = asking.ask(_store(), sid, request.POST.get("question", ""))
+    except ValueError:
+        return HttpResponseBadRequest("Ask something.")
+    return redirect(f"/mail/{sid}/search/ask/{seq}")
+
+
+@require_GET
+def search_asked(request, sid, seq):
+    from urllib.parse import urlencode
+
+    from django.http import Http404
+
+    from towpath.mail import search_ask as asking
+
+    account = _managed(sid)
+    asked = asking.question(_store(), seq)
+    if asked is None or asked["source_id"] != sid:
+        raise Http404
+    found = asking.answer(_store(), seq)
+    if found:
+        return redirect(f"/mail/{sid}/search?" + urlencode({"q": found["query"], "asked": asked["text"]}))
+    return render(request, "mail_search_waiting.html", {"nav": "mail", "account": account, "text": asked["text"]})
 
 
 @require_GET
