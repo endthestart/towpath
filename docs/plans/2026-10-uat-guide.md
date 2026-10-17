@@ -20,8 +20,12 @@ Decisions I made for you to confirm or reverse are listed in the
 | Try | Where | What to look for |
 | --- | --- | --- |
 | Reader and changes | open any message; Archive, Mark read | a dry-run receipt saying what would happen |
-| Senders | Mail → Senders | categories by people, newsletters, marketing…; change one and it sticks |
+| Senders | Mail → Senders | categories by people, newsletters, marketing…; change one and it sticks, and other senders from that company's domain follow (not gmail.com and the like) |
 | Rules | Mail → Rules → a template | Preview on recent mail; save; proposals appear under *Waiting for your answer*; approve per rule |
+| Rules in your words | Mail → Rules → *Describe a rule* | e.g. "label receipts and archive them"; the model fills in the rule form; check, preview, save |
+| Notes for drafts | Mail → *Drafting replies* | when you're free, phone number, sign-off; new drafts use them |
+| Follow-up reminders | Mail → *Remind you to follow up* | after 3/7/14 days unanswered: a *Follow-up* label (dry run) and a drafted nudge under *Awaiting reply* |
+| Attachments | Mail → Attachments | every file by kind, year and sender; search names; each message once |
 | Search | Mail → Search | full text, including archived mail |
 | Space | Mail → Space | by category, year, folder, sender, largest |
 | Clean up | Mail → Clean up | old marketing/newsletters: counts and examples; *Move to Archive* (dry run) |
@@ -38,7 +42,8 @@ off**. Start with *Mark as read*, *Flag* and *Archive*; leave *Move to Trash* an
 ## 3. Life story
 
 1. **Life** (`/life/`): fill in **About you** (name, birthday). Decide open questions 2 and 3 (Fastmail and finding
-   events by itself) — the Life page's account switches and *Find events by itself* do it.
+   events by itself) — the Life page's account switches and *Find events by itself* do it. Allow a photo folder too:
+   days with many photos become proposed events.
 2. **Memories**: keep, rename or dismiss what Towpath gathered (people, decades, trips and occasions).
 3. **Write down a memory**: a few of your own; they appear on the timeline as remembered.
 4. **Timeline**, **On this day**, **Your story** (print or download as Markdown), **Ask** (try "When did I first go
@@ -47,8 +52,8 @@ off**. Start with *Mark as read*, *Flag* and *Archive*; leave *Move to Trash* an
 
 ## 4. Photos and files
 
-- **Photos** (`/photos/`): cameras and years appear as photos are read (in progress); try "photos from my Fuji in
-  2019" in the plain-English box.
+- **Photos** (`/photos/`): cameras and years from 40,000+ photos read; try "photos from my Fuji in 2019" in the
+  plain-English box. Few of your photos record a location, so place search has little to go on.
 - **Search all**: `in:"root/folder"`, `size:>100MB`, `modified:2019`; or ask in plain English.
 - **Space**: duplicate groups now say whether copies are identical by content.
 
