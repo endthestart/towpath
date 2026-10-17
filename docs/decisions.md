@@ -104,6 +104,8 @@ These are built into the current documents. The owner can accept or overturn eac
 
 ### D15. Role of Inbox Zero
 
+**Proposed to be superseded 2026-10-16** by [ADR 0002](adrs/0002-towpath-native-mail-management.md): Towpath-native mail management over IMAP, with Inbox Zero keeping Gmail until parity is qualified.
+
 **Accepted 2026-10-01; operational fit pending.** If an existing tool meets the need now and works well, Towpath uses it. Inbox Zero is Towpath's first mail-management provider: an optional Compose profile (or an existing instance) that Towpath integrates with through the [provider contract](interfaces.md#6-mail-management-provider), holding its own Gmail write access. Alternatives can be added behind the same contract, and Towpath may later build its own features and replace it. Its public API covers statistics and rules; other features are links to its own screens. Caveats are in [mail management](mail-management.md#caveats). A focused [evaluation](evaluations/inbox-zero-plan.md) on a dedicated test mailbox comes before use with a primary account.
 
 ### D16. Gmail structure without content
@@ -198,6 +200,7 @@ These are built into the current documents. The owner can accept or overturn eac
 | 2026-10-01 | License policy: open source and free for personal use qualifies; personal-use-only components stay optional and labeled; Inbox Zero becomes a candidate again | Accepted |
 | 2026-10-01 | Tooling review completed; recommendations R14 to R20 added; D14 partly settled; D15 opened | Research |
 | 2026-10-01 | D15: Inbox Zero integrated as an optional Compose service for mail management; D1 revised so `towpath-act` handles deliveries; D8, D11, D12 scoped to Towpath-built features | Accepted |
+| 2026-10-16 | ADR 0002: Towpath-native mail management over IMAP, Fastmail first; supersedes D15 at Gmail parity; `towpath-act` gains allowlisted IMAP actions | Proposed |
 | 2026-10-01 | Owner review: D14 accepted (Gmail API only; bring-your-own OAuth as the initial approach; separate Cloud projects); R14, R15, R17, R19, R20 accepted with qualifications; D16 opened; Inbox Zero provider contract and evaluation plan added; license class renamed "source available with use restrictions" | Accepted |
 | 2026-10-01 | First slice built on synthetic data; all 19 acceptance checks pass; findings recorded in [first slice results](first-slice.md#results) | Built |
 | 2026-10-01 | Built and tested on stubs: slice 1b model gateway; real Gmail client with read-only OAuth and scope refusal; D16 verification command; Paperless and Immich lookups; read-only Inbox Zero adapter; example config, config check, CI. Local verification handed to the owner | Built |
