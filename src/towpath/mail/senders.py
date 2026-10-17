@@ -217,6 +217,9 @@ def categorize_pending(config, slice_seconds: float = SLICE_SECONDS, clock=time.
             if state.get("senders_rowid") != top:
                 rebuilt = rebuild(intel, mail, sid, threads.owner(config.store_dir, sid, mail))
                 measure(intel, mail, sid)
+                from towpath.mail import notify
+
+                notify.measure(config.store_dir, sid)
                 state = {**threads._progress(intel, sid), "senders_rowid": top}
                 threads._set_progress(intel, sid, state)
             done, stop = 0, None

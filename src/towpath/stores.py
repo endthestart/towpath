@@ -361,6 +361,15 @@ CREATE TABLE IF NOT EXISTS senders (
   category_by TEXT NOT NULL, reason TEXT, input_digest TEXT NOT NULL, updated_at TEXT NOT NULL,
   PRIMARY KEY (source_id, address));
 CREATE INDEX IF NOT EXISTS senders_category ON senders (source_id, category, messages);
+-- Conversations already marked as important for the owner, and digests already proposed (so neither repeats).
+CREATE TABLE IF NOT EXISTS alerts (
+  source_id TEXT NOT NULL, thread_key TEXT NOT NULL, last_item TEXT NOT NULL, proposal_id TEXT NOT NULL,
+  at TEXT NOT NULL, PRIMARY KEY (source_id, thread_key, last_item));
+CREATE TABLE IF NOT EXISTS digests (
+  source_id TEXT NOT NULL, period TEXT NOT NULL, proposal_id TEXT NOT NULL, at TEXT NOT NULL,
+  PRIMARY KEY (source_id, period));
+-- Per source: mail statistics (volume by week, response times, correspondents), measured by the worker.
+CREATE TABLE IF NOT EXISTS stats (source_id TEXT PRIMARY KEY, body TEXT NOT NULL, updated_at TEXT NOT NULL);
 -- Per source: where the mail's space goes (by year, mailbox, category, largest messages), measured by the worker.
 CREATE TABLE IF NOT EXISTS space (source_id TEXT PRIMARY KEY, body TEXT NOT NULL, updated_at TEXT NOT NULL);
 -- Which messages each rule version has looked at (rowid watermark), and what it decided for each.

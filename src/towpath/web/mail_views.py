@@ -15,7 +15,7 @@ from django.shortcuts import redirect, render
 from django.views.decorators.http import require_GET, require_POST
 
 from towpath import connections, decisions, stores
-from towpath.mail import FEATURE, actions, analysis, executor, settings as mail_settings, threads, watch
+from towpath.mail import FEATURE, actions, analysis, executor, notify, settings as mail_settings, threads, watch
 from towpath.stores import open_store, store_path
 from towpath.unified import grants
 
@@ -53,7 +53,9 @@ def _accounts(config) -> list[dict]:
             "paused": mail_settings.paused(_store(), sid, role="web"),
             "dry_run": mail_settings.dry_run(_store(), sid, role="web"),
             "progress": analysis.progress(_store(), sid), "watch": watch.state(_store(), sid),
-            "conversations": threads.counts(_store(), sid) if managed else {}})
+            "conversations": threads.counts(_store(), sid) if managed else {},
+            "alerts": notify.alert_setting(_store(), sid, "web")["mode"],
+            "digest": notify.digest_setting(_store(), sid, "web")["every"]})
     return out
 
 
@@ -106,7 +108,7 @@ def _activity(source_id: str | None = None) -> dict:
 def _proposals() -> list[dict]:
     """Proposals waiting for the owner: those without an answer that no automatic rule or archive request covers,
     newest first."""
-    from towpath.mail import archive, rules
+    from towpath.mail import archive, notify, rules
 
     if not store_path(_store(), "mailplan").exists():
         return []
@@ -118,7 +120,7 @@ def _proposals() -> list[dict]:
         if r["proposal_id"] in answered:
             continue
         r["body"] = json.loads(r["body"])
-        if rules.auto_approved(_store(), r["body"], role="web") or archive.auto_approved(_store(), r["body"], "web"):
+        if any(m.auto_approved(_store(), r["body"], role="web") for m in (rules, archive, notify)):
             continue
         r["what"] = actions.describe(r["body"])
         out.append(r)
@@ -151,6 +153,8 @@ def overview(request):
     accounts = _accounts(config)
     types = [{"key": k, **v} for k, v in actions.TYPES.items()]
     return render(request, "mail.html", {"nav": "mail", "accounts": accounts, "types": types,
+                                         "alert_modes": list(notify.ALERT_MODES.items()),
+                                         "digest_every": list(notify.DIGEST_EVERY.items()),
                                          "saved": request.GET.get("saved"), "groups": _proposal_groups(_proposals()),
                                          "models": _models(config), "labels": threads.LABELS, **_activity()})
 
@@ -218,6 +222,32 @@ def dry_run(request):
         return HttpResponseBadRequest("Turn mail management on for this account first.")
     mail_settings.set_dry_run(_store(), sid, request.POST.get("dry_run") == "1")
     return redirect("/mail/?saved=dry-run")
+
+
+@require_POST
+def tell_me(request):
+    """Important-mail alerts and the digest for one account."""
+    sid = request.POST.get("source_id", "")
+    if not _account(_config(), sid)["managed"]:
+        return HttpResponseBadRequest("Turn mail management on for this account first.")
+    try:
+        if "alerts" in request.POST:
+            notify.set_alerts(_store(), sid, request.POST["alerts"])
+        if "digest" in request.POST:
+            notify.set_digest(_store(), sid, request.POST["digest"])
+    except ValueError:
+        return HttpResponseBadRequest("Choose one of the listed options.")
+    return redirect("/mail/?saved=1")
+
+
+@require_GET
+def stats_page(request, sid):
+    account = _account(_config(), sid)
+    if not account["managed"]:
+        return redirect("/mail/")
+    found = notify.stats(_store(), sid)
+    peak = max((w[1] + w[2] for w in (found or {}).get("weeks", [])), default=0)
+    return render(request, "mail_stats.html", {"nav": "mail", "account": account, "stats": found, "peak": peak})
 
 
 @require_POST

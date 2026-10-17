@@ -38,7 +38,8 @@ Balanced across three areas, mail first:
 
 ## Open questions
 
-None yet.
+1. **Attachment filing** (kept in scope at the start): where should Towpath file attachments from mail — Paperless
+   (its consume folder or API), Immich for photos, a NAS folder, or Google Drive? Building it waits for this.
 
 ## Decisions made for review
 
@@ -72,6 +73,9 @@ None yet.
 12. **Clean-up defaults:** newsletters, marketing, notifications and social mail older than 30 days in the inbox.
 13. **Mail search is its own index** (full text over Towpath's copy of each message) on the Mail pages; joining it
     to *Search all* comes with the life-story work.
+14. **Alerts and digest:** alerts mark only mail that arrives after they're turned on; the digest is written at 7am
+    Chicago time (the owner's time zone is assumed), daily or on Mondays, and put in the inbox from "Towpath digest"
+    at the owner's own address.
 
 ## Progress
 
@@ -82,3 +86,6 @@ None yet.
   categories, rules with templates, batch approval, automatic rules); the connector now updates the worker's stores
   at start too.
 - 2026-10-17: milestone 4 built (mail search, space, clean-up, archives verified before removal, unsubscribe).
+- 2026-10-17: `75f606a` deployed (reading resumed past the 8-bit header); the Mac Pro 35B added on Hub, chosen for
+  the three mail tasks and allowed to read mail text, logged as the owner's chat permission. Milestone 5 built
+  (alerts, digest, statistics); attachment filing waits on open question 1.

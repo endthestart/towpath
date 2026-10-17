@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block title %}Statistics · {{ account.name }} · Mail · Towpath{% endblock %}
+{% block content %}
+<a class="back-link" href="/mail/">← Mail</a>
+<header class="page-head compact"><p class="eyebrow">MAIL · {{ account.name|upper }}</p><h1>Statistics</h1>
+{% if stats %}<p class="lead">{% if stats.reply_hours.median is not None %}Over the last 90 days you replied in {{ stats.reply_hours.median }} hours, at the median, across {{ stats.reply_hours.count }} replies.{% else %}No replies in the last 90 days to measure.{% endif %} Measured {{ stats.updated_at|slice:":16" }} UTC.</p>{% endif %}</header>
+{% if not stats %}<p>Towpath measures these once it has read the account's mail.</p>{% else %}
+<section class="detail-card"><h2 class="card-title">Mail per week, last year</h2><table class="space-table"><thead><tr><th>Week</th><th>Received</th><th>Sent</th></tr></thead><tbody>
+{% for w in stats.weeks %}<tr><td>{{ w.0 }}</td><td>{{ w.1 }}</td><td>{{ w.2 }}</td></tr>{% endfor %}</tbody></table></section>
+<section class="detail-card"><h2 class="card-title">People you write to most (last year)</h2>
+{% for c in stats.top_correspondents %}<p><a href="/mail/{{ account.source_id }}/?from={{ c.0|urlencode }}">{{ c.0 }}</a> <span class="muted">· {{ c.1 }} message{{ c.1|pluralize }}</span></p>{% empty %}<p>None yet.</p>{% endfor %}</section>
+{% endif %}
+{% endblock %}
