@@ -118,12 +118,12 @@ def _criteria(source) -> dict:
 
 
 def candidates(store_dir, sid: str, c: dict, limit: int = LIMIT) -> list[dict]:
-    """Messages on the server matching the clean-up criteria, newest first."""
+    """Messages on the server matching the clean-up criteria, newest first. Flagged mail is never included."""
     if not store_path(store_dir, "mail").exists():
         return []
     cutoff = (datetime.now(timezone.utc) - timedelta(days=c["older_than"])).isoformat()
     cats = senders.categories(store_dir, sid)
-    where, args = ["source_id = ?", "coalesce(date_utc, '') < ?"], [sid, cutoff]
+    where, args = ["source_id = ?", "coalesce(date_utc, '') < ?", "flags NOT LIKE '%Flagged%'"], [sid, cutoff]
     if c["mailbox"] and c["mailbox"] != "*":
         where.append("lower(mailbox) = lower(?)")
         args.append(c["mailbox"])

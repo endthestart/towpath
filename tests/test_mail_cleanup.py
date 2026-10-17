@@ -231,3 +231,20 @@ def test_a_plain_english_mail_search_becomes_checked_operators(world, monkeypatc
         results = client.get(client.get(asked["Location"])["Location"]).content.decode()
         assert "Saturday?" in results and "Towpath searched for <code>from:sam after:2020</code>" in results
         assert search_ask.answer(world.store, bad) == {"query": "sleepy mail", "status": "words-after-invalid"}
+
+
+def test_clean_up_never_includes_flagged_mail(world):
+    from towpath.web.mail_clean_views import candidates
+
+    criteria = {"mailbox": "INBOX", "categories": [], "older_than": 0, "read_only": False, "sender": ""}
+    before = {m["subject"] for m in candidates(world.store, world.sid, criteria)}
+    assert "Weekly deals" in before
+    from contextlib import closing
+
+    from towpath.stores import open_store
+
+    with closing(open_store(world.store, "mail", "connect")) as db:  # as a flag read from the server records it
+        db.execute("UPDATE messages SET flags = ? WHERE subject = 'Weekly deals'", ('["\\\\Flagged"]',))
+        db.commit()
+    after = {m["subject"] for m in candidates(world.store, world.sid, criteria)}
+    assert "Weekly deals" not in after and after == before - {"Weekly deals"}
