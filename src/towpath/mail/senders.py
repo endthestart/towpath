@@ -30,6 +30,8 @@ SHARED_DOMAINS = {"gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "
                   "gmx.com", "msn.com"}
 TASK = "mail.classify"
 PROMPT = "mail.sender/1"
+PROMPT_GROUP = "mail.senders/1"
+GROUP = 8  # senders sorted in one model call
 CATEGORIES = {"person": "People", "newsletter": "Newsletters", "marketing": "Marketing",
               "notification": "Notifications", "receipt": "Receipts and orders", "finance": "Banking and bills",
               "travel": "Travel", "account": "Accounts and security", "social": "Social networks",
@@ -62,6 +64,12 @@ Categories:
 - cold_email: an unsolicited first contact from a stranger selling, pitching or recruiting.
 - other: anything else.
 Give a short reason (under 20 words)."""
+GROUP_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["senders"],
+                "properties": {"senders": {"type": "array", "minItems": 1, "maxItems": GROUP, "items": {
+                    "type": "object", "additionalProperties": False, "required": ["n", "category", "reason"],
+                    "properties": {"n": {"type": "integer", "minimum": 1, "maximum": GROUP},
+                                   "category": {"type": "string", "enum": list(CATEGORIES)},
+                                   "reason": {"type": "string", "maxLength": 160}}}}}}
 
 
 def now() -> str:
@@ -172,16 +180,39 @@ def rebuild(intel, mail, source_id: str, me: dict, store_dir=None) -> int:
 
 # -- the model's part -------------------------------------------------------------------------------------------
 
-def _prompt(mail, source_id: str, sender: dict) -> tuple[str, list[str]]:
+def _facts(mail, source_id: str, sender: dict, subjects_n: int = 6, snippet_chars: int = 400) -> tuple[str, list]:
     rows = mail.execute("SELECT item_id, subject, text FROM messages WHERE source_id = ? AND from_addr = ? "
-                        "ORDER BY date_utc DESC LIMIT 6", (source_id, sender["address"])).fetchall()
+                        "ORDER BY date_utc DESC LIMIT ?", (source_id, sender["address"], subjects_n)).fetchall()
     subjects = "\n".join(f"- {r[1] or '(no subject)'}" for r in rows)
-    snippet = " ".join(((rows[0][2] or "") if rows else "").split())[:400]
-    facts = (f"Name: {sender['name'] or '(none)'}\nAddress: {sender['address']}\nMessages: {sender['messages']}\n"
-             f"Mailing-list headers: {'yes' if sender['list_id'] or sender['unsubscribe'] else 'no'}\n"
-             f"The owner has written to them: {'yes' if sender['owner_wrote'] else 'no'}\n"
-             f"Recent subjects:\n{subjects}\nStart of the latest message: {snippet}")
-    return f"{INSTRUCTION}\n\n<sender>\n{facts}\n</sender>", [r[0] for r in rows]
+    snippet = " ".join(((rows[0][2] or "") if rows else "").split())[:snippet_chars]
+    return (f"Name: {sender['name'] or '(none)'}\nAddress: {sender['address']}\nMessages: {sender['messages']}\n"
+            f"Mailing-list headers: {'yes' if sender['list_id'] or sender['unsubscribe'] else 'no'}\n"
+            f"The owner has written to them: {'yes' if sender['owner_wrote'] else 'no'}\n"
+            f"Recent subjects:\n{subjects}\nStart of the latest message: {snippet}"), [r[0] for r in rows]
+
+
+def _prompt(mail, source_id: str, sender: dict) -> tuple[str, list[str]]:
+    facts, items = _facts(mail, source_id, sender)
+    return f"{INSTRUCTION}\n\n<sender>\n{facts}\n</sender>", items
+
+
+def _group_prompt(mail, source_id: str, group: list[dict]) -> tuple[str, list[str]]:
+    blocks, items = [], []
+    for n, s in enumerate(group, start=1):
+        facts, ids = _facts(mail, source_id, s, subjects_n=4, snippet_chars=200)
+        blocks.append(f'<sender n="{n}">\n{facts}\n</sender>')
+        items += ids
+    head = INSTRUCTION.replace("Give a short reason", "Answer for every sender, by its number n. Give each a short "
+                                                       "reason")
+    return f"{head}\n\n" + "\n\n".join(blocks), items
+
+
+def _settle(intel, source_id: str, s: dict, category: str, reason: str, model: str) -> None:
+    if category == "cold_email" and (s["owner_wrote"] or s["messages"] > 3):
+        category = "other"  # not a first contact
+    intel.execute("UPDATE senders SET category = ?, category_by = 'model', reason = ?, updated_at = ? "
+                  "WHERE source_id = ? AND address = ?",
+                  (category, f"{reason.strip()[:160]} ({model})", now(), source_id, s["address"]))
 
 
 def _categorize(config, intel, mail, source_id: str, deadline: float, clock) -> tuple[int, str | None]:
@@ -196,22 +227,35 @@ def _categorize(config, intel, mail, source_id: str, deadline: float, clock) -> 
             "'notification' ORDER BY (messages >= 3) DESC, last_date DESC LIMIT ?", (source_id, MODEL_BATCH))]
         if not rows:
             return done, None
-        for s in rows:
+        from towpath.mail.privacy import targets
+
+        missed = rows
+        if len(rows) > 1:  # several senders in one call; any the model leaves out are asked about one by one
+            group = rows[:GROUP]
+            prompt, items = _group_prompt(mail, source_id, group)
+            result = gateway.infer(config, TASK, prompt, "content", GROUP_SCHEMA,
+                                   targets(source_id, items, [s["address"] for s in group]),
+                                   prompt_version=PROMPT_GROUP)
+            if result["status"] in ("refused", "disabled"):
+                return done, "refused"
+            if _failure(result):
+                return done, _failure(result)
+            answered = {}
+            if result["status"] == "ok":
+                answered = {a["n"]: a for a in result["output"]["senders"] if 1 <= a["n"] <= len(group)}
+                for n, a in answered.items():
+                    _settle(intel, source_id, group[n - 1], a["category"], a["reason"], model)
+                intel.commit()
+                done += len(answered)
+            missed = [s for n, s in enumerate(group, start=1) if n not in answered]
+        for s in missed:
             if clock() >= deadline:
                 return done, None
             prompt, items = _prompt(mail, source_id, s)
-            from towpath.mail.privacy import targets
-
             result = gateway.infer(config, TASK, prompt, "content", SCHEMA, targets(source_id, items, [s["address"]]),
                                    prompt_version=PROMPT)
             if result["status"] == "ok":
-                category = result["output"]["category"]
-                if category == "cold_email" and (s["owner_wrote"] or s["messages"] > 3):
-                    category = "other"  # not a first contact
-                intel.execute("UPDATE senders SET category = ?, category_by = 'model', reason = ?, updated_at = ? "
-                              "WHERE source_id = ? AND address = ?",
-                              (category, f"{result['output']['reason'].strip()[:160]} ({model})", now(), source_id,
-                               s["address"]))
+                _settle(intel, source_id, s, result["output"]["category"], result["output"]["reason"], model)
             elif result["status"] in ("refused", "disabled"):
                 return done, "refused"
             elif _failure(result):

@@ -27,6 +27,11 @@ def answer(prompt: str) -> str:
         if "shop.example" in prompt:
             return json.dumps({"category": "marketing", "reason": "Sale announcements."})
         return json.dumps({"category": "cold_email", "reason": "A pitch."})
+    if '<sender n="' in prompt:  # several senders at once: answer for each block
+        blocks = re.findall(r'<sender n="(\d+)">(.*?)</sender>', prompt, re.S)
+        return json.dumps({"senders": [
+            {"n": int(n), "category": "marketing" if "shop.example" in b else "cold_email",
+             "reason": "Sale announcements." if "shop.example" in b else "A pitch."} for n, b in blocks]})
     if "check one email against the owner's rules" in prompt:
         ids = re.findall(r"^- (rule_[0-9a-f]+):", prompt, re.M)
         chosen = ids[0] if "Big sale" in prompt else "none"
@@ -56,7 +61,7 @@ def test_senders_are_totalled_and_categorized_and_the_owners_category_wins(world
     assert got["news@shop.example"]["category"] == "marketing" and got["news@shop.example"]["category_by"] == "model"
     assert got["news@shop.example"]["unsubscribe"] and got["news@shop.example"]["inbox"] == 1
     assert "reader@example.com" not in got  # the owner is never a sender
-    assert not any("sam@example.org" in p and "<sender>" in p for p in world.model_prompts())  # rules decided
+    assert not any("sam@example.org" in p and "<sender" in p for p in world.model_prompts())  # rules decided
     senders.mark(world.store, world.sid, "news@shop.example", "newsletter")
     senders.categorize_pending(world.worker())
     assert senders.categories(world.store, world.sid)["news@shop.example"] == "newsletter"
