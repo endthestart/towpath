@@ -240,3 +240,27 @@ def test_a_rule_described_in_words_is_drafted_by_the_model_for_the_owner_to_chec
     rule_drafts.draft_pending(world.worker())
     found = rule_drafts.draft(world.store, seq)
     assert found["status"] == "words-after-invalid" and found["body"]["instructions"] == "move it somewhere"
+
+
+def test_mail_from_companies_is_fyi_without_the_model_until_the_owner_says_its_a_person(world):
+    from test_mail_threads import mail
+
+    from towpath import connect
+    from towpath.mail import analysis, threads
+
+    world.state.mailboxes["INBOX"].messages[11] = mail(11, "Shop Deals <deals@shop.example>", "reader@example.com",
+                                                       "For you", "Want 20% off this weekend?", 1)
+    connect.sync(world.worker(), world.sid)
+    analysis.analyze_pending(world.worker())
+    senders.categorize_pending(world.worker())
+    threads.track_pending(world.worker())
+
+    def deal():
+        return next(t for s in threads.STATES for t in threads.listing(world.store, world.sid, s)
+                    if t["subject"] == "For you")
+
+    assert deal()["state"] == "fyi" and deal()["state_by"] == "rule-sender"
+    assert not any("20% off" in p for p in world.model_prompts() if "<conversation>" in p)
+    senders.mark(world.store, world.sid, "deals@shop.example", "person")
+    threads.track_pending(world.worker())
+    assert deal()["state_by"] == "model"  # back to the model once the owner calls the sender a person

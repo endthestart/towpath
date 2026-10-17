@@ -46,6 +46,10 @@ DRAFT_DAYS = 30  # drafts are written for conversations waiting on the owner wit
 OWNER_WROTE_LAST_DAYS = 60  # after this, a conversation the owner ended is done rather than awaiting
 OLD_DAYS = 365 * 2  # an unanswered conversation older than this is done without asking the model
 RETRY_SECONDS = 10 * 60
+# Senders in these categories are companies and services, and the owner never wrote to them (someone the owner wrote
+# to is a person): their mail is FYI without asking the model, until the owner says the sender is a person.
+NOT_PEOPLE = ("newsletter", "marketing", "notification", "receipt", "finance", "travel", "account", "social",
+              "calendar")
 BUSY_SECONDS = 60
 TRANSIENT = ("APIConnectionError", "APITimeoutError", "InternalServerError", "RateLimitError")
 BUSY = ("ConflictError",)
@@ -309,6 +313,33 @@ def _owner_examples(intel, store_dir, source_id: str, limit: int = 6) -> str:
             if lines else "")
 
 
+def _settle_by_sender(config, intel, source_id: str) -> int:
+    """Conversations whose latest message is from a company or service: FYI by rule, not for the model. A sender the
+    owner later calls a person sends theirs back to the model."""
+    from towpath.mail import senders
+
+    cats = senders.categories(config.store_dir, source_id, ROLE)
+    since = (datetime.now(timezone.utc) - timedelta(days=OLD_DAYS)).isoformat()
+    changed = 0
+    for key, last_from in intel.execute(
+            "SELECT thread_key, last_from FROM threads WHERE source_id = ? AND state_by = 'rule' AND kind = "
+            "'conversation' AND last_from_owner = 0 AND last_date >= ?", (source_id, since)).fetchall():
+        category = cats.get(last_from or "")
+        if category in NOT_PEOPLE:
+            intel.execute("UPDATE threads SET state = 'fyi', state_by = 'rule-sender', reason = ? WHERE source_id = ? "
+                          "AND thread_key = ?", (f"From a sender sorted as {senders.CATEGORIES[category].lower()}.",
+                                                 source_id, key))
+            changed += 1
+    for key, last_from in intel.execute("SELECT thread_key, last_from FROM threads WHERE source_id = ? AND state_by = "
+                                        "'rule-sender'", (source_id,)).fetchall():
+        if cats.get(last_from or "") not in NOT_PEOPLE:
+            intel.execute("UPDATE threads SET state_by = 'rule' WHERE source_id = ? AND thread_key = ?",
+                          (source_id, key))
+            changed += 1
+    intel.commit()
+    return changed
+
+
 def _classify(config, intel, mail, source_id: str, me: dict, deadline: float, clock,
               days: int = OLD_DAYS) -> tuple[int, str | None]:
     from towpath.models import gateway
@@ -479,6 +510,7 @@ def track_pending(config, slice_seconds: float = SLICE_SECONDS, clock=time.monot
         try:
             me = owner(config.store_dir, sid, mail)
             rebuilt = _rebuild(intel, mail, config.store_dir, sid, me, deadline, clock)
+            _settle_by_sender(config, intel, sid)
             state = _progress(intel, sid)
             classified = drafted = 0
             stop = None
