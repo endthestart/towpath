@@ -45,6 +45,10 @@ Balanced across three areas, mail first:
 3. **Finding life events by itself:** built, and your direction of October 14 says it should run in the background
    across allowed mail. Turn it on now (it reads Gmail through Google's paced API and uses the Mac Pro model for
    hours), or wait for UAT?
+4. **Photo previews:** the Photos, Year and On this day pages list photos by name only. Towpath could keep each
+   photo's small embedded camera thumbnail (read by ExifTool, no new software; about 10 KB each, roughly 400 MB for
+   the library) in a store of its own, never for the hidden export or photos hidden in Apple Photos. That reverses
+   decision 17 (nothing copied or thumbnailed). Build it, off until you turn it on?
 
 ## Decisions made for review
 
