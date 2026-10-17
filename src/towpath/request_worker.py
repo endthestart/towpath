@@ -28,6 +28,21 @@ def singleton(store_dir):
             fcntl.flock(handle, fcntl.LOCK_UN)
 
 
+def _owner_facing(config, credentials_dir) -> list[dict]:
+    """What the owner is waiting on, quick when nothing is queued: changes they asked for (and approved ones), and
+    plain-English searches, photo requests and rule drafts. Run between the long model slices so none waits for a
+    whole poll."""
+    from towpath import photos, search_translate
+    from towpath.mail import executor, rule_drafts, search_ask
+
+    out = executor.run_pending(config, credentials_dir)
+    out += search_translate.translate_pending(config)
+    out += search_ask.translate_pending(config)
+    out += photos.translate_pending(config)
+    out += rule_drafts.draft_pending(config)
+    return out
+
+
 def run_once(config, credentials_dir=None):
     """Existing queue receipts survive restart; idle polling makes no provider calls.
 
@@ -54,13 +69,7 @@ def run_once(config, credentials_dir=None):
         from towpath import space_hash
 
         indexing += space_hash.confirm_pending(config)
-        indexing += photos.translate_pending(config)
-        from towpath import search_translate
-
-        indexing += search_translate.translate_pending(config)
-        from towpath.mail import search_ask
-
-        indexing += search_ask.translate_pending(config)
+        indexing += _owner_facing(config, credentials_dir)
         from towpath import life_propose  # life-story proposals, only once the owner allowed them
 
         indexing += life_propose.propose_pending(config, credentials_dir)
@@ -76,25 +85,27 @@ def run_once(config, credentials_dir=None):
         from towpath import life_ask
 
         indexing += life_ask.answer_pending(config)
+        indexing += _owner_facing(config, credentials_dir)
         from towpath.mail import analysis, executor, watch  # mail management, for accounts the owner chose
 
         watch.ensure(config, analysis.eligible(config))
         indexing += executor.run_pending(config, credentials_dir)
         indexing += analysis.build_search(config)
         indexing += analysis.analyze_pending(config)
+        indexing += _owner_facing(config, credentials_dir)
         from towpath.mail import threads
 
         indexing += threads.track_pending(config)
+        indexing += _owner_facing(config, credentials_dir)
         from towpath.mail import rules, senders
 
         indexing += senders.categorize_pending(config)
         indexing += rules.evaluate_pending(config)
-        from towpath.mail import rule_drafts
-
-        indexing += rule_drafts.draft_pending(config)
+        indexing += _owner_facing(config, credentials_dir)
         from towpath.mail import purchases
 
         indexing += purchases.read_pending(config)
+        indexing += _owner_facing(config, credentials_dir)
         from towpath.mail import archive
 
         indexing += archive.archive_pending(config)
