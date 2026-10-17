@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block title %}Events that may disagree · Life · Towpath{% endblock %}
+{% block content %}
+<a class="back-link" href="/life/">← Life</a>
+<header class="page-head compact"><h1>Events that may disagree</h1>
+<p class="lead">Pairs of events worded nearly alike: on about the same day (perhaps one event found twice) or a few months apart (perhaps one event whose dates disagree). Keep the right one, or say both are right; Towpath remembers.</p></header>
+{% if saved %}<div class="notice" role="status">Saved.</div>{% endif %}
+{% for p in pairs %}<section class="detail-card"><h2 class="card-title">{{ p.kind|capfirst }} <span class="muted">· {{ p.apart }} day{{ p.apart|pluralize }} apart</span></h2>
+{% for side, r in p.items %}{% if side == 'a' or side == 'b' %}<p><strong>{{ r.statement }}</strong> <span class="muted">· {{ r.when }}{% if r.state != 'proposed' %} · {{ r.state }}{% endif %}</span>{% if r.evidence_url %} <a href="{{ r.evidence_url }}">source</a>{% endif %}</p>{% if r.quote %}<blockquote>“{{ r.quote }}”</blockquote>{% endif %}{% endif %}{% endfor %}
+<form method="post" action="/life/pairs" class="form-actions">{% csrf_token %}<input type="hidden" name="a" value="{{ p.a.id }}"><input type="hidden" name="b" value="{{ p.b.id }}">
+  <button class="button secondary" name="choice" value="a">Keep the first ({{ p.a.when }})</button>
+  <button class="button secondary" name="choice" value="b">Keep the second ({{ p.b.when }})</button>
+  <button class="button secondary" name="choice" value="both">Both are right</button></form>
+</section>{% empty %}<p>Nothing to settle: no two events look like the same one.</p>{% endfor %}
+{% endblock %}

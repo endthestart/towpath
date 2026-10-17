@@ -340,3 +340,31 @@ def test_the_export_package_holds_what_towpath_learned_and_no_mail_text(world, m
 
     assert b"move a couch" not in everything  # no mail text
     assert PASSWORD.encode() not in everything and OWNER.encode() not in everything  # no secrets
+
+
+def test_events_that_may_disagree_are_paired_for_the_owner_to_settle(world, monkeypatch):
+    from towpath import life_conflicts
+
+    with closing(open_store(world.store, "life", "worker")) as db:
+        life.save(db, claim("Flew to Example Junction", "2009-05-15", f"{world.sid}:other"), world.sid, "run_b")
+        life.save(db, claim("Helped Sam move", "2011-05-20", f"{world.sid}:other2"), world.sid, "run_b")
+        db.commit()
+    found = life_conflicts.find(world.store)
+    kinds = {(p["a"].statement, p["kind"]) for p in found}
+    assert ("Flew to Example Junction", "the same event twice?") in kinds
+    assert ("Helped Sam move", "one event, dates that disagree?") in kinds
+    assert not any("Dinner with Sam" in (p["a"].statement, p["b"].statement) for p in found)  # not alike enough
+    monkeypatch.setattr(auth, "_setup_codes", {})
+    configure(world.store)
+    auth.create_account(world.store, "owner", OWNER)
+    with override_settings(TOWPATH_STORE_DIR=world.store, TOWPATH_CONFIG=world.config, ALLOWED_HOSTS=["testserver"]):
+        client = Client()
+        client.post("/login", {"username": "owner", "password": OWNER})
+        assert "2 pairs to settle" in client.get("/life/").content.decode()
+        flew = next(p for p in found if p["a"].statement == "Flew to Example Junction")
+        moved = next(p for p in found if p["a"].statement == "Helped Sam move")
+        client.post("/life/pairs", {"a": flew["a"].claim_id, "b": flew["b"].claim_id, "choice": "a"})
+        client.post("/life/pairs", {"a": moved["a"].claim_id, "b": moved["b"].claim_id, "choice": "both"})
+        assert "Nothing to settle" in client.get("/life/pairs").content.decode()
+    states = {c.claim_id: c.state for c in life.claims(world.store)}
+    assert states[flew["b"].claim_id] == "rejected" and states[flew["a"].claim_id] == "accepted"

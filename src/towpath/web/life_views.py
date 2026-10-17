@@ -93,7 +93,10 @@ def overview(request):
     rows = [_row(c) for c in proposed if _shown(c, show)][:300]
     status = _status()
     year = date.today().year - 1
+    from towpath import life_conflicts
+
     return render(request, "life.html", {
+        "pairs": len(life_conflicts.find(settings.TOWPATH_STORE_DIR)),
         "nav": "life", "profile": life_groups.profile(settings.TOWPATH_STORE_DIR), "accounts": _accounts(config),
         "saved": request.GET.get("saved"), "show": show,
         "model": {"id": endpoint_id, "name": endpoint.model, "address": endpoint.base_url,
@@ -289,6 +292,30 @@ def ask(request):
     return render(request, "life_ask.html", {
         "nav": "life", "asked": asked, "waiting": any(q["answer"] is None for q in asked),
         "model_ok": bool(endpoint_id) and decisions.model_granted(config, endpoint_id, "content")})
+
+
+@require_http_methods(["GET", "POST"])
+def pairs(request):
+    """Events that may disagree, for the owner to settle: keep one, or both are right."""
+    from towpath import life_conflicts
+
+    store = settings.TOWPATH_STORE_DIR
+    if request.method == "POST":
+        a, b, choice = request.POST.get("a", ""), request.POST.get("b", ""), request.POST.get("choice", "")
+        known = {c.claim_id for c in life.claims(store, limit=10**6)}
+        if a not in known or b not in known or choice not in ("a", "b", "both"):
+            return HttpResponseBadRequest("Those events aren't known.")
+        if choice == "both":
+            life_conflicts.both_right(store, a, b)
+        else:
+            keep, drop = (a, b) if choice == "a" else (b, a)
+            life.review(store, keep, "accept")
+            life.review(store, drop, "reject")
+        return redirect("/life/pairs?saved=1")
+    found = life_conflicts.find(store)
+    for p in found:
+        p["a"], p["b"] = _row(p["a"]), _row(p["b"])
+    return render(request, "life_pairs.html", {"nav": "life", "pairs": found, "saved": request.GET.get("saved")})
 
 
 @require_GET

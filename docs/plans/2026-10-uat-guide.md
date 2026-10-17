@@ -53,7 +53,9 @@ password with full IMAP and SMTP access), then on Mail → Settings tick the kin
    days with many photos become proposed events.
 2. **2025 events to review** (Life → events to review): the re-read of 2025 finished on October 15 and left 16 of
    its 101 events for you to keep or reject.
-3. **Memories**: keep, rename or dismiss what Towpath gathered (people, decades, trips and occasions).
+3. **Pairs to settle** (Life → *pairs to settle*, when there are any): events worded alike on about the same day,
+   or a few months apart; keep the right one or say both are right.
+3b. **Memories**: keep, rename or dismiss what Towpath gathered (people, decades, trips and occasions).
 4. **Export**: Your story → *Download everything Towpath knows*: a zip of plain JSON and Markdown (events,
    memories, people, rules, sender categories, purchases, decisions; no mail text or passwords).
 5. **Write down a memory**: a few of your own; they appear on the timeline as remembered.
