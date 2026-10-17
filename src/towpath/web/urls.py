@@ -30,6 +30,7 @@ urlpatterns = [
     path("life/auto", life_views.auto, name="life-auto"),
     path("life/profile", life_views.profile, name="life-profile"),
     path("life/timeline", life_views.timeline, name="life-timeline"),
+    path("life/today", life_views.today, name="life-today"),
     path("life/ask", life_views.ask, name="life-ask"),
     path("life/memories/", life_views.memories, name="life-memories"),
     path("life/memories/decide", life_views.memory_decide, name="life-memory-decide"),

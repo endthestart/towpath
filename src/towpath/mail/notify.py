@@ -166,6 +166,18 @@ def digest_text(store_dir, source_id: str, since: datetime, role: str = ROLE) ->
     if noisy:
         lines += ["", "Mostly unread — maybe unsubscribe:"]
         lines += [f"  - {s['name'] or s['address']}: {s['unread']} unread of {s['messages']}" for s in noisy]
+    from towpath import life_today
+
+    past = life_today.on_this_day(store_dir, role=role)["years"]
+    if past:
+        lines += ["", "On this day:"]
+        for y in past[:5]:
+            bits = [c.statement for c in y["events"][:2]]
+            if y["photos"]:
+                bits.append(f"{len(y['photos'])} photo{'s' if len(y['photos']) != 1 else ''}")
+            if y["sent"]:
+                bits.append(f"you wrote to {y['sent'][0]['to']}")
+            lines.append(f"  {y['year']}: " + "; ".join(bits))
     lines += ["", "Open Towpath's Mail page to answer, clean up or unsubscribe."]
     return "\n".join(lines)
 

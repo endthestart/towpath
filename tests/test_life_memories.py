@@ -145,3 +145,24 @@ def test_the_pages(world, monkeypatch):
         assert "Looking through your records" in client.get("/life/ask").content.decode()
         client.post("/life/profile", {"name": "R", "birthday": "not a date"})
         assert life_groups.profile(world.store)["name"] == "Reader"
+
+
+def test_on_this_day_and_each_years_context(world, monkeypatch):
+    from datetime import date
+
+    from towpath import life_today
+
+    found = life_today.on_this_day(world.store, date(2026, 5, 14))
+    assert [y["year"] for y in found["years"]] == ["2009"]
+    assert [c.statement for c in found["years"][0]["events"]] == ["Flew to Example Junction"]
+    context = life_today.year_context(world.store)
+    assert sum(v.get("sent", 0) for v in context.values()) == 3
+    assert any("dana@example.net" in v.get("people", []) for v in context.values())
+    monkeypatch.setattr(auth, "_setup_codes", {})
+    configure(world.store)
+    auth.create_account(world.store, "owner", OWNER)
+    with override_settings(TOWPATH_STORE_DIR=world.store, TOWPATH_CONFIG=world.config, ALLOWED_HOSTS=["testserver"]):
+        client = Client()
+        client.post("/login", {"username": "owner", "password": OWNER})
+        assert "Flew to Example Junction" in client.get("/life/today?day=2026-05-14").content.decode()
+        assert "emails received" in client.get("/life/timeline").content.decode()

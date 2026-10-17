@@ -13,7 +13,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from datetime import date
 from urllib.parse import urlencode
 
-from towpath import connections, decisions, life, life_ask, life_groups, life_propose, stores
+from towpath import connections, decisions, life, life_ask, life_groups, life_propose, life_today, stores
 from towpath.unified import grants
 
 LIFE_STORES = ("decisions", "connections")
@@ -150,9 +150,29 @@ def timeline(request):
         if c.claim_id in in_group or (c.significance == "routine" and not show_minor):
             continue
         years.setdefault(_row(c)["year"], {"groups": [], "events": []})["events"].append(_row(c))
-    ordered = [{"year": y, "age": _age(me.get("birthday"), y), **years[y]} for y in sorted(years, reverse=True)]
+    context = life_today.year_context(store)
+    for y in context:
+        years.setdefault(y, {"groups": [], "events": []})
+    ordered = [{"year": y, "age": _age(me.get("birthday"), y), "context": context.get(y, {}), **years[y]}
+               for y in sorted(years, reverse=True) if y != "Undated" or years[y]["events"] or years[y]["groups"]]
     return render(request, "life_timeline.html", {"nav": "life", "years": ordered, "profile": me,
                                                   "show_minor": show_minor})
+
+
+@require_GET
+def today(request):
+    from datetime import date as date_
+
+    try:
+        day = date_.fromisoformat(request.GET["day"]) if request.GET.get("day") else None
+    except ValueError:
+        day = None
+    found = life_today.on_this_day(settings.TOWPATH_STORE_DIR, day)
+    for y in found["years"]:
+        y["events"] = [_row(c) for c in y["events"]]
+        for p in y["photos"]:
+            p["ref"] = "/ref/?" + urlencode({"r": f"file:{p['root_alias']}/{p['rel_path']}"})
+    return render(request, "life_today.html", {"nav": "life", **found})
 
 
 @require_GET
