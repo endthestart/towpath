@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block title %}{% if rule %}Edit rule{% else %}New rule{% endif %} · Mail · Towpath{% endblock %}
+{% block content %}
+<a class="back-link" href="/mail/{{ account.source_id }}/rules">← Rules</a>
+<header class="page-head compact"><p class="eyebrow">MAIL · {{ account.name|upper }}</p><h1>{% if rule %}Edit “{{ rule.body.name }}”{% else %}New rule{% endif %}</h1>
+<p class="lead">Fill in only what matters. Text without * matches anywhere, ignoring case; with * it's a pattern, such as *@shop.example.</p></header>
+{% if error %}<div class="notice warn" role="alert">{{ error }}</div>{% endif %}
+<section class="detail-card"><form method="post" class="settings-form">{% csrf_token %}
+  <label>Name <input name="name" value="{{ body.name|default:'' }}" required></label>
+  <fieldset><legend>Which mail</legend>
+  <label>From <input name="from" value="{{ conditions.from|default:'' }}"></label>
+  <label>To or Cc <input name="to" value="{{ conditions.to|default:'' }}"></label>
+  <label>Subject <input name="subject" value="{{ conditions.subject|default:'' }}"></label>
+  <label>Text <input name="body" value="{{ conditions.body|default:'' }}"></label>
+  <label>Mailbox <input name="mailbox" value="{{ conditions.mailbox|default:'' }}"><span>Usually INBOX. Leave empty for any.</span></label>
+  <div>Category {% for key, label in categories %}<label class="check"><input type="checkbox" name="categories" value="{{ key }}"{% if key in conditions.categories %} checked{% endif %}> {{ label }}</label>{% endfor %}</div>
+  <label>In your words (optional) <textarea name="instructions" rows="3" placeholder="asks me to pay or renew something">{{ body.instructions|default:'' }}</textarea><span>The AI model checks each message that passes the conditions above against this.</span></label>
+  </fieldset>
+  <fieldset><legend>What to do</legend>
+  {% for a in action_rows %}<div class="inline-form"><label>Action <select name="action_{{ a.i }}"><option value="">—</option>{% for key, label in action_choices %}<option value="{{ key }}"{% if key == a.type %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <label>Label or mailbox <input name="param_{{ a.i }}" value="{{ a.param }}"></label></div>{% endfor %}
+  </fieldset>
+  <fieldset><legend>Which messages</legend>
+  <label class="check"><input type="radio" name="scope" value="new"{% if body.scope != 'all' %} checked{% endif %}> New mail only</label>
+  <label class="check"><input type="radio" name="scope" value="all"{% if body.scope == 'all' %} checked{% endif %}> All mail, including the history</label></fieldset>
+  <div class="form-actions"><button class="button" type="submit">Save</button><button class="button secondary" type="submit" name="preview" value="1">Preview on recent mail</button></div>
+</form></section>
+{% if preview is not None %}<section class="detail-card"><h2 class="card-title">Preview</h2>
+<p class="footnote">Of the latest 200 messages in the rule's mailbox, these pass its conditions{% if body.instructions %}; the AI model's check isn't part of the preview{% endif %}. Nothing was changed.</p>
+{% for p in preview %}<p><a href="/mail/m/{{ p.item_id }}/">{{ p.subject|default:'(No subject)' }}</a> <span class="muted">· {{ p.from }} · {{ p.date|slice:":10" }}</span></p>{% empty %}<p>No matches.</p>{% endfor %}</section>{% endif %}
+{% endblock %}

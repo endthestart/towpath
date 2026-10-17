@@ -92,11 +92,13 @@ def _connector_setup(data_dir: Path | None, config: Path | None, credentials_dir
         except config_mod.ConfigError as exc:
             raise typer.BadParameter(str(exc)) from exc
         _check_scratch(layout.data / "scratch")
-        # The stores the connectors write gain this version's tables and indexes before the web service, which
-        # starts after them and only reads, checks for them. Stores that don't exist yet are left to their writer.
+        # The stores the connector process writes (as connect, worker or act) gain this version's tables and indexes
+        # before the web service, which starts after it and checks for them. Stores that don't exist yet are left
+        # to their writer.
         for name, roles in stores.WRITERS.items():
-            if "connect" in roles and stores.store_path(cfg.store_dir, name).exists():
-                stores.open_store(cfg.store_dir, name, "connect").close()
+            role = next((r for r in ("connect", "worker", "act") if r in roles), None)
+            if role and stores.store_path(cfg.store_dir, name).exists():
+                stores.open_store(cfg.store_dir, name, role).close()
         return cfg, credentials_dir or layout.credentials
     return _load(config or Path("towpath.toml")), credentials_dir
 

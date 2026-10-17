@@ -16,7 +16,7 @@
   {% if a.managed %}
   <p>{% if a.progress %}Read {{ a.progress.read }} of {{ a.progress.indexed }} indexed messages{% if a.progress.history_done %}, the whole history{% else %}, newest first{% endif %}.{% if a.progress.reason %} <span class="warn-text">{{ a.progress.reason }}</span>{% endif %}{% else %}Reading starts with the next check, after the account is indexed.{% endif %}
   {% if a.watch %}{% if a.watch.state == 'watching' %}New mail is noticed as it arrives.{% elif a.watch.state == 'stopped' %}Watching for new mail stopped ({{ a.watch.detail }}).{% elif a.watch.state == 'unsupported' %}This server can't tell Towpath about new mail; it is found at each scheduled check.{% endif %}{% endif %}
-  <a href="/mail/{{ a.source_id }}/">Messages</a> · <a href="/mail/{{ a.source_id }}/conversations?state=needs_owner_reply">To reply{% if a.conversations.needs_owner_reply %} ({{ a.conversations.needs_owner_reply }}){% endif %}</a> · <a href="/mail/{{ a.source_id }}/conversations?state=awaiting_others">Awaiting reply{% if a.conversations.awaiting_others %} ({{ a.conversations.awaiting_others }}){% endif %}</a></p>
+  <a href="/mail/{{ a.source_id }}/">Messages</a> · <a href="/mail/{{ a.source_id }}/conversations?state=needs_owner_reply">To reply{% if a.conversations.needs_owner_reply %} ({{ a.conversations.needs_owner_reply }}){% endif %}</a> · <a href="/mail/{{ a.source_id }}/conversations?state=awaiting_others">Awaiting reply{% if a.conversations.awaiting_others %} ({{ a.conversations.awaiting_others }}){% endif %}</a> · <a href="/mail/{{ a.source_id }}/senders">Senders</a> · <a href="/mail/{{ a.source_id }}/rules">Rules</a></p>
   <form method="post" action="/mail/pause" class="inline-form">{% csrf_token %}<input type="hidden" name="source_id" value="{{ a.source_id }}"><input type="hidden" name="pause" value="{% if a.paused %}0{% else %}1{% endif %}"><button class="button secondary" type="submit">{% if a.paused %}Resume reading{% else %}Pause reading{% endif %}</button></form>
 
   <h4>What Towpath may change</h4>
@@ -46,10 +46,15 @@
 </div>{% endfor %}
 </section>
 
-{% if proposals %}<section class="detail-card"><h2 class="card-title">Waiting for your answer</h2>
-{% for p in proposals %}<form method="post" action="/mail/answer" class="inline-form">{% csrf_token %}<input type="hidden" name="proposal_id" value="{{ p.proposal_id }}">
-  <span><strong>{{ p.what }}</strong> · {{ p.body.reason }}</span>
-  <button class="button" name="approve" value="1">Approve</button><button class="button secondary" name="approve" value="0">Reject</button></form>{% endfor %}
+{% if groups %}<section class="detail-card"><h2 class="card-title">Waiting for your answer</h2>
+{% for g in groups %}<article class="mail-account"><h3>{{ g.name }} <span class="muted">· {{ g.count }} change{{ g.count|pluralize }}</span></h3>
+  <form method="post" action="/mail/answer-batch" class="form-actions">{% csrf_token %}<input type="hidden" name="producer" value="{{ g.producer }}">
+    <button class="button" name="approve" value="1">Approve all {{ g.count }}</button><button class="button secondary" name="approve" value="0">Reject all</button></form>
+  {% for p in g.examples %}<form method="post" action="/mail/answer" class="inline-form">{% csrf_token %}<input type="hidden" name="proposal_id" value="{{ p.proposal_id }}">
+    <span>{{ p.what }} · {% if p.body.target.item_id %}<a href="/mail/m/{{ p.body.target.item_id }}/">{{ p.subject|default:'(No subject)' }}</a>{% endif %}<br><span class="footnote">{{ p.body.reason }}</span></span>
+    <button class="button secondary" name="approve" value="1">Approve</button><button class="button secondary" name="approve" value="0">Reject</button></form>{% endfor %}
+  {% if g.count > 5 %}<p class="footnote">And {{ g.count|add:"-5" }} more like these.</p>{% endif %}
+</article>{% endfor %}
 </section>{% endif %}
 
 <section class="detail-card"><h2 class="card-title">What Towpath did</h2>

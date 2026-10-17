@@ -103,20 +103,43 @@ def _activity(source_id: str | None = None) -> dict:
 
 
 def _proposals() -> list[dict]:
-    """Proposals that have no answer yet (none are made before the features of later milestones)."""
+    """Proposals waiting for the owner: those without an answer that no automatic rule covers, newest first."""
+    from towpath.mail import rules
+
     if not store_path(_store(), "mailplan").exists():
         return []
     answered = mail_settings.answers(_store(), role="web")
     with closing(open_store(_store(), "mailplan", "web")) as db:
-        rows = [dict(r) for r in db.execute("SELECT * FROM proposals ORDER BY created_at DESC LIMIT 200")]
+        rows = [dict(r) for r in db.execute("SELECT * FROM proposals ORDER BY created_at DESC")]
     out = []
     for r in rows:
         if r["proposal_id"] in answered:
             continue
         r["body"] = json.loads(r["body"])
+        if rules.auto_approved(_store(), r["body"], role="web"):
+            continue
         r["what"] = actions.describe(r["body"])
         out.append(r)
     return out
+
+
+def _proposal_groups(found: list[dict]) -> list[dict]:
+    """Waiting proposals grouped by what made them (a rule's version), with a few examples each."""
+    from towpath.mail import rules
+
+    groups: dict[str, dict] = {}
+    names = {f"rule:{r['rule_id']}@{r['version']}": r["body"]["name"] for r in rules.all_rules(_store(), role="web")}
+    for p in found:
+        key = p["body"].get("producer") or "other"
+        g = groups.setdefault(key, {"producer": key, "name": names.get(key, key), "items": []})
+        g["items"].append(p)
+    subjects = _subjects([p["body"]["target"].get("item_id") for g in groups.values() for p in g["items"][:5]
+                          if p["body"]["target"].get("item_id")])
+    for g in groups.values():
+        g["count"] = len(g["items"])
+        g["examples"] = [{**p, "subject": (subjects.get(p["body"]["target"].get("item_id")) or {}).get("subject")}
+                         for p in g["items"][:5]]
+    return sorted(groups.values(), key=lambda g: -g["count"])
 
 
 @require_GET
@@ -126,7 +149,7 @@ def overview(request):
     accounts = _accounts(config)
     types = [{"key": k, **v} for k, v in actions.TYPES.items()]
     return render(request, "mail.html", {"nav": "mail", "accounts": accounts, "types": types,
-                                         "saved": request.GET.get("saved"), "proposals": _proposals(),
+                                         "saved": request.GET.get("saved"), "groups": _proposal_groups(_proposals()),
                                          "models": _models(config), "labels": threads.LABELS, **_activity()})
 
 
@@ -207,6 +230,19 @@ def answer(request):
 
 
 @require_POST
+def answer_batch(request):
+    """Approve or reject every waiting proposal from one rule version at once."""
+    producer = request.POST.get("producer", "")
+    found = [p for p in _proposals() if (p["body"].get("producer") or "other") == producer]
+    if not found:
+        return HttpResponseBadRequest("Nothing from that rule is waiting.")
+    decision = "approved" if request.POST.get("approve") == "1" else "rejected"
+    for p in found:
+        mail_settings.answer(_store(), p["proposal_id"], p["digest"], decision)
+    return redirect("/mail/?saved=answer")
+
+
+@require_POST
 def undo(request):
     key = request.POST.get("key", "")
     rows = executor.receipts(_store(), limit=500)
@@ -252,6 +288,7 @@ def messages(request, sid):
     if not account["managed"]:
         return redirect("/mail/")
     box = request.GET.get("box") or "INBOX"
+    sender = (request.GET.get("from") or "").lower() or None
     before = request.GET.get("before") or "9999"
     rows = []
     boxes = []
@@ -259,10 +296,11 @@ def messages(request, sid):
         with closing(open_store(_store(), "mail", "web")) as db:
             boxes = [r[0] for r in db.execute("SELECT DISTINCT mailbox FROM messages WHERE source_id = ? ORDER BY 1",
                                               (sid,))]
+            where, args = ("from_addr = ?", sender) if sender else ("mailbox = ?", box)
             rows = [dict(r) for r in db.execute(
-                "SELECT item_id, subject, from_name, from_addr, date_utc, flags, has_attachments, list_unsubscribe "
-                "FROM messages WHERE source_id = ? AND mailbox = ? AND coalesce(date_utc, '') < ? "
-                "ORDER BY date_utc DESC LIMIT ?", (sid, box, before, PAGE + 1))]
+                "SELECT item_id, subject, from_name, from_addr, date_utc, flags, has_attachments, list_unsubscribe, "
+                f"mailbox FROM messages WHERE source_id = ? AND {where} AND coalesce(date_utc, '') < ? "
+                "ORDER BY date_utc DESC LIMIT ?", (sid, args, before, PAGE + 1))]
     present = _present([r["item_id"] for r in rows])
     rows = [r for r in rows if r["item_id"] in present]
     more = len(rows) > PAGE
@@ -270,7 +308,7 @@ def messages(request, sid):
     for r in rows:
         r["unread"] = "\\Seen" not in json.loads(r["flags"])
     return render(request, "mail_messages.html", {
-        "nav": "mail", "account": account, "box": box, "boxes": boxes, "rows": rows,
+        "nav": "mail", "account": account, "box": box, "boxes": boxes, "rows": rows, "sender": sender,
         "next_before": rows[-1]["date_utc"] if more and rows else None})
 
 

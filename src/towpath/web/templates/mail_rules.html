@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Rules · {{ account.name }} · Mail · Towpath{% endblock %}
+{% block content %}
+<a class="back-link" href="/mail/">← Mail</a>
+<header class="page-head compact"><p class="eyebrow">MAIL · {{ account.name|upper }}</p><h1>Rules</h1>
+<p class="lead">Rules look at your mail and propose changes. A rule asks you first until you switch it to <em>automatic</em>, and automatic rules still only make dry runs while the account is in dry runs only. Moving to Trash always asks.</p></header>
+{% if saved %}<div class="notice" role="status">Saved.</div>{% endif %}
+<section class="detail-card"><div class="form-actions"><a class="button" href="/mail/{{ account.source_id }}/rules/new">New rule</a>
+{% for key, name in templates %}<a class="button secondary" href="/mail/{{ account.source_id }}/rules/new?template={{ key }}">{{ name }}</a>{% endfor %}</div></section>
+{% for r in rows %}<section class="detail-card"><h2 class="card-title">{{ r.name }} <span class="muted">· {% if not r.enabled %}off{% elif r.mode == 'auto' %}automatic{% else %}asks you first{% endif %}</span></h2>
+<p>When {{ r.conditions }}: {{ r.what }}. <span class="muted">{% if r.body.scope == 'all' %}All mail, including history.{% else %}New mail only.{% endif %} Looked at {{ r.examined }}, matched {{ r.matched }}.</span></p>
+<form method="post" action="/mail/rules/change" class="form-actions">{% csrf_token %}<input type="hidden" name="rule_id" value="{{ r.rule_id }}">
+  <a class="button secondary" href="/mail/{{ account.source_id }}/rules/{{ r.rule_id }}/edit">Edit</a>
+  <a class="button secondary" href="/mail/{{ account.source_id }}/rules/{{ r.rule_id }}/">History</a>
+  <button class="button secondary" name="op" value="{% if r.enabled %}disable{% else %}enable{% endif %}">{% if r.enabled %}Turn off{% else %}Turn on{% endif %}</button>
+  <button class="button secondary" name="op" value="{% if r.mode == 'auto' %}propose{% else %}auto{% endif %}">{% if r.mode == 'auto' %}Ask me first{% else %}Make automatic{% endif %}</button>
+  <button class="button secondary" name="op" value="up" aria-label="Move up">↑</button><button class="button secondary" name="op" value="down" aria-label="Move down">↓</button>
+  <button class="button secondary" name="op" value="delete">Delete</button></form>
+</section>{% empty %}<p>No rules yet. Start from a template above.</p>{% endfor %}
+{% endblock %}

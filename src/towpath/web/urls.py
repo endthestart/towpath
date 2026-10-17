@@ -1,6 +1,6 @@
 from django.urls import path
 
-from towpath.web import auth, life_views, mail_views, space_views, unified_views, views
+from towpath.web import auth, life_views, mail_rules_views, mail_views, space_views, unified_views, views
 
 urlpatterns = [
     path("", views.overview, name="overview"),
@@ -34,6 +34,14 @@ urlpatterns = [
     path("mail/mark", mail_views.mark, name="mail-mark"),
     path("mail/save-draft", mail_views.save_draft, name="mail-save-draft"),
     path("mail/<str:sid>/conversations", mail_views.conversations, name="mail-conversations"),
+    path("mail/sender-category", mail_rules_views.sender_category, name="mail-sender-category"),
+    path("mail/rules/change", mail_rules_views.rule_change, name="mail-rule-change"),
+    path("mail/answer-batch", mail_views.answer_batch, name="mail-answer-batch"),
+    path("mail/<str:sid>/senders", mail_rules_views.sender_list, name="mail-senders"),
+    path("mail/<str:sid>/rules", mail_rules_views.rule_list, name="mail-rules"),
+    path("mail/<str:sid>/rules/new", mail_rules_views.rule_edit, name="mail-rule-new"),
+    path("mail/<str:sid>/rules/<str:rule_id>/edit", mail_rules_views.rule_edit, name="mail-rule-edit"),
+    path("mail/<str:sid>/rules/<str:rule_id>/", mail_rules_views.rule_history, name="mail-rule-history"),
     path("mail/undo", mail_views.undo, name="mail-undo"),
     path("mail/act", mail_views.act, name="mail-act"),
     path("mail/m/<str:item_id>/", mail_views.reader, name="mail-reader"),

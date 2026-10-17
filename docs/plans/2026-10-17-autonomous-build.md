@@ -55,9 +55,22 @@ None yet.
 5. **Reply tracking rules:** mailing-list and automated mail is FYI without the model; a conversation the owner
    ended over 60 days ago is *done* by rule; conversations older than two years are *done* without asking the
    model; everything else with a person goes to the model, newest first.
+6. **Twelve categories** for senders: people, newsletters, marketing, notifications, receipts and orders, banking
+   and bills, travel, accounts and security, social networks, calendar, cold email, other. A sender has one
+   category; account-security mail and calendar invitations are also recognised per message.
+7. **Rules propose; automatic is opt-in per rule** and limited to reversible changes. Switching a rule to automatic
+   also carries out the proposals of that version still waiting. Changing a rule's conditions or actions makes a new
+   version, which looks at mail again; switching it on, off or to automatic doesn't.
+8. **Rule patterns:** text without `*` matches anywhere ignoring case; with `*` it's a wildcard over the whole
+   value. A rule with a condition in words waits (rather than skipping mail) while no model may read mail text.
+9. **A message Towpath can't read** (malformed headers) is kept with its identity and the problem named, so one
+   message can't stop reading again (this stopped reading Fastmail at 55,650 messages on 2026-10-17).
 
 ## Progress
 
 - 2026-10-17: milestone 1 deployed (`6147799`); Fastmail management on; reading the whole history.
 - 2026-10-17: model check (decision 2); further models per connection and a model per task; the account-wide dry
   runs switch; milestone 2 built (conversations, reply drafts).
+- 2026-10-17: fixed reading stopping on an 8-bit header (`75f606a`, deploying); milestone 3 built (senders,
+  categories, rules with templates, batch approval, automatic rules); the connector now updates the worker's stores
+  at start too.

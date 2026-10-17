@@ -185,14 +185,21 @@ def pending(store_dir, role: str = ROLE) -> list[dict]:
             if key not in done:
                 out.append({"key": key, "source_id": r["source_id"], "body": json.loads(r["body"]),
                             "digest": r["digest"], "created_at": r["created_at"], "approved": True})
+    from towpath.mail import rules
+
     answers = settings.answers(store_dir, role=role)
     with closing(open_store(store_dir, "mailplan", role)) as p:
         for r in p.execute("SELECT * FROM proposals ORDER BY created_at"):
             answer = answers.get(r["proposal_id"])
-            if r["proposal_id"] in done or not answer or answer["decision"] != "approved":
+            if r["proposal_id"] in done or (answer and answer["decision"] != "approved"):
                 continue
-            out.append({"key": r["proposal_id"], "source_id": r["source_id"], "body": json.loads(r["body"]),
-                        "digest": r["digest"], "created_at": r["created_at"], "approved_digest": answer["digest"],
+            body = json.loads(r["body"])
+            if answer is None:
+                if not rules.auto_approved(store_dir, body, role=role):
+                    continue
+                answer = {"digest": r["digest"]}  # the owner set the rule that proposed it to run by itself
+            out.append({"key": r["proposal_id"], "source_id": r["source_id"], "body": body, "digest": r["digest"],
+                        "created_at": r["created_at"], "approved_digest": answer["digest"],
                         "approved": answer["digest"] == r["digest"]})
     return out
 

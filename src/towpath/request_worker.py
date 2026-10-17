@@ -56,6 +56,10 @@ def run_once(config, credentials_dir=None):
         from towpath.mail import threads
 
         indexing += threads.track_pending(config)
+        from towpath.mail import rules, senders
+
+        indexing += senders.categorize_pending(config)
+        indexing += rules.evaluate_pending(config)
     return {"searches": search["searches_run"], "fetched": fetched["fetched"],
             "failed": fetched["failed"], "presence_checked": fetched.get("presence_checked", 0),
             "termination": fetched["termination"], "indexing": indexing}

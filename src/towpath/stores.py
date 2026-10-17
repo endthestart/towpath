@@ -296,6 +296,16 @@ CREATE TABLE IF NOT EXISTS requests (
   author TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS answers (
   proposal_id TEXT PRIMARY KEY, digest TEXT NOT NULL, decision TEXT NOT NULL, author TEXT NOT NULL, at TEXT NOT NULL);
+-- The owner's rules for an account: what to look for and what to do. Every change adds a revision; the version
+-- counts changes to what the rule looks for or does, so proposals and automation are tied to exactly that.
+CREATE TABLE IF NOT EXISTS rules (
+  rule_id TEXT NOT NULL, revision INTEGER NOT NULL, source_id TEXT NOT NULL, version INTEGER NOT NULL,
+  body TEXT NOT NULL, enabled INTEGER NOT NULL, mode TEXT NOT NULL, position INTEGER NOT NULL,
+  deleted INTEGER NOT NULL DEFAULT 0, author TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (rule_id, revision));
+-- The owner's category for a sender; it applies to all of that sender's mail and outranks rules and models.
+CREATE TABLE IF NOT EXISTS sender_marks (
+  source_id TEXT NOT NULL, address TEXT NOT NULL, category TEXT NOT NULL, author TEXT NOT NULL, at TEXT NOT NULL,
+  PRIMARY KEY (source_id, address));
 -- The owner's own word on a conversation's state (to reply, awaiting, FYI, done); it outranks rules and models.
 CREATE TABLE IF NOT EXISTS thread_marks (
   source_id TEXT NOT NULL, thread_key TEXT NOT NULL, state TEXT NOT NULL, author TEXT NOT NULL, at TEXT NOT NULL,
@@ -312,6 +322,23 @@ CREATE INDEX IF NOT EXISTS threads_state ON threads (source_id, state, last_date
 CREATE TABLE IF NOT EXISTS drafts (
   source_id TEXT NOT NULL, thread_key TEXT NOT NULL, reply_to_item TEXT NOT NULL, input_digest TEXT NOT NULL,
   body TEXT NOT NULL, model TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (source_id, thread_key));
+-- Everyone who writes to the owner, with totals from the mail store and a category (rules, the model, or the owner).
+CREATE TABLE IF NOT EXISTS senders (
+  source_id TEXT NOT NULL, address TEXT NOT NULL, name TEXT, domain TEXT, messages INTEGER NOT NULL,
+  unread INTEGER NOT NULL, bytes INTEGER NOT NULL, first_date TEXT, last_date TEXT, list_id TEXT, unsubscribe TEXT,
+  one_click INTEGER NOT NULL, owner_wrote INTEGER NOT NULL, inbox INTEGER NOT NULL, category TEXT NOT NULL,
+  category_by TEXT NOT NULL, reason TEXT, input_digest TEXT NOT NULL, updated_at TEXT NOT NULL,
+  PRIMARY KEY (source_id, address));
+CREATE INDEX IF NOT EXISTS senders_category ON senders (source_id, category, messages);
+-- Which messages each rule version has looked at (rowid watermark), and what it decided for each.
+CREATE TABLE IF NOT EXISTS rule_runs (
+  source_id TEXT NOT NULL, rule_id TEXT NOT NULL, version INTEGER NOT NULL, watermark INTEGER NOT NULL,
+  examined INTEGER NOT NULL, matched INTEGER NOT NULL, updated_at TEXT NOT NULL,
+  PRIMARY KEY (source_id, rule_id, version));
+CREATE TABLE IF NOT EXISTS rule_matches (
+  source_id TEXT NOT NULL, rule_id TEXT NOT NULL, version INTEGER NOT NULL, item_id TEXT NOT NULL,
+  matched INTEGER NOT NULL, by TEXT NOT NULL, reason TEXT, proposals TEXT NOT NULL, at TEXT NOT NULL,
+  PRIMARY KEY (source_id, rule_id, version, item_id));
 -- Per source: how far the conversation job has looked at the mail store (its rowids), and its progress.
 CREATE TABLE IF NOT EXISTS progress (
   source_id TEXT PRIMARY KEY, watermark INTEGER NOT NULL, state TEXT NOT NULL, updated_at TEXT NOT NULL);

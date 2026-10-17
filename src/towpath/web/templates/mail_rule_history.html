@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block title %}{{ rule.name }} · Rules · Towpath{% endblock %}
+{% block content %}
+<a class="back-link" href="/mail/{{ account.source_id }}/rules">← Rules</a>
+<header class="page-head compact"><p class="eyebrow">RULE</p><h1>{{ rule.name }}</h1>
+<p class="lead">When {{ rule.conditions }}: {{ rule.what }}.</p></header>
+<section class="detail-card"><p>Version {{ rule.version }}. You approved {{ history.approved }} and rejected {{ history.rejected }} of its proposals.</p>
+{% for run in history.runs %}<p class="footnote">Version {{ run.version }}: looked at {{ run.examined }}, matched {{ run.matched }} (updated {{ run.updated_at|slice:":16" }}).</p>{% endfor %}</section>
+<section class="detail-card"><h2 class="card-title">Latest matches</h2>
+{% for m in history.matches %}<p><a href="/mail/m/{{ m.item_id }}/">{{ m.subject|default:'(No subject)' }}</a> <span class="muted">· {{ m.at|slice:":16" }} · {% if m.by == 'model' %}the AI model: {{ m.reason }}{% else %}its conditions{% endif %}</span></p>{% empty %}<p>None yet.</p>{% endfor %}</section>
+{% endblock %}
