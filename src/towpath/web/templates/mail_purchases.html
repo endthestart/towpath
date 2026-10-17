@@ -5,6 +5,9 @@
 <header class="page-head compact"><p class="eyebrow">MAIL · {{ account.name|upper }}</p><h1>Purchases</h1>
 <p class="lead">What you bought, read from receipts and order confirmations by the AI model, newest first. {{ summary.count }} found in {{ summary.looked }} message{{ summary.looked|pluralize }} looked at so far; an order told about in several emails is listed once. Totals are as the emails state them.</p></header>
 <form method="get" class="search filters" role="search"><label for="q" class="sr-only">Merchant or item</label><input id="q" name="q" value="{{ q }}" placeholder="Merchant or item: tent, Apple, glasses"><label>Year <input name="year" value="{{ year }}" inputmode="numeric" maxlength="4" size="5"></label><button class="button" type="submit">Show</button></form>
+{% if recurring %}<section class="detail-card"><h2 class="card-title">Looks recurring</h2>
+{% for r in recurring %}<p><a href="?q={{ r.merchant|urlencode }}"><strong>{{ r.merchant }}</strong></a> <span class="muted">· every {{ r.every }}{% if r.amount is not None %}, about {{ r.amount|floatformat:2 }} {{ r.currency|default:'' }}{% endif %} · {{ r.count }} charges, last {{ r.last }}, next about {{ r.next }}</span></p>{% endfor %}
+<p class="footnote">Three or more purchases about a month or a year apart. Check the ones you no longer use.</p></section>{% endif %}
 {% if not q and not year and summary.years %}<section class="detail-card"><h2 class="card-title">By year</h2>
 <table class="space-table"><thead><tr><th>Year</th><th>Purchases</th><th>Total</th></tr></thead><tbody>
 {% for y in summary.years %}<tr><td><a href="?year={{ y.0 }}">{{ y.0 }}</a></td><td>{{ y.2 }}</td><td>{{ y.3|floatformat:2 }} {{ y.1 }}</td></tr>{% endfor %}</tbody></table>

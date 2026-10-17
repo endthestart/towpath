@@ -177,3 +177,31 @@ def summary(store_dir, source_id: str, role: str = "web") -> dict:
     return {"years": sorted(((y, c, *v) for (y, c), v in years.items()), reverse=True),
             "merchants": [(m, c, *v) for (m, c), v in sorted(merchants.items(), key=lambda x: -x[1][0])[:20]],
             "count": len(rows), "looked": looked}
+
+
+def recurring(store_dir, source_id: str, role: str = "web") -> list[dict]:
+    """Merchants charging at a steady rhythm (three or more purchases about a month or a year apart): likely
+    subscriptions, with the typical amount, the last charge and when the next would come."""
+    from datetime import date, timedelta
+    from statistics import median
+
+    by_merchant: dict[str, list[dict]] = {}
+    for r in listing(store_dir, source_id, limit=10**6, role=role):
+        if r["day"] and r["merchant"]:
+            by_merchant.setdefault(r["merchant"].strip().lower(), []).append(r)
+    out = []
+    for rows in by_merchant.values():
+        days = sorted({date.fromisoformat(r["day"]) for r in rows})
+        if len(days) < 3:
+            continue
+        gaps = [(b - a).days for a, b in zip(days, days[1:], strict=False)]
+        typical = median(gaps)
+        every = "month" if 25 <= typical <= 35 else ("year" if 350 <= typical <= 380 else None)
+        if every is None or max(abs(g - typical) for g in gaps) > (6 if every == "month" else 20):
+            continue
+        last = max(rows, key=lambda r: r["day"])
+        totals = [r["total"] for r in rows if r["total"] is not None]
+        out.append({"merchant": last["merchant"], "every": every, "count": len(days), "last": last["day"],
+                    "amount": median(totals) if totals else None, "currency": last["currency"],
+                    "next": (days[-1] + timedelta(days=round(typical))).isoformat()})
+    return sorted(out, key=lambda r: r["next"])

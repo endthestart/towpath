@@ -78,3 +78,21 @@ def test_the_purchases_page_and_ask(world, monkeypatch):
         page = client.get(f"/mail/{world.sid}/purchases").content.decode()
         assert "Acme Outdoor" in page and "Two-person tent" in page and "129.50" in page
         assert "No purchases match" in client.get(f"/mail/{world.sid}/purchases?q=sofa").content.decode()
+
+
+def test_steady_charges_look_recurring(world):
+    from contextlib import closing
+
+    from towpath.stores import open_store
+
+    with closing(open_store(world.store, "mailintel", "worker")) as db:
+        for i, day in enumerate(["2026-07-03", "2026-08-02", "2026-09-03", "2026-10-02"]):
+            db.execute("INSERT INTO purchases VALUES (?,?,1,'StreamCo',?,9.99,'USD','[]',?, 'm', 't')",
+                       (world.sid, f"s{i}", day, f"S{i}"))
+        for i, day in enumerate(["2026-01-05", "2026-03-20", "2026-09-01"]):
+            db.execute("INSERT INTO purchases VALUES (?,?,1,'Hardware Store',?,40,'USD','[]',?, 'm', 't')",
+                       (world.sid, f"h{i}", day, f"H{i}"))
+        db.commit()
+    found = purchases.recurring(world.store, world.sid)
+    assert [(r["merchant"], r["every"], r["count"], r["amount"]) for r in found] == [("StreamCo", "month", 4, 9.99)]
+    assert found[0]["next"] == "2026-11-01"

@@ -104,7 +104,8 @@ def purchases_page(request, sid):
     q, year = request.GET.get("q", "").strip(), request.GET.get("year", "").strip()
     return render(request, "mail_purchases.html", {
         "nav": "mail", "account": account, "q": q, "year": year,
-        "rows": purchases.listing(_store(), sid, q, year), "summary": purchases.summary(_store(), sid)})
+        "rows": purchases.listing(_store(), sid, q, year), "summary": purchases.summary(_store(), sid),
+        "recurring": [] if q or year else purchases.recurring(_store(), sid)})
 
 
 @require_GET
