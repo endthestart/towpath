@@ -6,13 +6,13 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `a6b182e` (mail milestones 2–5: reply tracking and drafts, senders and rules, search, clean-up,
-verified archives, unsubscribing, alerts, digest, statistics; models per task; reading past 8-bit headers),
-publishing run [39038163169](https://github.com/endthestart/towpath/actions/runs/39038163169). New stores and
-tables only; the web service and connector add their own tables at start.
+Revision `131fabe` (learned sender categories, the owner's marks as examples for the model, Ask citing file
+names; on top of the October 17 releases below), publishing run
+[39046692798](https://github.com/endthestart/towpath/actions/runs/39046692798). New stores and tables only; the web
+service and connector add their own tables at start.
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:90f49c4ef552bcbded0d12fe34563291a3e57c759d81b5876663f065562d4394`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:7d328a8ea0534daf77bf83f8cb91ad8ca2a960ae4995909e807060c06ff4e9b3`
+- `web`: `ghcr.io/endthestart/towpath@sha256:b68983cf21a7b1636b4e176bae3a404f1a4fd485bbbacb12bcebc33b8bf0b06f`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:7d6e28db67fb6e96f36111f57db784fe9a634808a2c3821218d78f6bf0bbdbb8`
 
 Towpath's data folder (stores, sign-ins and the Recoll index) lives on a mirrored SSD pool since 2026-10-08,
 with hourly snapshots replicated to the main pool: Recoll's index writes had saturated the spinning disks. The
@@ -27,6 +27,11 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `00060df` | Recollections, Your story, days with many photos as life events, how long awaited replies have taken | `towpath@sha256:4d7c2937…`, `towpath-recoll@sha256:6f2fa103…` |
+| `b14b7d8` | People pages, Overview Today cards, plain-English Search all, duplicates confirmed by content | `towpath@sha256:a4a5893d…`, `towpath-recoll@sha256:5cd5c906…` |
+| `3d63e3f` | Keep-from-cloud marks, On this day, Search all filters and message text, Facebook export | `towpath@sha256:262d3bed…`, `towpath-recoll@sha256:60d74441…` |
+| `49720f8` | Life story layers (finding events by itself, memories, Ask), photo search, Gmail over IMAP, contacts and calendars | `towpath@sha256:77e24a37…`, `towpath-recoll@sha256:543b24cc…` |
+| `a6b182e` | Mail milestones 2–5: reply tracking and drafts, senders and rules, search, clean-up, archives, unsubscribing, alerts, digest, statistics | `towpath@sha256:90f49c4e…`, `towpath-recoll@sha256:7d328a8e…` |
 | `75f606a` | Reading past an 8-bit header; reply tracking and drafts; further models per connection | `towpath@sha256:f7e130aa…`, `towpath-recoll@sha256:f8d8d660…` |
 | `6147799` | Mail management foundation (dry runs, write password, Mail page) | `towpath@sha256:301cccb8…`, `towpath-recoll@sha256:f349f184…` |
 | `1b29e1e` | Proposals skip marketing and spam, rate significance and wait for a busy model | `towpath@sha256:73c8a3f7…`, `towpath-recoll@sha256:a3348cc8…` |
