@@ -19,21 +19,27 @@ def connection(store_dir: Path):
 _overviews: dict = {}
 
 
+OVERVIEW_SECONDS = 300
+
+
 def overview(store_dir: Path) -> dict:
     """Mail totals for the Overview page. Counting labels reads every message's record (about two seconds for a
-    quarter of a million), so the answer is kept until the store file changes, which only a sync does."""
+    quarter of a million), so the answer is kept until the store file changes, which only a sync does, and for
+    five minutes even then (with new mail watched for, a sync happens every few minutes)."""
+    import time
+
     path = store_path(store_dir, "source")
     try:
         st = path.stat()
         key = (str(path), st.st_mtime_ns, st.st_size)
     except OSError:
         key = None
-    if key is not None and key in _overviews:
-        return _overviews[key]
+    kept = _overviews.get(str(path))
+    if kept is not None and (kept[0] == key or time.monotonic() - kept[2] < OVERVIEW_SECONDS):
+        return kept[1]
     result = _overview(store_dir)
     if key is not None:
-        _overviews.clear()
-        _overviews[key] = result
+        _overviews[str(path)] = (key, result, time.monotonic())
     return result
 
 

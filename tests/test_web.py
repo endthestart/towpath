@@ -72,7 +72,7 @@ def test_bounded_pages_and_query(mail_index):
     assert len(index.emails(mail_index, query="x" * 1000)["query"]) == 200
 
 
-def test_overview_counts_are_kept_until_the_store_changes(mail_index):
+def test_overview_counts_are_kept_until_the_store_changes_and_five_minutes_have_passed(mail_index, monkeypatch):
     import sqlite3
 
     first = index.overview(mail_index)
@@ -81,6 +81,8 @@ def test_overview_counts_are_kept_until_the_store_changes(mail_index):
     db.execute("UPDATE items SET absent_since_run = 'r9' WHERE item_id = 'demo-0'")
     db.commit()
     db.close()
+    assert index.overview(mail_index) is first  # changed, but counted less than five minutes ago
+    monkeypatch.setattr(index, "OVERVIEW_SECONDS", 0)
     assert index.overview(mail_index)["total"] == first["total"] - 1
 
 
