@@ -329,6 +329,15 @@ def digest_text(store_dir, source_id: str, since: datetime, role: str = ROLE) ->
     lines += ["", "New in your inbox:"]
     lines += [f"  {senders.CATEGORIES.get(c, c)}: {n}" for c, n in sorted(counts.items(), key=lambda x: -x[1])] or \
         ["  nothing new"]
+    from towpath.mail import purchases
+
+    bought = [p for p in purchases.listing(store_dir, source_id, limit=20, role=role)
+              if (p["day"] or "") >= since.date().isoformat()]
+    if bought:
+        lines += ["", "Bought:"]
+        lines += [f"  - {p['merchant']}" + (f", {p['total']:.2f} {p['currency'] or ''}".rstrip()
+                                            if p["total"] is not None else "") +
+                  (f": {', '.join(p['items'][:3])}" if p["items"] else "") for p in bought]
     noisy = [s for s in senders.listing(store_dir, source_id, order="unread", limit=50, role=role)
              if s["unsubscribe"] and s["category"] in ("newsletter", "marketing") and s["unread"] >= 10][:5]
     if noisy:

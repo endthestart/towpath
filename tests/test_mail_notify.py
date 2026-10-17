@@ -48,7 +48,15 @@ def test_alerts_flag_conversations_that_newly_need_a_reply(world):
 
 
 def test_the_digest_goes_into_the_inbox_once_per_period(world):
+    from contextlib import closing
+
+    from towpath.stores import open_store
+
     notify.set_digest(world.store, world.sid, "daily")
+    with closing(open_store(world.store, "mailintel", "worker")) as db:
+        db.execute("INSERT INTO purchases VALUES (?, 'x1', 1, 'Acme Outdoor', ?, 129.5, 'USD', '[\"Tent\"]', 'A1', "
+                   "'m', ?)", (world.sid, datetime.now(timezone.utc).date().isoformat(), "2026-10-17"))
+        db.commit()
     morning = datetime(2026, 10, 17, 13, 0, tzinfo=timezone.utc)  # 8am in Chicago
     assert notify.digests_pending(world.worker(), at=datetime(2026, 10, 17, 10, 0, tzinfo=timezone.utc)) == []
     assert notify.digests_pending(world.worker(), at=morning)[0]["period"] == "2026-10-17"
@@ -60,6 +68,7 @@ def test_the_digest_goes_into_the_inbox_once_per_period(world):
     text = message_from_bytes(notes[0].raw, policy=policy.default).get_content()
     assert "Waiting for your reply (1)" in text and "Saturday?" in text and "Deck quote" in text
     assert "no answer for 4 days" in text
+    assert "Bought:" in text and "Acme Outdoor, 129.50 USD: Tent" in text
 
 
 def test_statistics_are_measured_and_shown(world, monkeypatch):
