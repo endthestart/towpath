@@ -387,6 +387,24 @@ def listing(store_dir, source_id: str, category: str | None = None, order: str =
     return out[offset:offset + limit]
 
 
+def inbox(store_dir, source_id: str, role: str = "web") -> dict:
+    """What is in the inbox now, by category: how many messages and how many unread, most first."""
+    if not store_path(store_dir, "mail").exists():
+        return {"total": 0, "unread": 0, "categories": []}
+    cats = categories(store_dir, source_id, role)
+    counts: dict[str, list] = {}
+    with closing(open_store(store_dir, "mail", role)) as db:
+        for m in db.execute("SELECT subject, from_addr, list_id, flags FROM messages WHERE source_id = ? AND "
+                            "mailbox IN ('INBOX', 'Inbox', 'inbox')", (source_id,)):
+            c = message_category(dict(m), cats.get(m["from_addr"]))
+            got = counts.setdefault(c, [0, 0])
+            got[0] += 1
+            got[1] += "\\Seen" not in m["flags"]
+    rows = sorted(({"category": c, "label": CATEGORIES.get(c, c), "messages": n, "unread": u}
+                   for c, (n, u) in counts.items()), key=lambda r: -r["messages"])
+    return {"total": sum(r["messages"] for r in rows), "unread": sum(r["unread"] for r in rows), "categories": rows}
+
+
 def totals(store_dir, source_id: str, role: str = "web") -> list[dict]:
     """Senders and messages per category, with the owner's marks applied."""
     counts: dict[str, dict] = {}

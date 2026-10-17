@@ -152,6 +152,9 @@ def test_the_pages_for_senders_rules_and_batch_answers(world, monkeypatch):
     with override_settings(TOWPATH_STORE_DIR=world.store, TOWPATH_CONFIG=world.config, ALLOWED_HOSTS=["testserver"]):
         client = Client()
         client.post("/login", {"username": "owner", "password": OWNER})
+        found = senders.inbox(world.store, world.sid)
+        assert found["total"] == 3 and {c["category"] for c in found["categories"]} >= {"marketing"}
+        assert f"/mail/{world.sid}/clean?categories=marketing&amp;older_than=0" in client.get("/mail/").content.decode()
         page = client.get(f"/mail/{world.sid}/senders").content.decode()
         assert "news@shop.example" in page and "Sale announcements." in page
         client.post("/mail/sender-category", {"source_id": world.sid, "address": "news@shop.example",

@@ -16,7 +16,8 @@ from django.shortcuts import redirect, render
 from django.views.decorators.http import require_GET, require_POST
 
 from towpath import connections, decisions, stores
-from towpath.mail import FEATURE, actions, analysis, executor, notify, settings as mail_settings, threads, watch
+from towpath.mail import FEATURE, actions, analysis, executor, notify, senders, settings as mail_settings, threads
+from towpath.mail import watch
 from towpath.stores import open_store, store_path
 from towpath.unified import grants
 
@@ -56,6 +57,7 @@ def _accounts(config) -> list[dict]:
             "dry_run": mail_settings.dry_run(_store(), sid, role="web"),
             "progress": analysis.progress(_store(), sid), "watch": watch.state(_store(), sid),
             "conversations": threads.counts(_store(), sid) if managed else {},
+            "inbox": senders.inbox(_store(), sid) if managed else None,
             "alerts": notify.alert_setting(_store(), sid, "web")["mode"],
             "digest": notify.digest_setting(_store(), sid, "web")["every"],
             "follow_up": notify.follow_up_days(_store(), sid, "web"),
