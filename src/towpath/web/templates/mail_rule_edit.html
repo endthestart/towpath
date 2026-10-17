@@ -5,7 +5,8 @@
 <header class="page-head compact"><p class="eyebrow">MAIL · {{ account.name|upper }}</p><h1>{% if rule %}Edit “{{ rule.body.name }}”{% else %}New rule{% endif %}</h1>
 <p class="lead">Fill in only what matters. Text without * matches anywhere, ignoring case; with * it's a pattern, such as *@shop.example.</p></header>
 {% if error %}<div class="notice warn" role="alert">{{ error }}</div>{% endif %}
-<section class="detail-card"><form method="post" class="settings-form">{% csrf_token %}
+{% if drafted_from %}<div class="notice" role="status">Drafted from “{{ drafted_from }}”{% if draft_status != 'drafted' %}: the AI model couldn't draft it, so your words are the condition; choose what to do below{% else %} by the AI model{% endif %}. Check it, preview it, then save.</div>{% endif %}
+<section class="detail-card"><form method="post" class="settings-form"{% if drafted_from %} action="/mail/{{ account.source_id }}/rules/new"{% endif %}>{% csrf_token %}
   <label>Name <input name="name" value="{{ body.name|default:'' }}" required></label>
   <fieldset><legend>Which mail</legend>
   <label>From <input name="from" value="{{ conditions.from|default:'' }}"></label>

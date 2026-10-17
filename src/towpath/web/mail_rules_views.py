@@ -145,6 +145,35 @@ def _form_context(account, body: dict, rule: dict | None, error=None, preview=No
             "action_choices": RULE_ACTIONS}
 
 
+@require_POST
+def rule_describe(request, sid):
+    from towpath.mail import rule_drafts
+
+    _managed(sid)
+    try:
+        seq = rule_drafts.ask(_store(), sid, request.POST.get("description", ""))
+    except ValueError:
+        return HttpResponseBadRequest("Describe the rule.")
+    return redirect(f"/mail/{sid}/rules/drafted/{seq}")
+
+
+@require_GET
+def rule_drafted(request, sid, seq):
+    from towpath.mail import rule_drafts
+
+    account = _managed(sid)
+    asked = rule_drafts.request(_store(), seq)
+    if asked is None or asked["source_id"] != sid:
+        raise Http404
+    found = rule_drafts.draft(_store(), seq)
+    if found is None:
+        return render(request, "mail_rule_waiting.html", {"nav": "mail", "account": account, "text": asked["text"]})
+    context = _form_context(account, found["body"], None)
+    context["drafted_from"] = asked["text"]
+    context["draft_status"] = found["status"]
+    return render(request, "mail_rule_edit.html", context)
+
+
 @require_http_methods(["GET", "POST"])
 def rule_edit(request, sid, rule_id=None):
     account = _managed(sid)

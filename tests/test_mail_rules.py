@@ -205,3 +205,38 @@ def test_the_owners_marks_are_examples_for_the_model(world):
     with closing(open_store(world.store, "mailintel", "worker")) as intel:
         text = threads._owner_examples(intel, world.store, world.sid)
     assert '"Saturday?": done' in text and "follow their judgement" in text
+
+
+def test_a_rule_described_in_words_is_drafted_by_the_model_for_the_owner_to_check(world, monkeypatch):
+    from towpath.mail import rule_drafts
+
+    def drafting(prompt):
+        if "Turn the owner's description into one mail rule" in prompt:
+            return json.dumps({"name": "Shop sales", "from": "*@shop.example", "subject": "", "categories": [],
+                               "instructions": "", "actions": [{"type": "add_keyword", "value": "Shop"},
+                                                               {"type": "archive", "value": ""}], "scope": "new"})
+        return answer(prompt)
+
+    world.model_stub.respond = drafting
+    monkeypatch.setattr(auth, "_setup_codes", {})
+    configure(world.store)
+    auth.create_account(world.store, "owner", OWNER)
+    with override_settings(TOWPATH_STORE_DIR=world.store, TOWPATH_CONFIG=world.config, ALLOWED_HOSTS=["testserver"]):
+        client = Client()
+        client.post("/login", {"username": "owner", "password": OWNER})
+        asked = client.post(f"/mail/{world.sid}/rules/describe", {"description": "label shop mail and archive it"})
+        assert asked.status_code == 302
+        assert "is drafting this rule" in client.get(asked["Location"]).content.decode()
+        assert rule_drafts.draft_pending(world.worker()) == [{"step": "rule-drafts", "drafted": 1}]
+        page = client.get(asked["Location"]).content.decode()
+        assert "Drafted from" in page and "*@shop.example" in page and 'value="Shop"' in page
+        assert rules.all_rules(world.store, world.sid, "web") == []  # nothing is saved until the owner saves it
+        assert rule_drafts.draft_pending(world.worker()) == []
+    world.model_stub.respond = lambda prompt: json.dumps({"name": "x", "from": "", "subject": "", "categories": [],
+                                                          "instructions": "", "actions": [{"type": "move",
+                                                                                           "value": ""}],
+                                                          "scope": "new"})
+    seq = rule_drafts.ask(world.store, world.sid, "move it somewhere")
+    rule_drafts.draft_pending(world.worker())
+    found = rule_drafts.draft(world.store, seq)
+    assert found["status"] == "words-after-invalid" and found["body"]["instructions"] == "move it somewhere"

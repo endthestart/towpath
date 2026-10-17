@@ -86,6 +86,9 @@ def run_once(config, credentials_dir=None):
 
         indexing += senders.categorize_pending(config)
         indexing += rules.evaluate_pending(config)
+        from towpath.mail import rule_drafts
+
+        indexing += rule_drafts.draft_pending(config)
         from towpath.mail import archive
 
         indexing += archive.archive_pending(config)
