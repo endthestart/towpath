@@ -137,3 +137,8 @@ Balanced across three areas, mail first:
 - 2026-10-17: `131fabe` deployed. Follow-up reminders (a label and a drafted nudge after 3, 7 or 14 days
   unanswered), notes for drafts, the Attachments page, mail search operators (`from:`, `in:`, `after:`,
   `has:attachment`, `is:unread`, `larger:`…), and photo dates outside the years photography existed dropped.
+- 2026-10-17: `8c42865` and `4ff5d30` deployed. Reply labels in the mailbox (To-reply, Awaiting-reply); an Inbox Zero
+  [parity checklist](2026-10-17-inbox-zero-parity.md); Year pages; Ask cites attachments; conversations from
+  companies and services settled as FYI without the model (on Hub *To reply* by rule fell from 989 to 249); senders
+  sorted eight to a model call (about twice as many an hour). Then: purchases from receipts, plain-English mail
+  search, a whole-conversation page, per-account mail Settings, iCloud contacts and calendars.
