@@ -19,7 +19,8 @@ from email.utils import format_datetime, make_msgid
 from datetime import datetime, timezone
 
 URLS = re.compile(r"<([^>]+)>")
-SMTP = {"imap.fastmail.com": ("smtp.fastmail.com", 465), "imap.gmail.com": ("smtp.gmail.com", 465)}
+SMTP = {"imap.fastmail.com": ("smtp.fastmail.com", 465), "imap.gmail.com": ("smtp.gmail.com", 465),
+        "imap.mail.yahoo.com": ("smtp.mail.yahoo.com", 465)}  # iCloud sends only over STARTTLS: not yet
 TIMEOUT = 20
 
 

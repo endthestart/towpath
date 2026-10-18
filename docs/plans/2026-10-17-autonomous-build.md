@@ -91,7 +91,9 @@ Then, from the life-story and later milestones:
 Then (roadmap milestone 8 and the owner's ideas):
 
 14. **More mail providers**: iCloud Mail, Outlook.com and Yahoo Mail on Connections, each with its server filled in
-    and a link to making an app password; the same dry-run rules as every account.
+    and a link to making an app password; the same dry-run rules as every account. Built for iCloud Mail and
+    Yahoo Mail; Outlook.com is left out, since Microsoft no longer accepts passwords over IMAP for personal
+    accounts (it would need a Microsoft sign-in flow).
 15. **Birthdays coming up**: the digest and the Overview list the next week's birthdays and anniversaries from
     the owner's contacts.
 16. **Measure the catalog's hot path on Hub**: time adding Recoll's records to the catalog on Hub's current index

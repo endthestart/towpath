@@ -92,6 +92,7 @@ password with full IMAP and SMTP access), then on Mail → Settings tick the kin
 | Gmail over IMAP (milestone 6), to compare with Inbox Zero | Connections → Gmail (IMAP), with a Google app password |
 | Fastmail contacts and calendars | Connections → Fastmail contacts and calendars, a read-only CardDAV/CalDAV app password |
 | iCloud contacts and calendars (if you use them) | Connections → iCloud contacts and calendars, an app-specific password |
+| iCloud Mail or Yahoo Mail | Connections → *iCloud Mail* or *Yahoo Mail*: make an app password as the page says, sign in with the full address; dry runs as for every account. (Outlook.com needs a Microsoft sign-in Towpath doesn't have yet.) |
 | Facebook export | unzip a JSON export under the library; Connections → Facebook export |
 | Apple Messages | on a Mac: `brew install imessage-exporter`; give Terminal *Full Disk Access* (System Settings → Privacy & Security); then `imessage-exporter -f txt -o /Volumes/storage/exports/messages` (the `storage` share, which Towpath sees as `storage/exports/messages` in its library). Then Connections → *Apple Messages export* → that folder → *Check and add*, and *Index now*. Run the export again now and then. Allow it on the Life page only if you want messages in your life story. |
 

@@ -157,3 +157,15 @@ def test_an_ai_model_is_added_from_the_connections_page(pages, openai_stub):
     assert "local-9b" in html and "Test again" in html and "Check automatically" not in html
     assert client.post(f"/connections/{sid}/test")["Location"] == f"/connections/{sid}/?saved=test"
     assert "The model answered." in client.get(f"/connections/{sid}/?saved=test").content.decode()
+
+
+def test_icloud_and_yahoo_mail_have_their_servers_filled_in_and_ask_for_an_app_password(pages):
+    env, client = pages
+    listing = client.get("/connections/").content.decode()
+    assert "iCloud Mail" in listing and "Yahoo Mail" in listing
+    for provider, words in (("icloud_imap", "app-specific password at Apple"), ("yahoo_imap", "app password at Yahoo")):
+        html = client.get(f"/connections/add/{provider}").content.decode()
+        assert words in html and 'name="host"' not in html  # the server is filled in
+        response = client.post(f"/connections/add/{provider}", {"username": "reader", "password": "abcd efgh"})
+        assert response.status_code == 400 and "full" in response.content.decode()  # the full address, please
+    assert connections.PROVIDERS["icloud_imap"]["host"] == "imap.mail.me.com"

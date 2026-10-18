@@ -23,10 +23,29 @@
 <p class="footnote">Google's app passwords can't be limited to reading, so Towpath's own code enforces it: the reading connection only examines folders and reads with peeks, and nothing is changed. Towpath reads <strong>All Mail</strong> (every message once) and the <strong>Inbox</strong> by default. Mail management can later use a second app password to change mail.</p>
 </section>
 {% endif %}
+{% if provider == 'icloud_imap' %}
+<section class="detail-card steps"><h2 class="card-title">First, make an app-specific password at Apple</h2>
+<ol>
+  <li>App-specific passwords need two-factor authentication on your Apple Account. Sign in at <a href="https://account.apple.com" target="_blank" rel="noopener noreferrer">account.apple.com</a>, open <strong>Sign-In and Security</strong>, then <strong>App-Specific Passwords</strong>.</li>
+  <li>Name it <strong>Towpath</strong>, create it, and paste it below (the dashes are part of it).</li>
+  <li>Sign in below with your iCloud Mail address (ending in @icloud.com, @me.com or @mac.com).</li>
+</ol>
+<p class="footnote">Apple's app-specific passwords can't be limited to reading, so Towpath's own code enforces it: the reading connection only examines folders and reads with peeks. You can revoke the password at Apple at any time. <a href="{{ preset.help_url }}" target="_blank" rel="noopener noreferrer">Apple's help on app-specific passwords</a></p>
+</section>
+{% endif %}
+{% if provider == 'yahoo_imap' %}
+<section class="detail-card steps"><h2 class="card-title">First, make an app password at Yahoo</h2>
+<ol>
+  <li>In Yahoo, open <strong>Account Info → Account Security</strong> and choose <strong>Generate app password</strong> (it needs two-step verification).</li>
+  <li>Name it <strong>Towpath</strong>, generate it, and paste it below.</li>
+</ol>
+<p class="footnote">Yahoo's app passwords can't be limited to reading, so Towpath's own code enforces it: the reading connection only examines folders and reads with peeks. <a href="{{ preset.help_url }}" target="_blank" rel="noopener noreferrer">Yahoo's help on app passwords</a></p>
+</section>
+{% endif %}
 <section class="detail-card">
 <form method="post" class="auth-form" autocomplete="off">{% csrf_token %}
   <label>Email address <input type="email" name="username" value="{{ form.username }}" required autocomplete="username"></label>
-  <label>{% if provider == 'fastmail' or provider == 'gmail_imap' %}App password{% else %}Password{% endif %} <input type="password" name="password" required autocomplete="new-password"></label>
+  <label>{% if preset.host %}App password{% else %}Password{% endif %} <input type="password" name="password" required autocomplete="new-password"></label>
   {% if not preset.host %}
   <label>Server <input name="host" value="{{ form.host }}" required placeholder="imap.example.com"></label>
   <label>Port <input name="port" value="{{ form.port }}" inputmode="numeric" required></label>

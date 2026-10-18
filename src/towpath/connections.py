@@ -24,6 +24,8 @@ from pathlib import Path
 from towpath.stores import open_store
 
 ROLE = "connect"
+# Providers whose app passwords are shown in groups (spaces dropped) and whose sign-in is the full address.
+APP_PASSWORDS = ("fastmail", "gmail_imap", "icloud_imap", "yahoo_imap")
 PROVIDERS = {
     "gmail": {"label": "Gmail", "host": None, "port": None, "security": None,
               "help_url": "https://myaccount.google.com/connections"},
@@ -31,6 +33,10 @@ PROVIDERS = {
                  "help_url": "https://www.fastmail.help/hc/en-us/articles/360058752854-App-passwords"},
     "gmail_imap": {"label": "Gmail (IMAP)", "host": "imap.gmail.com", "port": 993, "security": "tls",
                    "help_url": "https://myaccount.google.com/apppasswords"},
+    "icloud_imap": {"label": "iCloud Mail", "host": "imap.mail.me.com", "port": 993, "security": "tls",
+                    "help_url": "https://support.apple.com/en-us/102654"},
+    "yahoo_imap": {"label": "Yahoo Mail", "host": "imap.mail.yahoo.com", "port": 993, "security": "tls",
+                   "help_url": "https://help.yahoo.com/kb/SLN15241.html"},
     "imap": {"label": "Email (IMAP)", "host": None, "port": 993, "security": "tls", "help_url": None},
     "fastmail_dav": {"label": "Fastmail contacts and calendars", "host": None, "port": None, "security": None,
                      "help_url": "https://www.fastmail.help/hc/en-us/articles/360058752854-App-passwords"},
