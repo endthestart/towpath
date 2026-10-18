@@ -83,7 +83,7 @@ Then, from the life-story and later milestones:
     and the *family edition* page.
 12. **Keep the evidence**: optional, off by default. For events the owner accepts, a copy of the cited message
     is kept in Towpath's data folder, so the event keeps its evidence if the mail is deleted (roadmap milestone 6,
-    "optional preservation"). Mail itself is never changed.
+    "optional preservation"). Mail itself is never changed. Built: Life → *Keep the evidence*.
 13. **One person, many addresses**: People merges a person seen under several addresses and names (mail,
     contacts, Messages) into one page, with the owner able to join or separate them.
 

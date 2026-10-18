@@ -94,10 +94,12 @@ def overview(request):
     rows = [_row(c) for c in proposed if _shown(c, show)][:300]
     status = _status()
     year = date.today().year - 1
-    from towpath import life_conflicts
+    from towpath import life_conflicts, life_evidence
 
     return render(request, "life.html", {
         "pairs": len(life_conflicts.find(settings.TOWPATH_STORE_DIR)),
+        "evidence": {"on": life_evidence.enabled(settings.TOWPATH_STORE_DIR, "web"),
+                     "kept": len(life_evidence.kept(settings.TOWPATH_STORE_DIR))},
         "nav": "life", "profile": life_groups.profile(settings.TOWPATH_STORE_DIR), "accounts": _accounts(config),
         "saved": request.GET.get("saved"), "show": show,
         "model": {"id": endpoint_id, "name": endpoint.model, "address": endpoint.base_url,
@@ -402,6 +404,11 @@ def story(request):
 
     family = request.GET.get("edition") == "family"
     found = life_story.story(settings.TOWPATH_STORE_DIR, family=family)
+    from towpath import life_evidence
+
+    copies = life_evidence.kept(settings.TOWPATH_STORE_DIR)
+    for n in found["notes"]:
+        n["kept"] = n["claim_id"] in copies
     from towpath import thumbs
 
     lines = [line for _, entries in found["chapters"] for e in entries for line in e["lines"]]
@@ -415,6 +422,30 @@ def story(request):
         response["Content-Disposition"] = f'attachment; filename="{name}"'
         return response
     return render(request, "life_story.html", {"nav": "life", **found, "saved": request.GET.get("saved")})
+
+
+@require_POST
+def keep_evidence(request):
+    from towpath import life_evidence
+
+    life_evidence.set_enabled(settings.TOWPATH_STORE_DIR, request.POST.get("on") == "1", author="owner")
+    return redirect("/life/?saved=evidence")
+
+
+@require_GET
+def evidence(request, claim_id):
+    """The kept copy of an event's evidence, as a plain-text download (never rendered as a page)."""
+    from django.http import HttpResponse
+
+    from towpath import life_evidence
+
+    data = life_evidence.copy(settings.TOWPATH_STORE_DIR, claim_id)
+    if data is None:
+        raise Http404
+    response = HttpResponse(data, content_type="text/plain; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="evidence-{claim_id}.txt"'
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 @require_POST

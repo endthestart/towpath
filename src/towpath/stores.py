@@ -296,6 +296,10 @@ CREATE TABLE IF NOT EXISTS answers (
   question_id TEXT PRIMARY KEY, status TEXT NOT NULL, body TEXT NOT NULL, model TEXT, at TEXT NOT NULL);
 -- What the grouping job has already looked at (a month of events, by the digest of its members).
 CREATE TABLE IF NOT EXISTS group_runs (key TEXT PRIMARY KEY, digest TEXT NOT NULL, updated_at TEXT NOT NULL);
+-- Copies of the evidence for events the owner kept, when the owner turned keeping it on (towpath.life_evidence).
+CREATE TABLE IF NOT EXISTS kept_evidence (
+  claim_id TEXT PRIMARY KEY, ref TEXT NOT NULL, path TEXT, sha256 TEXT, size INTEGER, status TEXT NOT NULL,
+  at TEXT NOT NULL);
 """,
     # Mail management (towpath.mail): what Towpath has read of each message it manages. Rebuildable from the
     # mailbox; written only by the connector, which holds the read-only connection.

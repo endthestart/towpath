@@ -413,3 +413,36 @@ def test_a_persons_page_lists_their_message_days_from_an_export(world, tmp_path,
     connections.index_pending(world.config, world.credentials)
     chats = people.person(world.store, "sam@example.org")["chats"]  # Sam writes mail as "Sam"
     assert [c["subject"] for c in chats] == ["Messages with Sam"]
+
+
+def test_keeping_the_evidence_copies_kept_events_messages_and_follows_the_owners_decisions(world, monkeypatch):
+    from towpath import life_evidence, life_story
+
+    helped = next(c for c in life.claims(world.store) if c.statement == "Helped Sam move")
+    life.review(world.store, helped.claim_id, "accept")
+    assert life_evidence.keep_pending(world.worker()) == []  # off until the owner turns it on
+    life_evidence.set_enabled(world.store, True)
+    assert life_evidence.keep_pending(world.worker())[0]["kept"] == 1
+    text = life_evidence.copy(world.store, helped.claim_id).decode()
+    assert "Event: Helped Sam move" in text and "Subject: Saturday?" in text
+    assert life_evidence.keep_pending(world.worker()) == []  # nothing new
+    monkeypatch.setattr(auth, "_setup_codes", {})
+    configure(world.store)
+    auth.create_account(world.store, "owner", OWNER)
+    with override_settings(TOWPATH_STORE_DIR=world.store, TOWPATH_CONFIG=world.config, ALLOWED_HOSTS=["testserver"]):
+        client = Client()
+        client.post("/login", {"username": "owner", "password": OWNER})
+        assert f"/life/evidence/{helped.claim_id}" in client.get("/life/story").content.decode()
+        got = client.get(f"/life/evidence/{helped.claim_id}")
+        assert got.status_code == 200 and got["Content-Disposition"].startswith("attachment")
+        assert client.get("/life/evidence/..%2F..%2Fdecisions.db").status_code == 404
+        assert "1 copy kept" in client.get("/life/").content.decode()
+    life.review(world.store, helped.claim_id, "reject")  # no longer kept: its copy goes
+    assert life_evidence.keep_pending(world.worker())[0]["dropped"] == 1
+    assert life_evidence.copy(world.store, helped.claim_id) is None
+    life.review(world.store, helped.claim_id, "accept")
+    life_evidence.keep_pending(world.worker())
+    life_evidence.set_enabled(world.store, False)  # off deletes every copy
+    assert life_evidence.keep_pending(world.worker())[0]["step"] == "life-evidence-deleted"
+    assert not list(life_evidence.folder(world.store).glob("*.txt"))
+    assert life_story.story(world.store)["notes"]

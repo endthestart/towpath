@@ -93,6 +93,9 @@ def run_once(config, credentials_dir=None):
         indexing += export_text.index_pending(config)
 
         indexing += life_bookings.propose(config)
+        from towpath import life_evidence
+
+        indexing += life_evidence.keep_pending(config)
         from towpath import life_groups
 
         indexing += life_groups.propose_groups(config)

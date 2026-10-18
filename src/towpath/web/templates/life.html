@@ -30,6 +30,12 @@
 <p class="footnote">Folders you allow add days with many photos, and dated documents such as a lease or a diploma, found by their names alone (nothing inside a file is read, and never identity papers or your private export).</p>
 </section>
 
+<section class="detail-card"><h2 class="card-title">Keep the evidence</h2>
+<form method="post" action="/life/keep-evidence" class="inline-form">{% csrf_token %}<input type="hidden" name="on" value="{% if evidence.on %}0{% else %}1{% endif %}">
+  <span>{% if evidence.on %}On: {{ evidence.kept }} cop{{ evidence.kept|pluralize:"y,ies" }} kept{% else %}Off{% endif %}</span>
+  <button class="button secondary" type="submit">{% if evidence.on %}Turn off (and delete the copies){% else %}Turn on{% endif %}</button></form>
+<p class="footnote">When it's on, Towpath keeps a copy of the message behind each event you keep (its date, sender, subject and text) in its own data folder, so the event keeps its evidence if you delete the mail. Your mail is never changed. An event you stop keeping loses its copy.</p></section>
+
 <section class="detail-card"><h2 class="card-title">The AI model that proposes events</h2>
 {% if model %}<form method="post" action="/life/model" class="inline-form">{% csrf_token %}<input type="hidden" name="endpoint_id" value="{{ model.id }}"><input type="hidden" name="allow" value="{% if model.allowed %}0{% else %}1{% endif %}">
   <span><strong>{{ model.name }}</strong> at {{ model.address }} — {% if model.allowed %}may read the text of the mail you chose above{% else %}receives no personal content yet{% endif %}</span>

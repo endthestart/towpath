@@ -97,7 +97,8 @@ def story(store_dir, role: str = "web", family: bool = False) -> dict:
                 continue
             n = None
             if c.citations:
-                notes.append({"n": len(notes) + 1, "ref": c.citations[0].ref, "quote": c.citations[0].captured_excerpt})
+                notes.append({"n": len(notes) + 1, "ref": c.citations[0].ref, "quote": c.citations[0].captured_excerpt,
+                              "claim_id": c.claim_id})
                 n = len(notes)
             photo = next((cit.ref.partition(":")[2] for cit in c.citations if cit.ref.startswith("folders:")), None)
             lines.append({"statement": c.statement, "when": c.when.expression, "note": n,
