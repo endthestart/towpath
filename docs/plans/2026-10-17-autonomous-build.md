@@ -288,3 +288,5 @@ rules, the side-by-side Gmail test before retiring Inbox Zero, Outlook.com, and 
   answered on Hub. Items 11–13 built; a second review's twelve findings fixed before their release.
 - 2026-10-17: `bdda51d` deployed (items 11–13: family edition, keeping the evidence (off), joining a person's
   addresses); all 34 pages answered on Hub.
+- 2026-10-18: `3fd33fe` then `a19cbcd` deployed (items 14–18, each batch reviewed and its findings fixed); all 34
+  pages answered on Hub. What remains on the roadmap waits on the owner (open questions 5–8).

@@ -6,14 +6,15 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `bdda51d` (a family edition of the story, optionally keeping the evidence for kept events, and joining a
-person's addresses; on top of `25e24b6`'s restore, saved photo searches and document events), publishing run
-[39085729660](https://github.com/endthestart/towpath/actions/runs/39085729660). New stores and tables only; the web
-service and connector add their own tables at start. Keeping the evidence is off. On Hub, Fastmail is allowed for
-the life story and finding events by itself is on (the owner's answers of October 17).
+Revision `a19cbcd` (iCloud Mail and Yahoo Mail, birthdays, anniversaries and this week's events on the Overview,
+and adding files to the catalog about twice as fast; on top of `bdda51d`'s family edition, kept evidence and joined
+addresses), publishing run [39091328075](https://github.com/endthestart/towpath/actions/runs/39091328075). New
+stores, tables and columns only; the web service and connector add their own at start. Keeping the evidence is off.
+On Hub, Fastmail is allowed for the life story and finding events by itself is on (the owner's answers of
+October 17).
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:d67f63efe3fe28907b1d7cd972a1a5fb36b504cb5faee7b5319557838748b6c4`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:44bfa8c58ccca2cbb323b3f0d0fd80e4429605cb53afddcd44df1938d3ede583`
+- `web`: `ghcr.io/endthestart/towpath@sha256:d58f82023a25026aab5c2aa9e841473bf8a85bfeafa2aabb930f32e2680d3c52`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:d56ca51f0f886781a32ef22fb88589279540ed338d93debcd3f3d2fdefb2a555`
 
 Towpath's data folder (stores, sign-ins and the Recoll index) lives on a mirrored SSD pool since 2026-10-08,
 with hourly snapshots replicated to the main pool: Recoll's index writes had saturated the spinning disks. The
@@ -28,6 +29,8 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `3fd33fe` | Items 14–18 before the calendar review's fixes | `towpath@sha256:d3fedc67…`, `towpath-recoll@sha256:c390e0a1…` |
+| `bdda51d` | Family edition, keeping the evidence (off), joining a person's addresses | `towpath@sha256:d67f63ef…`, `towpath-recoll@sha256:44bfa8c5…` |
 | `25e24b6` | Restore from an export, photo searches as collections, dated documents as life events | `towpath@sha256:6d6d30b8…`, `towpath-recoll@sha256:e116b8e7…` |
 | `a53f6c8` | Trips from photo days, bookings from receipts, Messages in Search all and on People pages | `towpath@sha256:f9322377…`, `towpath-recoll@sha256:61bbdafc…` |
 | `6c07ed8` | Overview mail totals and Photos counts kept for a few minutes | `towpath@sha256:c15bb67b…`, `towpath-recoll@sha256:4bb01445…` |
