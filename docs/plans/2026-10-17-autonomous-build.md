@@ -51,6 +51,15 @@ The owner chose to keep building until UAT. From the [roadmap](../roadmap.md)'s 
    per day in the owner's local time, the same protections as mail, tested only on made-up conversations. The owner
    runs the export at UAT (see the guide).
 
+Then, from the roadmap's life-story and sources milestones:
+
+5. **Trips from photos**: runs of days with many photos (in folders allowed for the life story) gathered into one
+   proposed trip memory, instead of one event per day.
+6. **Bookings as evidence**: purchases that are flights, hotels or tickets (read from receipts) proposed as dated
+   life events, citing the receipt, once the account is allowed for the life story.
+7. **Messages in Search all and People**: the Apple Messages export searchable from Search all, and a person's
+   conversations shown on their People page.
+
 ## Open questions
 
 1. ~~**Attachment filing**~~ — answered October 17: a folder in Towpath's data folder, by year and sender,

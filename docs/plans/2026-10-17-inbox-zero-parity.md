@@ -21,7 +21,7 @@ at that point. Dropped by the owner on October 16: meeting briefs and calendar, 
 | Bulk archive and Clean | Clean up by category and age; archive to a file, verified, then Trash | Built |
 | Email analytics | Statistics: volume, reply time, correspondents; Space; Attachments | Built |
 | Digest email | Daily or weekly digest put into the inbox | Built |
-| Attachment filing to a drive | Attachments page lists every file | Waiting on open question 1 (where to file) |
+| Attachment filing to a drive | Documents filed into Towpath's data folder by year and sender (owner's choice), a dry run first | Built |
 | Gmail | Gmail over IMAP with threads and labels, archive to All Mail | Built against the synthetic server; needs a Gmail app password to run beside Inbox Zero |
 
 **Moving rules across:** Towpath has a read-only Inbox Zero client (`towpath provider rules`) that is not configured
