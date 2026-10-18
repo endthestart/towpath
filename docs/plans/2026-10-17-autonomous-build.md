@@ -70,9 +70,10 @@ Then, from the roadmap's later milestone and the owner's search ideas:
 9. **Save a photo search as a collection**: the Photos page's filters, or a plain-English search, saved as a
    collection that keeps the search and lists what it finds (owner idea: natural-language search "can be saved as
    a collection"); hidden and private photos stay out as everywhere else. Built: Photos → *Save as a collection*.
-10. **Documents as life evidence**: dated documents in folders allowed for the life story (diplomas, leases,
-    contracts, certificates; found by name and type, and by their text through Recoll) proposed as events that
-    cite the file, read by the local model only (roadmap milestone 7, "document system as evidence").
+10. **Documents as life evidence**: built. Dated documents in folders allowed for the life story (a lease, a
+    diploma, a deed, an offer letter) proposed as events citing the file, found and dated by their names and year
+    folders alone: no model and nothing inside a file is read (stricter than first planned), never identity papers
+    or the private export.
 
 ## Open questions
 

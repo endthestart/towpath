@@ -57,6 +57,7 @@ password with full IMAP and SMTP access), then on Mail → Settings tick the kin
    or a few months apart; keep the right one or say both are right.
 4. **Memories**: keep, rename or dismiss what Towpath gathered (people, decades, trips and occasions). Runs of
    photo days now come as one trip; flights, stays and tickets bought by mail come as events citing the receipt.
+   Dated documents in allowed folders (a lease, a diploma, a deed) come as events citing the file.
 5. **Export**: Your story → *Download everything Towpath knows*: a zip of plain JSON and Markdown (events,
    memories, people, rules, sender categories, purchases, decisions; no mail text or passwords).
    *Restore your decisions* reads one back: upload it to see what it would add, then *Restore*. It only adds, and

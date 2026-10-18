@@ -27,6 +27,7 @@
   <span><strong>{{ a.name }}</strong> — {% if a.allowed %}used for your life story{% else %}not used{% endif %}</span>
   <button class="button secondary" type="submit">{% if a.allowed %}Stop using it{% else %}Use it{% endif %}</button></form>
 {% empty %}<p>No mail accounts yet. <a href="/connections/">Connect one</a>.</p>{% endfor %}
+<p class="footnote">Folders you allow add days with many photos, and dated documents such as a lease or a diploma, found by their names alone (nothing inside a file is read, and never identity papers or your private export).</p>
 </section>
 
 <section class="detail-card"><h2 class="card-title">The AI model that proposes events</h2>

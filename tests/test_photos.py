@@ -259,3 +259,33 @@ def test_runs_of_photo_days_become_one_trip_memory(tmp_path):
     trips = [g for g in life_groups.groups(store) if g["kind"] == "trip"]
     assert len(trips) == 1  # three days close together; the August day stands alone
     assert trips[0]["title"] == "Trip: 2009 Example Junction" and len(trips[0]["members"]) == 3
+
+
+def test_dated_documents_become_life_events_from_their_names_only(tmp_path):
+    from towpath import life, life_documents, photos
+    from towpath.unified import grants
+
+    private = photos.PRIVATE_GLOBS[0][2:]
+    names = {"Housing/Lease_2014-08-01.pdf": "Signed a lease", "School/2009/Diploma.pdf": "Graduated",
+             "Work/offer-letter 2015-09.docx": "Took a new job", "Car/Bill of Sale 2018-03-02.pdf": "Bought a car",
+             "Papers/Passport renewal 2016.pdf": None, "Papers/Software license agreement 2016.pdf": None,
+             "Housing/Lease template.pdf": None, "Housing/lease-2014-08-01.jpg": None,
+             f"{private}/Lease 2014-08-01.pdf": None, "Future/Lease 2999-01-01.pdf": None}
+    store = tmp_path / "state"
+    with open_store(store, "files", "connect") as db:
+        for i, rel in enumerate(names):
+            db.execute("INSERT INTO occurrences (occurrence_id, provider_id, native_id, root_alias, rel_path, members, "
+                       "media_type, size, dates, hashes, extraction, first_seen_run, last_seen_run, updated_at) "
+                       "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                       (f"occ_{i}", "folders", rel, "docs", rel, "[]", None, 9, "[]", "{}", "{}", "r", "r", "t"))
+        db.commit()
+    config = SimpleNamespace(store_dir=store, files=SimpleNamespace(roots={"docs": SimpleNamespace(path=tmp_path)}))
+    assert life_documents.propose(config) == []  # not allowed for the life story yet
+    grants.grant(store, "folders", "life-evidence", author="owner")
+    assert life_documents.propose(config)[0]["proposed"] == 4
+    got = {c.statement: c for c in life.claims(store)}
+    assert set(got) == {v for v in names.values() if v}
+    assert (got["Signed a lease"].when.earliest, got["Signed a lease"].when.precision) == ("2014-08-01", "day")
+    assert (got["Graduated"].when.precision, got["Took a new job"].when.precision) == ("year", "month")
+    assert got["Signed a lease"].citations[0].ref == "folders:occ_0"
+    assert life_documents.propose(config) == []  # nothing changed: not looked at again
