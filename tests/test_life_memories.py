@@ -257,8 +257,9 @@ def test_the_family_edition_holds_only_what_the_owner_shared_and_nothing_that_po
     life_groups.propose_groups(world.worker())
     trip = next(g for g in life_groups.groups(world.store) if g["kind"] == "trip")
     life_groups.decide(world.store, trip, "kept")
-    job = next(c for c in life.claims(world.store) if c.statement == "Started a new job")
-    life.review(world.store, job.claim_id, "accept")
+    by_name = {c.statement: c for c in life.claims(world.store)}
+    life.review(world.store, by_name["Started a new job"].claim_id, "accept")
+    life.review(world.store, by_name["Flew to Example Junction"].claim_id, "accept")  # the others stay proposed
     swim = life.recollect(world.store, "Learned to swim", "1987", "year", "1987-01-01", "1987-12-31")
     assert life_story.story(world.store, family=True)["chapters"] == []  # nothing shared until the owner says so
     monkeypatch.setattr(auth, "_setup_codes", {})
@@ -273,7 +274,11 @@ def test_the_family_edition_holds_only_what_the_owner_shared_and_nothing_that_po
         assert client.post("/life/share", {"kind": "mail", "key": "x", "on": "1"}).status_code == 400
         page = client.get("/life/story?edition=family").content.decode()
         md = client.get("/life/story?edition=family&format=md")
-    assert "Trip to Example Junction" in page and "Learned to swim" in page and "Started a new job" not in page
+        bad = client.post("/life/share", {"kind": "claim", "key": "clm_nothing", "on": "1"}).status_code
+    assert bad == 400
+    assert "Flew to Example Junction" in page and "Learned to swim" in page and "Started a new job" not in page
+    assert "Stayed at the canal hotel" not in page  # in the shared memory, but never accepted
+    assert "Trip to Example Junction" not in page and "Four days by the canal" not in page  # shown by its kind
     assert ">Sources</h2>" not in page and f"{world.sid}:" not in page and "1980-06" not in page  # no refs or birthday
     text = md.content.decode()
     assert md["Content-Disposition"].endswith('"family-edition.md"') and "[^" not in text and "The 1980s" in text
@@ -406,13 +411,24 @@ def test_a_persons_page_lists_their_message_days_from_an_export(world, tmp_path,
 
     library = tmp_path / "library"
     (library / "messages").mkdir(parents=True)
-    (library / "messages" / "Sam.txt").write_text("Oct 01, 2026  9:00:00 AM\nSam\nLunch Friday?\n")
+    (library / "messages" / "Sam Rivera.txt").write_text("Oct 01, 2026  9:00:00 AM\nSam Rivera\nLunch Friday?\n")
+    (library / "messages" / "Sam.txt").write_text("Oct 01, 2026  9:00:00 AM\nSam\nSomeone else called Sam\n")
     monkeypatch.setenv("TOWPATH_LIBRARY", str(library))
     sid = connections.add_messages(world.store, library / "messages")
     connections.start_indexing(world.store, world.credentials, sid)
     connections.index_pending(world.config, world.credentials)
-    chats = people.person(world.store, "sam@example.org")["chats"]  # Sam writes mail as "Sam"
-    assert [c["subject"] for c in chats] == ["Messages with Sam"]
+    assert people.person(world.store, "sam@example.org")["chats"] == []  # "Sam" alone would match strangers
+    from test_mail_threads import ME, mail
+
+    from towpath import connect
+    from towpath.mail import analysis
+
+    for n in (50, 51):
+        world.state.mailboxes["INBOX"].messages[n] = mail(n, "Sam Rivera <sam@example.org>", ME, "Hi", "Hi", 1)
+    connect.sync(world.worker(), world.sid)
+    analysis.analyze_pending(world.worker())
+    chats = people.person(world.store, "sam@example.org")["chats"]  # now writes mail as "Sam Rivera"
+    assert [c["subject"] for c in chats] == ["Messages with Sam Rivera"]
 
 
 def test_keeping_the_evidence_copies_kept_events_messages_and_follows_the_owners_decisions(world, monkeypatch):
@@ -442,6 +458,13 @@ def test_keeping_the_evidence_copies_kept_events_messages_and_follows_the_owners
     assert life_evidence.copy(world.store, helped.claim_id) is None
     life.review(world.store, helped.claim_id, "accept")
     life_evidence.keep_pending(world.worker())
+    life_evidence.set_enabled(world.store, False)
+    assert life_evidence.copy(world.store, helped.claim_id) is None  # not served once keeping is off
+    life_evidence.set_enabled(world.store, True)
+    life.review(world.store, helped.claim_id, "reject")
+    assert life_evidence.copy(world.store, helped.claim_id) is None  # nor once the event isn't kept
+    life.review(world.store, helped.claim_id, "accept")
+    (life_evidence.folder(world.store) / "stray.txt").write_text("left by a crash")
     life_evidence.set_enabled(world.store, False)  # off deletes every copy
     assert life_evidence.keep_pending(world.worker())[0]["step"] == "life-evidence-deleted"
     assert not list(life_evidence.folder(world.store).glob("*.txt"))
@@ -482,3 +505,35 @@ def test_the_owner_joins_a_persons_addresses_and_towpath_only_suggests(world, mo
     assert [p["address"] for p in rows] == ["sam@example.org"] and rows[0]["also"] == ["sam.rivera@work.example"]
     people.separate(world.store, "sam.rivera@work.example")
     assert people.addresses(world.store, "sam@example.org") == ["sam@example.org"]
+    with pytest.raises(ValueError):
+        people.join(world.store, "sam@example.org", "stranger@nowhere.example")  # never seen: refused
+    with pytest.raises(ValueError):
+        people.separate(world.store, "sam@example.org")  # not joined to anyone
+    # A loop only a damaged store could hold still resolves, so pages never redirect forever.
+    with closing(open_store(world.store, "decisions", "web")) as db:
+        for a, b in (("sam@example.org", "sam.rivera@work.example"), ("sam.rivera@work.example", "sam@example.org")):
+            db.execute("INSERT OR REPLACE INTO settings VALUES (?, 'person', ?, 'x', 't')", (f"address:{a}", f'"{b}"'))
+        db.commit()
+    assert people.primary(world.store, "sam@example.org") == "sam@example.org"
+
+
+def test_a_copy_that_cannot_be_written_never_stops_the_worker_and_is_tried_later(world, monkeypatch):
+    from towpath import life_evidence
+
+    helped = next(c for c in life.claims(world.store) if c.statement == "Helped Sam move")
+    life.review(world.store, helped.claim_id, "accept")
+    life_evidence.set_enabled(world.store, True)
+
+    def full(*_):
+        raise OSError(28, "No space left on device")
+    monkeypatch.setattr(life_evidence, "_write", full)
+    assert life_evidence.keep_pending(world.worker()) == []  # recorded, not raised
+    with closing(open_store(world.store, "life", "web")) as db:
+        status, next_try = db.execute("SELECT status, next_try FROM kept_evidence").fetchone()
+    assert status == "failed: OSError" and next_try
+    monkeypatch.undo()
+    assert life_evidence.keep_pending(world.worker()) == []  # not before its time
+    with closing(open_store(world.store, "life", "worker")) as db:
+        db.execute("UPDATE kept_evidence SET next_try = '2000-01-01'")
+        db.commit()
+    assert life_evidence.keep_pending(world.worker())[0]["kept"] == 1

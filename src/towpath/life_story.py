@@ -6,7 +6,10 @@ the owner hasn't accepted never appear.
 
 The family edition is the part the owner marked *shareable*: a kept memory marked shareable brings its events, and
 an event (or recollection) can be marked on its own. It holds no sources, excerpts, photos, addresses or ages: only
-what happened and when, by calendar decade. Towpath shares nothing itself; the owner downloads it and decides.
+what happened and when, by calendar decade. Only events the owner accepted (or remembered themselves) appear, even
+inside a shared memory; a memory's model-written summary is left out, and so is a title that names a person, an
+address or a folder (it is shown by its kind instead). Towpath shares nothing itself; the owner downloads it and
+decides.
 """
 
 from contextlib import closing
@@ -20,9 +23,15 @@ KEPT = ("accepted", "corrected")
 SHARE_KEY, SHAREABLE = "audience", "shareable"  # an item setting (towpath.decisions.SETTINGS)
 
 
-def _share_target(kind: str, key: str) -> str:
-    if kind not in ("claim", "group") or not key or ":" in key:
+def _share_target(store_dir, kind: str, key: str) -> str:
+    if kind not in ("claim", "group") or not key or ":" in key or len(key) > 64:
         raise ValueError("only an event or a memory can be shared")
+    if kind == "claim":
+        found = any(c.claim_id == key for c in life.claims(store_dir, limit=10**6))  # recollections included
+    else:
+        found = any(g["group_id"] == key for g in life_groups.groups(store_dir))
+    if not found:
+        raise ValueError("no such event or memory")
     return f"{kind}:{key}"
 
 
@@ -30,7 +39,7 @@ def share(store_dir, kind: str, key: str, on: bool, author: str = "owner") -> No
     """Mark an event or memory shareable for the family edition, or take it back."""
     import json
 
-    target = _share_target(kind, key)
+    target = _share_target(store_dir, kind, key)
     with closing(open_store(store_dir, "decisions", "web")) as db:
         if on:
             db.execute("INSERT OR REPLACE INTO settings (target_id, key, value, author, at) VALUES (?,?,?,?,?)",
@@ -73,11 +82,17 @@ def story(store_dir, role: str = "web", family: bool = False) -> dict:
     used = set()
     entries = []
     for g in memories:
-        members = [claims_[m] for m in g["members"] if m in claims_ and claims_[m].state != "rejected"]
+        members = [claims_[m] for m in g["members"] if m in claims_ and
+                   (claims_[m].state in KEPT if family else claims_[m].state != "rejected")]
         if not members:
             continue
         used.update(c.claim_id for c in members)
-        entries.append({"date": g["earliest"] or "", "title": g["title"], "summary": g.get("summary"),
+        title, summary = g["title"], g.get("summary")
+        if family:
+            summary = None  # written by a model, not the owner
+            if g["kind"] in ("person", "trip") or any(ch in title for ch in "@/\\"):
+                title = g["label"]
+        entries.append({"date": g["earliest"] or "", "title": title, "summary": summary,
                         "events": members, "kind": g["label"], "group_id": g["group_id"],
                         "shareable": f"group:{g['group_id']}" in marked})
     for c in kept_claims.values():

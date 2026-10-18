@@ -23,7 +23,7 @@ def _target(address: str) -> str:
     return f"address:{address}"
 
 
-def _valid(address: str) -> str:
+def valid_address(address: str) -> str:
     address = (address or "").strip().lower()
     if "@" not in address or len(address) > 320 or any(c.isspace() for c in address):
         raise ValueError("a person is joined by email address")
@@ -39,28 +39,50 @@ def joins(store_dir, role: str = "web") -> dict[str, str]:
             "SELECT target_id, value FROM settings WHERE key = ? AND target_id LIKE 'address:%'", (JOIN_KEY,))}
 
 
+def _resolve(found: dict[str, str], address: str) -> str:
+    """Follow joins to the person's own address; a loop (only a damaged store could hold one) stops where it began."""
+    seen = [address]
+    while address in found and found[address] not in seen:
+        address = found[address]
+        seen.append(address)
+    return address if address not in found else seen[0]
+
+
 def primary(store_dir, address: str, role: str = "web") -> str:
-    address = address.lower()
-    return joins(store_dir, role).get(address, address)
+    return _resolve(joins(store_dir, role), address.lower())
 
 
 def addresses(store_dir, address: str, role: str = "web") -> list[str]:
     """A person's addresses: their own first, then those the owner joined to them."""
     found = joins(store_dir, role)
-    main = found.get(address.lower(), address.lower())
-    return [main] + sorted(a for a, p in found.items() if p == main and a != main)
+    main = _resolve(found, address.lower())
+    return [main] + sorted(a for a in found if a != main and _resolve(found, a) == main)
+
+
+def known(store_dir, address: str, role: str = "web") -> bool:
+    """Whether an address is someone the owner corresponds with (in managed mail or in contacts)."""
+    if address in dav_sync.names(store_dir, role):
+        return True
+    managed = _managed(store_dir)
+    if not managed or not store_path(store_dir, "mail").exists():
+        return False
+    with closing(open_store(store_dir, "mail", role)) as db:
+        return db.execute(f"SELECT 1 FROM messages WHERE from_addr = ? AND source_id IN "
+                          f"({','.join('?' for _ in managed)}) LIMIT 1", (address, *managed)).fetchone() is not None
 
 
 def join(store_dir, person: str, other: str, author: str = "owner") -> None:
     """Join ``other`` (and anyone already joined to it) to ``person``."""
     from towpath.decisions import now
 
-    person, other = _valid(person), _valid(other)
+    person, other = valid_address(person), valid_address(other)
     found = joins(store_dir)
-    person = found.get(person, person)
-    if other == person:
+    person = _resolve(found, person)
+    if _resolve(found, other) == person:
         raise ValueError("that is already this person")
-    moved = [other] + [a for a, p in found.items() if p == other]
+    if not known(store_dir, other):
+        raise ValueError("Towpath doesn't know that address")
+    moved = [other] + [a for a in found if a != other and _resolve(found, a) == other]
     with closing(open_store(store_dir, "decisions", "web")) as db:
         for a in moved:
             db.execute("INSERT OR REPLACE INTO settings (target_id, key, value, author, at) VALUES (?,?,?,?,?)",
@@ -73,7 +95,9 @@ def join(store_dir, person: str, other: str, author: str = "owner") -> None:
 def separate(store_dir, address: str, author: str = "owner") -> None:
     from towpath.decisions import now
 
-    address = _valid(address)
+    address = valid_address(address)
+    if address not in joins(store_dir):
+        raise ValueError("that address isn't joined to anyone")
     with closing(open_store(store_dir, "decisions", "web")) as db:
         db.execute("DELETE FROM settings WHERE target_id = ? AND key = ?", (_target(address), JOIN_KEY))
         db.execute("INSERT INTO decision_log (kind, target_id, detail, author, at) VALUES ('person-separate', ?, ?, "
@@ -103,13 +127,16 @@ def suggestions(store_dir, address: str, role: str = "web", limit: int = 5) -> l
     found = joins(store_dir, role)
     out = {a: "the same name in your contacts" for a, n in names.items()
            if n and n.strip().lower() == name.strip().lower()}
-    if store_path(store_dir, "mail").exists():
+    managed = _managed(store_dir)
+    if managed and store_path(store_dir, "mail").exists():
         with closing(open_store(store_dir, "mail", role)) as db:
-            for (a,) in db.execute("SELECT DISTINCT from_addr FROM messages WHERE lower(from_name) = lower(?) AND "
-                                   "from_addr IS NOT NULL LIMIT 50", (name,)):
+            for (a,) in db.execute(f"SELECT DISTINCT from_addr FROM messages WHERE lower(from_name) = lower(?) AND "
+                                   f"from_addr IS NOT NULL AND source_id IN ({','.join('?' for _ in managed)}) "
+                                   f"LIMIT 50", (name, *managed)):
                 out.setdefault(a.lower(), "writes under the same name")
-    return [{"address": a, "why": why} for a, why in sorted(out.items())
-            if a not in mine and found.get(a, a) not in mine][:limit]
+    # never an address already joined to someone: joining it here would quietly take it from them
+    return [{"address": a, "why": why} for a, why in sorted(out.items()) if a not in mine and a not in found and
+            not any(_resolve(found, b) == a for b in found)][:limit]
 
 
 def _managed(store_dir) -> list[str]:
@@ -186,7 +213,8 @@ def person(store_dir, address: str, role: str = "web") -> dict:
     events = [c for c in life.claims(store_dir, limit=10**6, role=role)
               if c.state != "rejected" and any(cit.ref in native for cit in c.citations)]
     chats = []  # days of messages (Apple Messages, Facebook) with someone of this name, from their exports
-    chat_names = sorted({n.lower() for n in (_name_of(store_dir, a, names, role) for a in group) if n})
+    chat_names = sorted({n.lower() for n in (_name_of(store_dir, a, names, role) for a in group)
+                         if n and len(n.split()) >= 2})  # a first name alone would match strangers
     if chat_names and store_path(store_dir, "source").exists():  # the names they write under
         with closing(open_store(store_dir, "source", role)) as src:
             chats = [dict(r) for r in src.execute(

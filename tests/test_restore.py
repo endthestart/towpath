@@ -246,8 +246,8 @@ def test_what_the_owner_shared_for_the_family_edition_comes_back(world):
 def test_joined_addresses_come_back(world):
     from towpath import people
 
-    people.join(world.store, "sam@example.org", "sam.rivera@work.example")
+    people.join(world.store, "sam@example.org", "pat@example.org")
     _, data = export.build(world.store)
     fresh(world)
     restore.apply(world.store, data)
-    assert people.addresses(world.store, "sam@example.org") == ["sam@example.org", "sam.rivera@work.example"]
+    assert people.addresses(world.store, "sam@example.org") == ["sam@example.org", "pat@example.org"]

@@ -299,7 +299,7 @@ CREATE TABLE IF NOT EXISTS group_runs (key TEXT PRIMARY KEY, digest TEXT NOT NUL
 -- Copies of the evidence for events the owner kept, when the owner turned keeping it on (towpath.life_evidence).
 CREATE TABLE IF NOT EXISTS kept_evidence (
   claim_id TEXT PRIMARY KEY, ref TEXT NOT NULL, path TEXT, sha256 TEXT, size INTEGER, status TEXT NOT NULL,
-  at TEXT NOT NULL);
+  at TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, next_try TEXT);
 """,
     # Mail management (towpath.mail): what Towpath has read of each message it manages. Rebuildable from the
     # mailbox; written only by the connector, which holds the read-only connection.
@@ -316,6 +316,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS messages_identity ON messages (source_id, mail
 CREATE INDEX IF NOT EXISTS messages_thread ON messages (source_id, thread_key);
 CREATE INDEX IF NOT EXISTS messages_box ON messages (source_id, mailbox, date_utc);
 CREATE INDEX IF NOT EXISTS messages_sender ON messages (source_id, from_addr);
+CREATE INDEX IF NOT EXISTS messages_from_name ON messages (lower(from_name));
 CREATE INDEX IF NOT EXISTS messages_message_id ON messages (source_id, message_id);
 -- Full-text search over what Towpath read of each message, kept in step by triggers; it stays searchable after
 -- the message leaves the server. Filled for older stores by a worker job ("rebuild"), never at startup.

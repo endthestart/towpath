@@ -1,6 +1,6 @@
 """People pages: everyone the owner corresponds with, and one person's mail and life events over the years."""
 
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from django.conf import settings
 from django.http import HttpResponseBadRequest
@@ -24,7 +24,7 @@ def everyone(request):
 def one(request, address):
     main = people.primary(settings.TOWPATH_STORE_DIR, address)
     if main != address.lower():  # a joined address: its person's page
-        return redirect(f"/people/{main}/")
+        return redirect(f"/people/{quote(main, safe='@')}/")
     found = people.person(settings.TOWPATH_STORE_DIR, address)
     found["suggested"] = people.suggestions(settings.TOWPATH_STORE_DIR, address)
     peak = max((y["received"] + y["sent"] for y in found["years"]), default=0)
@@ -46,10 +46,11 @@ def one(request, address):
 def join(request, address):
     """Join another address to this person, or separate one again (the owner's decision)."""
     try:
+        address = people.primary(settings.TOWPATH_STORE_DIR, people.valid_address(address))
         if request.POST.get("separate"):
             people.separate(settings.TOWPATH_STORE_DIR, request.POST["separate"])
         else:
             people.join(settings.TOWPATH_STORE_DIR, address, request.POST.get("other", ""))
     except ValueError as exc:
         return HttpResponseBadRequest(str(exc))
-    return redirect(f"/people/{people.primary(settings.TOWPATH_STORE_DIR, address)}/?saved=1")
+    return redirect(f"/people/{quote(people.primary(settings.TOWPATH_STORE_DIR, address), safe='@')}/?saved=1")

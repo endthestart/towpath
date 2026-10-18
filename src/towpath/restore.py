@@ -118,7 +118,9 @@ def restorable_setting(target: str, key: str, value: str) -> bool:
         return _loads(value) == "both-right"
     if target.startswith("address:"):  # the owner joined this address to a person
         found = _loads(value)
-        return key == "person" and isinstance(found, str) and "@" in found and "@" in target
+        address = target.split(":", 1)[1]
+        return (key == "person" and isinstance(found, str) and "@" in found and "@" in address and
+                found == found.lower() and address == address.lower() and found != address)
     if target.startswith("space:"):
         return key == space.KEEP_KEY and value == space.KEEP_VALUE
     if key in item_settings.SETTINGS:
@@ -284,6 +286,13 @@ def _opt(row: dict, *keys) -> tuple:
     return vals
 
 
+def _joins_clash(d, address: str, person: str) -> bool:
+    """Whether joining ``address`` to ``person`` would contradict the joins here, or make a loop or a chain."""
+    here = {t.split(":", 1)[1]: json.loads(v) for t, v in d.execute(
+        "SELECT target_id, value FROM settings WHERE key = 'person' AND target_id LIKE 'address:%'")}
+    return address in here or person in here or address in here.values()
+
+
 def _work(store_dir, found: dict) -> dict:
     """What a restore would add: rows per table, and counts of what it leaves alone."""
     from towpath.connect import item_id
@@ -351,6 +360,9 @@ def _work(store_dir, found: dict) -> dict:
                 if sid is None:
                     continue
                 target = item_id(sid, native["native_id"])
+            if target.startswith("address:") and _joins_clash(d, target.split(":", 1)[1], json.loads(value)):
+                kept += 1  # a join here already decides who this address (or that person) is
+                continue
             if not once("settings", target, key):
                 continue
             if d.execute("SELECT 1 FROM settings WHERE target_id = ? AND key = ?", (target, key)).fetchone():

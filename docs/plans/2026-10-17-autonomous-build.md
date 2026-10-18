@@ -247,3 +247,5 @@ Then, from the life-story and later milestones:
   itself is reading Fastmail's 2026 mail.
 - 2026-10-17: `a53f6c8` deployed (items 5–7: trips from photos, bookings from receipts, Messages in Search all and
   on People pages); all 34 pages answered on Hub. Items 8–10 built and under review before release.
+- 2026-10-17: `25e24b6` deployed (items 8–10, after a review whose twelve findings were fixed first); all 34 pages
+  answered on Hub. Items 11–13 built; a second review's twelve findings fixed before their release.
