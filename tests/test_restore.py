@@ -229,3 +229,15 @@ def test_the_restore_button_applies_only_the_file_whose_plan_was_shown(world, mo
         client.post("/restore", {"package": upload})
         page = client.post("/restore", {"action": "restore", "digest": "0" * 64}).content.decode()
         assert "changed since its plan was shown" in page and not senders.marks(world.store, world.sid, "web")
+
+
+def test_what_the_owner_shared_for_the_family_edition_comes_back(world):
+    from towpath import life_story
+
+    first = life.claims(world.store)[0].claim_id
+    life.review(world.store, first, "accept")
+    life_story.share(world.store, "claim", first, True)
+    _, data = export.build(world.store)
+    fresh(world)
+    restore.apply(world.store, data)
+    assert life_story.shared(world.store) == {f"claim:{first}"}

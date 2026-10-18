@@ -62,6 +62,8 @@ password with full IMAP and SMTP access), then on Mail → Settings tick the kin
    memories, people, rules, sender categories, purchases, decisions; no mail text or passwords).
    *Restore your decisions* reads one back: upload it to see what it would add, then *Restore*. It only adds, and
    never brings back permissions, model choices or mail switches; rules return turned off.
+   **Family edition**: on Your story choose *Share* beside memories and events you'd show family, then open
+   the *family edition* (print or Markdown): only those, with no sources, excerpts, photos or ages.
 6. **Write down a memory**: a few of your own; they appear on the timeline as remembered.
 7. **Timeline**, **On this day**, **Your story** (print or download as Markdown), **Ask** (try "When did I first go
    to …?").

@@ -1,12 +1,15 @@
 {% extends 'base.html' %}
-{% block title %}{% if name %}{{ name }}'s story{% else %}Your story{% endif %} · Towpath{% endblock %}
+{% block title %}{% if family %}Family edition{% elif name %}{{ name }}'s story{% else %}Your story{% endif %} · Towpath{% endblock %}
 {% block content %}
-<a class="back-link" href="/life/">← Life</a>
-<header class="page-head compact"><h1>{% if name %}{{ name }}'s story{% else %}Your story{% endif %}</h1>
-<p class="lead">Only what you kept: memories, the events you accepted and your own recollections, in order. <a href="?format=md">Download as Markdown</a>, or print this page. <a href="/export">Download everything Towpath knows</a> (events, memories, people, your rules and decisions) as plain files, or <a href="/restore">restore your decisions</a> from one.</p></header>
+<a class="back-link" href="{% if family %}/life/story{% else %}/life/{% endif %}">← {% if family %}Your story{% else %}Life{% endif %}</a>
+{% if family %}<header class="page-head compact"><h1>{% if name %}{{ name }}'s story{% else %}My story{% endif %} <span class="muted">· family edition</span></h1>
+<p class="lead">Only what you marked shareable: what happened and when, with no sources, excerpts, photos, addresses or ages. Towpath shares nothing itself. <a href="?edition=family&amp;format=md">Download it as Markdown</a>, or print this page, and decide who sees it.</p></header>
+{% else %}<header class="page-head compact"><h1>{% if name %}{{ name }}'s story{% else %}Your story{% endif %}</h1>
+<p class="lead">Only what you kept: memories, the events you accepted and your own recollections, in order. <a href="?format=md">Download as Markdown</a>, or print this page. Mark what you'd share with family, then see the <a href="?edition=family">family edition</a>. <a href="/export">Download everything Towpath knows</a> (events, memories, people, your rules and decisions) as plain files, or <a href="/restore">restore your decisions</a> from one.</p></header>
+{% if saved %}<div class="notice" role="status">Saved.</div>{% endif %}{% endif %}
 {% for name, entries in chapters %}<section class="detail-card"><h2 class="card-title">{{ name }}</h2>
-{% for e in entries %}{% if e.title %}<h3>{{ e.title }}{% if e.year %} <span class="muted">· {{ e.year }}</span>{% endif %}</h3>{% if e.summary %}<p>{{ e.summary }}</p>{% endif %}{% endif %}
-<ul>{% for l in e.lines %}<li>{% if l.preview %}<img class="photo-preview {{ l.turn }}" src="/photos/preview/{{ l.photo }}" alt="" loading="lazy" width="96" height="72"> {% endif %}{{ l.statement }} <span class="muted">· {{ l.when }}</span>{% if l.note %} <a href="#note-{{ l.note }}"><sup>{{ l.note }}</sup></a>{% elif l.remembered %} <span class="muted">(remembered)</span>{% endif %}</li>{% endfor %}</ul>
-{% endfor %}</section>{% empty %}<p>Nothing kept yet. Keep events on the <a href="/life/">Life</a> page, keep <a href="/life/memories/">memories</a>, or write down your own.</p>{% endfor %}
-{% if notes %}<section class="detail-card"><h2 class="card-title">Sources</h2>{% for n in notes %}<p id="note-{{ n.n }}" class="footnote">{{ n.n }}. {{ n.ref }}{% if n.quote %} — “{{ n.quote }}”{% endif %}</p>{% endfor %}</section>{% endif %}
+{% for e in entries %}{% if e.title %}<h3>{{ e.title }}{% if e.year %} <span class="muted">· {{ e.year }}</span>{% endif %}</h3>{% if not family %}{% include "_share_button.html" with kind="group" key=e.group_id on=e.shareable what="this memory and its events" %}{% endif %}{% if e.summary %}<p>{{ e.summary }}</p>{% endif %}{% endif %}
+<ul>{% for l in e.lines %}<li>{% if l.preview %}<img class="photo-preview {{ l.turn }}" src="/photos/preview/{{ l.photo }}" alt="" loading="lazy" width="96" height="72"> {% endif %}{{ l.statement }} <span class="muted">· {{ l.when }}</span>{% if l.note %} <a href="#note-{{ l.note }}"><sup>{{ l.note }}</sup></a>{% elif l.remembered %} <span class="muted">(remembered)</span>{% endif %}{% if not family and not e.title %} {% include "_share_button.html" with kind="claim" key=l.claim_id on=l.shareable what="this event" %}{% endif %}</li>{% endfor %}</ul>
+{% endfor %}</section>{% empty %}<p>{% if family %}Nothing marked shareable yet. On <a href="/life/story">your story</a>, choose <em>Share</em> beside a memory or an event.{% else %}Nothing kept yet. Keep events on the <a href="/life/">Life</a> page, keep <a href="/life/memories/">memories</a>, or write down your own.{% endif %}</p>{% endfor %}
+{% if notes and not family %}<section class="detail-card"><h2 class="card-title">Sources</h2>{% for n in notes %}<p id="note-{{ n.n }}" class="footnote">{{ n.n }}. {{ n.ref }}{% if n.quote %} — “{{ n.quote }}”{% endif %}</p>{% endfor %}</section>{% endif %}
 {% endblock %}

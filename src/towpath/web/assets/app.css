@@ -86,3 +86,4 @@ code.copyable{display:inline-block;margin-top:6px;padding:6px 10px;background:va
 .page-head p a{text-decoration:underline;text-underline-offset:2px}
 .photo-preview{width:96px;height:72px;object-fit:cover;border-radius:4px;background:var(--soft)}
 .photo-preview.rot90{transform:rotate(90deg)}.photo-preview.rot180{transform:rotate(180deg)}.photo-preview.rot270{transform:rotate(270deg)}
+.share-form{display:inline;margin-left:.4em}.share-form .link-button{font-size:.85em}

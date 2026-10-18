@@ -79,7 +79,8 @@ Then, from the life-story and later milestones:
 
 11. **Family edition**: the owner marks events and memories *shareable* on the Life pages; *Download the family
     edition* gives the story with only shareable, accepted events and kept memories, without sources, addresses
-    or excerpts (roadmap milestone 8, "curated family edition, audience enforced").
+    or excerpts (roadmap milestone 8, "curated family edition, audience enforced"). Built: Your story → *Share*,
+    and the *family edition* page.
 12. **Keep the evidence**: optional, off by default. For events the owner accepts, a copy of the cited message
     is kept in Towpath's data folder, so the event keeps its evidence if the mail is deleted (roadmap milestone 6,
     "optional preservation"). Mail itself is never changed.

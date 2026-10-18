@@ -24,7 +24,7 @@ import zlib
 from contextlib import closing
 from datetime import date
 
-from towpath import decisions as item_settings, life, life_conflicts, life_groups, space
+from towpath import decisions as item_settings, life, life_conflicts, life_groups, life_story, space
 from towpath.decisions import now
 from towpath.stores import open_store, store_path
 
@@ -98,6 +98,8 @@ def _loads(value: str):
 
 def restorable_setting(target: str, key: str, value: str) -> bool:
     """Whether a decisions-store setting is one of the owner's decisions a file may bring back, and is well formed."""
+    if target.startswith(("claim:", "group:")) and key == life_story.SHARE_KEY:
+        return value == life_story.SHAREABLE  # marked for the family edition
     if target.startswith("claim:"):
         if key == life.REVIEW_KEY:
             return _review(_loads(value))

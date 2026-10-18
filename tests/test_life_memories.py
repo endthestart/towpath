@@ -250,6 +250,37 @@ def test_the_story_holds_only_what_the_owner_kept(world, monkeypatch):
         assert md["Content-Disposition"].startswith("attachment") and b"Started a new job" in md.content
 
 
+def test_the_family_edition_holds_only_what_the_owner_shared_and_nothing_that_points_to_records(world, monkeypatch):
+    from towpath import life_story
+
+    life_groups.set_profile(world.store, "Reader", "1980-06-01")
+    life_groups.propose_groups(world.worker())
+    trip = next(g for g in life_groups.groups(world.store) if g["kind"] == "trip")
+    life_groups.decide(world.store, trip, "kept")
+    job = next(c for c in life.claims(world.store) if c.statement == "Started a new job")
+    life.review(world.store, job.claim_id, "accept")
+    swim = life.recollect(world.store, "Learned to swim", "1987", "year", "1987-01-01", "1987-12-31")
+    assert life_story.story(world.store, family=True)["chapters"] == []  # nothing shared until the owner says so
+    monkeypatch.setattr(auth, "_setup_codes", {})
+    configure(world.store)
+    auth.create_account(world.store, "owner", OWNER)
+    with override_settings(TOWPATH_STORE_DIR=world.store, TOWPATH_CONFIG=world.config, ALLOWED_HOSTS=["testserver"]):
+        client = Client()
+        client.post("/login", {"username": "owner", "password": OWNER})
+        assert 'name="kind" value="group"' in client.get("/life/story").content.decode()
+        client.post("/life/share", {"kind": "group", "key": trip["group_id"], "on": "1"})
+        client.post("/life/share", {"kind": "claim", "key": swim.claim_id, "on": "1"})
+        assert client.post("/life/share", {"kind": "mail", "key": "x", "on": "1"}).status_code == 400
+        page = client.get("/life/story?edition=family").content.decode()
+        md = client.get("/life/story?edition=family&format=md")
+    assert "Trip to Example Junction" in page and "Learned to swim" in page and "Started a new job" not in page
+    assert ">Sources</h2>" not in page and f"{world.sid}:" not in page and "1980-06" not in page  # no refs or birthday
+    text = md.content.decode()
+    assert md["Content-Disposition"].endswith('"family-edition.md"') and "[^" not in text and "The 1980s" in text
+    life_story.share(world.store, "claim", swim.claim_id, False)
+    assert "Learned to swim" not in life_story.markdown(life_story.story(world.store, family=True))
+
+
 def test_ask_cites_attachments_in_allowed_accounts(world):
     from test_mail_attachments import with_files
 

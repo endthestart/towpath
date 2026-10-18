@@ -400,7 +400,8 @@ def story(request):
 
     from towpath import life_story
 
-    found = life_story.story(settings.TOWPATH_STORE_DIR)
+    family = request.GET.get("edition") == "family"
+    found = life_story.story(settings.TOWPATH_STORE_DIR, family=family)
     from towpath import thumbs
 
     lines = [line for _, entries in found["chapters"] for e in entries for line in e["lines"]]
@@ -410,9 +411,23 @@ def story(request):
         line["turn"] = _TURN.get(shown.get(line["photo"]), "")
     if request.GET.get("format") == "md":
         response = HttpResponse(life_story.markdown(found), content_type="text/markdown; charset=utf-8")
-        response["Content-Disposition"] = 'attachment; filename="my-story.md"'
+        name = "family-edition.md" if family else "my-story.md"
+        response["Content-Disposition"] = f'attachment; filename="{name}"'
         return response
-    return render(request, "life_story.html", {"nav": "life", **found})
+    return render(request, "life_story.html", {"nav": "life", **found, "saved": request.GET.get("saved")})
+
+
+@require_POST
+def share(request):
+    """Mark an event or memory shareable for the family edition, or take it back."""
+    from towpath import life_story
+
+    try:
+        life_story.share(settings.TOWPATH_STORE_DIR, request.POST.get("kind", ""), request.POST.get("key", ""),
+                         request.POST.get("on") == "1", author="owner")
+    except ValueError as exc:
+        return HttpResponseBadRequest(str(exc))
+    return redirect("/life/story?saved=1")
 
 
 @require_POST
