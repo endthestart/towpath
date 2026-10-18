@@ -20,7 +20,8 @@ from datetime import datetime, timezone
 
 URLS = re.compile(r"<([^>]+)>")
 SMTP = {"imap.fastmail.com": ("smtp.fastmail.com", 465), "imap.gmail.com": ("smtp.gmail.com", 465),
-        "imap.mail.yahoo.com": ("smtp.mail.yahoo.com", 465)}  # iCloud sends only over STARTTLS: not yet
+        "imap.mail.yahoo.com": ("smtp.mail.yahoo.com", 465)}
+NO_SMTP = {"imap.mail.me.com"}  # iCloud sends only over STARTTLS, which Towpath doesn't use yet
 TIMEOUT = 20
 
 
@@ -45,12 +46,15 @@ def options(list_unsubscribe: str | None, list_unsubscribe_post: str | None) -> 
     return found
 
 
-def best(found: dict, sender: str | None = None, list_id: str | None = None) -> tuple[str, str] | None:
+def best(found: dict, sender: str | None = None, list_id: str | None = None,
+         host: str | None = None) -> tuple[str, str] | None:
     """The method Towpath can carry out, one-click first. An email goes only to an address in the domain of the
-    sender (or of the List-Id), so it is offered only then."""
+    sender (or of the List-Id), and never from an account Towpath can't send from, so it is offered only then."""
     if found.get("post"):
         return "post", found["post"]
     mailto = found.get("mail")
+    if host in NO_SMTP:
+        mailto = None
     if mailto and (sender is None or _domain(urllib.parse.unquote(urllib.parse.urlsplit(mailto).path))
                    in {_domain(sender), _domain((list_id or "").strip("<>"))}):
         return "mail", mailto

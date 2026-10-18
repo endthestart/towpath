@@ -10,6 +10,7 @@ import fnmatch
 import functools
 import os
 import re
+import unicodedata
 from pathlib import Path, PurePosixPath
 from urllib.parse import unquote, urlsplit
 
@@ -25,10 +26,17 @@ def _real(path: Path) -> Path:
     return Path(os.path.realpath(path))
 
 
+def _fold(name: str) -> str:
+    """A file name as a case- and Unicode-insensitive filesystem (APFS, SMB) may treat it: a provider naming a link
+    in another case must still find it is a link."""
+    return unicodedata.normalize("NFC", name).casefold()
+
+
 class Folders:
     """Real paths for many files at once, for listing a large tree. Each folder is resolved and listed once and
     only symbolic links are followed one by one, so files' own metadata is never read. Reads still resolve
-    each path in full first."""
+    each path in full first. A folder's listing is kept for the whole listing run: a link made inside it during the
+    run is caught when the file is read, not here."""
 
     def __init__(self, size: int = 4096):
         self._folder = functools.lru_cache(maxsize=size)(self._resolve_folder)
@@ -39,14 +47,14 @@ class Folders:
     def _resolve_folder(folder: str) -> tuple[Path, frozenset] | None:
         try:
             with os.scandir(folder) as entries:
-                links = frozenset(e.name for e in entries if e.is_symlink())
+                links = frozenset(_fold(e.name) for e in entries if e.is_symlink())
         except OSError:
             return None
         return _real(Path(folder)), links
 
     def real(self, path: Path) -> Path:
         found = self._folder(str(path.parent))
-        if found is None or path.name in found[1]:
+        if found is None or _fold(path.name) in found[1]:
             return _real(path)
         return found[0] / path.name
 
@@ -55,7 +63,7 @@ class Folders:
         answer: run once per file while listing millions)."""
         parent, _, name = full.rpartition("/")
         found = self._folder(parent or "/")
-        if found is None or name in found[1]:
+        if found is None or _fold(name) in found[1]:
             return str(_real(full))  # a symbolic link, or a folder that can't be listed: resolved in full
         folder = str(found[0])
         return folder + name if folder.endswith("/") else f"{folder}/{name}"

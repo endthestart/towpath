@@ -439,3 +439,16 @@ def test_the_listing_fast_path_accepts_and_refuses_exactly_what_the_full_check_d
             got = ("refused", None)
         assert got == expected, rel
     assert archive.exists()
+
+
+def test_a_link_named_in_another_case_is_still_followed(fx, tmp_path):
+    probe = tmp_path / "CaseProbe"
+    probe.write_text("x")
+    if not (tmp_path / "caseprobe").exists():
+        pytest.skip("this filesystem tells names apart by case")
+    roots = fx.config.files.roots
+    archive = Path(roots["archive"].path)
+    (archive / "esc").symlink_to(fx.root / "outside")
+    for name in ("Esc", "ESC", "esc"):
+        with pytest.raises(refs.BadReference):
+            refs.locate(f"file://{archive}/{name}/secret.txt", roots, refs.Folders())

@@ -63,7 +63,8 @@ TASK_LABELS = {"life.propose": "Life story: propose events", "life.group": "Life
 MODEL_TIMEOUT_SECONDS = 300.0  # a model on a sleeping machine can take a minute or two to wake and load
 # Folders left out by default: special use (RFC 6154) first, then common names for servers that omit it.
 SKIP_SPECIAL = {"\\trash", "\\junk", "\\drafts"}
-SKIP_NAMES = {"trash", "deleted items", "deleted messages", "spam", "junk", "junk mail", "junk e-mail", "drafts"}
+SKIP_NAMES = {"trash", "deleted items", "deleted messages", "spam", "junk", "junk mail", "junk e-mail", "drafts",
+              "bulk", "bulk mail", "notes"}  # Yahoo's spam is "Bulk"; iCloud lists its Notes as a mailbox
 SLICE_SECONDS = 300
 CHECK_EVERY_SECONDS = 3.0
 
@@ -156,8 +157,8 @@ def test_imap(settings: dict, password: str) -> list[dict]:
     try:
         session = connect_session(source, password)
     except LoginError:
-        raise ConnectionProblem("The server rejected the address or password. Check both; for Fastmail, use an "
-                                "app password, not your account password.") from None
+        raise ConnectionProblem("The server rejected the address or password. Check both, and use an app "
+                                "password, not your account password.") from None
     except socket.gaierror:
         raise ConnectionProblem(f"Couldn't find the server {source.host}. Check the server name.") from None
     except ssl.SSLError:
@@ -202,7 +203,7 @@ def test_write_imap(settings: dict, password: str) -> dict:
     try:
         session: ActSession = connect_act(source, password)
     except LoginError:
-        raise ConnectionProblem("The server rejected that password. For Fastmail, make a new app password.") from None
+        raise ConnectionProblem("The server rejected that password. Make a new app password.") from None
     except (OSError, IMAPClientError):
         raise ConnectionProblem(f"Couldn't connect to {where}.") from None
     try:
@@ -215,7 +216,7 @@ def test_write_imap(settings: dict, password: str) -> dict:
             raise
         except (WriteViolation, IMAPClientError):  # opened read-only, or refused outright
             raise ConnectionProblem("That password can only read mail. Make an app password that can change mail "
-                                    "too (for Fastmail: Mail, with full access).") from None
+                                    "too (in Fastmail: Mail, with full access).") from None
         session.unselect()
         caps = sorted(session.capabilities())
         if "MOVE" not in caps:

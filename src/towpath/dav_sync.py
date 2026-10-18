@@ -192,12 +192,14 @@ def birthdays_ahead(store_dir, days: int = 14, today=None, role: str = "web") ->
 
     if store_dir is None or not store_path(store_dir, "dav").exists():
         return []
-    today = today or date.today()
+    today = today or _today()
     out, seen = [], set()
     with closing(open_store(store_dir, "dav", role)) as db:
-        rows = db.execute("SELECT name, emails, birthday, 'Birthday' FROM contacts WHERE birthday IS NOT NULL AND "
-                          "name IS NOT NULL UNION ALL SELECT c.name, c.emails, d.date, d.label FROM contact_dates d "
-                          "JOIN contacts c USING (source_id, href) WHERE d.date IS NOT NULL AND c.name IS NOT NULL")
+        # the same person in two address books: a card with a year, then one with an address, wins
+        rows = db.execute("SELECT * FROM (SELECT name, emails, birthday AS day, 'Birthday' AS label FROM contacts "
+                          "WHERE birthday IS NOT NULL AND name IS NOT NULL UNION ALL SELECT c.name, c.emails, d.date, "
+                          "d.label FROM contact_dates d JOIN contacts c USING (source_id, href) WHERE d.date IS NOT "
+                          "NULL AND c.name IS NOT NULL) ORDER BY substr(day, 1, 2) = '--', emails = '[]'")
         for name, emails, birthday, label in rows:
             m = re.fullmatch(r"(\d{4})?-*(\d{2})-(\d{2})", birthday)  # "1990-10-20", or "---10-20" with no year
             if not m:
@@ -210,9 +212,10 @@ def birthdays_ahead(store_dir, days: int = 14, today=None, role: str = "web") ->
                     if (month, day) != (2, 29):
                         break
                     when = date(y, 2, 28)
-                if today <= when <= today + timedelta(days=days):
-                    born = int(year) if year.isdigit() and 1800 < int(year) <= today.year else None  # 1604: no year
-                    key = (name, when, label)
+                if today <= when < today + timedelta(days=days):
+                    # 1604 (Apple) and 1900 or so (other exporters) stand for "no year"
+                    born = int(year) if year.isdigit() and 1900 < int(year) <= today.year else None
+                    key = (name.casefold(), when, label)
                     if key not in seen:
                         seen.add(key)
                         out.append({"name": name, "date": when, "in_days": (when - today).days, "label": label,
@@ -220,6 +223,16 @@ def birthdays_ahead(store_dir, days: int = 14, today=None, role: str = "web") ->
                                     "address": (json.loads(emails) or [None])[0]})
                     break
     return sorted(out, key=lambda b: (b["date"], b["name"]))
+
+
+def _today():
+    """Today where the owner lives (the server's own clock may be on UTC)."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from towpath.mail.notify import TIMEZONE
+
+    return datetime.now(ZoneInfo(TIMEZONE)).date()
 
 
 def week_ahead(store_dir, today=None, days: int = 7, limit: int = 12, role: str = "web") -> list[dict]:
@@ -230,7 +243,7 @@ def week_ahead(store_dir, today=None, days: int = 7, limit: int = 12, role: str 
 
     if store_dir is None or not store_path(store_dir, "dav").exists():
         return []
-    today = today or date.today()
+    today = today or _today()
     first, last = today.isoformat(), (today + timedelta(days=days - 1)).isoformat()
     with closing(open_store(store_dir, "dav", role)) as db:
         rows = db.execute("SELECT summary, start, all_day, location FROM events WHERE start IS NOT NULL AND "

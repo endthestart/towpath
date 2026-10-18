@@ -14,6 +14,7 @@ from django.shortcuts import redirect, render
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from towpath.mail import actions, archive, rules, search as mail_search, senders, settings as mail_settings
+from towpath import connections
 from towpath.mail import unsubscribe
 from towpath.stores import open_store, store_path
 from towpath.web.mail_rules_views import _managed
@@ -230,13 +231,14 @@ def _offers(sid: str) -> list[dict]:
     rows = [r for r in senders.listing(_store(), sid, limit=10**6) if r["unsubscribe"] and r["category"] != "person"]
     if not rows:
         return []
+    host = ((connections.get(_store(), sid, role="web") or {}).get("settings") or {}).get("host") or ""
     with closing(open_store(_store(), "mail", "web")) as db:
         for r in rows:
             latest = db.execute("SELECT list_unsubscribe, list_unsubscribe_post, list_id FROM messages WHERE "
                                 "source_id = ? AND from_addr = ? AND list_unsubscribe IS NOT NULL ORDER BY date_utc "
                                 "DESC LIMIT 1", (sid, r["address"])).fetchone()
             found = unsubscribe.options(latest[0], latest[1]) if latest else {}
-            r["method"] = unsubscribe.best(found, r["address"], latest[2] if latest else None)
+            r["method"] = unsubscribe.best(found, r["address"], latest[2] if latest else None, host)
             r["list_id"] = latest[2] if latest else None
             r["mail_to"] = (r["method"][1][len("mailto:"):].split("?")[0]
                             if r["method"] and r["method"][0] == "mail" else None)

@@ -297,3 +297,24 @@ def test_anniversaries_and_apples_labelled_dates_are_read_from_cards(world):
     assert any(server.multigets)  # the unchanged card is read once more for its dates
     got = dav_sync.birthdays_ahead(config.store_dir, today=date(2026, 10, 17))
     assert [(b["name"], b["label"], b["turns"]) for b in got] == [("Sam Rivera", "Anniversary", 14)]
+
+
+def test_the_same_person_in_two_address_books_shows_once_with_the_year_and_address(tmp_path):
+    import json
+    from datetime import date
+
+    from towpath import dav_sync
+
+    store = tmp_path / "state"
+    with open_store(store, "dav", "connect") as db:
+        for sid, name, emails, birthday in (("a", "sam rivera", [], "---10-20"),
+                                            ("b", "Sam Rivera", ["sam@example.org"], "1990-10-20"),
+                                            ("c", "Placeholder", [], "1900-10-21")):
+            db.execute("INSERT INTO contacts (source_id, href, etag, uid, name, emails, phones, birthday, org, "
+                       "collection, updated_at) VALUES (?, '/c', 'e', NULL, ?, ?, '[]', ?, NULL, 'c', 't')",
+                       (sid, name, json.dumps(emails), birthday))
+        db.commit()
+    got = dav_sync.birthdays_ahead(store, today=date(2026, 10, 17))
+    assert [(b["name"], b["turns"], b["address"]) for b in got] == [("Sam Rivera", 36, "sam@example.org"),
+                                                                   ("Placeholder", None, None)]
+    assert dav_sync.birthdays_ahead(store, today=date(2026, 10, 6)) == []  # 14 days from the 6th end on the 19th
