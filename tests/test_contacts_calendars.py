@@ -12,6 +12,7 @@ import pytest
 
 from towpath import config as config_mod, connections, dav_sync, life, life_calendar
 from towpath.adapters import dav
+from towpath.stores import open_store
 from towpath.unified import grants
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -126,7 +127,7 @@ def world(tmp_path):
 def test_parsing():
     card = dav.parse_vcard(CARD)
     assert card == {"uid": "c1", "name": "Sam Rivera", "emails": ["sam@example.org", "sam.work@example.net"],
-                    "phones": [], "birthday": "1985-04-12", "org": "Example Lock"}
+                    "phones": [], "birthday": "1985-04-12", "org": "Example Lock", "dates": []}
     trip, = dav.parse_events(EVENTS["trip.ics"])
     assert trip["summary"] == "Flight to Example Junction" and trip["start"] == "2009-05-14T08:15:00Z"
     assert trip["tz"] == "UTC" and not trip["recurring"]
@@ -269,3 +270,30 @@ def test_this_week_lists_events_that_dont_repeat_once_each(tmp_path):
         db.commit()
     got = dav_sync.week_ahead(store, today=date(2026, 10, 17))
     assert [(e["summary"], e["time"]) for e in got] == [("Dentist", "09:30"), ("Holiday", None)]
+
+
+def test_anniversaries_and_apples_labelled_dates_are_read_from_cards(world):
+    from datetime import date
+
+    card = ("BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Alex Example\r\nANNIVERSARY:20101030\r\n"
+            "item2.X-ABDATE;type=pref:2014-11-02\r\nitem2.X-ABLabel:_$!<Anniversary>!$_\r\n"
+            "item3.X-ABDATE:1999-10-25\r\nitem3.X-ABLabel:First day at work\r\n"
+            "item4.X-ABDATE:not a date\r\nEND:VCARD\r\n")
+    assert dav.card_dates(card) == [("Anniversary", "2010-10-30"), ("Anniversary", "2014-11-02"),
+                                    ("First day at work", "1999-10-25")]
+    config, creds, server = world
+    found = dav_sync.test(USER, PASSWORD, server.urls)
+    sid = dav_sync.add(config.store_dir, creds, USER, PASSWORD, found, server.urls)
+    connections.start_indexing(config.store_dir, creds, sid)
+    dav_sync.sync_pending(config, creds)
+    with open_store(config.store_dir, "dav", "connect") as db:  # as if read before dates were kept
+        db.execute("DELETE FROM contact_dates")
+        db.commit()
+    server.items["/dav/addressbooks/user/reader@example.com/Default/sam.vcf"] = ("e-1", CARD.replace(
+        "END:VCARD", "ANNIVERSARY:2012-10-20\r\nEND:VCARD"))
+    connections.start_indexing(config.store_dir, creds, sid)
+    server.multigets.clear()
+    dav_sync.sync_pending(config, creds)
+    assert any(server.multigets)  # the unchanged card is read once more for its dates
+    got = dav_sync.birthdays_ahead(config.store_dir, today=date(2026, 10, 17))
+    assert [(b["name"], b["label"], b["turns"]) for b in got] == [("Sam Rivera", "Anniversary", 14)]

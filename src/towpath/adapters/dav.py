@@ -191,8 +191,42 @@ def _unescape(value: str) -> str:
     return value.replace("\\n", "\n").replace("\\N", "\n").replace("\\,", ",").replace("\\;", ";").replace("\\\\", "\\")
 
 
+APPLE_LABEL = re.compile(r"^_\$!<(.+)>!\$_$")  # Apple's built-in labels, e.g. _$!<Anniversary>!$_
+
+
+def _date(value: str) -> str | None:
+    m = re.match(r"(\d{4}|--)-?(\d{2})-?(\d{2})", value.strip())
+    return f"{m.group(1)}-{m.group(2)}-{m.group(3)}" if m else None
+
+
+def card_dates(text: str) -> list[tuple[str, str]]:
+    """(label, date) for each date a card records besides the birthday: ``ANNIVERSARY``, and Apple's grouped
+    ``itemN.X-ABDATE`` with its ``itemN.X-ABLabel``."""
+    unfolded = re.sub(r"\r?\n[ \t]", "", text)
+    labels, dated, out = {}, [], []
+    for line in unfolded.splitlines():
+        head, sep, value = line.partition(":")
+        if not sep:
+            continue
+        group, _, name = head.split(";")[0].rpartition(".")
+        name = name.upper()
+        if name == "X-ABLABEL" and group:
+            raw = _unescape(value).strip()
+            m = APPLE_LABEL.match(raw)
+            labels[group] = (m.group(1) if m else raw)[:40] or "Date"
+        elif name == "X-ABDATE":
+            dated.append((group, _date(value)))
+        elif name == "ANNIVERSARY":
+            day = _date(value)
+            if day:
+                out.append(("Anniversary", day))
+    out += [(labels.get(group, "Date"), day) for group, day in dated if day]
+    return sorted(set(out))
+
+
 def parse_vcard(text: str) -> dict:
-    card = {"uid": None, "name": None, "emails": [], "phones": [], "birthday": None, "org": None}
+    card = {"uid": None, "name": None, "emails": [], "phones": [], "birthday": None, "org": None,
+            "dates": card_dates(text)}
     for name, _, value in _lines(text):
         if name == "UID":
             card["uid"] = value.strip()

@@ -103,8 +103,9 @@ Then (roadmap milestone 8 and the owner's ideas):
     [performance plan](2026-10-08-ui-performance-and-ux.md#adding-to-the-catalog-measured-again-2026-10-17)).
 
 17. **This week from calendars**: the Overview lists the next seven days' events from connected calendars.
+    Built; events that repeat are stored once, as their first occurrence, so only one-off events show for now.
 18. **Anniversaries from contacts**: dates a contact card records besides the birthday (vCard `ANNIVERSARY`, and
-    Apple's labelled dates) beside the birthdays on the Overview.
+    Apple's labelled dates) beside the birthdays on the Overview. Built; cards read before are read once more.
 
 After these, what remains on the roadmap waits on the owner (see the open questions): importing Inbox Zero's
 rules, the side-by-side Gmail test before retiring Inbox Zero, Outlook.com, and iCloud Photos.

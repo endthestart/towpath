@@ -491,6 +491,11 @@ CREATE TABLE IF NOT EXISTS contacts (
   source_id TEXT NOT NULL, href TEXT NOT NULL, etag TEXT NOT NULL, uid TEXT, name TEXT, emails TEXT NOT NULL,
   phones TEXT NOT NULL, birthday TEXT, org TEXT, collection TEXT NOT NULL, updated_at TEXT NOT NULL,
   PRIMARY KEY (source_id, href));
+-- Dates a contact card records besides the birthday (an anniversary, Apple's labelled dates). A row with no label
+-- and no date marks a card read for its dates and found to have none.
+CREATE TABLE IF NOT EXISTS contact_dates (
+  source_id TEXT NOT NULL, href TEXT NOT NULL, label TEXT, date TEXT);
+CREATE INDEX IF NOT EXISTS contact_dates_card ON contact_dates (source_id, href);
 CREATE TABLE IF NOT EXISTS events (
   source_id TEXT NOT NULL, href TEXT NOT NULL, n INTEGER NOT NULL, etag TEXT NOT NULL, uid TEXT, summary TEXT,
   start TEXT, end TEXT, all_day INTEGER NOT NULL, tz TEXT, location TEXT, organizer TEXT, attendees TEXT NOT NULL,

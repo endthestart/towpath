@@ -98,6 +98,9 @@ def _store_items(db, sid: str, collection: dict, texts: dict[str, str], etags: d
             db.execute("INSERT OR REPLACE INTO contacts VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                        (sid, href, etags.get(href, ""), card["uid"], card["name"], json.dumps(card["emails"]),
                         json.dumps(card["phones"]), card["birthday"], card["org"], collection["href"], now()))
+            db.execute("DELETE FROM contact_dates WHERE source_id = ? AND href = ?", (sid, href))
+            db.executemany("INSERT INTO contact_dates VALUES (?,?,?,?)",
+                           [(sid, href, label, day) for label, day in card["dates"]] or [(sid, href, None, None)])
         else:
             db.execute("DELETE FROM events WHERE source_id = ? AND href = ?", (sid, href))
             for n, e in enumerate(dav.parse_events(text)):
@@ -124,10 +127,16 @@ def sync(store_dir: Path, credentials_dir: Path, c: dict, opener=None) -> dict:
                 table = "contacts" if kind == "contacts" else "events"
                 known = {r[0]: r[1] for r in db.execute(f"SELECT DISTINCT href, etag FROM {table} WHERE source_id = ? "
                                                         f"AND collection = ?", (sid, col["href"]))}
-                changed = [h for h, e in etags.items() if known.get(h) != e]
+                checked = {r[0] for r in db.execute("SELECT DISTINCT href FROM contact_dates WHERE source_id = ?",
+                                                    (sid,))} if kind == "contacts" else set(known)
+                # a card read before Towpath kept its other dates is read once more
+                changed = [h for h, e in etags.items() if known.get(h) != e or h not in checked]
                 totals["read"] += _store_items(db, sid, col, client.multiget(col["href"], changed, kind), etags)
                 gone = [h for h in known if h not in etags]
                 db.executemany(f"DELETE FROM {table} WHERE source_id = ? AND href = ?", [(sid, h) for h in gone])
+                if kind == "contacts":
+                    db.executemany("DELETE FROM contact_dates WHERE source_id = ? AND href = ?",
+                                   [(sid, h) for h in gone])
                 totals["removed"] += len(gone)
                 db.execute("INSERT OR REPLACE INTO collections VALUES (?,?,?,?,?,?,?)",
                            (sid, col["href"], kind, col["name"], col["ctag"], len(etags), now()))
@@ -176,8 +185,9 @@ def names(store_dir, role: str = "worker") -> dict[str, str]:
 
 
 def birthdays_ahead(store_dir, days: int = 14, today=None, role: str = "web") -> list[dict]:
-    """Contacts' birthdays in the next ``days`` days (today included), soonest first, with the age they turn when the
-    card gives a birth year. A 29 February birthday falls on the 28th in other years."""
+    """Contacts' birthdays, anniversaries and other dates their cards record, in the next ``days`` days (today
+    included), soonest first, with the years they mark when the card gives a year. A 29 February date falls on the
+    28th in other years."""
     from datetime import date, timedelta
 
     if store_dir is None or not store_path(store_dir, "dav").exists():
@@ -185,8 +195,10 @@ def birthdays_ahead(store_dir, days: int = 14, today=None, role: str = "web") ->
     today = today or date.today()
     out, seen = [], set()
     with closing(open_store(store_dir, "dav", role)) as db:
-        rows = db.execute("SELECT name, emails, birthday FROM contacts WHERE birthday IS NOT NULL AND name IS NOT NULL")
-        for name, emails, birthday in rows:
+        rows = db.execute("SELECT name, emails, birthday, 'Birthday' FROM contacts WHERE birthday IS NOT NULL AND "
+                          "name IS NOT NULL UNION ALL SELECT c.name, c.emails, d.date, d.label FROM contact_dates d "
+                          "JOIN contacts c USING (source_id, href) WHERE d.date IS NOT NULL AND c.name IS NOT NULL")
+        for name, emails, birthday, label in rows:
             m = re.fullmatch(r"(\d{4})?-*(\d{2})-(\d{2})", birthday)  # "1990-10-20", or "---10-20" with no year
             if not m:
                 continue
@@ -200,10 +212,10 @@ def birthdays_ahead(store_dir, days: int = 14, today=None, role: str = "web") ->
                     when = date(y, 2, 28)
                 if today <= when <= today + timedelta(days=days):
                     born = int(year) if year.isdigit() and 1800 < int(year) <= today.year else None  # 1604: no year
-                    key = (name, when)
+                    key = (name, when, label)
                     if key not in seen:
                         seen.add(key)
-                        out.append({"name": name, "date": when, "in_days": (when - today).days,
+                        out.append({"name": name, "date": when, "in_days": (when - today).days, "label": label,
                                     "turns": when.year - born if born else None,
                                     "address": (json.loads(emails) or [None])[0]})
                     break
