@@ -94,8 +94,9 @@ Then (roadmap milestone 8 and the owner's ideas):
     and a link to making an app password; the same dry-run rules as every account. Built for iCloud Mail and
     Yahoo Mail; Outlook.com is left out, since Microsoft no longer accepts passwords over IMAP for personal
     accounts (it would need a Microsoft sign-in flow).
-15. **Birthdays coming up**: the digest and the Overview list the next week's birthdays and anniversaries from
-    the owner's contacts.
+15. **Birthdays coming up**: built on the Overview: the next two weeks' birthdays from the owner's contacts, with
+    the age they turn when the card gives a year. Not in the digest: it goes into one account's mailbox, and
+    contacts are another connection's. Anniversaries wait for the contacts reader to keep them.
 16. **Measure the catalog's hot path on Hub**: time adding Recoll's records to the catalog on Hub's current index
     (roadmap: Rust for hot paths); move it to Rust only if the measurement shows it still dominates.
 

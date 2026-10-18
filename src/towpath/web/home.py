@@ -1,6 +1,6 @@
 """The Overview page's "Today" cards: what needs the owner across mail, the life story and photos."""
 
-from towpath import connections, life, life_groups, life_today, photos
+from towpath import connections, dav_sync, life, life_groups, life_today, photos
 from towpath.mail import FEATURE, senders, settings as mail_settings, threads
 from towpath.unified import grants
 
@@ -23,4 +23,5 @@ def cards(store_dir) -> dict:
     return {"accounts": accounts,
             "events_to_review": sum(c.state == "proposed" and c.significance != "routine" for c in claims),
             "memories_to_review": sum(g["state"] == "proposed" for g in groups),
-            "on_this_day": len(today["years"]), "photos": photos.progress(store_dir).get("read", 0)}
+            "on_this_day": len(today["years"]), "photos": photos.progress(store_dir).get("read", 0),
+            "birthdays": dav_sync.birthdays_ahead(store_dir, role="web")}

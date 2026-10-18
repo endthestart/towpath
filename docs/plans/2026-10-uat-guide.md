@@ -69,7 +69,8 @@ password with full IMAP and SMTP access), then on Mail → Settings tick the kin
 6. **Write down a memory**: a few of your own; they appear on the timeline as remembered.
 7. **Timeline**, **On this day**, **Your story** (print or download as Markdown), **Ask** (try "When did I first go
    to …?").
-8. **People** (`/people/`): a person's mail by year, conversations and events, and the days you messaged them
+8. **Birthdays**: with contacts connected, the Overview lists the next two weeks' birthdays.
+9. **People** (`/people/`): a person's mail by year, conversations and events, and the days you messaged them
    (once the Messages export is added).
    Someone writing from several addresses under the same full name is suggested; *Join* makes them one person
    (and *Separate* undoes it). Towpath never joins addresses by itself.

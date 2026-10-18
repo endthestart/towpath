@@ -7,6 +7,7 @@ shows. The owner starts it, or puts it on a schedule, on the Connections page, a
 """
 
 import json
+import re
 from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
@@ -172,6 +173,41 @@ def names(store_dir, role: str = "worker") -> dict[str, str]:
             for e in json.loads(emails):
                 out.setdefault(e, name)
     return out
+
+
+def birthdays_ahead(store_dir, days: int = 14, today=None, role: str = "web") -> list[dict]:
+    """Contacts' birthdays in the next ``days`` days (today included), soonest first, with the age they turn when the
+    card gives a birth year. A 29 February birthday falls on the 28th in other years."""
+    from datetime import date, timedelta
+
+    if store_dir is None or not store_path(store_dir, "dav").exists():
+        return []
+    today = today or date.today()
+    out, seen = [], set()
+    with closing(open_store(store_dir, "dav", role)) as db:
+        rows = db.execute("SELECT name, emails, birthday FROM contacts WHERE birthday IS NOT NULL AND name IS NOT NULL")
+        for name, emails, birthday in rows:
+            m = re.fullmatch(r"(\d{4})?-*(\d{2})-(\d{2})", birthday)  # "1990-10-20", or "---10-20" with no year
+            if not m:
+                continue
+            year, month, day = m.group(1) or "", int(m.group(2)), int(m.group(3))
+            for y in (today.year, today.year + 1):
+                try:
+                    when = date(y, month, day)
+                except ValueError:
+                    if (month, day) != (2, 29):
+                        break
+                    when = date(y, 2, 28)
+                if today <= when <= today + timedelta(days=days):
+                    born = int(year) if year.isdigit() and 1800 < int(year) <= today.year else None  # 1604: no year
+                    key = (name, when)
+                    if key not in seen:
+                        seen.add(key)
+                        out.append({"name": name, "date": when, "in_days": (when - today).days,
+                                    "turns": when.year - born if born else None,
+                                    "address": (json.loads(emails) or [None])[0]})
+                    break
+    return sorted(out, key=lambda b: (b["date"], b["name"]))
 
 
 def events(store_dir, source_id: str | None = None, before: str | None = None, role: str = "web") -> list[dict]:

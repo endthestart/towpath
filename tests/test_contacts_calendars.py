@@ -222,3 +222,28 @@ def test_the_add_pages_for_fastmail_and_icloud(world, monkeypatch):
         assert "Apple Account email" in page and "app-specific password" in page
         missing = client.post("/connections/add/icloud_dav", {"username": "reader", "password": ""})
         assert missing.status_code == 400 and "Apple Account email" in missing.content.decode()
+
+
+def test_birthdays_in_the_next_two_weeks_with_the_age_they_turn(tmp_path):
+    import json
+    from datetime import date
+
+    from towpath import dav_sync
+    from towpath.stores import open_store
+
+    store = tmp_path / "state"
+    cards = [("Sam Rivera", "1990-10-20", ["sam@example.org"]), ("Pat Example", "---10-17", []),
+             ("Leap Example", "2000-02-29", []), ("Old Card", "1604-10-25", []), ("Far Away", "1980-12-25", []),
+             ("New Year", "1985-01-02", [])]
+    with open_store(store, "dav", "connect") as db:
+        for i, (name, birthday, emails) in enumerate(cards):
+            db.execute("INSERT INTO contacts (source_id, href, etag, uid, name, emails, phones, birthday, org, "
+                       "collection, updated_at) VALUES ('dav', ?, 'e', NULL, ?, ?, '[]', ?, NULL, 'c', 't')",
+                       (f"/c/{i}", name, json.dumps(emails), birthday))
+        db.commit()
+    got = dav_sync.birthdays_ahead(store, today=date(2026, 10, 17))
+    assert [(b["name"], b["in_days"], b["turns"]) for b in got] == [
+        ("Pat Example", 0, None), ("Sam Rivera", 3, 36), ("Old Card", 8, None)]
+    assert got[1]["address"] == "sam@example.org"
+    assert [b["name"] for b in dav_sync.birthdays_ahead(store, today=date(2027, 2, 20))] == ["Leap Example"]
+    assert [b["name"] for b in dav_sync.birthdays_ahead(store, today=date(2026, 12, 28))] == ["New Year"]
