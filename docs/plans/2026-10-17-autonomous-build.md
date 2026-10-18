@@ -54,11 +54,23 @@ The owner chose to keep building until UAT. From the [roadmap](../roadmap.md)'s 
 Then, from the roadmap's life-story and sources milestones:
 
 5. **Trips from photos**: runs of days with many photos (in folders allowed for the life story) gathered into one
-   proposed trip memory, instead of one event per day.
+   proposed trip memory, instead of one event per day. Built (`96cc6f5`).
 6. **Bookings as evidence**: purchases that are flights, hotels or tickets (read from receipts) proposed as dated
-   life events, citing the receipt, once the account is allowed for the life story.
+   life events, citing the receipt, once the account is allowed for the life story. Built (`379d6da`).
 7. **Messages in Search all and People**: the Apple Messages export searchable from Search all, and a person's
-   conversations shown on their People page.
+   conversations shown on their People page. Built (`a53f6c8`).
+
+Then, from the roadmap's later milestone and the owner's search ideas:
+
+8. **Restore from an export package**: load the owner's own decisions (reviews, recollections, memories kept or
+   renamed, rules, sender categories, settings) from an export archive into a fresh Towpath, shown first as a dry
+   run of what would be added, never overwriting a newer decision (roadmap milestone 8, "portable export and
+   restore").
+9. **Save a photo search as a collection**: the Photos page's filters, or a plain-English search, saved as a
+   collection that keeps the search and lists what it finds (owner idea: natural-language search "can be saved as
+   a collection"); hidden and private photos stay out as everywhere else.
+10. **Year in review**: a printable page per year with its events, trips, people written to most, and purchases,
+    from allowed sources only, using what the life pages already hold (no new model calls).
 
 ## Open questions
 

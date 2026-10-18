@@ -55,20 +55,23 @@ password with full IMAP and SMTP access), then on Mail → Settings tick the kin
    its 101 events for you to keep or reject.
 3. **Pairs to settle** (Life → *pairs to settle*, when there are any): events worded alike on about the same day,
    or a few months apart; keep the right one or say both are right.
-4. **Memories**: keep, rename or dismiss what Towpath gathered (people, decades, trips and occasions).
+4. **Memories**: keep, rename or dismiss what Towpath gathered (people, decades, trips and occasions). Runs of
+   photo days now come as one trip; flights, stays and tickets bought by mail come as events citing the receipt.
 5. **Export**: Your story → *Download everything Towpath knows*: a zip of plain JSON and Markdown (events,
    memories, people, rules, sender categories, purchases, decisions; no mail text or passwords).
 6. **Write down a memory**: a few of your own; they appear on the timeline as remembered.
 7. **Timeline**, **On this day**, **Your story** (print or download as Markdown), **Ask** (try "When did I first go
    to …?").
-8. **People** (`/people/`): a person's mail by year, conversations and events.
+8. **People** (`/people/`): a person's mail by year, conversations and events, and the days you messaged them
+   (once the Messages export is added).
 
 ## 4. Photos and files
 
 - **Photos** (`/photos/`): cameras and years from 40,000+ photos read; try "photos from my Fuji in 2019" in the
   plain-English box. Small previews appear as they're made (each photo's own camera thumbnail; none for the private
   export or photos hidden in Apple Photos; turn them off on the page). Few of your photos record a location.
-- **Search all**: `in:"root/folder"`, `size:>100MB`, `modified:2019`; or ask in plain English.
+- **Search all**: `in:"root/folder"`, `size:>100MB`, `modified:2019`; or ask in plain English. Words in your
+  Messages and Facebook conversations are found too, once those exports are added.
 - **Space**: duplicate groups now say whether copies are identical by content.
 
 ## 5. Waiting on you (not yet connected)
