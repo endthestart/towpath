@@ -75,6 +75,17 @@ Then, from the roadmap's later milestone and the owner's search ideas:
     folders alone: no model and nothing inside a file is read (stricter than first planned), never identity papers
     or the private export.
 
+Then, from the life-story and later milestones:
+
+11. **Family edition**: the owner marks events and memories *shareable* on the Life pages; *Download the family
+    edition* gives the story with only shareable, accepted events and kept memories, without sources, addresses
+    or excerpts (roadmap milestone 8, "curated family edition, audience enforced").
+12. **Keep the evidence**: optional, off by default. For events the owner accepts, a copy of the cited message
+    is kept in Towpath's data folder, so the event keeps its evidence if the mail is deleted (roadmap milestone 6,
+    "optional preservation"). Mail itself is never changed.
+13. **One person, many addresses**: People merges a person seen under several addresses and names (mail,
+    contacts, Messages) into one page, with the owner able to join or separate them.
+
 ## Open questions
 
 1. ~~**Attachment filing**~~ — answered October 17: a folder in Towpath's data folder, by year and sender,
