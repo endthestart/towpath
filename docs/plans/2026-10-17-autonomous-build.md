@@ -69,8 +69,9 @@ Then, from the roadmap's later milestone and the owner's search ideas:
 9. **Save a photo search as a collection**: the Photos page's filters, or a plain-English search, saved as a
    collection that keeps the search and lists what it finds (owner idea: natural-language search "can be saved as
    a collection"); hidden and private photos stay out as everywhere else.
-10. **Year in review**: a printable page per year with its events, trips, people written to most, and purchases,
-    from allowed sources only, using what the life pages already hold (no new model calls).
+10. **Documents as life evidence**: dated documents in folders allowed for the life story (diplomas, leases,
+    contracts, certificates; found by name and type, and by their text through Recoll) proposed as events that
+    cite the file, read by the local model only (roadmap milestone 7, "document system as evidence").
 
 ## Open questions
 
