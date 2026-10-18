@@ -18,6 +18,24 @@ October 18):
    rewritten from Inbox Zero (below, under *Rules from Inbox Zero*). Inbox Zero is retired only when you prefer
    Towpath's lists.
 
+### Rules from Inbox Zero
+
+Inbox Zero on Hub has its ten built-in rules, all automatic. Six are rewritten as Towpath rules: on the Gmail
+account's **Rules** page choose *Rules from Inbox Zero → Add them, switched off*, then preview each and switch on the
+ones you want:
+
+| Inbox Zero rule | Towpath rule |
+| --- | --- |
+| Marketing: label, archive | Marketing mail in the inbox: label *Marketing*, archive |
+| Cold Email: label, archive | Cold email in the inbox: label *Cold-Email* (labels can't hold spaces), archive |
+| Receipt, Newsletter, Calendar, Notification: label | The same category in the inbox: the same label |
+
+Inbox Zero's other four (To Reply with a drafted reply, Awaiting Reply, FYI, Actioned) are Towpath's conversations:
+*To reply* (with a draft you save yourself), *Awaiting reply*, *FYI* and *Done*; turn on reply labels in the
+account's Settings to see them as Gmail labels. The 21 senders Inbox Zero had learned are listed privately
+(`towpath-private/inbox-zero/learned-senders-2026-10-18.md`), to mark on the Senders page if Towpath files any
+differently. Confirm or change these rules during the side-by-side week.
+
 ## 1. Start here (10 minutes)
 
 1. **Overview** (`/`): the Today cards: conversations waiting for your reply, life events and memories to review,

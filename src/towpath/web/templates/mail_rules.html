@@ -7,6 +7,9 @@
 {% if saved %}<div class="notice" role="status">Saved.</div>{% endif %}
 <section class="detail-card"><form method="post" action="/mail/{{ account.source_id }}/rules/describe" class="search">{% csrf_token %}<label for="description" class="sr-only">Describe a rule</label><input id="description" name="description" maxlength="400" placeholder="Describe a rule: label receipts and archive them once read"><button class="button" type="submit">Draft it</button></form>
 <div class="form-actions"><a class="button" href="/mail/{{ account.source_id }}/rules/new">New rule</a></div></section>
+<section class="detail-card"><h2 class="card-title">Rules from Inbox Zero</h2>
+<p>Inbox Zero's six category rules, rewritten for Towpath: label marketing and cold email and archive them; label receipts, newsletters, calendar mail and notifications. They're added <strong>switched off</strong>: preview each, then switch on the ones you want. (Inbox Zero's To Reply, Awaiting Reply, FYI and Actioned are Towpath's conversations; turn on reply labels in Settings to see them as labels.)</p>
+<form method="post" action="/mail/{{ account.source_id }}/rules/inbox-zero" class="form-actions">{% csrf_token %}<button class="button secondary" type="submit">Add them, switched off</button></form></section>
 <section class="detail-card"><h2 class="card-title">Start from a template</h2>
 {% for t in templates %}<p><a href="/mail/{{ account.source_id }}/rules/new?template={{ t.key }}"><strong>{{ t.name }}</strong></a>{% if t.inbox %} <span class="muted">· would look at {{ t.inbox }} message{{ t.inbox|pluralize }} in your inbox now, {{ t.unread }} unread</span>{% endif %}</p>{% endfor %}
 <p class="footnote">A template opens in the rule form: preview it on your mail before you save it.</p></section>

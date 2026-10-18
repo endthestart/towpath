@@ -316,3 +316,24 @@ def test_a_sender_called_a_person_gets_the_rules_state_back_without_a_model(worl
     deal = next(t for s in threads.STATES for t in threads.listing(world.store, world.sid, s)
                 if t["subject"] == "For you")
     assert deal["state"] == "needs_owner_reply" and deal["state_by"] == "rule"
+
+
+def test_the_rules_rewritten_from_inbox_zero_are_added_switched_off_once(world, monkeypatch):
+    from django.test import Client, override_settings
+
+    from towpath.web import auth
+    from towpath.web.application import configure
+
+    monkeypatch.setattr(auth, "_setup_codes", {})
+    configure(world.store)
+    auth.create_account(world.store, "owner", "correct horse battery staple")
+    with override_settings(TOWPATH_STORE_DIR=world.store, TOWPATH_CONFIG=world.config, ALLOWED_HOSTS=["testserver"]):
+        client = Client()
+        client.post("/login", {"username": "owner", "password": "correct horse battery staple"})
+        assert "Rules from Inbox Zero" in client.get(f"/mail/{world.sid}/rules").content.decode()
+        client.post(f"/mail/{world.sid}/rules/inbox-zero")
+        client.post(f"/mail/{world.sid}/rules/inbox-zero")  # twice: nothing added the second time
+    added = rules.all_rules(world.store, world.sid)
+    assert len(added) == 6 and all(r["enabled"] == 0 and r["mode"] == "propose" for r in added)
+    marketing = next(r for r in added if r["body"]["name"].startswith("Marketing"))
+    assert [a["type"] for a in marketing["body"]["actions"]] == ["add_keyword", "archive"]

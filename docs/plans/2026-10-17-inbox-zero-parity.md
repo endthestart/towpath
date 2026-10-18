@@ -24,9 +24,9 @@ at that point. Dropped by the owner on October 16: meeting briefs and calendar, 
 | Attachment filing to a drive | Documents filed into Towpath's data folder by year and sender (owner's choice), a dry run first | Built |
 | Gmail | Gmail over IMAP with threads and labels, archive to All Mail | Built against the synthetic server; needs a Gmail app password to run beside Inbox Zero |
 
-**Moving rules across:** Towpath has a read-only Inbox Zero client (`towpath provider rules`) that is not configured
-on Hub. With an API key scoped to reading rules, its rules could be imported as Towpath rules in words, turned off
-for review; not built, since the API's rule format hasn't been exercised.
+**Moving rules across:** done by hand (the owner's answer of 2026-10-18). Inbox Zero held only its ten built-in rules;
+six are Towpath rules the owner adds switched off from the Rules page (*Rules from Inbox Zero*), four are Towpath's
+conversation states.
 
 **Retirement test:** with Gmail connected over IMAP, run both side by side for a week and compare *To reply*,
 categories and unsubscribe candidates; retire Inbox Zero once the owner prefers Towpath's lists and Gmail write

@@ -145,6 +145,14 @@ def rule_list(request, sid):
         "templates": templates, "saved": request.GET.get("saved")})
 
 
+@require_POST
+def rule_inbox_zero(request, sid):
+    """Add the rules rewritten from Inbox Zero, switched off."""
+    account = _managed(sid)
+    added = rules.add_inbox_zero(_store(), account["source_id"])
+    return redirect(f"/mail/{account['source_id']}/rules?saved=inbox-zero-{added}")
+
+
 def _form_body(post) -> dict:
     acts = []
     for i in range(3):

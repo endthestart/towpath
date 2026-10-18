@@ -51,6 +51,32 @@ TEMPLATES = {
                       "actions": [{"type": "mark_read", "params": {}}]},
 }
 
+# Inbox Zero's rules on Hub (read 2026-10-18), rewritten by hand as the owner asked: its six category rules, with the
+# same labels and archiving. Its other four (To Reply, Awaiting Reply, FYI, Actioned) are Towpath's conversation
+# states, shown as labels when the account's reply labels are on; its drafted replies are Towpath's drafts.
+INBOX_ZERO = [
+    {"name": f"{label} (from Inbox Zero)", "conditions": {"categories": [category], "mailbox": "INBOX"},
+     "actions": [{"type": "add_keyword", "params": {"keyword": label}}] +
+                ([{"type": "archive", "params": {}}] if archive else [])}
+    for label, category, archive in (("Marketing", "marketing", True), ("Cold-Email", "cold_email", True),
+                                     ("Receipt", "receipt", False), ("Newsletter", "newsletter", False),
+                                     ("Calendar", "calendar", False), ("Notification", "notification", False))]
+
+
+def add_inbox_zero(store_dir, source_id: str, author: str = "owner") -> int:
+    """Add the rules rewritten from Inbox Zero to an account, switched off for the owner to review. Rules already
+    there (the same conditions and actions) aren't added twice. Returns how many were added."""
+    have = [r["body"] for r in all_rules(store_dir, source_id, "web")]
+    added = 0
+    for body in INBOX_ZERO:
+        clean = validate(body)
+        if clean not in have:
+            save(store_dir, source_id, clean, enabled=False, mode="propose", author=author)
+            have.append(clean)
+            added += 1
+    return added
+
+
 MATCH_SCHEMA_BASE = {"type": "object", "additionalProperties": False, "required": ["rule", "reason"],
                      "properties": {"reason": {"type": "string", "maxLength": 160}}}
 

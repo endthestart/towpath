@@ -123,7 +123,9 @@ rules, the side-by-side Gmail test before retiring Inbox Zero, Outlook.com, and 
    any photo; never for the private export or photos hidden in Apple Photos (by the library's own hidden flag).
    Built with a test for each rule.
 5. ~~**Importing Inbox Zero's rules**~~ — answered 2026-10-18: rewrite by hand, as Towpath rules switched off, listed
-   in the UAT guide for the owner to confirm. Was: Towpath has a read-only client for Inbox Zero's API, but its rule format has
+   in the UAT guide for the owner to confirm. Done: Inbox Zero's rules read from its database on Hub (read-only,
+   approved by the owner); six become Towpath rules added switched off from the Rules page, four are Towpath's
+   conversation states. Was: Towpath has a read-only client for Inbox Zero's API, but its rule format has
    never been tried against a real instance. Options: (a) the owner makes an Inbox Zero API key that can only read
    rules and stores it in Towpath's credentials folder (Towpath never shows it), and Towpath imports the rules
    turned off, for review; (b) skip importing and write the few rules that matter in Towpath by hand.

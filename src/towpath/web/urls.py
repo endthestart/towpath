@@ -85,6 +85,7 @@ urlpatterns = [
     path("mail/<str:sid>/archives", mail_clean_views.archives_page, name="mail-archives"),
     path("mail/<str:sid>/rules", mail_rules_views.rule_list, name="mail-rules"),
     path("mail/<str:sid>/rules/new", mail_rules_views.rule_edit, name="mail-rule-new"),
+    path("mail/<str:sid>/rules/inbox-zero", mail_rules_views.rule_inbox_zero, name="mail-rules-inbox-zero"),
     path("mail/<str:sid>/attachments", mail_clean_views.attachments_page, name="mail-attachments"),
     path("mail/<str:sid>/attachments/filing", mail_clean_views.filing_mode, name="mail-filing"),
     path("mail/<str:sid>/purchases", mail_clean_views.purchases_page, name="mail-purchases"),
