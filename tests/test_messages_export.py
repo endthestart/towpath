@@ -119,3 +119,20 @@ def test_the_add_page(export, monkeypatch):
         assert "imessage-exporter -f txt" in client.get("/connections/add/imessage").content.decode()
         added = client.post("/connections/add/imessage", {"path": "messages-export"})
         assert added.status_code == 302
+
+
+def test_message_text_is_searchable_from_search_all(export):
+    from towpath import export_text
+    from towpath.unified.contracts import Filters
+    from towpath.unified.sources import MailAdapter
+
+    config, creds, root, _, _ = export
+    sid = connections.add_messages(config.store_dir, root)
+    connections.start_indexing(config.store_dir, creds, sid)
+    connections.index_pending(config, creds)
+    worker = connections.merged(config, creds)
+    assert export_text.index_pending(worker)[0]["added"] == 3
+    adapter = MailAdapter(worker, worker.sources[sid])
+    found = adapter.search(Filters.parse("congratulations"), None, 20).results
+    assert [r.title for r in found] == ["Messages with Sam Rivera"]
+    assert export_text.index_pending(worker) == []  # each item once

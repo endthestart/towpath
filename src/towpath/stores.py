@@ -333,6 +333,17 @@ WHEN old.subject IS NOT new.subject OR old.from_name IS NOT new.from_name OR old
   INSERT INTO messages_text (rowid, subject, from_name, from_addr, text)
   VALUES (new.rowid, new.subject, new.from_name, new.from_addr, new.text);
 END;
+-- The text of conversations from exports (Apple Messages, Facebook), for Search all; written by the connector,
+-- which alone can read the exports.
+CREATE TABLE IF NOT EXISTS export_text (
+  item_id TEXT PRIMARY KEY, source_id TEXT NOT NULL, text TEXT NOT NULL, at TEXT NOT NULL);
+CREATE VIRTUAL TABLE IF NOT EXISTS export_text_index USING fts5(text, content='export_text', content_rowid='rowid');
+CREATE TRIGGER IF NOT EXISTS export_text_insert AFTER INSERT ON export_text BEGIN
+  INSERT INTO export_text_index (rowid, text) VALUES (new.rowid, new.text);
+END;
+CREATE TRIGGER IF NOT EXISTS export_text_delete AFTER DELETE ON export_text BEGIN
+  INSERT INTO export_text_index (export_text_index, rowid, text) VALUES ('delete', old.rowid, old.text);
+END;
 -- Attachments filed into Towpath's data folder (documents only): planned while filing is a dry run, then filed,
 -- each copy read back and checked against the hash of what the server sent.
 CREATE TABLE IF NOT EXISTS filed (

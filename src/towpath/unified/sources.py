@@ -175,6 +175,10 @@ class MailAdapter(SourceAdapter):
 
         if not words:
             return []
+        if getattr(self.source, "adapter", None) in ("facebook", "imessage"):  # conversation text from an export
+            from towpath import export_text
+
+            return export_text.search(self.config.store_dir, self.source_id, words, MAX_TEXT_IDS, READ_ROLE)
         try:
             found = mail_search.search(self.config.store_dir, self.source_id, " ".join(words), limit=MAX_TEXT_IDS,
                                        role=READ_ROLE)

@@ -85,7 +85,9 @@ def run_once(config, credentials_dir=None):
         from towpath import life_photos
 
         indexing += life_photos.propose(config)
-        from towpath import life_bookings
+        from towpath import export_text, life_bookings
+
+        indexing += export_text.index_pending(config)
 
         indexing += life_bookings.propose(config)
         from towpath import life_groups

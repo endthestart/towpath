@@ -74,10 +74,23 @@ def person(store_dir, address: str, role: str = "web") -> dict:
                     f"SELECT source_id, native_id FROM items WHERE item_id IN ({','.join('?' for _ in chunk)})", chunk)}
     events = [c for c in life.claims(store_dir, limit=10**6, role=role)
               if c.state != "rejected" and any(cit.ref in native for cit in c.citations)]
+    chats = []  # days of messages (Apple Messages, Facebook) with someone of this name, from their exports
+    name = names.get(address)
+    if not name and store_path(store_dir, "mail").exists():  # the name they write under
+        with closing(open_store(store_dir, "mail", role)) as db:
+            row = db.execute("SELECT from_name FROM messages WHERE from_addr = ? AND coalesce(from_name, '') != '' "
+                             "LIMIT 1", (address,)).fetchone()
+        name = row[0] if row else None
+    if name and store_path(store_dir, "source").exists():
+        with closing(open_store(store_dir, "source", role)) as src:
+            chats = [dict(r) for r in src.execute(
+                "SELECT i.source_id, i.native_id, i.subject, i.date_utc FROM items i JOIN sources s USING (source_id) "
+                "WHERE s.adapter IN ('imessage', 'facebook') AND lower(i.from_addr) = lower(?) AND "
+                "i.absent_since_run IS NULL ORDER BY i.date_utc DESC LIMIT 20", (name,))]
     years = sorted(set(by_year) | set(sent_by_year), reverse=True)
     dated = [y for y in years if y]
     return {"address": address, "name": names.get(address), "years": [
         {"year": y, "received": by_year.get(y, 0), "sent": sent_by_year.get(y, 0)} for y in dated],
-            "conversations": conversations, "events": events, "accounts": _managed(store_dir),
+            "conversations": conversations, "events": events, "accounts": _managed(store_dir), "chats": chats,
             "received": sum(by_year.values()), "sent": sum(sent_by_year.values()),
             "span": (min(dated), max(dated)) if dated else None}

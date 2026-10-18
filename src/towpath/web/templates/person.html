@@ -10,6 +10,8 @@
 <table class="space-table"><thead><tr><th>Year</th><th>From them</th><th>From you</th><th></th></tr></thead><tbody>
 {% for y in p.years %}<tr><td><a href="/life/year/{{ y.year }}">{{ y.year }}</a></td><td>{{ y.received }}</td><td>{{ y.sent }}</td><td><meter min="0" max="100" value="{{ y.width }}"></meter></td></tr>{% empty %}<tr><td colspan="4">No mail with them yet.</td></tr>{% endfor %}</tbody></table></section>
 {% if events %}<section class="detail-card"><h2 class="card-title">Life events with them</h2>{% for e in events %}<p>{{ e.statement }} <span class="muted">· {{ e.when }}{% if e.state != 'proposed' %} · {{ e.state }}{% endif %}</span>{% if e.url %} <a href="{{ e.url }}">evidence</a>{% endif %}</p>{% endfor %}</section>{% endif %}
+{% if p.chats %}<section class="detail-card"><h2 class="card-title">Messages</h2>
+{% for c in p.chats %}<p><a href="/ref/?r={{ c.source_id|urlencode }}%3A{{ c.native_id|urlencode }}">{{ c.date_utc|slice:":10" }}</a> <span class="muted">· {{ c.subject }}</span></p>{% endfor %}</section>{% endif %}
 <section class="detail-card"><h2 class="card-title">Latest conversations</h2>
 {% for c in p.conversations %}<p><a href="/mail/m/{{ c.item_id }}/">{{ c.subject|default:'(No subject)' }}</a> <span class="muted">· {{ c.date|slice:":10" }}</span></p>{% empty %}<p>None.</p>{% endfor %}</section>
 {% endblock %}

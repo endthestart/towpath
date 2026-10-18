@@ -368,3 +368,17 @@ def test_events_that_may_disagree_are_paired_for_the_owner_to_settle(world, monk
         assert "Nothing to settle" in client.get("/life/pairs").content.decode()
     states = {c.claim_id: c.state for c in life.claims(world.store)}
     assert states[flew["b"].claim_id] == "rejected" and states[flew["a"].claim_id] == "accepted"
+
+
+def test_a_persons_page_lists_their_message_days_from_an_export(world, tmp_path, monkeypatch):
+    from towpath import connections, people
+
+    library = tmp_path / "library"
+    (library / "messages").mkdir(parents=True)
+    (library / "messages" / "Sam.txt").write_text("Oct 01, 2026  9:00:00 AM\nSam\nLunch Friday?\n")
+    monkeypatch.setenv("TOWPATH_LIBRARY", str(library))
+    sid = connections.add_messages(world.store, library / "messages")
+    connections.start_indexing(world.store, world.credentials, sid)
+    connections.index_pending(world.config, world.credentials)
+    chats = people.person(world.store, "sam@example.org")["chats"]  # Sam writes mail as "Sam"
+    assert [c["subject"] for c in chats] == ["Messages with Sam"]
