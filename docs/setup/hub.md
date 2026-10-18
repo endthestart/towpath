@@ -6,14 +6,14 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `25e24b6` (restoring the owner's decisions from an export, photo searches saved as collections, and dated
-documents in allowed folders as life events; on top of `a53f6c8`'s trips, bookings and Messages search), publishing
-run [39083979457](https://github.com/endthestart/towpath/actions/runs/39083979457). New stores and tables only; the
-web service and connector add their own tables at start. On Hub, Fastmail is allowed for the life story and finding
-events by itself is on (the owner's answers of October 17).
+Revision `bdda51d` (a family edition of the story, optionally keeping the evidence for kept events, and joining a
+person's addresses; on top of `25e24b6`'s restore, saved photo searches and document events), publishing run
+[39085729660](https://github.com/endthestart/towpath/actions/runs/39085729660). New stores and tables only; the web
+service and connector add their own tables at start. Keeping the evidence is off. On Hub, Fastmail is allowed for
+the life story and finding events by itself is on (the owner's answers of October 17).
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:6d6d30b87181b6dc8f8485f4e86f58df8bd44a49529cb242a106275203950d8d`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:e116b8e7cc3df55d2d7b9727d0529b6ccecd2de6b6249cb3b22dcef82d4b8a2c`
+- `web`: `ghcr.io/endthestart/towpath@sha256:d67f63efe3fe28907b1d7cd972a1a5fb36b504cb5faee7b5319557838748b6c4`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:44bfa8c58ccca2cbb323b3f0d0fd80e4429605cb53afddcd44df1938d3ede583`
 
 Towpath's data folder (stores, sign-ins and the Recoll index) lives on a mirrored SSD pool since 2026-10-08,
 with hourly snapshots replicated to the main pool: Recoll's index writes had saturated the spinning disks. The
@@ -28,6 +28,7 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `25e24b6` | Restore from an export, photo searches as collections, dated documents as life events | `towpath@sha256:6d6d30b8…`, `towpath-recoll@sha256:e116b8e7…` |
 | `a53f6c8` | Trips from photo days, bookings from receipts, Messages in Search all and on People pages | `towpath@sha256:f9322377…`, `towpath-recoll@sha256:61bbdafc…` |
 | `6c07ed8` | Overview mail totals and Photos counts kept for a few minutes | `towpath@sha256:c15bb67b…`, `towpath-recoll@sha256:4bb01445…` |
 | `ffae7c4` | Photo previews, never for the private export or photos hidden in Apple Photos; stored mail first for life events | `towpath@sha256:9aa88615…`, `towpath-recoll@sha256:9623d91e…` |

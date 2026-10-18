@@ -249,3 +249,5 @@ Then, from the life-story and later milestones:
   on People pages); all 34 pages answered on Hub. Items 8–10 built and under review before release.
 - 2026-10-17: `25e24b6` deployed (items 8–10, after a review whose twelve findings were fixed first); all 34 pages
   answered on Hub. Items 11–13 built; a second review's twelve findings fixed before their release.
+- 2026-10-17: `bdda51d` deployed (items 11–13: family edition, keeping the evidence (off), joining a person's
+  addresses); all 34 pages answered on Hub.
