@@ -3,8 +3,9 @@
 from urllib.parse import urlencode
 
 from django.conf import settings
-from django.shortcuts import render
-from django.views.decorators.http import require_GET
+from django.http import HttpResponseBadRequest
+from django.shortcuts import redirect, render
+from django.views.decorators.http import require_GET, require_POST
 
 from towpath import life_groups, people
 
@@ -21,7 +22,11 @@ def everyone(request):
 
 @require_GET
 def one(request, address):
+    main = people.primary(settings.TOWPATH_STORE_DIR, address)
+    if main != address.lower():  # a joined address: its person's page
+        return redirect(f"/people/{main}/")
     found = people.person(settings.TOWPATH_STORE_DIR, address)
+    found["suggested"] = people.suggestions(settings.TOWPATH_STORE_DIR, address)
     peak = max((y["received"] + y["sent"] for y in found["years"]), default=0)
     for y in found["years"]:
         y["width"] = round((y["received"] + y["sent"]) / peak * 100) if peak else 0
@@ -33,4 +38,18 @@ def one(request, address):
     memories = [g for g in life_groups.groups(settings.TOWPATH_STORE_DIR)
                 if g["kind"] == "person" and address.lower() in g["title"].lower() or
                 g["kind"] == "person" and found["name"] and found["name"] in g["title"]]
-    return render(request, "person.html", {"nav": "people", "p": found, "events": events, "memories": memories})
+    return render(request, "person.html", {"nav": "people", "p": found, "events": events, "memories": memories,
+                                           "saved": request.GET.get("saved")})
+
+
+@require_POST
+def join(request, address):
+    """Join another address to this person, or separate one again (the owner's decision)."""
+    try:
+        if request.POST.get("separate"):
+            people.separate(settings.TOWPATH_STORE_DIR, request.POST["separate"])
+        else:
+            people.join(settings.TOWPATH_STORE_DIR, address, request.POST.get("other", ""))
+    except ValueError as exc:
+        return HttpResponseBadRequest(str(exc))
+    return redirect(f"/people/{people.primary(settings.TOWPATH_STORE_DIR, address)}/?saved=1")

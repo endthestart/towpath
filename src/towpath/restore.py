@@ -116,6 +116,9 @@ def restorable_setting(target: str, key: str, value: str) -> bool:
         return _profile(_loads(value))
     if target == life_conflicts.TARGET:
         return _loads(value) == "both-right"
+    if target.startswith("address:"):  # the owner joined this address to a person
+        found = _loads(value)
+        return key == "person" and isinstance(found, str) and "@" in found and "@" in target
     if target.startswith("space:"):
         return key == space.KEEP_KEY and value == space.KEEP_VALUE
     if key in item_settings.SETTINGS:

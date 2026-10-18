@@ -71,6 +71,8 @@ password with full IMAP and SMTP access), then on Mail → Settings tick the kin
    to …?").
 8. **People** (`/people/`): a person's mail by year, conversations and events, and the days you messaged them
    (once the Messages export is added).
+   Someone writing from several addresses under the same full name is suggested; *Join* makes them one person
+   (and *Separate* undoes it). Towpath never joins addresses by itself.
 
 ## 4. Photos and files
 

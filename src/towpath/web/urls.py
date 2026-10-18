@@ -22,6 +22,7 @@ urlpatterns = [
     path("space/status", space_views.status, name="space-status"),
     path("people/", people_views.everyone, name="people"),
     path("people/<str:address>/", people_views.one, name="person"),
+    path("people/<str:address>/join", people_views.join, name="person-join"),
     path("photos/", photo_views.page, name="photos"),
     path("photos/ask", photo_views.ask, name="photos-ask"),
     path("photos/preview/<str:occurrence_id>", photo_views.preview, name="photo-preview"),

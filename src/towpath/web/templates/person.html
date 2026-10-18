@@ -5,6 +5,11 @@
 <header class="page-head compact"><h1>{{ p.name|default:p.address }}</h1>
 <p class="lead">{% if p.name %}{{ p.address }} · {% endif %}{{ p.received }} from them, {{ p.sent }} from you{% if p.span %}, {% if p.span.0 == p.span.1 %}in {{ p.span.0 }}{% else %}{{ p.span.0 }}–{{ p.span.1 }}{% endif %}{% endif %}.</p>
 <p>{% for sid in p.accounts %}<a href="/mail/{{ sid }}/search?q=from%3A{{ p.address|urlencode }}">Their mail</a> · <a href="/mail/{{ sid }}/attachments?sender={{ p.address|urlencode }}">Files they sent</a>{% if not forloop.last %} · {% endif %}{% endfor %}</p></header>
+{% if saved %}<div class="notice" role="status">Saved.</div>{% endif %}
+{% if p.also or p.suggested %}<section class="detail-card"><h2 class="card-title">Their addresses</h2>
+{% for a in p.also %}<form method="post" action="/people/{{ p.address|urlencode }}/join" class="inline-form">{% csrf_token %}<input type="hidden" name="separate" value="{{ a }}"><span>{{ a }} <span class="muted">· joined by you</span></span><button class="link-button text" type="submit">Separate</button></form>{% endfor %}
+{% for s in p.suggested %}<form method="post" action="/people/{{ p.address|urlencode }}/join" class="inline-form">{% csrf_token %}<input type="hidden" name="other" value="{{ s.address }}"><span>{{ s.address }} <span class="muted">· {{ s.why }}; the same person?</span></span><button class="button secondary" type="submit">Join</button></form>{% endfor %}
+<p class="footnote">Towpath never joins addresses by itself. Joined addresses count as one person here and on the People list; separate one to undo.</p></section>{% endif %}
 {% if memories %}<section class="detail-card"><h2 class="card-title">Memories</h2>{% for g in memories %}<p><a href="/life/memories/{{ g.group_id }}/">{{ g.title }}</a> <span class="muted">· {{ g.members|length }} events · {{ g.state }}</span></p>{% endfor %}</section>{% endif %}
 <section class="detail-card"><h2 class="card-title">Mail over the years</h2>
 <table class="space-table"><thead><tr><th>Year</th><th>From them</th><th>From you</th><th></th></tr></thead><tbody>

@@ -446,3 +446,39 @@ def test_keeping_the_evidence_copies_kept_events_messages_and_follows_the_owners
     assert life_evidence.keep_pending(world.worker())[0]["step"] == "life-evidence-deleted"
     assert not list(life_evidence.folder(world.store).glob("*.txt"))
     assert life_story.story(world.store)["notes"]
+
+
+def test_the_owner_joins_a_persons_addresses_and_towpath_only_suggests(world, monkeypatch):
+    from test_mail_threads import ME, mail
+
+    from towpath import connect, people
+    from towpath.mail import analysis
+
+    inbox = world.state.mailboxes["INBOX"].messages
+    inbox[40] = mail(40, "Sam Rivera <sam@example.org>", ME, "Lunch", "Lunch Friday?", 1)
+    inbox[41] = mail(41, "Sam Rivera <sam@example.org>", ME, "Photos", "Here are the photos.", 1)
+    inbox[42] = mail(42, "Sam Rivera <sam.rivera@work.example>", ME, "From work", "My work address.", 1)
+    connect.sync(world.worker(), world.sid)
+    analysis.analyze_pending(world.worker())
+    for address in ("sam@example.org", "sam.rivera@work.example"):
+        senders.mark(world.store, world.sid, address, "person")
+    senders.categorize_pending(world.worker())
+    assert [s["address"] for s in people.suggestions(world.store, "sam@example.org")] == ["sam.rivera@work.example"]
+    before = {p["address"] for p in people.everyone(world.store)}
+    assert {"sam@example.org", "sam.rivera@work.example"} <= before  # nothing joined by Towpath itself
+    monkeypatch.setattr(auth, "_setup_codes", {})
+    configure(world.store)
+    auth.create_account(world.store, "owner", OWNER)
+    with override_settings(TOWPATH_STORE_DIR=world.store, TOWPATH_CONFIG=world.config, ALLOWED_HOSTS=["testserver"]):
+        client = Client()
+        client.post("/login", {"username": "owner", "password": OWNER})
+        assert "the same person?" in client.get("/people/sam@example.org/").content.decode()
+        client.post("/people/sam@example.org/join", {"other": "sam.rivera@work.example"})
+        assert client.get("/people/sam.rivera@work.example/")["Location"] == "/people/sam@example.org/"
+        page = client.get("/people/sam@example.org/").content.decode()
+        assert "joined by you" in page and "From work" in page and "Lunch" in page
+        assert client.post("/people/sam@example.org/join", {"other": "not an address"}).status_code == 400
+    rows = [p for p in people.everyone(world.store) if "sam" in p["address"]]
+    assert [p["address"] for p in rows] == ["sam@example.org"] and rows[0]["also"] == ["sam.rivera@work.example"]
+    people.separate(world.store, "sam.rivera@work.example")
+    assert people.addresses(world.store, "sam@example.org") == ["sam@example.org"]

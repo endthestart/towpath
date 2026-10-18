@@ -241,3 +241,13 @@ def test_what_the_owner_shared_for_the_family_edition_comes_back(world):
     fresh(world)
     restore.apply(world.store, data)
     assert life_story.shared(world.store) == {f"claim:{first}"}
+
+
+def test_joined_addresses_come_back(world):
+    from towpath import people
+
+    people.join(world.store, "sam@example.org", "sam.rivera@work.example")
+    _, data = export.build(world.store)
+    fresh(world)
+    restore.apply(world.store, data)
+    assert people.addresses(world.store, "sam@example.org") == ["sam@example.org", "sam.rivera@work.example"]

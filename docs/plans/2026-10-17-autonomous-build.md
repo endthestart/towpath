@@ -85,7 +85,8 @@ Then, from the life-story and later milestones:
     is kept in Towpath's data folder, so the event keeps its evidence if the mail is deleted (roadmap milestone 6,
     "optional preservation"). Mail itself is never changed. Built: Life → *Keep the evidence*.
 13. **One person, many addresses**: People merges a person seen under several addresses and names (mail,
-    contacts, Messages) into one page, with the owner able to join or separate them.
+    contacts, Messages) into one page, with the owner able to join or separate them. Built: suggested by the same
+    full name, joined only by the owner.
 
 ## Open questions
 

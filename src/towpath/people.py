@@ -1,8 +1,9 @@
 """People: everyone the owner corresponds with, from mail management's senders and the owner's contacts.
 
 A person is an email address mail management counts as a person (the owner wrote to them, they are in the owner's
-contacts, the owner marked them, or the model judged so). Addresses are never merged into one person by Towpath; a
-contact's several addresses are shown together because the contact card groups them.
+contacts, the owner marked them, or the model judged so). Towpath never merges addresses by itself: it suggests
+addresses that write under the same name, and the owner joins them into one person (or separates them again).
+The joins are the owner's decisions (decisions store); a joined address's page is its person's page.
 """
 
 import json
@@ -13,6 +14,102 @@ from towpath import dav_sync, life
 from towpath.mail import FEATURE, senders, threads
 from towpath.stores import open_store, store_path
 from towpath.unified import grants
+
+
+JOIN_KEY = "person"
+
+
+def _target(address: str) -> str:
+    return f"address:{address}"
+
+
+def _valid(address: str) -> str:
+    address = (address or "").strip().lower()
+    if "@" not in address or len(address) > 320 or any(c.isspace() for c in address):
+        raise ValueError("a person is joined by email address")
+    return address
+
+
+def joins(store_dir, role: str = "web") -> dict[str, str]:
+    """Each joined address and the address of the person it belongs to."""
+    if not store_path(store_dir, "decisions").exists():
+        return {}
+    with closing(open_store(store_dir, "decisions", role)) as db:
+        return {t.split(":", 1)[1]: json.loads(v) for t, v in db.execute(
+            "SELECT target_id, value FROM settings WHERE key = ? AND target_id LIKE 'address:%'", (JOIN_KEY,))}
+
+
+def primary(store_dir, address: str, role: str = "web") -> str:
+    address = address.lower()
+    return joins(store_dir, role).get(address, address)
+
+
+def addresses(store_dir, address: str, role: str = "web") -> list[str]:
+    """A person's addresses: their own first, then those the owner joined to them."""
+    found = joins(store_dir, role)
+    main = found.get(address.lower(), address.lower())
+    return [main] + sorted(a for a, p in found.items() if p == main and a != main)
+
+
+def join(store_dir, person: str, other: str, author: str = "owner") -> None:
+    """Join ``other`` (and anyone already joined to it) to ``person``."""
+    from towpath.decisions import now
+
+    person, other = _valid(person), _valid(other)
+    found = joins(store_dir)
+    person = found.get(person, person)
+    if other == person:
+        raise ValueError("that is already this person")
+    moved = [other] + [a for a, p in found.items() if p == other]
+    with closing(open_store(store_dir, "decisions", "web")) as db:
+        for a in moved:
+            db.execute("INSERT OR REPLACE INTO settings (target_id, key, value, author, at) VALUES (?,?,?,?,?)",
+                       (_target(a), JOIN_KEY, json.dumps(person), author, now()))
+        db.execute("INSERT INTO decision_log (kind, target_id, detail, author, at) VALUES ('person-join', ?, ?, ?, ?)",
+                   (_target(other), json.dumps({"person": person, "moved": moved}), author, now()))
+        db.commit()
+
+
+def separate(store_dir, address: str, author: str = "owner") -> None:
+    from towpath.decisions import now
+
+    address = _valid(address)
+    with closing(open_store(store_dir, "decisions", "web")) as db:
+        db.execute("DELETE FROM settings WHERE target_id = ? AND key = ?", (_target(address), JOIN_KEY))
+        db.execute("INSERT INTO decision_log (kind, target_id, detail, author, at) VALUES ('person-separate', ?, ?, "
+                   "?, ?)", (_target(address), "{}", author, now()))
+        db.commit()
+
+
+def _name_of(store_dir, address: str, names: dict, role: str) -> str | None:
+    if names.get(address):
+        return names[address]
+    if not store_path(store_dir, "mail").exists():
+        return None
+    with closing(open_store(store_dir, "mail", role)) as db:
+        row = db.execute("SELECT from_name FROM messages WHERE from_addr = ? AND coalesce(from_name, '') != '' "
+                         "GROUP BY from_name ORDER BY count(*) DESC LIMIT 1", (address,)).fetchone()
+    return row[0] if row else None
+
+
+def suggestions(store_dir, address: str, role: str = "web", limit: int = 5) -> list[dict]:
+    """Other addresses that may be the same person: the same full name in the owner's contacts or in the From
+    line of their mail. Only suggested; nothing is joined until the owner says so."""
+    names = dav_sync.names(store_dir, role)
+    mine = addresses(store_dir, address, role)
+    name = _name_of(store_dir, mine[0], names, role)
+    if not name or len(name.split()) < 2 or "@" in name:  # a first name alone is too common to go on
+        return []
+    found = joins(store_dir, role)
+    out = {a: "the same name in your contacts" for a, n in names.items()
+           if n and n.strip().lower() == name.strip().lower()}
+    if store_path(store_dir, "mail").exists():
+        with closing(open_store(store_dir, "mail", role)) as db:
+            for (a,) in db.execute("SELECT DISTINCT from_addr FROM messages WHERE lower(from_name) = lower(?) AND "
+                                   "from_addr IS NOT NULL LIMIT 50", (name,)):
+                out.setdefault(a.lower(), "writes under the same name")
+    return [{"address": a, "why": why} for a, why in sorted(out.items())
+            if a not in mine and found.get(a, a) not in mine][:limit]
 
 
 def _managed(store_dir) -> list[str]:
@@ -35,13 +132,27 @@ def everyone(store_dir, limit: int = 500, role: str = "web") -> list[dict]:
     for address, name in names.items():
         found.setdefault(address, {"address": address, "name": name, "messages": 0, "first": None, "last": None,
                                    "accounts": []})
+    for address, main in joins(store_dir, role).items():  # the owner's joins: one row per person
+        joined = found.pop(address, None)
+        if joined is None:
+            continue
+        p = found.setdefault(main, {**joined, "address": main, "messages": 0, "accounts": []})
+        p["messages"] += joined["messages"]
+        p["first"] = min(filter(None, [p["first"], joined["first"]]), default=None)
+        p["last"] = max(filter(None, [p["last"], joined["last"]]), default=None)
+        p["accounts"] = sorted(set(p["accounts"]) | set(joined["accounts"]))
+        p["name"] = p["name"] or joined["name"]
+        p.setdefault("also", []).append(address)
     return sorted(found.values(), key=lambda p: (-p["messages"], p["name"] or p["address"]))[:limit]
 
 
 def person(store_dir, address: str, role: str = "web") -> dict:
-    """One person: mail by year (both ways), recent conversations, and life events from mail with them."""
-    address = address.lower()
+    """One person (with every address the owner joined to them): mail by year (both ways), recent conversations,
+    and life events from mail with them."""
+    group = addresses(store_dir, address, role)
+    address = group[0]
     names = dav_sync.names(store_dir, role)
+    marks_in = ",".join("?" for _ in group)
     by_year: Counter = Counter()
     sent_by_year: Counter = Counter()
     conversations = []
@@ -51,16 +162,16 @@ def person(store_dir, address: str, role: str = "web") -> dict:
             for sid in _managed(store_dir):
                 sent = sorted(threads.sent_mailboxes(store_dir, sid, role))
                 marks = ",".join("?" for _ in sent)
-                for year, n in db.execute("SELECT substr(date_utc, 1, 4), count(DISTINCT coalesce(message_id, "
-                                          "item_id)) FROM messages WHERE source_id = ? AND from_addr = ? GROUP BY 1",
-                                          (sid, address)):
+                for year, n in db.execute(f"SELECT substr(date_utc, 1, 4), count(DISTINCT coalesce(message_id, "
+                                          f"item_id)) FROM messages WHERE source_id = ? AND from_addr IN ({marks_in}) "
+                                          f"GROUP BY 1", (sid, *group)):
                     by_year[year] += n
                 for year, to in db.execute(f"SELECT substr(date_utc, 1, 4), to_addrs FROM messages WHERE source_id = ? "
                                            f"AND mailbox IN ({marks})", (sid, *sent)):
-                    if address in json.loads(to):
+                    if set(group) & set(json.loads(to)):
                         sent_by_year[year] += 1
-                for r in db.execute("SELECT item_id, subject, date_utc, thread_key FROM messages WHERE source_id = ? "
-                                    "AND from_addr = ? ORDER BY date_utc DESC LIMIT 200", (sid, address)):
+                for r in db.execute(f"SELECT item_id, subject, date_utc, thread_key FROM messages WHERE source_id = ? "
+                                    f"AND from_addr IN ({marks_in}) ORDER BY date_utc DESC LIMIT 200", (sid, *group)):
                     refs.add(r[0])
                     if len(conversations) < 15 and r[3] not in {c["thread_key"] for c in conversations}:
                         conversations.append({"item_id": r[0], "subject": r[1], "date": r[2], "thread_key": r[3]})
@@ -75,21 +186,18 @@ def person(store_dir, address: str, role: str = "web") -> dict:
     events = [c for c in life.claims(store_dir, limit=10**6, role=role)
               if c.state != "rejected" and any(cit.ref in native for cit in c.citations)]
     chats = []  # days of messages (Apple Messages, Facebook) with someone of this name, from their exports
-    name = names.get(address)
-    if not name and store_path(store_dir, "mail").exists():  # the name they write under
-        with closing(open_store(store_dir, "mail", role)) as db:
-            row = db.execute("SELECT from_name FROM messages WHERE from_addr = ? AND coalesce(from_name, '') != '' "
-                             "LIMIT 1", (address,)).fetchone()
-        name = row[0] if row else None
-    if name and store_path(store_dir, "source").exists():
+    chat_names = sorted({n.lower() for n in (_name_of(store_dir, a, names, role) for a in group) if n})
+    if chat_names and store_path(store_dir, "source").exists():  # the names they write under
         with closing(open_store(store_dir, "source", role)) as src:
             chats = [dict(r) for r in src.execute(
-                "SELECT i.source_id, i.native_id, i.subject, i.date_utc FROM items i JOIN sources s USING (source_id) "
-                "WHERE s.adapter IN ('imessage', 'facebook') AND lower(i.from_addr) = lower(?) AND "
-                "i.absent_since_run IS NULL ORDER BY i.date_utc DESC LIMIT 20", (name,))]
+                f"SELECT i.source_id, i.native_id, i.subject, i.date_utc FROM items i JOIN sources s USING (source_id) "
+                f"WHERE s.adapter IN ('imessage', 'facebook') AND lower(i.from_addr) IN "
+                f"({','.join('?' for _ in chat_names)}) AND i.absent_since_run IS NULL ORDER BY i.date_utc DESC "
+                f"LIMIT 20", chat_names)]
     years = sorted(set(by_year) | set(sent_by_year), reverse=True)
     dated = [y for y in years if y]
-    return {"address": address, "name": names.get(address), "years": [
+    return {"address": address, "also": group[1:], "name": next(filter(None, (names.get(a) for a in group)), None),
+            "years": [
         {"year": y, "received": by_year.get(y, 0), "sent": sent_by_year.get(y, 0)} for y in dated],
             "conversations": conversations, "events": events, "accounts": _managed(store_dir), "chats": chats,
             "received": sum(by_year.values()), "sent": sum(sent_by_year.values()),
