@@ -6,15 +6,14 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `a19cbcd` (iCloud Mail and Yahoo Mail, birthdays, anniversaries and this week's events on the Overview,
-and adding files to the catalog about twice as fast; on top of `bdda51d`'s family edition, kept evidence and joined
-addresses), publishing run [39091328075](https://github.com/endthestart/towpath/actions/runs/39091328075). New
-stores, tables and columns only; the web service and connector add their own at start. Keeping the evidence is off.
-On Hub, Fastmail is allowed for the life story and finding events by itself is on (the owner's answers of
-October 17).
+Revision `33ec167` (Inbox Zero's rules rewritten as a switched-off set on each account's Rules page; on top of
+`a19cbcd`'s new providers, Overview dates and faster catalog), publishing run
+[39128020256](https://github.com/endthestart/towpath/actions/runs/39128020256). New stores, tables and columns only;
+the web service and connector add their own at start. Keeping the evidence is off. On Hub, Fastmail is allowed for
+the life story and finding events by itself is on (the owner's answers of October 17).
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:d58f82023a25026aab5c2aa9e841473bf8a85bfeafa2aabb930f32e2680d3c52`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:d56ca51f0f886781a32ef22fb88589279540ed338d93debcd3f3d2fdefb2a555`
+- `web`: `ghcr.io/endthestart/towpath@sha256:7310e6b3b0aaa033087cc7dc5a6d2dae369e8110f1d9c4c0cb0527683b2cac6f`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:b7000a6434a6ae99829d895f62cf5ccb67c3f7c318f33b299d20bf68cdaf62d5`
 
 Towpath's data folder (stores, sign-ins and the Recoll index) lives on a mirrored SSD pool since 2026-10-08,
 with hourly snapshots replicated to the main pool: Recoll's index writes had saturated the spinning disks. The
@@ -29,6 +28,7 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `a19cbcd` | New providers, birthdays and calendar on the Overview, faster catalog | `towpath@sha256:d58f8202…`, `towpath-recoll@sha256:d56ca51f…` |
 | `3fd33fe` | Items 14–18 before the calendar review's fixes | `towpath@sha256:d3fedc67…`, `towpath-recoll@sha256:c390e0a1…` |
 | `bdda51d` | Family edition, keeping the evidence (off), joining a person's addresses | `towpath@sha256:d67f63ef…`, `towpath-recoll@sha256:44bfa8c5…` |
 | `25e24b6` | Restore from an export, photo searches as collections, dated documents as life events | `towpath@sha256:6d6d30b8…`, `towpath-recoll@sha256:e116b8e7…` |

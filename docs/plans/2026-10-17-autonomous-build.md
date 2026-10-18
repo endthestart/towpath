@@ -294,3 +294,5 @@ rules, the side-by-side Gmail test before retiring Inbox Zero, Outlook.com, and 
   addresses); all 34 pages answered on Hub.
 - 2026-10-18: `3fd33fe` then `a19cbcd` deployed (items 14–18, each batch reviewed and its findings fixed); all 34
   pages answered on Hub. What remains on the roadmap waits on the owner (open questions 5–8).
+- 2026-10-18: `33ec167` deployed (Inbox Zero's rules rewritten, the owner's answer to question 5); all 34 pages
+  answered on Hub. Every open question is answered; nothing on the roadmap is left without new scope.
