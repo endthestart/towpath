@@ -23,7 +23,7 @@ DOCUMENTS = {".pdf", ".doc", ".docx", ".odt", ".rtf", ".pages", ".txt"}
 # (what a name says, what the event is, the search words that find it)
 KINDS = (
     (re.compile(r"\bdiploma\b|\bgraduation\b|\bdegree certificate\b", re.I), "Graduated", "accomplishment",
-     ("diploma", "graduation")),
+     ("diploma", "graduation", "degree certificate")),
     (re.compile(r"\blease\b|\brental agreement\b|\btenancy agreement\b", re.I), "Signed a lease", "event",
      ("lease", "rental agreement", "tenancy agreement")),
     (re.compile(r"\bdeed\b|\bclosing disclosure\b|\bsettlement statement\b|\bhud[- ]?1\b", re.I), "Bought a home",
@@ -37,8 +37,8 @@ KINDS = (
     (re.compile(r"\bcertificate of (completion|achievement)\b|\bcertification\b", re.I), "Earned a certificate",
      "accomplishment", ("certificate of", "certification")),
 )
-NEVER = re.compile(r"passport|licen[cs]e(?! agreement)|social security|\bssn\b|birth certificate|\bvisa\b|\bid card\b",
-                   re.I)
+NEVER = re.compile(r"passport|licen[cs]e(?! agreement)|social security|\bssn\b|birth certificate|\bvisa\b|"
+                   r"\bid\b|\bid card|identity|identification", re.I)
 DAY = re.compile(r"(?<!\d)((?:19|20)\d{2})[-_. ]?(0[1-9]|1[0-2])[-_. ]?(0[1-9]|[12]\d|3[01])(?!\d)")
 MONTH = re.compile(r"(?<!\d)((?:19|20)\d{2})[-_. ](0[1-9]|1[0-2])(?!\d)")
 YEAR = re.compile(r"(?<!\d)((?:19|20)\d{2})(?!\d)")
@@ -48,13 +48,14 @@ def _words(name: str) -> str:
     return re.sub(r"[_\-.]+", " ", name)
 
 
-def kind_of(name: str) -> tuple[str, str] | None:
-    """(statement, claim kind) for a document name, or None."""
+def kind_of(rel_path: str) -> tuple[str, str] | None:
+    """(statement, claim kind) for a document (by its name; never anything in a folder of identity papers)."""
+    folders, _, name = rel_path.rpartition("/")
     stem, dot, ext = name.rpartition(".")
     if not dot or f".{ext.lower()}" not in DOCUMENTS:
         return None
     words = _words(stem)
-    if NEVER.search(words):
+    if NEVER.search(words) or NEVER.search(_words(folders)):
         return None
     return next(((statement, kind) for pattern, statement, kind, _ in KINDS if pattern.search(words)), None)
 
@@ -72,22 +73,22 @@ def when_of(rel_path: str) -> When | None:
             except ValueError:
                 continue
             if first > today:
-                continue
+                return None  # a date to come: not something that happened
             if precision == "day":
                 return When(first.isoformat(), "day", first.isoformat(), first.isoformat())
             last = (first.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
             return When(first.isoformat()[:7], "month", first.isoformat(), last.isoformat())
     for part in [name, *reversed(parts[:-1])]:
-        m = YEAR.search(part)
-        if m and int(m[1]) <= today.year:
-            return When(m[1], "year", f"{m[1]}-01-01", f"{m[1]}-12-31")
+        years = YEAR.findall(part)  # the last one: "Lease 1920 Maple Ave 2014" is from 2014
+        if years and int(years[-1]) <= today.year:
+            return When(years[-1], "year", f"{years[-1]}-01-01", f"{years[-1]}-12-31")
     return None
 
 
 def _match() -> str:
     """The catalog's name index matches substrings (trigrams): each phrase as written with spaces, underscores,
     dashes or nothing between its words."""
-    phrases = {w.replace(" ", sep) for *_, words in KINDS for w in words for sep in (" ", "_", "-", "")}
+    phrases = {w.replace(" ", sep) for *_, words in KINDS for w in words for sep in (" ", "_", "-", ".", "")}
     return " OR ".join(f'"{p}"' for p in sorted(phrases))
 
 
@@ -103,20 +104,23 @@ def propose(config) -> list[dict]:
         with closing(open_store(config.store_dir, "life", life.WRITER)) as db:
             row = db.execute("SELECT digest, updated_at FROM group_runs WHERE key = ?", (STATE_KEY,)).fetchone()
         now = datetime.now(timezone.utc)
-        if row and row[0] == mark and now - datetime.fromisoformat(row[1]) < RECHECK:
+        # Looked at again only once the catalog changed, and at most every few hours while it keeps changing.
+        if row and (row[0] == mark or now - datetime.fromisoformat(row[1]) < RECHECK):
             return []
         marks = ",".join("?" for _ in allowed)
+        ends = " OR ".join("lower(o.rel_path) LIKE ?" for _ in DOCUMENTS)
         found = files.execute(
             f"SELECT o.provider_id, o.occurrence_id, o.root_alias, o.rel_path FROM occurrences_text t JOIN occurrences "
             f"o ON o.rowid = t.rowid WHERE occurrences_text MATCH ? AND o.missing_since_run IS NULL AND "
-            f"o.provider_id IN ({marks})", (_match(), *allowed)).fetchall()
+            f"o.provider_id IN ({marks}) AND ({ends})",
+            (_match(), *allowed, *(f"%{e}" for e in sorted(DOCUMENTS))))
+        # the private export is tested on the full path before a name is even looked at
+        candidates = [(p, o, a, r) for p, o, a, r in found if not private_in(config, a, r) and kind_of(r)]
     made = 0
     with closing(open_store(config.store_dir, "life", life.WRITER)) as db:
-        for provider, occ, alias, rel in found:
-            if private_in(config, alias, rel):  # tested on the full path, before the name is even looked at
-                continue
+        for provider, occ, _alias, rel in candidates:
             name = rel.rpartition("/")[2]
-            what, when = kind_of(name), when_of(rel)
+            what, when = kind_of(rel), when_of(rel)
             if what is None or when is None:
                 continue
             ref = f"{provider}:{occ}"

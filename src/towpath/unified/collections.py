@@ -267,12 +267,12 @@ def _evaluate_query(adapters, collection: dict, max_per_source: int) -> tuple[li
     return items, list(reasons)
 
 
-def _evaluate_photos(store_dir, collection: dict) -> tuple[list, list]:
+def _evaluate_photos(store_dir, collection: dict, config=None) -> tuple[list, list]:
     from towpath import photos
 
     if store_dir is None:
         raise CollectionError("a photo collection is evaluated against this Towpath's photo catalog")
-    rows, total = photos.search(store_dir, photo_filters(collection["filters"]), limit=MAX_PHOTOS)
+    rows, total = photos.search(store_dir, photo_filters(collection["filters"]), limit=MAX_PHOTOS, config=config)
     reasons = [f"showing the first {MAX_PHOTOS} of {total} photos"] if total > len(rows) else []
     baseline = {b["ref"]: b for b in collection["baseline"]}
     items, current = [], set()
@@ -296,11 +296,11 @@ def _evaluate_photos(store_dir, collection: dict) -> tuple[list, list]:
 
 
 def evaluate(adapters, collection: dict, mode: str = "local", max_per_source: int = MAX_PER_SOURCE,
-             store_dir=None) -> dict:
+             store_dir=None, config=None) -> dict:
     """Re-check a collection against its sources now. Never changes the collection."""
     try:
         if collection["kind"] == "photos":
-            items, reasons = _evaluate_photos(store_dir, collection)
+            items, reasons = _evaluate_photos(store_dir, collection, config)
         elif collection["kind"] == "set":
             items, reasons = _evaluate_set(adapters, collection)
         else:

@@ -229,8 +229,10 @@ def _count_facets(store_dir, role: str) -> dict:
                                                   f"IS NOT NULL AND {VISIBLE} GROUP BY 1 ORDER BY 2 DESC LIMIT 12")]}
 
 
-def search(store_dir, f: dict, limit: int = 200, offset: int = 0, role: str = "web") -> tuple[list[dict], int]:
-    """Photos matching typed filters, newest taken first, and how many match in all."""
+def search(store_dir, f: dict, limit: int = 200, offset: int = 0, role: str = "web",
+           config=None) -> tuple[list[dict], int]:
+    """Photos matching typed filters, newest taken first, and how many match in all. With the configuration, a file
+    is tested for the private export on its full path (its root may be the export or sit inside it)."""
     if not store_path(store_dir, "files").exists():
         return [], 0
     where, args = [], []
@@ -252,10 +254,11 @@ def search(store_dir, f: dict, limit: int = 200, offset: int = 0, role: str = "w
         where.append("lower(o.rel_path) LIKE ?")
         args.append(f"%{f['text'].lower()}%")
     where.append("p." + VISIBLE)
-    where.append("NOT towpath_private(o.rel_path)")  # the purge takes these out; never list one that slipped in
+    where.append("NOT towpath_private(o.root_alias, o.rel_path)")  # the purge takes these out; never list one
     clause = " AND ".join(where)
     with closing(open_store(store_dir, "files", role)) as db:
-        db.create_function("towpath_private", 1, is_private, deterministic=True)
+        db.create_function("towpath_private", 2, (lambda alias, rel: private_in(config, alias, rel)) if config
+                           else (lambda alias, rel: is_private(rel)), deterministic=True)
         total = db.execute(f"SELECT count(*) FROM photo_meta p JOIN occurrences o USING (occurrence_id) WHERE "
                            f"{clause} AND p.problem IS NULL AND o.missing_since_run IS NULL", args).fetchone()[0]
         rows = [dict(r) for r in db.execute(

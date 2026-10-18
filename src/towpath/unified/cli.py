@@ -207,9 +207,16 @@ def collections_list(config: Path = ConfigOpt):
 
 @collections_app.command("show")
 def collections_show(collection: str, config: Path = ConfigOpt):
-    """One collection's definition, members and accepted baseline."""
+    """One collection's definition, members and accepted baseline (for a photo collection, only how many: a photo
+    accepted then may be hidden since)."""
     cfg = _config(config)
-    _collections_call(lambda c: c.get(cfg.store_dir, collection))
+
+    def show(c):
+        found = c.get(cfg.store_dir, collection)
+        if found["kind"] == "photos":
+            found["baseline"] = {"accepted": len(found["baseline"])}
+        return found
+    _collections_call(show)
 
 
 @collections_app.command("create")

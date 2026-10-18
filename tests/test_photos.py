@@ -261,7 +261,9 @@ def test_runs_of_photo_days_become_one_trip_memory(tmp_path):
     assert trips[0]["title"] == "Trip: 2009 Example Junction" and len(trips[0]["members"]) == 3
 
 
-def test_dated_documents_become_life_events_from_their_names_only(tmp_path):
+def test_dated_documents_become_life_events_from_their_names_only(tmp_path, monkeypatch):
+    from datetime import timedelta
+
     from towpath import life, life_documents, photos
     from towpath.unified import grants
 
@@ -270,7 +272,9 @@ def test_dated_documents_become_life_events_from_their_names_only(tmp_path):
              "Work/offer-letter 2015-09.docx": "Took a new job", "Car/Bill of Sale 2018-03-02.pdf": "Bought a car",
              "Papers/Passport renewal 2016.pdf": None, "Papers/Software license agreement 2016.pdf": None,
              "Housing/Lease template.pdf": None, "Housing/lease-2014-08-01.jpg": None,
-             f"{private}/Lease 2014-08-01.pdf": None, "Future/Lease 2999-01-01.pdf": None}
+             f"{private}/Lease 2014-08-01.pdf": None, "Future/Lease 2999-01-01.pdf": None,
+             "Identity/Certification 2015.pdf": None, "Lease 1920 Maple Ave 2013.pdf": "Signed a lease",
+             "Please read 2015.pdf": None}
     store = tmp_path / "state"
     with open_store(store, "files", "connect") as db:
         for i, rel in enumerate(names):
@@ -282,10 +286,22 @@ def test_dated_documents_become_life_events_from_their_names_only(tmp_path):
     config = SimpleNamespace(store_dir=store, files=SimpleNamespace(roots={"docs": SimpleNamespace(path=tmp_path)}))
     assert life_documents.propose(config) == []  # not allowed for the life story yet
     grants.grant(store, "folders", "life-evidence", author="owner")
-    assert life_documents.propose(config)[0]["proposed"] == 4
+    assert life_documents.propose(config)[0]["proposed"] == 5
     got = {c.statement: c for c in life.claims(store)}
     assert set(got) == {v for v in names.values() if v}
+    assert sorted(c.when.earliest for c in life.claims(store) if c.statement == "Signed a lease") == [
+        "2013-01-01", "2014-08-01"]
     assert (got["Signed a lease"].when.earliest, got["Signed a lease"].when.precision) == ("2014-08-01", "day")
     assert (got["Graduated"].when.precision, got["Took a new job"].when.precision) == ("year", "month")
-    assert got["Signed a lease"].citations[0].ref == "folders:occ_0"
-    assert life_documents.propose(config) == []  # nothing changed: not looked at again
+    assert life_documents.when_of("Lease 2999-01.pdf") is None  # a date to come is not a year either
+    with open_store(store, "files", "connect") as db:  # a new document arrives
+        db.execute("INSERT INTO occurrences (occurrence_id, provider_id, native_id, root_alias, rel_path, members, "
+                   "media_type, size, dates, hashes, extraction, first_seen_run, last_seen_run, updated_at) "
+                   "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                   ("occ_new", "folders", "x", "docs", "Resignation 2020-02-03.pdf", "[]", None, 9, "[]", "{}", "{}",
+                    "r", "r", "t"))
+        db.commit()
+    assert life_documents.propose(config) == []  # looked at again only after a few hours
+    monkeypatch.setattr(life_documents, "RECHECK", timedelta(0))
+    assert life_documents.propose(config)[0]["proposed"] == 1
+    assert life_documents.propose(config) == []  # nothing changed since: not looked at again

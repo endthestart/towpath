@@ -12,7 +12,7 @@
 {% if plan.waiting %}<p class="muted">Not connected here yet: {{ plan.waiting|join:", " }}. Add {{ plan.waiting|length|pluralize:"it,them" }} on Connections, then restore again for {{ plan.waiting|length|pluralize:"its,their" }} mail decisions.</p>{% endif %}
 {% if plan.skipped %}<p class="muted">{{ plan.skipped }} left out (not something a file may restore, or not readable).</p>{% endif %}
 <p class="muted">Never restored: {{ plan.left_out|join:"; " }}.</p>
-<form method="post" class="form-actions">{% csrf_token %}{% if plan.total %}<button class="button" name="action" value="restore">Restore {{ plan.total }}</button>{% endif %}<button class="button secondary" name="action" value="cancel">Cancel</button></form></section>
+<form method="post" class="form-actions">{% csrf_token %}<input type="hidden" name="digest" value="{{ digest }}">{% if plan.total %}<button class="button" name="action" value="restore">Restore {{ plan.total }}</button>{% endif %}<button class="button secondary" name="action" value="cancel">Cancel</button></form></section>
 {% endif %}
 {% if not plan or done %}<section class="detail-card"><h2 class="card-title">Choose an export</h2>
 <form method="post" enctype="multipart/form-data">{% csrf_token %}<p><input type="file" name="package" accept=".zip,application/zip" required></p>

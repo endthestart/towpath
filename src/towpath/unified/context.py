@@ -59,6 +59,8 @@ def _candidates(config, adapters, query, refs, collection, max_items, sources) -
         from towpath.unified import collections
 
         found = collections.get(config.store_dir, collection)
+        if found["kind"] == "photos":
+            raise ContextError("a photo collection lists photos, not evidence for a context packet")
         if found["kind"] == "set":
             members = [m["ref"] for m in found["members"]]
             return members[:max_items], {"collection": found["collection_id"], "kind": "set",

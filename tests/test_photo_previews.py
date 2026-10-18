@@ -224,3 +224,6 @@ def test_a_photo_search_saved_as_a_collection_never_lists_a_hidden_photo(world, 
         assert "1 accepted photo no longer match" in page
     with pytest.raises(collections.CollectionError):
         collections.create(config.store_dir, "Nothing", "photos", photos={"camera": " "})
+    from towpath import restore
+
+    assert restore.package(config.store_dir)["collection_items"] == []  # accepted photos never go into a file

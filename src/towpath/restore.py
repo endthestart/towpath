@@ -5,19 +5,24 @@ has used since, changes nothing they decided. It first shows what it would add (
 asks (``apply``). Only the owner's own decisions come back: reviews of events, recollections, memories kept or
 dismissed, the profile, settled pairs, folders kept off Space's clutter list, per-item marks (who may see an item,
 which models may read it), dismissed proposals, collections, questions asked, sender categories, conversation marks,
-draft notes and rules.
+draft notes and rules. Each row is checked as strictly as the page that made it would check it, so a damaged or
+hand-edited file can't leave a decision behind that breaks a page.
 
 What could change mail, reach a model or widen access never comes back from a file: permissions for sources and
 models, the model chosen for each task, finding events by itself, an account's dry-run switch and the changes it
 allows, digests, labels and filing. Rules come back turned off, asking first, for the owner to review. Mail
 decisions belong to an account, matched by its provider and name; an account not connected here yet is skipped
-and can be restored later, once it is.
+and can be restored later, once it is. Marks on a sender or a message are moved to the matching account's own IDs.
+A photo collection comes back as its search: which photos the owner accepted is never written to a file, since a
+photo may be hidden later. A review of an event found again under another account's ID starts unreviewed.
 """
 
 import io
 import json
 import zipfile
+import zlib
 from contextlib import closing
+from datetime import date
 
 from towpath import decisions as item_settings, life, life_conflicts, life_groups, space
 from towpath.decisions import now
@@ -25,8 +30,8 @@ from towpath.stores import open_store, store_path
 
 VERSION = 1
 WRITER = "web"
-MAX_MEMBER = 64 * 1024 * 1024  # bytes of one file in the package, uncompressed
-MAX_TOTAL = 256 * 1024 * 1024
+MAX_MEMBER = 16 * 1024 * 1024  # bytes of one file in the package, uncompressed
+MAX_TOTAL = 32 * 1024 * 1024
 MAIL_KEYS = {"draft_notes"}  # the only account settings restored: nothing that changes mail
 TABLES = ("accounts", "settings", "dismissals", "collections", "collection_items", "questions", "sender_marks",
           "thread_marks")
@@ -41,14 +46,61 @@ class RestoreError(ValueError):
 # -- what the export writes for a restore -----------------------------------------------------------------------
 
 
+def _str(*values) -> bool:
+    return all(isinstance(v, str) and v for v in values)
+
+
+def _review(value) -> bool:
+    if not isinstance(value, dict) or value.get("state") not in ("accepted", "rejected", "corrected", "proposed"):
+        return False
+    if not _str(value.get("by"), value.get("at")):
+        return False
+    correction = value.get("correction")
+    if correction is None:
+        return value["state"] != "corrected"
+    if not isinstance(correction, dict) or not correction or set(correction) - {"statement", "when"}:
+        return False
+    if "statement" in correction and not _str(correction["statement"]):
+        return False
+    if "when" in correction:
+        try:
+            life.When.from_dict(correction["when"]).bounds()
+        except Exception:  # noqa: BLE001 - any malformed date is refused
+            return False
+    return True
+
+
+def _group(value) -> bool:
+    return (isinstance(value, dict) and value.get("state") in ("kept", "dismissed") and
+            _str(value.get("kind"), value.get("title"), value.get("by"), value.get("at")) and
+            isinstance(value.get("members"), list) and all(_str(m) for m in value["members"]) and
+            all(_str(m) for m in value.get("proposed_members") or []) and
+            isinstance(value.get("proposed_members", []), list))
+
+
+def _profile(value) -> bool:
+    if not isinstance(value, dict) or set(value) - {"name", "birthday"}:
+        return False
+    if value.get("name") is not None and not (isinstance(value["name"], str) and len(value["name"]) <= 80):
+        return False
+    try:
+        return value.get("birthday") is None or bool(date.fromisoformat(value["birthday"]))
+    except (TypeError, ValueError):
+        return False
+
+
+def _loads(value: str):
+    try:
+        return json.loads(value)
+    except (ValueError, RecursionError):
+        return None
+
+
 def restorable_setting(target: str, key: str, value: str) -> bool:
-    """Whether a decisions-store setting is one of the owner's decisions a file may bring back."""
+    """Whether a decisions-store setting is one of the owner's decisions a file may bring back, and is well formed."""
     if target.startswith("claim:"):
         if key == life.REVIEW_KEY:
-            try:
-                return json.loads(value).get("state") in ("accepted", "rejected", "corrected", "proposed")
-            except (ValueError, AttributeError):
-                return False
+            return _review(_loads(value))
         if key == life.RECOLLECTION_KEY:
             try:
                 life.Claim.from_dict(json.loads(value))
@@ -57,11 +109,11 @@ def restorable_setting(target: str, key: str, value: str) -> bool:
                 return False
         return False
     if target.startswith("group:"):
-        return key == life_groups.GROUP_KEY and _is_json(value, dict)
+        return key == life_groups.GROUP_KEY and _group(_loads(value))
     if (target, key) == (life_groups.PROFILE_TARGET, life_groups.PROFILE_KEY):
-        return _is_json(value, dict)
+        return _profile(_loads(value))
     if target == life_conflicts.TARGET:
-        return _is_json(value)
+        return _loads(value) == "both-right"
     if target.startswith("space:"):
         return key == space.KEEP_KEY and value == space.KEEP_VALUE
     if key in item_settings.SETTINGS:
@@ -69,10 +121,31 @@ def restorable_setting(target: str, key: str, value: str) -> bool:
     return False
 
 
-def _is_json(value: str, kind=object) -> bool:
+def draft_notes(value: str) -> bool:
+    from towpath.mail.threads import NOTES_MAX
+
+    found = _loads(value)
+    return isinstance(found, str) and len(found) <= NOTES_MAX
+
+
+def collection_ok(kind, definition) -> bool:
+    """A collection definition the collection pages can read."""
+    from towpath.unified import collections
+    from towpath.unified.contracts import Filters
+
+    if kind not in collections.KINDS:
+        return False
+    if kind == "set":
+        return definition is None
+    if not isinstance(definition, str):
+        return False
     try:
-        return isinstance(json.loads(value), kind)
-    except ValueError:
+        found = json.loads(definition)
+        if kind == "photos":
+            return isinstance(found, dict) and collections.photo_filters(found) == found
+        Filters.from_dict(found)
+        return True
+    except Exception:  # noqa: BLE001 - anything unreadable is refused
         return False
 
 
@@ -96,8 +169,18 @@ def package(store_dir) -> dict[str, list]:
                 if restorable_setting(r["target_id"], r["key"], r["value"]) or (
                         r["target_id"] in mail_targets and r["key"] in MAIL_KEYS):
                     out["settings"].append(r)
-            for table in ("dismissals", "collections", "collection_items", "questions"):
+            for table in ("dismissals", "collections", "questions"):
                 out[table] = _rows(db, f"SELECT * FROM {table}")
+            # members of reference sets only: a photo collection's accepted photos are never written to a file
+            out["collection_items"] = _rows(db, "SELECT * FROM collection_items WHERE role = 'member'")
+        items = [r for r in out["settings"] if r["key"] in item_settings.SETTINGS and r["target_id"].startswith("itm_")]
+        if items and store_path(store_dir, "source").exists():
+            with closing(open_store(store_dir, "source", WRITER)) as src:
+                for r in items:  # a message's mark moves with the message, whose ID is made from its account's
+                    row = src.execute("SELECT source_id, native_id FROM items WHERE item_id = ?",
+                                      (r["target_id"],)).fetchone()
+                    if row:
+                        r["item"] = {"source_id": row[0], "native_id": row[1]}
     if store_path(store_dir, "maildecisions").exists():
         with closing(open_store(store_dir, "maildecisions", WRITER)) as db:
             for table in ("sender_marks", "thread_marks"):
@@ -110,6 +193,16 @@ def package(store_dir) -> dict[str, list]:
 
 def read(data: bytes) -> dict:
     """The restore part of an export package, checked; RestoreError when it isn't one."""
+    try:
+        return _read(data)
+    except RestoreError:
+        raise
+    except (zipfile.BadZipFile, zlib.error, EOFError, RuntimeError, NotImplementedError, RecursionError,
+            ValueError, OSError):  # damaged, encrypted, oddly compressed or absurdly nested
+        raise RestoreError("That export is damaged and can't be read.") from None
+
+
+def _read(data: bytes) -> dict:
     try:
         z = zipfile.ZipFile(io.BytesIO(data))
     except zipfile.BadZipFile:
@@ -135,7 +228,7 @@ def read(data: bytes) -> dict:
                 raise RestoreError("That export is too large to restore.")
             try:
                 return json.loads(raw)
-            except ValueError:
+            except (ValueError, RecursionError):
                 raise RestoreError(f"{name} in that export can't be read.") from None
 
         version = load("restore/version.json", {})
@@ -174,14 +267,23 @@ def _accounts(store_dir, exported: list[dict]) -> dict[str, str | None]:
 
 def _s(row: dict, *keys) -> tuple:
     vals = tuple(row.get(k) for k in keys)
-    if not all(isinstance(v, str) and v for v in vals):
+    if not _str(*vals):
+        raise KeyError
+    return vals
+
+
+def _opt(row: dict, *keys) -> tuple:
+    vals = tuple(row.get(k) for k in keys)
+    if not all(v is None or isinstance(v, str) for v in vals):
         raise KeyError
     return vals
 
 
 def _work(store_dir, found: dict) -> dict:
     """What a restore would add: rows per table, and counts of what it leaves alone."""
+    from towpath.connect import item_id
     from towpath.mail import rules as mail_rules, senders, threads
+    from towpath.unified.contracts import Reference
 
     accounts = _accounts(store_dir, found["accounts"])
     names = {str(a.get("source_id")): a.get("display_name") or a.get("source_id") for a in found["accounts"]}
@@ -189,6 +291,7 @@ def _work(store_dir, found: dict) -> dict:
                             "sender_marks", "thread_marks", "rules")}
     kept = skipped = 0
     waiting: set[str] = set()
+    seen: set[tuple] = set()
 
     def account(sid):
         """The account here, or None: an account not connected here yet waits; one the package doesn't list is
@@ -200,6 +303,13 @@ def _work(store_dir, found: dict) -> dict:
             waiting.add(names.get(sid, sid))
         return accounts.get(sid)
 
+    def once(*key) -> bool:
+        """False for a row the file already held (counted once)."""
+        if key in seen:
+            return False
+        seen.add(key)
+        return True
+
     with closing(open_store(store_dir, "decisions", WRITER)) as d:
         for r in found["settings"]:
             try:
@@ -208,15 +318,35 @@ def _work(store_dir, found: dict) -> dict:
                 skipped += 1
                 continue
             if target.startswith("mail:"):
+                if key not in MAIL_KEYS or not draft_notes(value):
+                    skipped += 1
+                    continue
                 sid = account(target.split(":", 1)[1])
                 if sid is None:
-                    continue
-                if key not in MAIL_KEYS or not _is_json(value):
-                    skipped += 1
                     continue
                 target = f"mail:{sid}"
             elif not restorable_setting(target, key, value):
                 skipped += 1
+                continue
+            elif target.startswith("sender:"):  # sender:<account>:<address>
+                parts = target.split(":", 2)
+                if len(parts) != 3 or not parts[2]:
+                    skipped += 1
+                    continue
+                sid = account(parts[1])
+                if sid is None:
+                    continue
+                target = f"sender:{sid}:{parts[2]}"
+            elif isinstance(r.get("item"), dict):  # a message's own mark: its ID is made from its account's
+                native = r["item"]
+                if not _str(native.get("source_id"), native.get("native_id")):
+                    skipped += 1
+                    continue
+                sid = account(native["source_id"])
+                if sid is None:
+                    continue
+                target = item_id(sid, native["native_id"])
+            if not once("settings", target, key):
                 continue
             if d.execute("SELECT 1 FROM settings WHERE target_id = ? AND key = ?", (target, key)).fetchone():
                 kept += 1
@@ -225,40 +355,56 @@ def _work(store_dir, found: dict) -> dict:
         for r in found["dismissals"]:
             try:
                 match_key, author, at = _s(r, "match_key", "author", "at")
+                proposal, reason = _opt(r, "proposal_id", "reason")
             except KeyError:
                 skipped += 1
+                continue
+            if not once("dismissal", match_key):
                 continue
             if d.execute("SELECT 1 FROM dismissals WHERE match_key = ?", (match_key,)).fetchone():
                 kept += 1
             else:
-                adds["dismissals"].append((match_key, r.get("proposal_id"), r.get("reason"), author, at))
-        new_collections = set()
+                adds["dismissals"].append((match_key, proposal, reason, author, at))
+        new_collections = {}
         for r in found["collections"]:
             try:
                 cid, name, kind, author, created, updated = _s(r, "collection_id", "name", "kind", "author",
                                                                "created_at", "updated_at")
+                (definition,) = _opt(r, "definition")
             except KeyError:
                 skipped += 1
+                continue
+            if len(name) > 120 or not collection_ok(kind, definition):
+                skipped += 1
+                continue
+            if not once("collection", cid) or not once("collection-name", name):
                 continue
             if d.execute("SELECT 1 FROM collections WHERE collection_id = ? OR name = ?", (cid, name)).fetchone():
                 kept += 1
             else:
-                new_collections.add(cid)
-                adds["collections"].append((cid, name, kind, r.get("definition"), author, created, updated))
+                new_collections[cid] = kind
+                adds["collections"].append((cid, name, kind, definition, author, created, updated))
         for r in found["collection_items"]:
             try:
                 cid, ref, role, author, added = _s(r, "collection_id", "ref", "role", "author", "added_at")
-            except KeyError:
+                version, title, source_type, note = _opt(r, "version", "title", "source_type", "note")
+                Reference.parse(ref)
+            except Exception:  # noqa: BLE001 - a malformed row or reference is left out
                 skipped += 1
                 continue
-            if cid in new_collections:
-                adds["collection_items"].append((cid, ref, role, r.get("version"), r.get("title"),
-                                                 r.get("source_type"), r.get("note"), author, added))
+            if role != "member" or new_collections.get(cid) != "set":
+                skipped += role != "member"
+                continue
+            if once("item", cid, ref):
+                adds["collection_items"].append((cid, ref, role, version, title, source_type, note, author, added))
         for r in found["questions"]:
             try:
                 qid, text, author, at = _s(r, "question_id", "text", "author", "at")
             except KeyError:
                 skipped += 1
+                continue
+            if len(text) > 2000 or not once("question", qid):
+                skipped += len(text) > 2000
                 continue
             if d.execute("SELECT 1 FROM questions WHERE question_id = ?", (qid,)).fetchone():
                 kept += 1
@@ -279,7 +425,7 @@ def _work(store_dir, found: dict) -> dict:
                     skipped += 1
                     continue
                 sid = account(old_sid)
-                if sid is None:
+                if sid is None or not once(table, sid, name):
                     continue
                 if m.execute(f"SELECT 1 FROM {table} WHERE source_id = ? AND {field} = ?", (sid, name)).fetchone():
                     kept += 1

@@ -256,7 +256,7 @@ def _collection(cid: str) -> dict:
 def collection_detail(request, cid):
     collection = _collection(cid)
     evaluation = collections.evaluate(None if collection["kind"] == "photos" else _adapters(), collection, mode="local",
-                                      store_dir=_store())
+                                      store_dir=_store(), config=getattr(settings, "TOWPATH_CONFIG", None))
     for item in evaluation["items"]:
         item["url"] = _ref_url(item["ref"])
     query = None
@@ -300,6 +300,6 @@ def collection_accept(request, cid):
     if collection["kind"] not in ("query", "photos"):
         return HttpResponseBadRequest("only query and photo collections have accepted results")
     evaluation = collections.evaluate(None if collection["kind"] == "photos" else _adapters(), collection, mode="local",
-                                      store_dir=_store())
+                                      store_dir=_store(), config=getattr(settings, "TOWPATH_CONFIG", None))
     collections.accept(_store(), collection["collection_id"], evaluation)
     return HttpResponseRedirect(reverse("collection", args=[collection["collection_id"]]))

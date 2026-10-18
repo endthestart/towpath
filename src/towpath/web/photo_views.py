@@ -25,7 +25,8 @@ def page(request):
     f["located"] = f["located"] == "1"
     number = int(request.GET.get("page") or 1) if (request.GET.get("page") or "1").isdigit() else 1
     active = any(v for v in f.values())
-    rows, total = photos.search(_store(), f, limit=PAGE, offset=(number - 1) * PAGE) if active else ([], 0)
+    rows, total = photos.search(_store(), f, limit=PAGE, offset=(number - 1) * PAGE,
+                                 config=getattr(settings, "TOWPATH_CONFIG", None)) if active else ([], 0)
     for r in rows:
         r["ref"] = "/ref/?" + urlencode({"r": f"{r['provider_id']}:{r['occurrence_id']}"})
     query = urlencode({k: ("1" if v is True else v) for k, v in f.items() if v})

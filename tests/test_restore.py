@@ -3,8 +3,10 @@ that could change mail, reach a model or widen access."""
 
 import io
 import json
+import re
 import sys
 import zipfile
+from contextlib import closing
 from pathlib import Path
 
 import pytest
@@ -12,8 +14,8 @@ from django.test import Client, override_settings
 
 from towpath import decisions, export, life, life_propose, restore
 from towpath.mail import rules, senders, settings as mail_settings, threads
-from towpath.stores import store_path
-from towpath.unified import grants
+from towpath.stores import open_store, store_path
+from towpath.unified import collections, grants
 from towpath.web import auth
 from towpath.web.application import configure
 
@@ -46,7 +48,7 @@ def decided(w):
 def fresh(w):
     """The same connections, with every decision gone (a new Towpath the owner added the account to again)."""
     for store in ("decisions", "maildecisions"):
-        store_path(w.store, store).unlink()
+        store_path(w.store, store).unlink(missing_ok=True)
 
 
 def test_a_restore_brings_back_the_owners_decisions_and_nothing_that_changes_mail(world):
@@ -140,6 +142,90 @@ def test_the_restore_page_shows_the_plan_then_restores(world, monkeypatch):
         page = client.post("/restore", {"package": upload}).content.decode()
         assert "What this export would add" in page and "Never restored" in page
         assert not life.reviews(world.store, [first])
-        page = client.post("/restore", {"action": "restore"}).content.decode()
+        digest = re.search(r'name="digest" value="(\w+)"', page)[1]
+        page = client.post("/restore", {"action": "restore", "digest": digest}).content.decode()
         assert "Restored" in page and life.reviews(world.store, [first])[first]["state"] == "rejected"
         assert not (Path(world.store) / "pending-restore.zip").exists()
+
+
+def _edited(data, change):
+    z = zipfile.ZipFile(io.BytesIO(data))
+    files = {n: z.read(n) for n in z.namelist()}
+    change(files)
+    return _zip(files)
+
+
+def _add(files, name, *rows):
+    files[f"restore/{name}.json"] = json.dumps(json.loads(files[f"restore/{name}.json"]) + list(rows)).encode()
+
+
+def test_damaged_or_hand_edited_rows_are_left_out_and_cannot_break_a_page(world):
+    first = decided(world)
+    _, data = export.build(world.store)
+    at = {"author": "x", "at": "2026-01-01"}
+
+    def damage(files):
+        _add(files, "settings",
+             {"target_id": "claim:clm_x", "key": "review", "value": json.dumps({"state": "accepted"}), **at},
+             {"target_id": "group:g1", "key": "group", "value": "{}", **at},
+             {"target_id": mail_settings.target(world.sid), "key": "draft_notes", "value": json.dumps(["x"]), **at},
+             {"target_id": mail_settings.target(world.sid), "key": "draft_notes", "value": json.dumps("x" * 5000),
+              **at})
+        _add(files, "collections",
+             {"collection_id": "col_bad1", "name": "Bad JSON", "kind": "query", "definition": "{not json",
+              "author": "x", "created_at": "t", "updated_at": "t"},
+             {"collection_id": "col_bad2", "name": "Bad kind", "kind": "anything", "definition": None,
+              "author": "x", "created_at": "t", "updated_at": "t"},
+             {"collection_id": "col_bad3", "name": "Photos as query", "kind": "query",
+              "definition": json.dumps({"camera": "x"}), "author": "x", "created_at": "t", "updated_at": "t"})
+        _add(files, "dismissals", {"match_key": "m1", "reason": ["not text"], **at})
+    damaged = _edited(data, damage)
+    fresh(world)
+    plan = restore.plan(world.store, damaged)
+    assert plan["skipped"] >= 8
+    restore.apply(world.store, damaged)
+    assert life.reviews(world.store, [first])[first]["state"] == "rejected"  # the good rows still came back
+    assert threads.notes(world.store, world.sid, "web") == "Sign off with just my first name."
+    assert life.claims(world.store)
+    assert not [c for c in collections.list_all(world.store) if c["name"].startswith("Bad")]
+    for bad in (b"PK\x03\x04" + b"\x00" * 40, _zip({"restore/version.json": b"[" * 100_000})):
+        with pytest.raises(restore.RestoreError):
+            restore.plan(world.store, bad)
+
+
+def test_marks_that_keep_mail_from_cloud_models_follow_the_account_to_its_new_id(world):
+    from towpath.connect import item_id
+    from towpath.mail import privacy
+
+    with closing(open_store(world.store, "source", "web")) as src:
+        item, native = src.execute("SELECT item_id, native_id FROM items WHERE source_id = ? LIMIT 1",
+                                   (world.sid,)).fetchone()
+    decisions.set_item(world.config, privacy.sender_target(world.sid, "sam@example.org"), model_use="no-cloud")
+    decisions.set_item(world.config, item, model_use="local-only")
+    _, data = export.build(world.store)
+    fresh(world)
+    with closing(open_store(world.store, "connections", "connect")) as db:
+        db.execute("UPDATE connections SET source_id = 'fastmail-new' WHERE source_id = ?", (world.sid,))
+        db.commit()
+    restore.apply(world.store, data)
+    with closing(open_store(world.store, "decisions", "web")) as db:
+        got = dict(db.execute("SELECT target_id, value FROM settings WHERE key = 'model_use'").fetchall())
+    assert got == {privacy.sender_target("fastmail-new", "sam@example.org"): "no-cloud",
+                   item_id("fastmail-new", native): "local-only"}
+
+
+def test_the_restore_button_applies_only_the_file_whose_plan_was_shown(world, monkeypatch):
+    decided(world)
+    _, data = export.build(world.store)
+    fresh(world)
+    monkeypatch.setattr(auth, "_setup_codes", {})
+    configure(world.store)
+    auth.create_account(world.store, "owner", OWNER)
+    with override_settings(TOWPATH_STORE_DIR=world.store, TOWPATH_CONFIG=world.config, ALLOWED_HOSTS=["testserver"]):
+        client = Client()
+        client.post("/login", {"username": "owner", "password": OWNER})
+        upload = io.BytesIO(data)
+        upload.name = "a.zip"
+        client.post("/restore", {"package": upload})
+        page = client.post("/restore", {"action": "restore", "digest": "0" * 64}).content.decode()
+        assert "changed since its plan was shown" in page and not senders.marks(world.store, world.sid, "web")
