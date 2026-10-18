@@ -65,7 +65,8 @@ Then, from the roadmap's later milestone and the owner's search ideas:
 8. **Restore from an export package**: load the owner's own decisions (reviews, recollections, memories kept or
    renamed, rules, sender categories, settings) from an export archive into a fresh Towpath, shown first as a dry
    run of what would be added, never overwriting a newer decision (roadmap milestone 8, "portable export and
-   restore").
+   restore"). Built: Your story → *Restore your decisions* (add-only; permissions, model choices and mail
+   switches never come back from a file; rules return turned off).
 9. **Save a photo search as a collection**: the Photos page's filters, or a plain-English search, saved as a
    collection that keeps the search and lists what it finds (owner idea: natural-language search "can be saved as
    a collection"); hidden and private photos stay out as everywhere else.

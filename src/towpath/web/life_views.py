@@ -11,6 +11,7 @@ from django.shortcuts import redirect, render
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from datetime import date
+from pathlib import Path
 from urllib.parse import urlencode
 
 from towpath import connections, decisions, life, life_ask, life_groups, life_propose, life_today, stores
@@ -329,6 +330,52 @@ def export(request):
     response = HttpResponse(data, content_type="application/zip")
     response["Content-Disposition"] = f'attachment; filename="{name}"'
     return response
+
+
+PENDING_RESTORE = "pending-restore.zip"
+
+
+@require_http_methods(["GET", "POST"])
+def restore(request):
+    """Bring the owner's decisions back from an export: upload it, see what would be added, then add it."""
+    import os
+
+    from towpath import restore as restore_mod
+
+    store = Path(settings.TOWPATH_STORE_DIR)
+    pending = store / PENDING_RESTORE
+    context = {"nav": "life"}
+    if request.method == "POST" and request.POST.get("action") == "restore" and pending.exists():
+        try:
+            context["done"] = restore_mod.apply(store, pending.read_bytes(), author="owner")
+        except restore_mod.RestoreError as exc:
+            context["error"] = str(exc)
+        pending.unlink(missing_ok=True)
+    elif request.method == "POST" and request.POST.get("action") == "cancel":
+        pending.unlink(missing_ok=True)
+    elif request.method == "POST":
+        upload = request.FILES.get("package")
+        if upload is None:
+            context["error"] = "Choose an export file (a towpath-export zip)."
+        elif upload.size > restore_mod.MAX_TOTAL:
+            context["error"] = "That file is too large to be a Towpath export."
+        else:
+            data = b"".join(upload.chunks())
+            try:
+                context["plan"] = restore_mod.plan(store, data)
+            except restore_mod.RestoreError as exc:
+                context["error"] = str(exc)
+            else:
+                fd = os.open(pending, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                with os.fdopen(fd, "wb") as f:
+                    f.write(data)
+                context["name"] = upload.name
+    if "plan" not in context and "done" not in context and pending.exists():
+        try:
+            context["plan"] = restore_mod.plan(store, pending.read_bytes())
+        except restore_mod.RestoreError:
+            pending.unlink(missing_ok=True)
+    return render(request, "life_restore.html", context)
 
 
 @require_GET

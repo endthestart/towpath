@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Restore from an export · Life · Towpath{% endblock %}
+{% block content %}
+<a class="back-link" href="/life/story">← Your story</a>
+<header class="page-head compact"><h1>Restore from an export</h1>
+<p class="lead">Bring your decisions back from a Towpath export: events you kept, rejected or edited, your recollections and memories, sender categories, conversation marks, notes and rules. A restore only adds; anything you've already decided here stays as it is. Permissions, model choices and anything that changes mail are never restored from a file, and rules come back turned off for you to review.</p></header>
+{% if error %}<div class="notice warn" role="alert">{{ error }}</div>{% endif %}
+{% if done %}<div class="notice" role="status">Restored {{ done.total }} decision{{ done.total|pluralize }}.</div>
+{% elif plan %}<section class="detail-card"><h2 class="card-title">What this export would add{% if name %} <span class="muted">· {{ name }}</span>{% endif %}</h2>
+{% if plan.adds %}<ul>{% for label, n in plan.adds %}<li>{{ n }} {{ label }}</li>{% endfor %}</ul>{% else %}<p>Nothing new: everything in it is already decided here.</p>{% endif %}
+{% if plan.kept %}<p class="muted">{{ plan.kept }} already decided here, kept as they are.</p>{% endif %}
+{% if plan.waiting %}<p class="muted">Not connected here yet: {{ plan.waiting|join:", " }}. Add {{ plan.waiting|length|pluralize:"it,them" }} on Connections, then restore again for {{ plan.waiting|length|pluralize:"its,their" }} mail decisions.</p>{% endif %}
+{% if plan.skipped %}<p class="muted">{{ plan.skipped }} left out (not something a file may restore, or not readable).</p>{% endif %}
+<p class="muted">Never restored: {{ plan.left_out|join:"; " }}.</p>
+<form method="post" class="form-actions">{% csrf_token %}{% if plan.total %}<button class="button" name="action" value="restore">Restore {{ plan.total }}</button>{% endif %}<button class="button secondary" name="action" value="cancel">Cancel</button></form></section>
+{% endif %}
+{% if not plan or done %}<section class="detail-card"><h2 class="card-title">Choose an export</h2>
+<form method="post" enctype="multipart/form-data">{% csrf_token %}<p><input type="file" name="package" accept=".zip,application/zip" required></p>
+<p class="form-actions"><button class="button">See what it would add</button></p></form></section>{% endif %}
+{% endblock %}

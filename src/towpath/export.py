@@ -31,6 +31,8 @@ contents, or passwords are included; each record names its source instead (a mes
 - `people.json`: everyone you correspond with, with mail counts and dates.
 - `mail/<account>/`: your rules, sender categories, conversation marks, purchases, settings and filed documents.
 - `decisions.json`: every decision recorded, with who made it and when.
+- `restore/`: your decisions in the form Towpath reads back (Life → Export → *Restore*), to bring them into a new
+  Towpath. Permissions, model choices and anything that changes mail are never restored from a file.
 """
 
 
@@ -50,7 +52,7 @@ def _rows(store_dir, store: str, sql: str, args=()) -> list[dict]:
 
 def build(store_dir) -> tuple[str, bytes]:
     """(file name, zip bytes)."""
-    from towpath import life, life_groups, life_story, people
+    from towpath import life, life_groups, life_story, people, restore
     from towpath.mail import FEATURE, purchases, rules, senders, settings as mail_settings, threads
     from towpath.unified import grants
 
@@ -80,4 +82,7 @@ def build(store_dir) -> tuple[str, bytes]:
                 store_dir, "mail", "SELECT filename, path, size, sha256, status, at FROM filed WHERE source_id = ? AND "
                 "status IN ('filed', 'same')", (sid,))))
         z.writestr("decisions.json", _json(_rows(store_dir, "decisions", "SELECT * FROM decision_log ORDER BY rowid")))
+        z.writestr("restore/version.json", _json({"version": restore.VERSION}))
+        for name, rows in restore.package(store_dir).items():
+            z.writestr(f"restore/{name}.json", _json(rows))
     return f"towpath-export-{when:%Y-%m-%d}.zip", buf.getvalue()
