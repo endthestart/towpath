@@ -232,3 +232,5 @@ Then, from the roadmap's later milestone and the owner's search ideas:
   visible originals, 9,567 photos hidden or deleted) and left out every file of the libraries it couldn't read
   (mostly libraries' own copies in backups); 137 previews were made in the first pass. Finding life events by
   itself is reading Fastmail's 2026 mail.
+- 2026-10-17: `a53f6c8` deployed (items 5–7: trips from photos, bookings from receipts, Messages in Search all and
+  on People pages); all 34 pages answered on Hub. Items 8–10 built and under review before release.

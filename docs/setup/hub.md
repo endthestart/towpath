@@ -6,14 +6,14 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `6c07ed8` (the Overview's mail totals and the Photos page's counts kept for a few minutes; on top of
-`ffae7c4`'s photo previews), publishing run
-[39071681066](https://github.com/endthestart/towpath/actions/runs/39071681066). New stores and tables only; the web
+Revision `a53f6c8` (trips gathered from runs of photo days, bookings from receipts as life events, and Messages and
+Facebook conversations in Search all and on People pages), publishing run
+[39081978910](https://github.com/endthestart/towpath/actions/runs/39081978910). New stores and tables only; the web
 service and connector add their own tables at start. On Hub, Fastmail is allowed for the life story and finding
 events by itself is on (the owner's answers of October 17).
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:c15bb67b8c1044ba0d2b7161360a33f8cc616471a30bd4fca8d10f86e577eca8`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:4bb01445290bdfef2099c3c32cbbe008d16bb93468e504faf9714a5771865b02`
+- `web`: `ghcr.io/endthestart/towpath@sha256:f9322377568359834db78907cdff707b619dbb247cb9a0fc7ff73b68fb359477`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:61bbdafcbe3bb9be3b44fd210eee418ddf86a7e59f576b6ef5036e5e88118dac`
 
 Towpath's data folder (stores, sign-ins and the Recoll index) lives on a mirrored SSD pool since 2026-10-08,
 with hourly snapshots replicated to the main pool: Recoll's index writes had saturated the spinning disks. The
@@ -28,6 +28,7 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `6c07ed8` | Overview mail totals and Photos counts kept for a few minutes | `towpath@sha256:c15bb67b…`, `towpath-recoll@sha256:4bb01445…` |
 | `ffae7c4` | Photo previews, never for the private export or photos hidden in Apple Photos; stored mail first for life events | `towpath@sha256:9aa88615…`, `towpath-recoll@sha256:9623d91e…` |
 | `44d310e` | Filing documents from mail into the data folder, as a dry run first | `towpath@sha256:3def2759…`, `towpath-recoll@sha256:f384e8e9…` |
 | `1d06040` | Fixes from a privacy review: the private export kept out of the catalog and Recoll, model calls name their mail, grants honoured | `towpath@sha256:df03a081…`, `towpath-recoll@sha256:8ce94950…` |
