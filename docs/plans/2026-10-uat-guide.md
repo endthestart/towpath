@@ -72,6 +72,8 @@ password with full IMAP and SMTP access), then on Mail → Settings tick the kin
 - **Photos** (`/photos/`): cameras and years from 40,000+ photos read; try "photos from my Fuji in 2019" in the
   plain-English box. Small previews appear as they're made (each photo's own camera thumbnail; none for the private
   export or photos hidden in Apple Photos; turn them off on the page). Few of your photos record a location.
+  *Save as a collection* keeps a search (yours or a plain-English one); its collection lists what it finds each
+  time, with previews, and never a hidden or private photo.
 - **Search all**: `in:"root/folder"`, `size:>100MB`, `modified:2019`; or ask in plain English. Words in your
   Messages and Facebook conversations are found too, once those exports are added.
 - **Space**: duplicate groups now say whether copies are identical by content.

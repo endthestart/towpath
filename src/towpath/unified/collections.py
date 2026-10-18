@@ -9,6 +9,9 @@ unchanged, changed, added, removed or unavailable, and whether the evaluation it
 - A ``set`` collection's members are explicit references, each with the version seen when it was added.
 - A ``query`` collection stores its filters. Its ``baseline`` is the result set the owner last
   accepted; evaluation compares the current results with it.
+- A ``photos`` collection stores a Photos-page search (camera, lens, dates, located, words) and works like a query
+  collection over the photo catalog. Photos hidden in Apple Photos or in the private export never appear in it, and
+  an accepted photo that is hidden later is only counted, never listed.
 """
 
 import json
@@ -22,7 +25,8 @@ from towpath.unified.contracts import ContractError, Filters, Reference, decode_
 
 SCHEMA = "towpath.collection/0"
 EVALUATION_SCHEMA = "towpath.collection-evaluation/0"
-KINDS = ("query", "set")
+KINDS = ("query", "set", "photos")
+MAX_PHOTOS = 2000
 WRITER = "web"
 READER = "connect"  # any non-writer opens the decisions store read-only
 MAX_PER_SOURCE = 500
@@ -42,16 +46,35 @@ def _log(db, kind: str, cid: str, detail: dict, author: str) -> None:
                (kind, f"collection:{cid}", json.dumps(detail, sort_keys=True), author, _now()))
 
 
-def create(store_dir, name: str, kind: str, filters: Filters | None = None, author: str = "local-user") -> dict:
+def photo_filters(given: dict) -> dict:
+    """A Photos-page search, cleaned: only its own fields, as short strings (``located`` as a flag)."""
+    from towpath import photos
+
+    clean = {}
+    for key in photos.FILTERS:
+        value = given.get(key)
+        if key == "located":
+            if value in (True, "1", 1):
+                clean[key] = True
+        elif isinstance(value, str) and value.strip():
+            clean[key] = " ".join(value.split())[:200]
+    if not clean:
+        raise CollectionError("a photo collection needs a search (a camera, lens, dates, place or words)")
+    return clean
+
+
+def create(store_dir, name: str, kind: str, filters: Filters | None = None, author: str = "local-user",
+           photos: dict | None = None) -> dict:
     name = (name or "").strip()
     if not name or len(name) > MAX_NAME:
         raise CollectionError(f"a collection needs a name of 1-{MAX_NAME} characters")
     if kind not in KINDS:
         raise CollectionError("kind must be query or set")
-    if (kind == "query") != (filters is not None):
-        raise CollectionError("a query collection needs filters; a set collection takes none")
+    if (kind == "query") != (filters is not None) or (kind == "photos") != (photos is not None):
+        raise CollectionError("a query collection needs filters, a photo collection a photo search; a set takes none")
     cid = "col_" + uuid.uuid4().hex[:12]
-    definition = json.dumps(filters.to_dict(), sort_keys=True) if filters else None
+    definition = json.dumps(filters.to_dict() if filters else photo_filters(photos), sort_keys=True) \
+        if filters or photos else None
     with closing(open_store(store_dir, "decisions", WRITER)) as db:
         if db.execute("SELECT 1 FROM collections WHERE name = ?", (name,)).fetchone():
             raise CollectionError(f"a collection named {name!r} already exists")
@@ -128,8 +151,8 @@ def accept(store_dir, key: str, evaluation: dict, author: str = "local-user") ->
         row = _row(db, key)
         if row is None:
             raise CollectionError(f"no collection {key!r}")
-        if row["kind"] != "query" or evaluation.get("collection_id") != row["collection_id"]:
-            raise CollectionError("only a query collection's own evaluation can become its baseline")
+        if row["kind"] not in ("query", "photos") or evaluation.get("collection_id") != row["collection_id"]:
+            raise CollectionError("only a query or photo collection's own evaluation can become its baseline")
         current = [i for i in evaluation["items"] if i["status"] in {"added", "unchanged", "changed", "unverified"}]
         previous = {item["ref"]: dict(item) for item in db.execute(
             "SELECT * FROM collection_items WHERE collection_id = ? AND role = 'baseline'",
@@ -244,10 +267,41 @@ def _evaluate_query(adapters, collection: dict, max_per_source: int) -> tuple[li
     return items, list(reasons)
 
 
-def evaluate(adapters, collection: dict, mode: str = "local", max_per_source: int = MAX_PER_SOURCE) -> dict:
+def _evaluate_photos(store_dir, collection: dict) -> tuple[list, list]:
+    from towpath import photos
+
+    if store_dir is None:
+        raise CollectionError("a photo collection is evaluated against this Towpath's photo catalog")
+    rows, total = photos.search(store_dir, photo_filters(collection["filters"]), limit=MAX_PHOTOS)
+    reasons = [f"showing the first {MAX_PHOTOS} of {total} photos"] if total > len(rows) else []
+    baseline = {b["ref"]: b for b in collection["baseline"]}
+    items, current = [], set()
+    for r in rows:
+        ref = f"{r['provider_id']}:{r['occurrence_id']}"
+        current.add(ref)
+        name = r["rel_path"].rsplit("/", 1)[-1]
+        entry = {"ref": ref, "title": f"{name} · {(r.get('taken') or '')[:10]}".rstrip(" ·"), "source_type": "photo",
+                 "version_now": str(r.get("size")), "occurrence_id": r["occurrence_id"]}
+        if ref in baseline:
+            status, reason = _compare(baseline[ref]["version"], entry["version_now"])
+            entry.update(version_then=baseline[ref]["version"], status=status, reason=reason)
+        else:
+            entry.update(version_then=None, status="added", reason="matches now; not in the accepted results")
+        items.append(entry)
+    gone = sum(1 for ref in baseline if ref not in current)
+    if gone and not reasons:  # counted, never listed: one may be a photo hidden since
+        reasons.append(f"{gone} accepted photo{'s' if gone != 1 else ''} no longer match (hidden, removed or changed "
+                       "since)")
+    return items, reasons
+
+
+def evaluate(adapters, collection: dict, mode: str = "local", max_per_source: int = MAX_PER_SOURCE,
+             store_dir=None) -> dict:
     """Re-check a collection against its sources now. Never changes the collection."""
     try:
-        if collection["kind"] == "set":
+        if collection["kind"] == "photos":
+            items, reasons = _evaluate_photos(store_dir, collection)
+        elif collection["kind"] == "set":
             items, reasons = _evaluate_set(adapters, collection)
         else:
             items, reasons = _evaluate_query(adapters, collection, max_per_source)

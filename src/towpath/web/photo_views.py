@@ -65,6 +65,19 @@ def previews(request):
 
 
 @require_POST
+def save(request):
+    """Keep the current search as a photo collection, which lists what it finds each time it's opened."""
+    from towpath.unified import collections
+
+    try:
+        created = collections.create(_store(), request.POST.get("name", ""), "photos", author="owner",
+                                     photos={k: request.POST.get(k, "") for k in photos.FILTERS})
+    except collections.CollectionError as exc:
+        return HttpResponseBadRequest(str(exc))
+    return redirect(f"/collections/{created['collection_id']}/")
+
+
+@require_POST
 def ask(request):
     text = " ".join(request.POST.get("question", "").split())[:300]
     if not text:

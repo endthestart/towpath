@@ -26,6 +26,7 @@ urlpatterns = [
     path("photos/ask", photo_views.ask, name="photos-ask"),
     path("photos/preview/<str:occurrence_id>", photo_views.preview, name="photo-preview"),
     path("photos/previews", photo_views.previews, name="photo-previews"),
+    path("photos/save", photo_views.save, name="photos-save"),
     path("photos/ask/<int:seq>", photo_views.asked, name="photos-asked"),
     path("life/", life_views.overview, name="life"),
     path("life/account", life_views.account, name="life-account"),

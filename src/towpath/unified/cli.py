@@ -258,7 +258,8 @@ def collections_evaluate(collection: str, accept: bool = typer.Option(False, "--
     adapters = _adapters(config, local)
 
     def run(c):
-        evaluation = c.evaluate(adapters, c.get(cfg.store_dir, collection), "local" if local else "connect")
+        evaluation = c.evaluate(adapters, c.get(cfg.store_dir, collection), "local" if local else "connect",
+                                store_dir=cfg.store_dir)
         if accept:
             evaluation["accepted"] = c.accept(cfg.store_dir, collection, evaluation)
         return evaluation

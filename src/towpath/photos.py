@@ -252,8 +252,10 @@ def search(store_dir, f: dict, limit: int = 200, offset: int = 0, role: str = "w
         where.append("lower(o.rel_path) LIKE ?")
         args.append(f"%{f['text'].lower()}%")
     where.append("p." + VISIBLE)
+    where.append("NOT towpath_private(o.rel_path)")  # the purge takes these out; never list one that slipped in
     clause = " AND ".join(where)
     with closing(open_store(store_dir, "files", role)) as db:
+        db.create_function("towpath_private", 1, is_private, deterministic=True)
         total = db.execute(f"SELECT count(*) FROM photo_meta p JOIN occurrences o USING (occurrence_id) WHERE "
                            f"{clause} AND p.problem IS NULL AND o.missing_since_run IS NULL", args).fetchone()[0]
         rows = [dict(r) for r in db.execute(

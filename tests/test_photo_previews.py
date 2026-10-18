@@ -180,3 +180,47 @@ def test_the_year_page_shows_previews_of_its_busiest_days_but_never_a_hidden_pho
         page = client.get("/life/year/2019").content.decode()
         assert f"/photos/preview/{by['plain']}" in page and f"/photos/preview/{by['hidden original']}" not in page
         assert f"/photos/preview/{by['private']}" not in page
+
+
+def test_a_photo_search_saved_as_a_collection_never_lists_a_hidden_photo(world, monkeypatch):
+    from django.test import Client, override_settings
+
+    from towpath.unified import collections
+    from towpath.web import auth
+    from towpath.web.application import configure
+
+    config, fake, _, by, root = world
+    run(config, fake)
+    monkeypatch.setattr(auth, "_setup_codes", {})
+    configure(config.store_dir)
+    auth.create_account(config.store_dir, "owner", "correct horse battery staple")
+    with override_settings(TOWPATH_STORE_DIR=config.store_dir, TOWPATH_CONFIG=config, ALLOWED_HOSTS=["testserver"]):
+        client = Client()
+        client.post("/login", {"username": "owner", "password": "correct horse battery staple"})
+        assert "Save as a collection" in client.get("/photos/", {"camera": "x100v"}).content.decode()
+        saved = client.post("/photos/save", {"name": "Fuji photos", "camera": "x100v", "lens": "<script>"})
+        cid = saved["Location"].split("/")[2]
+        found = collections.get(config.store_dir, cid)
+        assert found["kind"] == "photos" and found["filters"] == {"camera": "x100v", "lens": "<script>"}
+        collections.create(config.store_dir, "Fuji only", "photos", photos={"camera": "x100v"})
+        page = client.get(f"/collections/{collections.get(config.store_dir, 'Fuji only')['collection_id']}/")
+        page = page.content.decode()
+        assert by["plain"] in page and f"/photos/preview/{by['plain']}" in page
+        for why in ("hidden original", "private", "deleted original"):
+            assert by[why] not in page, why
+        cid = collections.get(config.store_dir, "Fuji only")["collection_id"]
+        client.post(f"/collections/{cid}/accept")
+        assert len(collections.get(config.store_dir, cid)["baseline"]) >= 2
+        # The owner hides an accepted photo: it is counted at most, never listed.
+        con = sqlite3.connect(root / "Lib.photoslibrary/database/Photos.sqlite")
+        con.execute("UPDATE ZASSET SET ZHIDDEN = 1 WHERE ZUUID = 'AAAA-1'")
+        con.commit()
+        con.close()
+        later = os.stat(root / "Lib.photoslibrary/database/Photos.sqlite").st_mtime_ns + 10**9
+        os.utime(root / "Lib.photoslibrary/database/Photos.sqlite", ns=(later, later))
+        run(config, fake)
+        page = client.get(f"/collections/{cid}/").content.decode()
+        assert by["visible original"] not in page and "AAAA-1" not in page
+        assert "1 accepted photo no longer match" in page
+    with pytest.raises(collections.CollectionError):
+        collections.create(config.store_dir, "Nothing", "photos", photos={"camera": " "})
