@@ -19,14 +19,17 @@ evidence. The export itself is never changed.
 
 Apple offers no general data API, so these are copies you make, then index like any folder.
 
-- **iCloud Mail:** add it as an IMAP account (*Connections → Email (IMAP)*, server `imap.mail.me.com`, port 993,
-  with an app-specific password from appleid.apple.com). Mail management works on it as on Fastmail.
+- **iCloud Mail:** *Connections → iCloud Mail*, with your iCloud address and an app-specific password from
+  account.apple.com. Mail management works on it as on Fastmail (dry runs first). Yahoo Mail works the same way
+  (*Connections → Yahoo Mail*). Outlook.com isn't offered: Microsoft no longer accepts passwords over IMAP for
+  personal accounts.
 - **iCloud Photos:** copy them to the server with [icloudpd](https://github.com/icloud-photos-downloader/icloud_photos_downloader)
   (it needs *Access iCloud Data on the Web* turned on and a sign-in every few months), then add the folder under
   *Folders on this server*. The Photos page then reads their cameras, dates and places.
-- **Messages:** there is no API. Export them on a Mac from its Messages database, or from a local iPhone backup,
-  with an exporter such as [imessage-exporter](https://github.com/ReagentX/imessage-exporter) (text or HTML), into a
-  folder on the server, and index that folder. A dedicated importer like the Facebook one is not built yet.
+- **Messages:** there is no API. Export them on a Mac with
+  [imessage-exporter](https://github.com/ReagentX/imessage-exporter) in its **text** format into a folder on the
+  server, then *Connections → Apple Messages export*. Each conversation becomes one item per day, searchable from
+  Search all and shown on People pages, with the same protections as mail.
 - **Contacts and calendars:** *Connections → iCloud contacts and calendars*, with your Apple Account email and an
   app-specific password. Towpath finds the address books and calendars the standard way and only reads them.
 
