@@ -88,6 +88,15 @@ Then, from the life-story and later milestones:
     contacts, Messages) into one page, with the owner able to join or separate them. Built: suggested by the same
     full name, joined only by the owner.
 
+Then (roadmap milestone 8 and the owner's ideas):
+
+14. **More mail providers**: iCloud Mail, Outlook.com and Yahoo Mail on Connections, each with its server filled in
+    and a link to making an app password; the same dry-run rules as every account.
+15. **Birthdays coming up**: the digest and the Overview list the next week's birthdays and anniversaries from
+    the owner's contacts.
+16. **Measure the catalog's hot path on Hub**: time adding Recoll's records to the catalog on Hub's current index
+    (roadmap: Rust for hot paths); move it to Rust only if the measurement shows it still dominates.
+
 ## Open questions
 
 1. ~~**Attachment filing**~~ — answered October 17: a folder in Towpath's data folder, by year and sender,
