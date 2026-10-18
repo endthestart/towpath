@@ -5,6 +5,19 @@ Fastmail is in **Dry runs only**, there is no write password, and every change s
 Decisions I made for you to confirm or reverse are listed in the
 [autonomous build plan](2026-10-17-autonomous-build.md#decisions-made-for-review); open questions are there too.
 
+## 0. First: connect Gmail for the side-by-side week
+
+Before anything else, connect Gmail to Towpath so both tools see the same mail for a week (your answer of
+October 18):
+
+1. Make a Google app password (2-Step Verification on; <https://myaccount.google.com/apppasswords>), named
+   *Towpath (reading)*, and check IMAP is on in Gmail's settings.
+2. Towpath → Connections → **Gmail (IMAP)** → your Gmail address and the app password → choose folders → *Index*.
+3. Leave the account in **Dry runs only** all week: Towpath proposes and records, Inbox Zero keeps doing the work.
+4. After a week, compare *To reply*, categories and unsubscribe candidates side by side, and confirm the rules
+   rewritten from Inbox Zero (below, under *Rules from Inbox Zero*). Inbox Zero is retired only when you prefer
+   Towpath's lists.
+
 ## 1. Start here (10 minutes)
 
 1. **Overview** (`/`): the Today cards: conversations waiting for your reply, life events and memories to review,
