@@ -402,3 +402,40 @@ def test_fixture_listing_boundaries(fx):
     page = fx.search("zebrafinch", limit=200)
     assert page["more_may_exist"] is False
 
+
+
+def test_the_listing_fast_path_accepts_and_refuses_exactly_what_the_full_check_does(fx):
+    from pathlib import PurePosixPath
+
+    def slow(rel):
+        if not rel or "\x00" in rel:
+            return "refused"
+        pure = PurePosixPath(rel)
+        if pure.is_absolute() or ".." in pure.parts or "\\" in rel:
+            return "refused"
+        return str(pure)
+
+    def fast(rel):
+        try:
+            return refs.check_relative(rel)
+        except refs.BadReference:
+            return "refused"
+    tricky = ["a", "a/b.txt", "a//b", "./a", "a/./b", "a/", "a/.", ".", "..", "../a", "a/..", "a/../b", "a\\b",
+              "a/..b", "...", "a/.hidden", ".hidden", "/a", "a\x00b", "", " a/b ", "a/b/c/d.e"]
+    assert [fast(r) for r in tricky] == [slow(r) for r in tricky]
+    roots = fx.config.files.roots
+    archive = Path(roots["archive"].path)
+    folders = refs.Folders()
+    for rel in ("notes/injection.md", "escape-link", "long/thesis-notes.txt", "notes/../escape-link"):
+        try:
+            full = refs.resolve_in_root(roots["archive"], rel)
+            expected = ("accepted", str(full))
+        except refs.BadReference:
+            expected = ("refused", None)
+        try:
+            refs._inside(roots["archive"], rel, folders)
+            got = ("accepted", folders.real_text(f"{folders.base_text(roots['archive'].path)}/{rel}"))
+        except refs.BadReference:
+            got = ("refused", None)
+        assert got == expected, rel
+    assert archive.exists()

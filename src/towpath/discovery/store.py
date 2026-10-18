@@ -54,10 +54,18 @@ def record_coverage(db, run_id: str, provider_id: str, root: str | None, complet
 def observe(db, occ: Occurrence, run_id: str) -> str:
     """Upsert one occurrence; returns 'new', 'same', or 'changed' (version differs from the last seen)."""
     loc = occ.locator
-    data = occ.to_dict()
+    ex = occ.extraction
+    # The same JSON as ``occ.to_dict()`` gives for these columns, built directly: this runs once per file on every
+    # import, millions of times, and ``asdict`` was the import's largest single cost.
     row = db.execute("SELECT version FROM occurrences WHERE occurrence_id = ?", (occ.occurrence_id,)).fetchone()
-    values = (loc.native_id, canonical_json(data["locator"]["members"]), occ.media_type, occ.size,
-              canonical_json(data["dates"]), canonical_json(occ.hashes), canonical_json(data["extraction"]),
+    values = (loc.native_id,
+              canonical_json([{"kind": m.kind, "name": m.name, "index": m.index} for m in loc.members]),
+              occ.media_type, occ.size,
+              canonical_json([{"meaning": d.meaning, "value": d.value, "basis": d.basis} for d in occ.dates]),
+              canonical_json(occ.hashes),
+              canonical_json({"status": ex.status, "parser": ex.parser, "parser_version": ex.parser_version,
+                              "extracted_bytes": ex.extracted_bytes, "limit_bytes": ex.limit_bytes,
+                              "detail": ex.detail, "truncated": ex.truncated}),
               occ.version)
     if row is None:
         db.execute("INSERT INTO occurrences (occurrence_id, provider_id, native_id, root_alias, rel_path, members, "

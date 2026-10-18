@@ -33,6 +33,7 @@ class Folders:
     def __init__(self, size: int = 4096):
         self._folder = functools.lru_cache(maxsize=size)(self._resolve_folder)
         self.base = functools.lru_cache(maxsize=64)(_real)  # each root's own real path
+        self.base_text = functools.lru_cache(maxsize=64)(lambda path: os.path.realpath(path))
 
     @staticmethod
     def _resolve_folder(folder: str) -> tuple[Path, frozenset] | None:
@@ -48,6 +49,16 @@ class Folders:
         if found is None or path.name in found[1]:
             return _real(path)
         return found[0] / path.name
+
+    def real_text(self, full: str) -> str:
+        """``real`` for a normalised absolute path given as text, without building Path objects (the same
+        answer: run once per file while listing millions)."""
+        parent, _, name = full.rpartition("/")
+        found = self._folder(parent or "/")
+        if found is None or name in found[1]:
+            return str(_real(full))  # a symbolic link, or a folder that can't be listed: resolved in full
+        folder = str(found[0])
+        return folder + name if folder.endswith("/") else f"{folder}/{name}"
 
 
 def _within(child: Path, parent: Path) -> bool:
@@ -71,7 +82,16 @@ def excluded(root, rel_path: str) -> bool:
         for pattern in root.exclude)
 
 
+def _plain(rel_path: str) -> bool:
+    """Whether a relative path is already in the form ``check_relative`` returns, so it needs no parsing."""
+    return not (rel_path.startswith(("/", "./")) or rel_path.endswith(("/", "/.")) or rel_path in (".", "..") or
+                "//" in rel_path or "/./" in rel_path or "\\" in rel_path or "\x00" in rel_path or
+                rel_path.startswith("../") or rel_path.endswith("/..") or "/../" in rel_path)
+
+
 def check_relative(rel_path: str) -> str:
+    if rel_path and _plain(rel_path):
+        return rel_path
     if not rel_path or "\x00" in rel_path:
         raise BadReference("empty or NUL-containing path")
     pure = PurePosixPath(rel_path)
@@ -88,6 +108,15 @@ def resolve_in_root(root, rel_path: str, folders: Folders | None = None) -> Path
     if not _within(target, base):
         raise BadReference("reference escapes its root")
     return target
+
+
+def _inside(root, rel_path: str, folders: Folders) -> None:
+    """``resolve_in_root`` with a folder cache, as text: refuses exactly what it refuses."""
+    rel_path = check_relative(rel_path)
+    base = folders.base_text(root.path)
+    target = folders.real_text(base + rel_path if base.endswith("/") else f"{base}/{rel_path}")
+    if not _within(target, base):
+        raise BadReference("reference escapes its root")
 
 
 def locate(reference: str, roots: dict, folders: Folders | None = None) -> tuple[str, str]:
@@ -107,16 +136,18 @@ def locate(reference: str, roots: dict, folders: Folders | None = None) -> tuple
     if "\x00" in path or not os.path.isabs(path):
         raise BadReference("reference must be an absolute file path")
     lexical = os.path.normpath(path)
+    check = resolve_in_root if folders is None else _inside
     for alias, root in roots.items():
         base = os.path.normpath(root.path)
         if lexical != base and _within(lexical, base):
             rel = _relative(lexical, base)
-            resolve_in_root(root, rel, folders)
+            check(root, rel, folders)
             return alias, rel
-        real_base = str(_real(root.path) if folders is None else folders.base(root.path))
+        real_base = _real(root.path) if folders is None else folders.base_text(root.path)
+        real_base = str(real_base)
         if lexical != real_base and _within(lexical, real_base):
             rel = _relative(lexical, real_base)
-            resolve_in_root(root, rel, folders)
+            check(root, rel, folders)
             return alias, rel
     raise BadReference("reference is outside every configured root")
 

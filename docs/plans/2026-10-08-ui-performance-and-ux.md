@@ -92,3 +92,19 @@ unique at every level, so they make 5 million folders, far more than real trees.
    out; about 5 s per million rows). By content hash later: that needs a read-only hashing pass that is
    scheduled and throttled.
 7. Static assets cached under versioned URLs (minor).
+
+## Adding to the catalog, measured again (2026-10-17)
+
+Hub's last full add (2026-10-09) put 8.6 M items in search in 105 minutes after Continue, about 1,400 a second
+including Recoll's reads (about 49 µs a record) on the spinning pool; it runs only when the owner asks to index
+again. A synthetic benchmark (100,000 invented paths, Mac SSD, profiled) found two Python costs per file:
+
+| Step | Before | After |
+| --- | --- | --- |
+| The containment check (`refs.locate`), about half the time | `pathlib` objects per file | text on normalised paths, through the folder cache; the original check stays for anything unusual |
+| Writing the row (`store.observe`) | `dataclasses.asdict` of the whole record | the stored columns' JSON built directly |
+| First add / re-adding unchanged files | 11,000 / 6,500 a second | 13,800 / 12,700 a second |
+
+At that rate the Python side is now about as fast as Recoll's own reads, so moving it to Rust would gain at most
+about twice on a step that runs only when the owner re-indexes. Not moved; measured again if re-indexing becomes
+routine.

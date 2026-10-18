@@ -98,7 +98,9 @@ Then (roadmap milestone 8 and the owner's ideas):
     the age they turn when the card gives a year. Not in the digest: it goes into one account's mailbox, and
     contacts are another connection's. Anniversaries wait for the contacts reader to keep them.
 16. **Measure the catalog's hot path on Hub**: time adding Recoll's records to the catalog on Hub's current index
-    (roadmap: Rust for hot paths); move it to Rust only if the measurement shows it still dominates.
+    (roadmap: Rust for hot paths); move it to Rust only if the measurement shows it still dominates. Done: two
+    Python costs removed (about twice as fast to re-add unchanged files); Rust not needed now (see the
+    [performance plan](2026-10-08-ui-performance-and-ux.md#adding-to-the-catalog-measured-again-2026-10-17)).
 
 ## Open questions
 
