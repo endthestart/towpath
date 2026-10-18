@@ -125,3 +125,33 @@ def test_a_refused_message_does_not_hold_up_the_rest(world, monkeypatch):
     monkeypatch.setattr(gateway, "infer", infer)
     found = purchases.read_pending(world.worker())[0]
     assert found["purchases"] == 1  # the receipt after the refused message was still read
+
+
+def test_bookings_become_life_events_once_the_account_is_allowed(world):
+    from contextlib import closing
+
+    from towpath import life, life_bookings
+    from towpath.stores import open_store
+    from towpath.unified import grants
+
+    receipt = analysis_item(world, "Your order confirmation")
+    with closing(open_store(world.store, "mailintel", "worker")) as db:
+        rows = [(world.sid, receipt, "Example Air", "2026-09-01", '["Flight to Denver"]'),
+                (world.sid, "other", "Corner Shop", "2026-09-02", '["Milk"]')]
+        db.executemany("INSERT INTO purchases VALUES (?,?,1,?,?,3,'USD',?,'X','m','t')", rows)
+        db.commit()
+    assert life_bookings.propose(world.worker()) == []  # not allowed for the life story yet
+    grants.grant(world.store, world.sid, "life-evidence", author="owner")
+    assert life_bookings.propose(world.worker()) == [{"step": "life-bookings", "proposed": 1}]
+    event, = life.claims(world.store)
+    assert event.statement == "Booked a flight with Example Air: Flight to Denver"
+    assert event.when.earliest == "2026-09-01" and event.citations[0].ref.startswith(f"{world.sid}:")
+
+
+def analysis_item(world, subject):
+    from contextlib import closing
+
+    from towpath.stores import open_store
+
+    with closing(open_store(world.store, "source", "web")) as src:
+        return src.execute("SELECT item_id FROM items WHERE subject = ?", (subject,)).fetchone()[0]
