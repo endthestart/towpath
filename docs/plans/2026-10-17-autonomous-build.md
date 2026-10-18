@@ -122,6 +122,21 @@ rules, the side-by-side Gmail test before retiring Inbox Zero, Outlook.com, and 
 4. ~~**Photo previews**~~ — answered October 17: yes, optional and on by default, as long as no cloud model reads
    any photo; never for the private export or photos hidden in Apple Photos (by the library's own hidden flag).
    Built with a test for each rule.
+5. **Importing Inbox Zero's rules** — Towpath has a read-only client for Inbox Zero's API, but its rule format has
+   never been tried against a real instance. Options: (a) the owner makes an Inbox Zero API key that can only read
+   rules and stores it in Towpath's credentials folder (Towpath never shows it), and Towpath imports the rules
+   turned off, for review; (b) skip importing and write the few rules that matter in Towpath by hand.
+   Recommended: (b) if there are fewer than about ten rules, else (a).
+6. **The side-by-side week before retiring Inbox Zero** — needs Gmail connected over IMAP with an app password
+   (Connections → Gmail (IMAP)), the owner's step. Options: (a) add it at the start of UAT and run both for a week,
+   dry runs only; (b) keep Inbox Zero for Gmail and use Towpath for Fastmail only. Recommended: (a).
+7. **Outlook.com** — Microsoft accepts only its own sign-in for personal accounts, which needs an app registered
+   in the owner's Microsoft account. Options: (a) build it if the owner uses Outlook.com; (b) leave it out.
+   Recommended: (b) unless there is an Outlook.com account worth reading.
+8. **iCloud Photos** — Apple has no API; the practical route is a copy made by icloudpd on the server, which needs
+   the owner's Apple sign-in every few months and *Access iCloud Data on the Web*. Options: (a) set it up (the
+   owner signs in; Towpath indexes the copy as a folder, with the same hidden and private rules); (b) rely on the
+   Photos libraries already on the NAS. Recommended: (b) if those libraries are current, else (a).
 
 ## Decisions made for review
 
