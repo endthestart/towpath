@@ -247,3 +247,25 @@ def test_birthdays_in_the_next_two_weeks_with_the_age_they_turn(tmp_path):
     assert got[1]["address"] == "sam@example.org"
     assert [b["name"] for b in dav_sync.birthdays_ahead(store, today=date(2027, 2, 20))] == ["Leap Example"]
     assert [b["name"] for b in dav_sync.birthdays_ahead(store, today=date(2026, 12, 28))] == ["New Year"]
+
+
+def test_this_week_lists_events_that_dont_repeat_once_each(tmp_path):
+    from datetime import date
+
+    from towpath import dav_sync
+    from towpath.stores import open_store
+
+    store = tmp_path / "state"
+    rows = [("a", "Dentist", "2026-10-19T09:30:00", 0, 0, "Main St"),
+            ("b", "Dentist", "2026-10-19T09:30:00", 0, 0, None),
+            ("c", "Holiday", "2026-10-20", 1, 0, None), ("d", "Standup", "2026-10-18T09:00:00", 0, 1, None),
+            ("e", "Later", "2026-10-30T10:00:00Z", 0, 0, None), ("f", "Yesterday", "2026-10-16", 1, 0, None)]
+    with open_store(store, "dav", "connect") as db:
+        for href, summary, start, all_day, recurring, location in rows:
+            db.execute("INSERT INTO events (source_id, href, n, etag, uid, summary, start, end, all_day, tz, location, "
+                       "organizer, attendees, recurring, description, collection, updated_at) VALUES "
+                       "('dav', ?, 0, 'e', NULL, ?, ?, NULL, ?, NULL, ?, NULL, '[]', ?, NULL, 'c', 't')",
+                       (href, summary, start, all_day, location, recurring))
+        db.commit()
+    got = dav_sync.week_ahead(store, today=date(2026, 10, 17))
+    assert [(e["summary"], e["time"]) for e in got] == [("Dentist", "09:30"), ("Holiday", None)]

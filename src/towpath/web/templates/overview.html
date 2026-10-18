@@ -9,6 +9,9 @@
   {% if today.birthdays %}<div class="metric"><p>Birthdays</p><strong>{{ today.birthdays|length }}</strong><span>in the next two weeks: {% for b in today.birthdays|slice:":4" %}{% if b.address %}<a href="/people/{{ b.address|urlencode }}/">{{ b.name }}</a>{% else %}{{ b.name }}{% endif %} {% if b.in_days == 0 %}today{% elif b.in_days == 1 %}tomorrow{% else %}{{ b.date|date:"D j M" }}{% endif %}{% if b.turns %} ({{ b.turns }}){% endif %}{% if not forloop.last %} · {% endif %}{% endfor %}{% if today.birthdays|length > 4 %} · and {{ today.birthdays|length|add:"-4" }} more{% endif %}</span></div>{% endif %}
   <div class="metric"><p>Photos</p><strong><a href="/photos/">{{ today.photos|floatformat:'0g' }}</a></strong><span>read for camera, date and place · <a href="/life/ask">Ask your records</a></span></div>
 </section>
+{% if today.week %}<section class="detail-card" aria-label="This week"><h2 class="card-title">This week</h2>
+{% for e in today.week %}<p>{{ e.day|date:"D j M" }}{% if e.time %} · {{ e.time }}{% endif %} — {{ e.summary }}{% if e.location %} <span class="muted">· {{ e.location }}</span>{% endif %}</p>{% endfor %}
+<p class="footnote">From your calendars; events that repeat aren't listed yet.</p></section>{% endif %}
 <section class="metrics" aria-label="Email index summary">
   <div class="metric"><p>Messages indexed</p><strong>{{ total|floatformat:'0g' }}</strong><span>Saved email metadata</span></div>
   <div class="metric"><p>Sent messages</p><strong>{{ sent|floatformat:'0g' }}</strong><span>Your side of the conversation</span></div>

@@ -24,4 +24,5 @@ def cards(store_dir) -> dict:
             "events_to_review": sum(c.state == "proposed" and c.significance != "routine" for c in claims),
             "memories_to_review": sum(g["state"] == "proposed" for g in groups),
             "on_this_day": len(today["years"]), "photos": photos.progress(store_dir).get("read", 0),
-            "birthdays": dav_sync.birthdays_ahead(store_dir, role="web")}
+            "birthdays": dav_sync.birthdays_ahead(store_dir, role="web"),
+            "week": dav_sync.week_ahead(store_dir, role="web")}

@@ -210,6 +210,31 @@ def birthdays_ahead(store_dir, days: int = 14, today=None, role: str = "web") ->
     return sorted(out, key=lambda b: (b["date"], b["name"]))
 
 
+def week_ahead(store_dir, today=None, days: int = 7, limit: int = 12, role: str = "web") -> list[dict]:
+    """Events starting in the next ``days`` days (today included), soonest first, across calendars. A repeating
+    event is stored once, as its first occurrence, so only events that don't repeat (and changed occurrences) are
+    listed. Days are compared as written in the calendar (its own local time, or UTC)."""
+    from datetime import date, timedelta
+
+    if store_dir is None or not store_path(store_dir, "dav").exists():
+        return []
+    today = today or date.today()
+    first, last = today.isoformat(), (today + timedelta(days=days - 1)).isoformat()
+    with closing(open_store(store_dir, "dav", role)) as db:
+        rows = db.execute("SELECT summary, start, all_day, location FROM events WHERE start IS NOT NULL AND "
+                          "substr(start, 1, 10) BETWEEN ? AND ? AND recurring = 0 ORDER BY start, summary LIMIT ?",
+                          (first, last, limit * 3)).fetchall()
+    out, seen = [], set()
+    for summary, start, all_day, location in rows:
+        key = (summary, start)
+        if key in seen:  # the same event in two calendars
+            continue
+        seen.add(key)
+        out.append({"summary": summary or "(No title)", "day": date.fromisoformat(start[:10]),
+                    "time": None if all_day or len(start) < 16 else start[11:16], "location": location})
+    return out[:limit]
+
+
 def events(store_dir, source_id: str | None = None, before: str | None = None, role: str = "web") -> list[dict]:
     if not store_path(store_dir, "dav").exists():
         return []

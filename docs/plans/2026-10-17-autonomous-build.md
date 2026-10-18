@@ -102,6 +102,13 @@ Then (roadmap milestone 8 and the owner's ideas):
     Python costs removed (about twice as fast to re-add unchanged files); Rust not needed now (see the
     [performance plan](2026-10-08-ui-performance-and-ux.md#adding-to-the-catalog-measured-again-2026-10-17)).
 
+17. **This week from calendars**: the Overview lists the next seven days' events from connected calendars.
+18. **Anniversaries from contacts**: dates a contact card records besides the birthday (vCard `ANNIVERSARY`, and
+    Apple's labelled dates) beside the birthdays on the Overview.
+
+After these, what remains on the roadmap waits on the owner (see the open questions): importing Inbox Zero's
+rules, the side-by-side Gmail test before retiring Inbox Zero, Outlook.com, and iCloud Photos.
+
 ## Open questions
 
 1. ~~**Attachment filing**~~ — answered October 17: a folder in Towpath's data folder, by year and sender,
