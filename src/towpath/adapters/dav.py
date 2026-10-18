@@ -209,7 +209,7 @@ def card_dates(text: str) -> list[tuple[str, str]]:
         if not sep:
             continue
         group, _, name = head.split(";")[0].rpartition(".")
-        name = name.upper()
+        group, name = group.lower(), name.upper()
         if name == "X-ABLABEL" and group:
             raw = _unescape(value).strip()
             m = APPLE_LABEL.match(raw)
@@ -266,7 +266,7 @@ def parse_events(text: str) -> list[dict]:
         if name == "BEGIN" and value.upper() == "VEVENT":
             current, depth = {"uid": None, "summary": None, "start": None, "end": None, "all_day": False,
                               "tz": None, "location": None, "organizer": None, "attendees": [], "recurring": False,
-                              "description": None, "recurrence_id": None}, 0
+                              "description": None, "recurrence_id": None, "status": None}, 0
         elif name == "BEGIN" and current is not None:
             depth += 1  # a VALARM inside the event
         elif name == "END" and current is not None and depth:
@@ -295,4 +295,6 @@ def parse_events(text: str) -> list[dict]:
                 current["recurrence_id"] = value.strip()
             elif name == "DESCRIPTION":
                 current["description"] = _unescape(value).strip()[:2000] or None
+            elif name == "STATUS":
+                current["status"] = value.strip().upper()[:20] or None
     return events

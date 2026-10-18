@@ -104,11 +104,13 @@ def _store_items(db, sid: str, collection: dict, texts: dict[str, str], etags: d
         else:
             db.execute("DELETE FROM events WHERE source_id = ? AND href = ?", (sid, href))
             for n, e in enumerate(dav.parse_events(text)):
-                db.execute("INSERT INTO events VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                db.execute("INSERT INTO events (source_id, href, n, etag, uid, summary, start, end, all_day, tz, "
+                           "location, organizer, attendees, recurring, description, collection, updated_at, override, "
+                           "status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                            (sid, href, n, etags.get(href, ""), e["uid"], e["summary"], e["start"], e["end"],
                             int(e["all_day"]), e["tz"], e["location"], e["organizer"], json.dumps(e["attendees"]),
                             int(e["recurring"] or bool(e["recurrence_id"])), e["description"], collection["href"],
-                            now()))
+                            now(), int(bool(e["recurrence_id"])), e["status"]))
         count += 1
     return count
 
@@ -127,9 +129,11 @@ def sync(store_dir: Path, credentials_dir: Path, c: dict, opener=None) -> dict:
                 table = "contacts" if kind == "contacts" else "events"
                 known = {r[0]: r[1] for r in db.execute(f"SELECT DISTINCT href, etag FROM {table} WHERE source_id = ? "
                                                         f"AND collection = ?", (sid, col["href"]))}
-                checked = {r[0] for r in db.execute("SELECT DISTINCT href FROM contact_dates WHERE source_id = ?",
-                                                    (sid,))} if kind == "contacts" else set(known)
-                # a card read before Towpath kept its other dates is read once more
+                checked = {r[0] for r in db.execute(
+                    "SELECT DISTINCT href FROM contact_dates WHERE source_id = ?" if kind == "contacts" else
+                    "SELECT DISTINCT href FROM events WHERE source_id = ? AND override IS NOT NULL", (sid,))}
+                # a card read before Towpath kept its other dates, or an event before it kept whether it was a
+                # changed occurrence and its status, is read once more
                 changed = [h for h, e in etags.items() if known.get(h) != e or h not in checked]
                 totals["read"] += _store_items(db, sid, col, client.multiget(col["href"], changed, kind), etags)
                 gone = [h for h in known if h not in etags]
@@ -199,7 +203,8 @@ def birthdays_ahead(store_dir, days: int = 14, today=None, role: str = "web") ->
         rows = db.execute("SELECT * FROM (SELECT name, emails, birthday AS day, 'Birthday' AS label FROM contacts "
                           "WHERE birthday IS NOT NULL AND name IS NOT NULL UNION ALL SELECT c.name, c.emails, d.date, "
                           "d.label FROM contact_dates d JOIN contacts c USING (source_id, href) WHERE d.date IS NOT "
-                          "NULL AND c.name IS NOT NULL) ORDER BY substr(day, 1, 2) = '--', emails = '[]'")
+                          "NULL AND c.name IS NOT NULL) ORDER BY CAST(substr(day, 1, 4) AS INTEGER) <= 1900, "
+                          "emails = '[]'")
         for name, emails, birthday, label in rows:
             m = re.fullmatch(r"(\d{4})?-*(\d{2})-(\d{2})", birthday)  # "1990-10-20", or "---10-20" with no year
             if not m:
@@ -235,29 +240,69 @@ def _today():
     return datetime.now(ZoneInfo(TIMEZONE)).date()
 
 
-def week_ahead(store_dir, today=None, days: int = 7, limit: int = 12, role: str = "web") -> list[dict]:
-    """Events starting in the next ``days`` days (today included), soonest first, across calendars. A repeating
-    event is stored once, as its first occurrence, so only events that don't repeat (and changed occurrences) are
-    listed. Days are compared as written in the calendar (its own local time, or UTC)."""
-    from datetime import date, timedelta
+def _local(value: str | None, all_day: bool, tz: str | None, zone):
+    """A stored start or end as the owner's local datetime (an all-day date at midnight)."""
+    from datetime import date, datetime
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+    if not value:
+        return None
+    try:
+        if all_day or len(value) == 10:
+            return datetime.combine(date.fromisoformat(value[:10]), datetime.min.time(), zone)
+        if value.endswith("Z"):
+            return datetime.fromisoformat(value[:-1] + "+00:00").astimezone(zone)
+        try:
+            source = ZoneInfo(tz) if tz and tz != "UTC" else zone  # no zone: the calendar's floating local time
+        except (ZoneInfoNotFoundError, ValueError):
+            source = zone
+        return datetime.fromisoformat(value).replace(tzinfo=source).astimezone(zone)
+    except ValueError:
+        return None
+
+
+def week_ahead(store_dir, today=None, days: int = 7, limit: int = 12, role: str = "web", now=None) -> list[dict]:
+    """What's on in the next ``days`` days (today included), in the owner's own time zone, soonest first, across
+    calendars: events that don't repeat, changed occurrences of ones that do, and events already under way (a
+    trip that started yesterday). Cancelled events and events already over are left out. A repeating event is
+    stored once, as its first occurrence, so its other occurrences aren't listed yet."""
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    from towpath.mail.notify import TIMEZONE
 
     if store_dir is None or not store_path(store_dir, "dav").exists():
         return []
+    zone = ZoneInfo(TIMEZONE)
     today = today or _today()
-    first, last = today.isoformat(), (today + timedelta(days=days - 1)).isoformat()
+    now = now or datetime.now(zone)
+    start_of = datetime.combine(today, datetime.min.time(), zone)
+    end_of = start_of + timedelta(days=days)
+    early, late = (today - timedelta(days=1)).isoformat(), (today + timedelta(days=days)).isoformat()
     with closing(open_store(store_dir, "dav", role)) as db:
-        rows = db.execute("SELECT summary, start, all_day, location FROM events WHERE start IS NOT NULL AND "
-                          "substr(start, 1, 10) BETWEEN ? AND ? AND recurring = 0 ORDER BY start, summary LIMIT ?",
-                          (first, last, limit * 3)).fetchall()
-    out, seen = [], set()
-    for summary, start, all_day, location in rows:
-        key = (summary, start)
-        if key in seen:  # the same event in two calendars
+        rows = db.execute(
+            "SELECT summary, start, end, all_day, tz, location FROM events WHERE start IS NOT NULL AND "
+            "(recurring = 0 OR override = 1) AND coalesce(upper(status), '') != 'CANCELLED' AND "
+            "((start >= ? AND start < ?) OR (start < ? AND end IS NOT NULL AND end >= ?))",
+            (early, late + "~", early, early)).fetchall()
+    found = {}
+    for summary, start, end, all_day, tz, location in rows:
+        begins = _local(start, bool(all_day), tz, zone)
+        if begins is None:
             continue
-        seen.add(key)
-        out.append({"summary": summary or "(No title)", "day": date.fromisoformat(start[:10]),
-                    "time": None if all_day or len(start) < 16 else start[11:16], "location": location})
-    return out[:limit]
+        ends = _local(end, bool(all_day), tz, zone)
+        if ends is None or ends <= begins:
+            ends = begins + (timedelta(days=1) if all_day else timedelta(minutes=1))
+        if begins >= end_of or ends <= start_of or (not all_day and ends <= now):
+            continue  # outside the window, or already over
+        key = (summary or "", begins)
+        if key in found and (found[key]["location"] or not location):
+            continue  # the same event in two calendars: keep the copy with a place
+        found[key] = {"summary": summary or "(No title)", "day": begins.date(), "starts": begins,
+                      "time": None if all_day else begins.strftime("%H:%M"), "location": location,
+                      "until": (ends - timedelta(days=1)).date() if all_day and ends - begins > timedelta(days=1)
+                      else None}
+    return sorted(found.values(), key=lambda e: (e["starts"], e["summary"]))[:limit]
 
 
 def events(store_dir, source_id: str | None = None, before: str | None = None, role: str = "web") -> list[dict]:

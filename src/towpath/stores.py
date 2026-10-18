@@ -52,6 +52,10 @@ ADDED_COLUMNS = {
     "files": {
         "citations": {"source_stamp": "TEXT"},
     },
+    # Whether a stored event is a changed occurrence of a repeating one, and its STATUS (CANCELLED, ...).
+    "dav": {
+        "events": {"override": "INTEGER", "status": "TEXT"},
+    },
 }
 
 SCHEMAS = {

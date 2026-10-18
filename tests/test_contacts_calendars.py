@@ -250,26 +250,40 @@ def test_birthdays_in_the_next_two_weeks_with_the_age_they_turn(tmp_path):
     assert [b["name"] for b in dav_sync.birthdays_ahead(store, today=date(2026, 12, 28))] == ["New Year"]
 
 
-def test_this_week_lists_events_that_dont_repeat_once_each(tmp_path):
-    from datetime import date
+def test_this_week_is_in_the_owners_time_zone_without_cancelled_or_finished_events(tmp_path):
+    from datetime import date, datetime
+    from zoneinfo import ZoneInfo
 
     from towpath import dav_sync
-    from towpath.stores import open_store
 
     store = tmp_path / "state"
-    rows = [("a", "Dentist", "2026-10-19T09:30:00", 0, 0, "Main St"),
-            ("b", "Dentist", "2026-10-19T09:30:00", 0, 0, None),
-            ("c", "Holiday", "2026-10-20", 1, 0, None), ("d", "Standup", "2026-10-18T09:00:00", 0, 1, None),
-            ("e", "Later", "2026-10-30T10:00:00Z", 0, 0, None), ("f", "Yesterday", "2026-10-16", 1, 0, None)]
+    rows = [  # href, summary, start, end, all_day, tz, recurring, override, status, location
+        ("a", "Dentist", "2026-10-19T09:30:00", None, 0, "America/Chicago", 0, 0, None, None),
+        ("b", "Dentist", "2026-10-19T09:30:00", None, 0, "America/Chicago", 0, 0, None, "Main St"),
+        ("c", "Late call", "2026-10-18T02:00:00Z", None, 0, "UTC", 0, 0, None, None),  # 21:00 on the 17th here
+        ("d", "Standup", "2026-10-18T09:00:00", None, 0, None, 1, 0, None, None),  # repeats: not listed yet
+        ("e", "Standup (moved)", "2026-10-20T14:00:00", None, 0, None, 1, 1, None, None),  # a changed occurrence
+        ("f", "Cancelled lunch", "2026-10-19T12:00:00", None, 0, None, 0, 0, "CANCELLED", None),
+        ("g", "Trip", "2026-10-15", "2026-10-21", 1, None, 0, 0, None, None),  # under way: 15th to 20th
+        ("h", "Breakfast", "2026-10-17T08:00:00", "2026-10-17T09:00:00", 0, None, 0, 0, None, None),  # over
+        ("i", "Next week", "2026-10-24T10:00:00", None, 0, None, 0, 0, None, None),
+    ]
     with open_store(store, "dav", "connect") as db:
-        for href, summary, start, all_day, recurring, location in rows:
+        for href, summary, start, end, all_day, tz, recurring, override, status, location in rows:
             db.execute("INSERT INTO events (source_id, href, n, etag, uid, summary, start, end, all_day, tz, location, "
-                       "organizer, attendees, recurring, description, collection, updated_at) VALUES "
-                       "('dav', ?, 0, 'e', NULL, ?, ?, NULL, ?, NULL, ?, NULL, '[]', ?, NULL, 'c', 't')",
-                       (href, summary, start, all_day, location, recurring))
+                       "organizer, attendees, recurring, description, collection, updated_at, override, status) "
+                       "VALUES ('dav', ?, 0, 'e', NULL, ?, ?, ?, ?, ?, ?, NULL, '[]', ?, NULL, 'c', 't', ?, ?)",
+                       (href, summary, start, end, all_day, tz, location, recurring, override, status))
         db.commit()
-    got = dav_sync.week_ahead(store, today=date(2026, 10, 17))
-    assert [(e["summary"], e["time"]) for e in got] == [("Dentist", "09:30"), ("Holiday", None)]
+    now = datetime(2026, 10, 17, 12, 0, tzinfo=ZoneInfo("America/Chicago"))
+    got = dav_sync.week_ahead(store, today=date(2026, 10, 17), now=now)
+    assert [(e["summary"], str(e["day"]), e["time"]) for e in got] == [
+        ("Trip", "2026-10-15", None), ("Late call", "2026-10-17", "21:00"), ("Dentist", "2026-10-19", "09:30"),
+        ("Standup (moved)", "2026-10-20", "14:00")]
+    assert got[0]["until"] == date(2026, 10, 20) and got[2]["location"] == "Main St"
+    card = ("BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:x\r\nSUMMARY:Off\r\nSTATUS:CANCELLED\r\n"
+            "DTSTART:20261019T120000Z\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n")
+    assert dav.parse_events(card)[0]["status"] == "CANCELLED"
 
 
 def test_anniversaries_and_apples_labelled_dates_are_read_from_cards(world):
@@ -307,7 +321,7 @@ def test_the_same_person_in_two_address_books_shows_once_with_the_year_and_addre
 
     store = tmp_path / "state"
     with open_store(store, "dav", "connect") as db:
-        for sid, name, emails, birthday in (("a", "sam rivera", [], "---10-20"),
+        for sid, name, emails, birthday in (("a", "sam rivera", ["old@example.org"], "1604-10-20"),
                                             ("b", "Sam Rivera", ["sam@example.org"], "1990-10-20"),
                                             ("c", "Placeholder", [], "1900-10-21")):
             db.execute("INSERT INTO contacts (source_id, href, etag, uid, name, emails, phones, birthday, org, "
