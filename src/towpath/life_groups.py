@@ -214,6 +214,37 @@ def _people(config, db, claims_, spans) -> int:
     return made
 
 
+def _photo_trips(db, claims_, spans) -> int:
+    """Runs of days with many photos (two or more days in a row, or a day apart) as one trip each, named for the
+    folder most of them are in: one memory instead of a separate event per day."""
+    import re
+    from collections import Counter
+    from datetime import date as date_
+
+    days = sorted((date_.fromisoformat(spans[c.claim_id][0][:10]), c) for c in claims_
+                  if c.citations and c.citations[0].ref.startswith("folders:") and spans.get(c.claim_id, (None,))[0])
+    runs, current = [], []
+    for day, c in days:
+        if current and (day - current[-1][0]).days > 2:
+            runs.append(current)
+            current = []
+        current.append((day, c))
+    if current:
+        runs.append(current)
+    made = 0
+    for run in runs:
+        if len({d for d, _ in run}) < 2:
+            continue
+        places = Counter(m.group(1) for _, c in run for m in [re.search(r"\(([^)]+)\)\s*$", c.statement)] if m)
+        span = f"{run[0][0]:%b %d}–{run[-1][0]:%b %d, %Y}"
+        title = f"Trip: {places.most_common(1)[0][0]}" if places else f"Days with many photos, {span}"
+        members = [c.claim_id for _, c in run]
+        _save(db, "grp_trip_" + digest(sorted(members))[:16], "trip", title,
+              f"{len(run)} days with many photos, {span}.", members, spans, "rule:photo-trips")
+        made += 1
+    return made
+
+
 def _chapters(config, db, claims_, spans) -> int:
     birthday = profile(config.store_dir, WRITER).get("birthday")
     if not birthday:
@@ -315,11 +346,12 @@ def propose_groups(config, slice_seconds: float = SLICE_SECONDS, clock=time.mono
         spans = {r[0]: (r[1], r[2]) for r in db.execute("SELECT claim_id, earliest, latest FROM claims")}
         key = digest(sorted(c.claim_id for c in claims_) + [json.dumps(profile(config.store_dir, WRITER),
                                                                        sort_keys=True)])
-        made = {"people": 0, "chapters": 0, "occasions": 0}
+        made = {"people": 0, "chapters": 0, "trips": 0, "occasions": 0}
         last = db.execute("SELECT digest FROM group_runs WHERE key = 'rules'").fetchone()
         if not last or last[0] != key:
-            db.execute("DELETE FROM groups WHERE producer IN ('rule:people', 'rule:chapters')")
+            db.execute("DELETE FROM groups WHERE producer IN ('rule:people', 'rule:chapters', 'rule:photo-trips')")
             made["people"] = _people(config, db, claims_, spans)
+            made["trips"] = _photo_trips(db, claims_, spans)
             made["chapters"] = _chapters(config, db, claims_, spans)
             db.execute("INSERT OR REPLACE INTO group_runs VALUES ('rules', ?, ?)", (key, now()))
             db.commit()

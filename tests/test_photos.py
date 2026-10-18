@@ -230,3 +230,32 @@ def test_private_rows_an_earlier_version_let_in_are_purged_once(tmp_path):
     with open_store(store, "files", "web") as db:
         assert [r[0] for r in db.execute("SELECT rel_path FROM occurrences")] == ["trips/a.jpg"]
         assert db.execute("SELECT count(*) FROM photo_meta").fetchone()[0] == 1
+
+
+def test_runs_of_photo_days_become_one_trip_memory(tmp_path):
+    from towpath import life_groups, life_photos
+    from towpath.unified import grants
+
+    store = tmp_path / "state"
+    with open_store(store, "files", "connect") as db:
+        n = 0
+        for day in ("2009-05-14", "2009-05-15", "2009-05-17", "2009-08-01"):
+            for i in range(16):
+                rel = f"2009 Example Junction/{day}_{i}.jpg"
+                db.execute("INSERT INTO occurrences (occurrence_id, provider_id, native_id, root_alias, rel_path, "
+                           "members, media_type, size, dates, hashes, extraction, first_seen_run, last_seen_run, "
+                           "updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                           (f"occ_{n}", "folders", rel, "pics", rel, "[]", "image/jpeg", 9, "[]", "{}", "{}", "r",
+                            "r", "t"))
+                db.execute("INSERT INTO photo_meta (occurrence_id, taken, extracted_at) VALUES (?, ?, 't')",
+                           (f"occ_{n}", f"{day}T10:{i:02d}:00"))
+                n += 1
+        db.commit()
+    roots = {"pics": SimpleNamespace(path=tmp_path / "pics")}
+    config = SimpleNamespace(store_dir=store, files=SimpleNamespace(roots=roots), tasks={}, endpoints={})
+    grants.grant(store, "folders", "life-evidence", author="owner")
+    assert life_photos.propose(config)[0]["proposed"] == 4
+    life_groups.propose_groups(config)
+    trips = [g for g in life_groups.groups(store) if g["kind"] == "trip"]
+    assert len(trips) == 1  # three days close together; the August day stands alone
+    assert trips[0]["title"] == "Trip: 2009 Example Junction" and len(trips[0]["members"]) == 3
