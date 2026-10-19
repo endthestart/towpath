@@ -44,6 +44,15 @@ def sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+def private(path: Path, mode: int) -> None:
+    """Owner-only modes where the filesystem allows them; a dataset with restricted NFSv4 ACLs refuses chmod and
+    keeps its inherited ACL instead (TrueNAS backup datasets)."""
+    try:
+        os.chmod(path, mode)
+    except PermissionError:
+        pass
+
+
 def gz(src: Path, dest: Path) -> None:
     with src.open("rb") as f, gzip.open(dest, "wb", compresslevel=6) as g:
         shutil.copyfileobj(f, g, 1 << 20)
@@ -77,7 +86,7 @@ def dump_store(snap_db: Path, work: Path, out: Path) -> dict:
 def run(source: Path, dest: Path, weekly: bool, stamp: str) -> Path:
     out = dest / stamp
     out.mkdir(parents=True, exist_ok=False)
-    os.chmod(out, 0o700)
+    private(out, 0o700)
     work = Path(tempfile.mkdtemp(prefix=".work-", dir=dest))
     manifest = {"format": "towpath.db-dump/1", "stamp": stamp, "weekly": weekly, "stores": [], "files": [],
                 "left_out": ["credentials/", "thumbs.db", "Recoll index"] + ([] if weekly else ["files.db"])}
@@ -98,7 +107,7 @@ def run(source: Path, dest: Path, weekly: bool, stamp: str) -> Path:
         manifest["finished"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
         (out / "manifest.json").write_text(json.dumps(manifest, indent=2))
         for p in out.iterdir():
-            os.chmod(p, 0o600)
+            private(p, 0o600)
     except BaseException:
         shutil.rmtree(out, ignore_errors=True)  # never leave a half dump that looks whole
         raise
