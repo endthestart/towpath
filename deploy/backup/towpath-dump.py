@@ -61,10 +61,10 @@ def gz(src: Path, dest: Path) -> None:
 def dump_store(snap_db: Path, work: Path, out: Path) -> dict:
     """One store from the snapshot: copied with its journal, rolled back if needed, checked, compacted, gzipped."""
     copy = work / snap_db.name
-    shutil.copy2(snap_db, copy)
+    shutil.copyfile(snap_db, copy)
     journal = snap_db.with_name(snap_db.name + "-journal")
     if journal.exists():
-        shutil.copy2(journal, work / journal.name)  # opening the copy rolls the unfinished write back
+        shutil.copyfile(journal, work / journal.name)  # opening the copy rolls the unfinished write back
     con = sqlite3.connect(copy)
     try:
         check = con.execute("PRAGMA integrity_check").fetchone()[0]
@@ -98,11 +98,11 @@ def run(source: Path, dest: Path, weekly: bool, stamp: str) -> Path:
         for name in FILES:
             f = source / "state" / name
             if f.exists():
-                shutil.copy2(f, out / name)
+                shutil.copyfile(f, out / name)
                 manifest["files"].append({"file": name, "sha256": sha256(out / name)})
         config = source / "config" / "towpath.toml"
         if config.exists():
-            shutil.copy2(config, out / "towpath.toml")
+            shutil.copyfile(config, out / "towpath.toml")
             manifest["files"].append({"file": "towpath.toml", "sha256": sha256(out / "towpath.toml")})
         manifest["finished"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
         (out / "manifest.json").write_text(json.dumps(manifest, indent=2))
