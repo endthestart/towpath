@@ -15,6 +15,9 @@ the life story and finding events by itself is on (the owner's answers of Octobe
 - `web`: `ghcr.io/endthestart/towpath@sha256:7310e6b3b0aaa033087cc7dc5a6d2dae369e8110f1d9c4c0cb0527683b2cac6f`
 - `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:b7000a6434a6ae99829d895f62cf5ccb67c3f7c318f33b299d20bf68cdaf62d5`
 
+Database dumps: nightly at 03:20 into `/mnt/tank/storage/backup/db-dumps/towpath/`, with a restore check each
+night ([backups](backups.md)).
+
 Towpath's data folder (stores, sign-ins and the Recoll index) lives on a mirrored SSD pool since 2026-10-08,
 with hourly snapshots replicated to the main pool: Recoll's index writes had saturated the spinning disks. The
 earlier copy on the main pool is kept for rollback. The personal datasets are mounted read-only under `/library`

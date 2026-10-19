@@ -24,17 +24,21 @@ Left out: `credentials/` (passwords stay out of backups; re-enter them after a r
 previews, rebuilt) and the Recoll index (rebuilt by indexing). `files.db`, the file catalog (about 17 GB), is
 dumped on the weekly run only.
 
-## On Hub (pending the owner's approval)
+## On Hub (installed 2026-10-19, the owner's approval relayed by the Project Manager)
 
 - Dataset `zssd/appfast/towpath`, mounted at `/mnt/zssd/appfast/towpath`.
 - Dumps: `/mnt/tank/storage/backup/db-dumps/towpath/<stamp>/`, script in `.../towpath/.bin/towpath-dump.py`.
-- A TrueNAS cron job (System → Advanced → Cron Jobs), as root, daily at 03:20:
+- TrueNAS cron job 3 (System → Advanced → Cron Jobs), as root, daily at 03:20 America/Chicago (errors are
+  mailed; normal output isn't):
 
       D=/mnt/tank/storage/backup/db-dumps/towpath; python3 $D/.bin/towpath-dump.py --dataset zssd/appfast/towpath \
         --mount /mnt/zssd/appfast/towpath --dest $D $([ "$(date +%u)" = 7 ] && echo --weekly) && \
         python3 $D/.bin/towpath-dump.py --dest $D --verify
 
   Sundays include `files.db`. About 0.2 GB a night and 5 GB a week compressed; about 45 GB kept.
+- First run, supervised, 2026-10-19 12:53 UTC: 12 stores in 38 s, 213 MB (mail 143 MB, source 66 MB, mail
+  intelligence 13 MB); restore check passed in 12 s; the snapshot was removed. The datasets' NFSv4 ACLs refuse
+  `chmod`, so the dumps keep the folder's inherited ACL (root and its group only), as the other dumps there do.
 - Nothing leaves Hub except through the encrypted offsite copy of `/mnt/tank/storage/backup`.
 
 ## Restoring
