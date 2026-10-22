@@ -26,14 +26,14 @@ on both Macs, so they work as they are. Their virtual environments were not copi
 | `towpath-unified-review` | `codex/unified-local-review-fixes` | Unified-review fixes; 4 commits not on GitHub | Clean |
 | `towpath` (separate clone) | `claude/happy-gauss-ugprmu` | Earliest Gmail-connector work | The Mac Pro already had this clone; its 4 unpushed commits and `codex/local-prevalidation-082b4b5` are in `~/Development/towpath/macbook-clone-branches.bundle` (`git fetch ../macbook-clone-branches.bundle '*:refs/remotes/macbook/*'`), its two untracked notes copied in |
 
-The GitHub repository `endthestart/towpath` is **public**, so branches not yet there were not pushed: whether
-to push them is the owner's call.
+The GitHub repository `endthestart/towpath` is **public**. The branches not on GitHub stay local, on both Macs
+(the owner's answer of 2026-10-21); push only reviewed work there.
 
 ## Outside git
 
 | What | Where | Moving it |
 | --- | --- | --- |
-| `towpath-private` (Hub deployment files and env, secrets such as a Google OAuth client and an old Mac Gmail token, private notes, backups of the retired Mac stores) | `~/Development/towpath-private` on the MacBook | **Not copied: the owner decides** how secrets move (and whether the old Mac Gmail token should move at all; `local-operation.md` says it was to be moved out of reach) |
+| `towpath-private` (Hub deployment files and env, secrets such as a Google OAuth client and an old Mac Gmail token, private notes, backups of the retired Mac stores) | `~/Development/towpath-private`, not a git repository | Copied to the Mac Pro as is on 2026-10-21 (the owner's choice; modes kept, secrets 600, checked by checksum) |
 | Gmail and quota configuration, Towpath's stores | On Hub (`/mnt/zssd/appfast/towpath`), the single writer since 2026-10-06 | Nothing to move; the Mac runs no Towpath stores |
 | Local databases | None in the checkouts; the retired Mac stores are in `towpath-private/backups` and `retired-handed-to-hub-20261006` | With `towpath-private` |
 | Apple Messages export | On the NAS (`storage/exports/messages`) once the owner runs imessage-exporter, see the UAT guide | Nothing to move |
