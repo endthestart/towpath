@@ -33,8 +33,6 @@ SLICE_SECONDS = 90  # per worker poll, so mail checks and searches keep running
 RETRY_SECONDS = 30 * 60  # after the mail account stopped (a sign-in that expired, a server error)
 MODEL_RETRY_SECONDS = 10 * 60  # after the model couldn't be reached
 BUSY_RETRY_SECONDS = 60  # a gateway serving one request at a time answers 409 while it's busy
-TRANSIENT = ("APIConnectionError", "APITimeoutError", "InternalServerError", "RateLimitError")
-BUSY = ("ConflictError",)
 BATCH = 20  # candidate messages read from the index at a time
 TEXT_LIMIT = 12_000  # characters of a message sent to the model
 EXCERPT_LIMIT = 300
@@ -391,13 +389,14 @@ def propose_pending(config, credentials_dir, slice_seconds: float = SLICE_SECOND
     is tried again after a while or as soon as the owner resumes."""
     from towpath.adapters import build_connector
     from towpath.adapters.errors import SyncStop
+    from towpath.mail.threads import _failure
     from towpath.models import gateway
 
     value = request(config.store_dir)
     if not _pending_request(config, value):
         value = _next_auto(config, clock) if auto(config.store_dir) else None
-    if blocked(config, value) is not None:
-        return []
+    if blocked(config, value) is not None or gateway.background_wait(config, TASK):
+        return []  # not allowed, or background model work waits its turn: no mail is fetched
     rid = run_id(value)
     endpoint_id = config.tasks[TASK]
     deadline = clock() + slice_seconds
@@ -435,7 +434,8 @@ def propose_pending(config, credentials_dir, slice_seconds: float = SLICE_SECOND
         producer = f"model:{config.endpoints[endpoint_id].model}/{PROMPT_VERSION}"
         done = []
         for message in batch:
-            if clock() > deadline or (request(config.store_dir) or {}).get("state") == "paused":
+            if clock() > deadline or (request(config.store_dir) or {}).get("state") == "paused" or \
+                    gateway.background_wait(config, TASK):
                 break
             outcome, proposed = "no-text", 0
             ref = f"{value['source_id']}:{message['native_id']}"
@@ -471,7 +471,7 @@ def propose_pending(config, credentials_dir, slice_seconds: float = SLICE_SECOND
                 sender = (parseaddr(raw)[1].lower() if "@" in raw else raw) or None
                 result = gateway.infer(config, TASK, prompt, "content", SCHEMA,
                                        targets(value["source_id"], [message["item_id"]], [sender]),
-                                       prompt_version=PROMPT_VERSION)
+                                       prompt_version=PROMPT_VERSION, background=True)
                 outcome = result["status"]
                 if item_refused(result):  # this message or its sender is kept from this model: the rest go on
                     outcome = "kept"
@@ -481,10 +481,12 @@ def propose_pending(config, credentials_dir, slice_seconds: float = SLICE_SECOND
                     proposed = sum(life.save(db, c, value["source_id"], rid) for c in found)
                 elif outcome in ("refused", "disabled"):
                     break  # a grant or the model changed: the Life page says why
-                elif any(t in (result.get("reason") or "") for t in BUSY):
+                elif _failure(result) == "paced":
+                    break  # background model work waits its turn: this message stays unread
+                elif _failure(result) == "busy":
                     return _stop(db, rid, state, "The AI model is busy with another request; Towpath tries again in "
                                                  "a minute.", BUSY_RETRY_SECONDS, requested_at)  # stays unread
-                elif any(t in (result.get("reason") or "") for t in TRANSIENT):
+                elif _failure(result) == "transient":
                     return _stop(db, rid, state, "The AI model didn't answer; Towpath tries again shortly.",
                                  MODEL_RETRY_SECONDS, requested_at)  # this message stays unread, to be tried again
             db.execute("INSERT OR REPLACE INTO examined (run_id, item_id, outcome, at) VALUES (?,?,?,?)",

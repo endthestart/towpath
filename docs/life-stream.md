@@ -144,7 +144,8 @@ owner's additions, removals and approval are decisions kept apart from regenerat
   person), life chapters by decade from the owner's birthday, and occasions, trips and projects that the model
   gathers from each month's events (with the days around it). The owner keeps (a snapshot in the decisions store),
   renames, edits or dismisses a memory; a kept memory is offered newly found events rather than changed. Proposals
-  mostly repeating a decided memory aren't shown again.
+  mostly repeating a decided memory aren't shown again. A month is gathered only once no reading run covering it
+  is still unfinished, so the model isn't asked again each time a new event lands in a year being read.
 - **Profile**: name and birthday, for ages on the timeline and the decade chapters.
 - **Recollections**: the owner writes down a memory with its date (year, month or day) and who was there; it is
   kept in the decisions store in their words, accepted as theirs, without a citation, and appears on the timeline,

@@ -320,7 +320,7 @@ def translate_pending(config) -> list[dict]:
     with closing(open_store(config.store_dir, "derived", "worker")) as d:
         for a in todo:
             result = gateway.infer(config, TASK, f"{TRANSLATE}\n\n{lists}\n\nRequest: {a['text']}", "content",
-                                   TRANSLATE_SCHEMA, prompt_version=PROMPT)
+                                   TRANSLATE_SCHEMA, prompt_version=PROMPT, background=False)
             filters = result["output"] if result["status"] == "ok" else {"text": a["text"]}
             d.execute("INSERT OR REPLACE INTO photo_answers VALUES (?,?,?,?)",
                       (a["seq"], json.dumps(filters), result["status"], now()))

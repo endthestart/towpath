@@ -51,8 +51,6 @@ RETRY_SECONDS = 10 * 60
 NOT_PEOPLE = ("newsletter", "marketing", "notification", "receipt", "finance", "travel", "account", "social",
               "calendar")
 BUSY_SECONDS = 60
-TRANSIENT = ("APIConnectionError", "APITimeoutError", "InternalServerError", "RateLimitError")
-BUSY = ("ConflictError",)
 NOREPLY = re.compile(r"(^|[._+-])(no-?reply|do-?not-?reply|notifications?|mailer-daemon|bounce[s]?|alerts?)"
                      r"([._+-]|@)", re.I)
 
@@ -267,13 +265,8 @@ def conversation_text(msgs: list[dict], me: dict, latest_chars: int = 6000, each
 
 
 def _failure(result: dict) -> str | None:
-    """'busy' or 'transient' when the model couldn't answer now (try again later), else None."""
-    reason = result.get("reason") or ""
-    if any(t in reason for t in BUSY):
-        return "busy"
-    if any(t in reason for t in TRANSIENT):
-        return "transient"
-    return None
+    """'busy', 'transient' or 'paced' when the model couldn't take the call now (try again later), else None."""
+    return result["failure"] if result["status"] == "unavailable" else None
 
 
 def item_refused(result: dict) -> bool:
@@ -379,7 +372,8 @@ def _classify(config, intel, mail, source_id: str, me: dict, deadline: float, cl
 
             result = gateway.infer(config, TASK_STATE, prompt, "content", STATE_SCHEMA,
                                    targets(source_id, [m["item_id"] for m in msgs][-20:],
-                                           [m["from_addr"] for m in msgs]), prompt_version=PROMPT_STATE)
+                                           [m["from_addr"] for m in msgs]), prompt_version=PROMPT_STATE,
+                                   background=True)
             if result["status"] == "ok":
                 t["state"], t["reason"] = result["output"]["state"], result["output"]["reason"].strip()[:200]
                 _save(intel, t, "model", f"{endpoint.model}/{PROMPT_STATE}")
@@ -478,7 +472,7 @@ def _draft(config, intel, mail, source_id: str, me: dict, deadline: float, clock
 
         result = gateway.infer(config, TASK_DRAFT, prompt, "content", DRAFT_SCHEMA,
                                targets(source_id, [m["item_id"] for m in msgs][-20:], [m["from_addr"] for m in msgs]),
-                               prompt_version=PROMPT_DRAFT)
+                               prompt_version=PROMPT_DRAFT, background=True)
         if result["status"] == "ok" and result["output"]["body"].strip():
             intel.execute("INSERT OR REPLACE INTO drafts VALUES (?,?,?,?,?,?,?)",
                           (source_id, key, last["item_id"], current, result["output"]["body"].strip(),

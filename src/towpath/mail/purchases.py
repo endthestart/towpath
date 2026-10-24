@@ -133,7 +133,8 @@ def read_pending(config, slice_seconds: float = SLICE_SECONDS, clock=time.monoto
                 prompt = (f"{INSTRUCTION}\n\n<email>\nFrom: {m['from_name'] or ''} <{m['from_addr'] or ''}>\n"
                           f"Date: {(m['date_utc'] or '')[:10]}\nSubject: {m['subject'] or ''}\n\n{text}\n</email>")
                 result = gateway.infer(config, TASK, prompt, "content", SCHEMA,
-                                       targets(sid, [m["item_id"]], [m["from_addr"]]), prompt_version=PROMPT)
+                                       targets(sid, [m["item_id"]], [m["from_addr"]]), prompt_version=PROMPT,
+                                       background=True)
                 if threads.item_refused(result):  # this message is kept from this model: the rest may go on
                     intel.execute("INSERT OR REPLACE INTO purchases (source_id, item_id, purchase, model, at) VALUES "
                                   "(?, ?, 0, 'refused', ?)", (sid, m["item_id"], now()))

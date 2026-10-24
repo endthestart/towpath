@@ -96,7 +96,8 @@ def translate_pending(config) -> list[dict]:
                                                             "LIMIT 40", (a["source_id"],))]
                 prompt = (SYNTAX.format(today=date.today().isoformat()) + f"\n\nFolders: {', '.join(boxes) or '-'}"
                           f"\n\nQuestion: {a['text']}")
-                result = gateway.infer(config, TASK, prompt, "content", SCHEMA, prompt_version=PROMPT)
+                result = gateway.infer(config, TASK, prompt, "content", SCHEMA, prompt_version=PROMPT,
+                                       background=False)
                 if result["status"] == "ok":
                     candidate = " ".join(result["output"]["query"].split())
                     try:

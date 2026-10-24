@@ -82,7 +82,9 @@ Fallbacks change method on the same endpoint or turn a feature off. They never s
 | Model listing | `GET /models` | Configured model ID is trusted as written |
 | Usage reporting | Response usage fields | Towpath's own input-size estimate, marked as an estimate |
 
-An endpoint that returns an error, times out, or produces invalid output repeatedly pauses its queue and reports the reason. Nothing is retried elsewhere.
+An endpoint that returns an error, times out, or produces invalid output repeatedly pauses its queue and reports the reason. Nothing is retried elsewhere. Only invalid output moves to the next method: a busy answer (409), a rate limit, a server error, a timeout or an unreachable endpoint ends the call at once.
+
+**Background work yields.** Work nobody is waiting on (finding events, gathering memories, sorting senders and conversations, reading purchases, plain-English rules, drafts) sends `Poundlock-Priority: background` and `Poundlock-Wait: 0`, so a gateway that queues answers at once when its model is busy instead of keeping the request in line; other endpoints ignore the headers. Background calls take at most a quarter of any hour of an endpoint: one starts only if even a call that runs to its timeout keeps the last hour within 15 minutes. After a busy or failed background call every background task waits together, 1, 5, 15 and then 60 minutes after failures in a row, until an answer arrives. The owner's own requests (searches, Ask, rule drafts, photo requests, the model-input queue) are never held back.
 
 ## Gateway behavior
 

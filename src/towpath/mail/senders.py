@@ -235,7 +235,7 @@ def _categorize(config, intel, mail, source_id: str, deadline: float, clock) -> 
             prompt, items = _group_prompt(mail, source_id, group)
             result = gateway.infer(config, TASK, prompt, "content", GROUP_SCHEMA,
                                    targets(source_id, items, [s["address"] for s in group]),
-                                   prompt_version=PROMPT_GROUP)
+                                   prompt_version=PROMPT_GROUP, background=True)
             if result["status"] in ("refused", "disabled") and not item_refused(result):
                 return done, "refused"
             if _failure(result):
@@ -253,7 +253,7 @@ def _categorize(config, intel, mail, source_id: str, deadline: float, clock) -> 
                 return done, None
             prompt, items = _prompt(mail, source_id, s)
             result = gateway.infer(config, TASK, prompt, "content", SCHEMA, targets(source_id, items, [s["address"]]),
-                                   prompt_version=PROMPT)
+                                   prompt_version=PROMPT, background=True)
             if result["status"] == "ok":
                 _settle(intel, source_id, s, result["output"]["category"], result["output"]["reason"], model)
             elif item_refused(result):  # kept from this model: the rule's category stands

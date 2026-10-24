@@ -199,12 +199,24 @@ def test_a_busy_model_is_waited_for_and_nothing_is_marked_read(world, monkeypatc
 
     config, credentials, sid, mid, model, state = world
     worker = allow(config, sid, mid)
-    busy = {"status": "manual-review", "reason": "json_schema: ConflictError; prompt: ConflictError"}
+    busy = {"status": "unavailable", "failure": "busy", "reason": "json_schema: ConflictError"}
     monkeypatch.setattr(gateway, "infer", lambda *a, **k: busy)  # Poundlock answers 409 while serving someone else
     assert life_propose.propose_pending(worker, credentials) == [
         {"step": "stopped", "reason": "The AI model is busy with another request; Towpath tries again in a minute."}]
     run = life_propose.progress(config.store_dir)
     assert run["examined"] == 0 and run["state"] == "stopped"
+
+
+def test_while_background_work_must_wait_no_mail_is_fetched_or_marked_read(world, monkeypatch):
+    from towpath.models import pacing
+
+    config, credentials, sid, mid, model, state = world
+    worker = allow(config, sid, mid)
+    monkeypatch.setattr(pacing, "wait", lambda *a, **k: 120.0)  # the hour's share is used, or the model was busy
+    before, commands = len(model.chat_requests()), len(state.transcript)
+    assert life_propose.propose_pending(worker, credentials) == []
+    assert len(model.chat_requests()) == before and len(state.transcript) == commands
+    assert life_propose.progress(config.store_dir) is None
 
 
 def test_finding_by_itself_reads_every_year_newest_first_without_a_period(world, monkeypatch):

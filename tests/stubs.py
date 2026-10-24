@@ -54,9 +54,10 @@ class Stub:
 
 class OpenAIStub(Stub):
     def __init__(self, model="stub-model", models=True, json_schema=True, json_object=True, embeddings=True,
-                 answers=None, default_answer='{"is_statement": true, "confidence": 0.9}', respond=None):
+                 answers=None, default_answer='{"is_statement": true, "confidence": 0.9}', respond=None, errors=None):
         self.model = model
         self.respond = respond  # optional: prompt -> answer text, for tests that answer by what was asked
+        self.errors = list(errors or [])  # HTTP statuses answered, in order, before any task prompt gets an answer
         self.flags = {"models": models, "json_schema": json_schema, "json_object": json_object,
                       "embeddings": embeddings}
         self.answers = list(answers or [])
@@ -92,6 +93,8 @@ class OpenAIStub(Stub):
                 content = "ok"
             elif PROBE_HINT in prompt:
                 content = '{"ok": true}'
+            elif self.errors:
+                return self.errors.pop(0), {"error": {"message": "unavailable", "type": "capacity_in_use"}}, None
             elif self.respond is not None:
                 content = self.respond(prompt)
             elif self.answers:

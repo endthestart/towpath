@@ -9,10 +9,10 @@ pytest.importorskip("openai")
 pytest.importorskip("jsonschema")
 
 from towpath import decisions, scan  # noqa: E402
-from towpath.models import gateway  # noqa: E402
+from towpath.models import gateway, queue  # noqa: E402
 from towpath.models.profiles import ProfileError  # noqa: E402
 
-SCHEMA = gateway.STATEMENT_SCHEMA
+SCHEMA = queue.STATEMENT_SCHEMA
 
 
 def endpoint(name, url, destination="this-machine", model="stub-model", kind="chat",
@@ -39,9 +39,9 @@ def test_1b_1_no_endpoint_disables_cleanly(ws):
     ws.sync_all()
     results = ws.scan_all()
     assert results["pdf-to-documents"]["candidates"] > 0
-    out = gateway.infer(ws.config, "doc.is_statement", "synthetic", "metadata", SCHEMA)
+    out = gateway.infer(ws.config, "doc.is_statement", "synthetic", "metadata", SCHEMA, background=False)
     assert out["status"] == "disabled" and "no endpoint" in out["reason"]
-    assert gateway.run_queue(ws.config) == {"disabled": len(scan.model_queue(ws.config))}
+    assert queue.run_queue(ws.config) == {"disabled": len(scan.model_queue(ws.config))}
 
 
 # 1b-2. Probe records exactly the capabilities the stub offers, using synthetic prompts only
@@ -65,14 +65,14 @@ def test_1b_3_fallback_ladder(ws, openai_stub):
                                 '```json\n{"is_statement": false, "confidence": 0.2}\n```'])
     bind(ws, endpoint("local", stub.url), {"doc.is_statement": "local"})
     gateway.probe(ws.config, "local")
-    out = gateway.infer(ws.config, "doc.is_statement", "synthetic test", "metadata", SCHEMA)
+    out = gateway.infer(ws.config, "doc.is_statement", "synthetic test", "metadata", SCHEMA, background=False)
     assert out["status"] == "ok" and out["method"] == "prompt"
     assert out["output"] == {"is_statement": False, "confidence": 0.2}
     formats = [(r["body"].get("response_format") or {}).get("type") for r in stub.chat_requests()[-3:]]
     assert formats == ["json_schema", "json_object", None]
 
     stub.answers[:] = ["not json"] * 4
-    out = gateway.infer(ws.config, "doc.is_statement", "synthetic test", "metadata", SCHEMA)
+    out = gateway.infer(ws.config, "doc.is_statement", "synthetic test", "metadata", SCHEMA, background=False)
     assert out["status"] == "manual-review"
     assert "invalid" in stub.chat_requests()[-1]["body"]["messages"][-1]["content"]  # the one re-ask
 
@@ -81,7 +81,7 @@ def test_1b_3b_repairable_json_on_first_rung(ws, openai_stub):
     stub = openai_stub(json_schema=True, answers=['{"is_statement": true, "confidence": 0.7'])
     bind(ws, endpoint("local", stub.url), {"doc.is_statement": "local"})
     gateway.probe(ws.config, "local")
-    out = gateway.infer(ws.config, "doc.is_statement", "synthetic", "metadata", SCHEMA)
+    out = gateway.infer(ws.config, "doc.is_statement", "synthetic", "metadata", SCHEMA, background=False)
     assert out["status"] == "ok" and out["method"] == "json_schema"
 
 
@@ -107,12 +107,12 @@ def test_1b_5_self_hosted_needs_grants(ws, openai_stub):
     bind(ws, endpoint("lan", stub.url, "self-hosted"), {"doc.is_statement": "lan"})
     gateway.probe(ws.config, "lan")  # synthetic prompts need no grant
     for data_class in ("metadata", "content"):
-        out = gateway.infer(ws.config, "doc.is_statement", "x", data_class, SCHEMA)
+        out = gateway.infer(ws.config, "doc.is_statement", "x", data_class, SCHEMA, background=False)
         assert out["status"] == "refused" and "no grant" in out["reason"]
     before = len(stub.chat_requests())
     decisions.grant_model(ws.config, "lan", "metadata")
-    assert gateway.infer(ws.config, "doc.is_statement", "x", "metadata", SCHEMA)["status"] == "ok"
-    assert gateway.infer(ws.config, "doc.is_statement", "x", "content", SCHEMA)["status"] == "refused"
+    assert gateway.infer(ws.config, "doc.is_statement", "x", "metadata", SCHEMA, background=False)["status"] == "ok"
+    assert gateway.infer(ws.config, "doc.is_statement", "x", "content", SCHEMA, background=False)["status"] == "refused"
     assert len(stub.chat_requests()) == before + 1
 
 
@@ -140,14 +140,14 @@ def test_1b_7_profile_change_fails_queued_work(ws, openai_stub):
     queued = len(scan.model_queue(ws.config))
     bind(ws, endpoint("lan", stub.url, "self-hosted"), {"doc.is_statement": "lan"})
     decisions.grant_model(ws.config, "lan", "metadata")
-    counts = gateway.run_queue(ws.config)  # no probe yet: work stays queued, pinned to this profile
+    counts = queue.run_queue(ws.config)  # no probe yet: work stays queued, pinned to this profile
     assert counts == {"queued": queued}
     assert {r["endpoint_fingerprint"] for r in scan.model_queue(ws.config)} != {None}
 
     ws.replace_config('model = "stub-model"', 'model = "other-model"')
     gateway.probe(ws.config, "lan")
     sent = len(stub.chat_requests())
-    counts = gateway.run_queue(ws.config)
+    counts = queue.run_queue(ws.config)
     assert counts == {"failed-changed-endpoint": queued}
     assert len(stub.chat_requests()) == sent  # nothing rerouted to the changed endpoint
     status, reason, _ = gateway.check_policy(ws.config, "doc.is_statement", "metadata", [])
@@ -162,7 +162,7 @@ def test_1b_8_adversarial_output_is_contained(ws, openai_stub):
     bind(ws, endpoint("local", stub.url), {"doc.is_statement": "local"})
     gateway.probe(ws.config, "local")
     decisions_before = _dump(ws, "decisions")
-    counts = gateway.run_queue(ws.config)
+    counts = queue.run_queue(ws.config)
     assert set(counts) == {"manual-review"}
     assert _dump(ws, "decisions") == decisions_before
     db = ws.db("derived")
@@ -178,7 +178,7 @@ def test_valid_model_results_are_recorded(ws, openai_stub):
     gateway.probe(ws.config, "local")
     excluded = sorted(r["item_id"] for r in scan.model_queue(ws.config))[0]
     decisions.set_item(ws.config, excluded, model_use="excluded")
-    counts = gateway.run_queue(ws.config)
+    counts = queue.run_queue(ws.config)
     assert counts.get("done", 0) == len(scan.model_queue(ws.config)) - 1
     assert counts.get("refused") == 1
     sent = json.dumps([r["body"] for r in stub.chat_requests()])

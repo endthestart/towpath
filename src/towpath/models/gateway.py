@@ -3,13 +3,17 @@
 Callers name a task, never an endpoint. Every call is checked against the
 task binding, the endpoint's destination, each item's model use, the data
 class ceiling, and the owner's grants, then recorded in the ledger. Fallbacks
-change method on the same endpoint; they never switch endpoints.
+change method on the same endpoint; they never switch endpoints. A model that
+is busy, unreachable or failing ends the call at once. Background work yields
+to everyone else using the model (pacing).
 """
 
 import hashlib
 import json
+import time
 from datetime import datetime, timezone
 
+from towpath.models import pacing
 from towpath.models.profiles import LOCAL_DESTINATIONS, ProfileError, check_destination, fingerprint, make_client
 from towpath.stores import open_store
 
@@ -170,9 +174,19 @@ def check_policy(config, task: str, data_class: str, item_ids: list[str]) -> tup
     return "ok", "", endpoint
 
 
+def background_wait(config, task: str) -> float:
+    """Seconds before the task's model takes background work again (0: now), so a caller can skip preparing it."""
+    endpoint = config.endpoints[config.tasks[task]]
+    return pacing.wait(config.store_dir, endpoint.id, endpoint.timeout_seconds)
+
+
 def infer(config, task: str, prompt: str, data_class: str, output_schema: dict, item_ids: list[str] = (),
-          prompt_version: str = "v0") -> dict:
-    """Run a structured task through the gateway. Never raises for policy or model failures."""
+          prompt_version: str = "v0", *, background: bool) -> dict:
+    """Run a structured task through the gateway. Never raises for policy or model failures.
+
+    ``background`` is work nobody is waiting on: it yields to everyone else using the model. A model that couldn't
+    take the call now answers status "unavailable" with a failure of "busy", "transient" (no answer, a server
+    error or a rate limit) or "paced" (background work waits its turn; nothing was sent)."""
     item_ids = list(item_ids)
     input_sha = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     status, reason, endpoint = check_policy(config, task, data_class, item_ids)
@@ -191,6 +205,12 @@ def infer(config, task: str, prompt: str, data_class: str, output_schema: dict, 
                 outcome="disabled", detail=reason)
         return {"status": "disabled", "reason": reason}
 
+    if background:
+        held = pacing.wait(config.store_dir, endpoint.id, endpoint.timeout_seconds)
+        if held:
+            return {"status": "unavailable", "failure": "paced",
+                    "reason": f"background model work waits {held:.0f} s more"}
+
     caps = report["capabilities"]
     methods = [m for m in ("json_schema", "json_object") if caps.get(m)] + ["prompt"]
     client = make_client(endpoint, config.root)
@@ -208,12 +228,22 @@ def infer(config, task: str, prompt: str, data_class: str, output_schema: dict, 
         elif method == "json_object":
             kwargs["response_format"] = {"type": "json_object"}
         resp = client.chat.completions.create(model=endpoint.model,
-                                              messages=[{"role": "user", "content": instruction + extra}], **kwargs)
+                                              messages=[{"role": "user", "content": instruction + extra}],
+                                              extra_headers=pacing.HEADERS if background else None, **kwargs)
         return resp
 
     import jsonschema
     import openai
+    # Another format can't help a model that is busy, unreachable or failing: the call ends at once.
+    UNAVAILABLE = (openai.ConflictError, openai.APIConnectionError, openai.RateLimitError,  # noqa: N806
+                   openai.InternalServerError)
     RECOVERABLE = (openai.APIError, jsonschema.ValidationError, ValueError, LookupError, TypeError)  # noqa: N806
+    started = time.monotonic()
+
+    def finish(result: dict) -> dict:
+        if background:
+            pacing.record(config.store_dir, endpoint.id, started, result.get("failure"))
+        return result
 
     for method in methods + ["re-ask"]:
         use = methods[-1] if method == "re-ask" else method
@@ -222,78 +252,22 @@ def infer(config, task: str, prompt: str, data_class: str, output_schema: dict, 
             resp = ask(use, extra)
             served = getattr(resp, "model", None)
             value = _validate(resp.choices[0].message.content or "", output_schema)
+        except UNAVAILABLE as exc:
+            reason = f"{method}: {exc.__class__.__name__}"
+            _ledger(config, **base, endpoint_id=endpoint.id, fingerprint=fp, destination=endpoint.destination,
+                    model=endpoint.model, method=method, outcome="unavailable", detail=reason)
+            return finish({"status": "unavailable", "reason": reason,
+                           "failure": "busy" if isinstance(exc, openai.ConflictError) else "transient"})
         except RECOVERABLE as exc:
             errors.append(f"{method}: {exc.__class__.__name__}")
             continue
         _ledger(config, **base, endpoint_id=endpoint.id, fingerprint=fp, destination=endpoint.destination,
                 model=endpoint.model, served_model=served, method=method, outcome="ok",
                 usage=json.dumps(getattr(getattr(resp, "usage", None), "model_dump", lambda: None)()))
-        return {"status": "ok", "output": value, "method": method, "endpoint_id": endpoint.id, "fingerprint": fp}
+        return finish({"status": "ok", "output": value, "method": method, "endpoint_id": endpoint.id,
+                       "fingerprint": fp})
 
     _ledger(config, **base, endpoint_id=endpoint.id, fingerprint=fp, destination=endpoint.destination,
             model=endpoint.model, served_model=served, method="exhausted", outcome="manual-review",
             detail="; ".join(errors))
-    return {"status": "manual-review", "reason": "; ".join(errors)}
-
-
-# -- the model-input queue -----------------------------------------------------------
-
-STATEMENT_SCHEMA = {"type": "object",
-                    "properties": {"is_statement": {"type": "boolean"},
-                                   "confidence": {"type": "number", "minimum": 0, "maximum": 1}},
-                    "required": ["is_statement", "confidence"], "additionalProperties": False}
-TASKS = {"doc.is_statement": ("Decide whether this email attachment is a financial or account statement. "
-                              "Use only the metadata below.", STATEMENT_SCHEMA)}
-
-
-def run_queue(config) -> dict:
-    """Process the model-input queue. A changed endpoint profile fails queued work; it never reroutes."""
-    derived = open_store(config.store_dir, "derived", ROLE)
-    source = open_store(config.store_dir, "source", ROLE)
-    counts: dict[str, int] = {}
-    rows = derived.execute("SELECT * FROM model_input_queue WHERE status IN ('awaiting-endpoint', 'queued')").fetchall()
-    for row in rows:
-        task = row["task"]
-        endpoint_id = config.tasks.get(task)
-        if endpoint_id is None or task not in TASKS:
-            counts["disabled"] = counts.get("disabled", 0) + 1
-            continue
-        fp = fingerprint(config.endpoints[endpoint_id])
-        if row["endpoint_fingerprint"] is None:
-            derived.execute("UPDATE model_input_queue SET endpoint_fingerprint = ?, status = 'queued' "
-                            "WHERE item_id = ? AND part_id = ? AND task = ?",
-                            (fp, row["item_id"], row["part_id"], task))
-        elif row["endpoint_fingerprint"] != fp:
-            derived.execute("UPDATE model_input_queue SET status = 'failed', detail = ? "
-                            "WHERE item_id = ? AND part_id = ? AND task = ?",
-                            ("endpoint profile changed after this work was queued; requeue explicitly",
-                             row["item_id"], row["part_id"], task))
-            counts["failed-changed-endpoint"] = counts.get("failed-changed-endpoint", 0) + 1
-            continue
-        meta = source.execute("""SELECT i.source_id, i.subject, i.from_addr, p.filename, p.mime_type, p.size FROM
-                                 parts p JOIN items i USING (item_id) WHERE p.item_id = ? AND p.part_id = ?""",
-                              (row["item_id"], row["part_id"])).fetchone()
-        instruction, schema = TASKS[task]
-        prompt = (f"{instruction}\nFile name: {meta['filename']}\nType: {meta['mime_type']}\nSize: {meta['size']}\n"
-                  f"Subject: {meta['subject']}\nSender domain: {(meta['from_addr'] or '').partition('@')[2]}")
-        from towpath.mail.privacy import targets  # the message and its sender, for the owner's marks
-
-        result = infer(config, task, prompt, "metadata", schema,
-                       targets(meta["source_id"], [row["item_id"]], [meta["from_addr"]]))
-        # Disabled work (for example, no probe yet) stays queued, pinned to this profile.
-        status = {"ok": "done", "manual-review": "manual-review", "disabled": "queued"}.get(
-            result["status"], result["status"])
-        derived.execute("UPDATE model_input_queue SET status = ?, detail = ? "
-                        "WHERE item_id = ? AND part_id = ? AND task = ?",
-                        (status, result.get("reason"), row["item_id"], row["part_id"], task))
-        if result["status"] == "ok":
-            derived.execute("""INSERT OR REPLACE INTO model_results (item_id, part_id, task, output, endpoint_id,
-                               endpoint_fingerprint, method, at) VALUES (?,?,?,?,?,?,?,?)""",
-                            (row["item_id"], row["part_id"], task, json.dumps(result["output"]), endpoint_id, fp,
-                             result["method"], now()))
-        counts[status] = counts.get(status, 0) + 1
-        derived.commit()
-    derived.commit()
-    derived.close()
-    source.close()
-    return counts
+    return finish({"status": "manual-review", "reason": "; ".join(errors)})

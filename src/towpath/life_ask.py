@@ -278,7 +278,7 @@ def answer_pending(config, slice_seconds: float = 120, clock=time.monotonic) -> 
                     break
                 result = gateway.infer(config, TASK, f"{INSTRUCTION}\n\nQuestion: {q['text']}\n\n<sources>\n"
                                        f"{_sources_text(sources)}\n</sources>", "content", SCHEMA,
-                                       _targets(sources), prompt_version=PROMPT)
+                                       _targets(sources), prompt_version=PROMPT, background=False)
                 if not item_refused(result):
                     break
                 kept = privacy.kept(config.store_dir, _targets(sources), role=WRITER)

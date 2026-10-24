@@ -313,7 +313,7 @@ def _ask_model(config, rules_: list[dict], message: dict) -> dict:
 
     return gateway.infer(config, TASK, prompt, "content", schema,
                          targets(message["source_id"], [message["item_id"]], [message.get("from_addr")]),
-                         prompt_version=PROMPT)
+                         prompt_version=PROMPT, background=True)
 
 
 def evaluate_pending(config, slice_seconds: float = SLICE_SECONDS, clock=time.monotonic) -> list[dict]:
@@ -390,7 +390,7 @@ def evaluate_pending(config, slice_seconds: float = SLICE_SECONDS, clock=time.mo
                 plan.commit()
             if examined or matched:
                 summaries.append({"source_id": sid, "step": "mail-rules", "examined": examined, "matched": matched,
-                                  **({"stopped": stopped} if stopped not in (None, "deadline") else {})})
+                                  **({"stopped": stopped} if stopped not in (None, "deadline", "paced") else {})})
         finally:
             for db in (intel, mail, plan, src):
                 db.close()

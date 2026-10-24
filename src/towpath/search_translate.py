@@ -84,7 +84,8 @@ def translate_pending(config) -> list[dict]:
             query, status = fallback(a["text"]), "words"
             if usable:
                 prompt = (SYNTAX.format(today=date.today().isoformat()) + f"\n\n{places}\n\nQuestion: {a['text']}")
-                result = gateway.infer(config, TASK, prompt, "content", SCHEMA, prompt_version=PROMPT)
+                result = gateway.infer(config, TASK, prompt, "content", SCHEMA, prompt_version=PROMPT,
+                                       background=False)
                 if result["status"] == "ok":
                     try:
                         Filters.parse(result["output"]["query"])

@@ -116,7 +116,8 @@ def draft_pending(config) -> list[dict]:
                             "actions": [], "scope": "new"}, "words"
             if usable:
                 prompt = INSTRUCTION.format(categories=", ".join(senders.CATEGORIES)) + f"\n\nDescription: {a['text']}"
-                result = gateway.infer(config, TASK, prompt, "content", _schema(), prompt_version=PROMPT)
+                result = gateway.infer(config, TASK, prompt, "content", _schema(), prompt_version=PROMPT,
+                                       background=False)
                 if result["status"] == "ok":
                     candidate = to_body(result["output"])
                     try:

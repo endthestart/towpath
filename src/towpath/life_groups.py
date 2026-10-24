@@ -266,7 +266,7 @@ def _chapters(config, db, claims_, spans) -> int:
 
 def _occasions(config, db, claims_, spans, deadline, clock) -> tuple[int, str | None]:
     """The model gathers each month's events (with ten days either side) into occasions; months whose events
-    haven't changed aren't asked about again."""
+    haven't changed aren't asked about again, and months still being read wait until their run finishes."""
     from towpath.mail.threads import _failure
     from towpath.models import gateway
 
@@ -274,10 +274,14 @@ def _occasions(config, db, claims_, spans, deadline, clock) -> tuple[int, str | 
     for c in claims_:
         if spans.get(c.claim_id, (None,))[0]:
             months.setdefault(spans[c.claim_id][0][:7], []).append(c)
+    reading = [(s["after"][:7], s["before"][:7]) for s in
+               (json.loads(r[0]) for r in db.execute("SELECT slice FROM runs WHERE state != 'done'"))]
     made = 0
     for month in sorted(months, reverse=True):
         if clock() >= deadline:
             return made, None
+        if any(first <= month <= last for first, last in reading):
+            continue
         first = date.fromisoformat(month + "-01")
         nearby = [c for c in claims_ if spans.get(c.claim_id, (None,))[0] and
                   abs((date.fromisoformat(spans[c.claim_id][0][:10]) - first).days - 15) <= 25]
@@ -299,7 +303,7 @@ def _occasions(config, db, claims_, spans, deadline, clock) -> tuple[int, str | 
         for _ in range(2):  # a second time without events from mail kept from this model, if it refused for them
             listed = "\n".join(f"- {c.claim_id} | {spans[c.claim_id][0][:10]} | {c.statement}" for c in nearby[:80])
             result = gateway.infer(config, TASK, f"{INSTRUCTION}\n\n<events>\n{listed}\n</events>", "content",
-                                   SCHEMA, names(nearby[:80]), prompt_version=PROMPT)
+                                   SCHEMA, names(nearby[:80]), prompt_version=PROMPT, background=True)
             if not item_refused(result):
                 break
             kept = privacy.kept(config.store_dir, names(nearby), role=WRITER)

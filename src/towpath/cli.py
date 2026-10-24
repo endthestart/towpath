@@ -538,9 +538,9 @@ def model_use(task: str, endpoint: str = typer.Argument(None, help="Endpoint ID;
 @model_app.command("run-queue")
 def model_run_queue(config: Path = ConfigOpt, as_json: bool = typer.Option(False, "--json")):
     """Process queued model work through the gateway (worker)."""
-    from towpath.models import gateway
+    from towpath.models import queue
 
-    _emit(gateway.run_queue(_load(config)), as_json)
+    _emit(queue.run_queue(_load(config)), as_json)
 
 
 @model_app.command("check")
