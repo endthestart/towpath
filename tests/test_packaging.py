@@ -102,7 +102,7 @@ def test_deployment_files_only_pull_pinned_images():
 
 
 def test_deployment_examples_hold_no_private_values():
-    for path in DEPLOY.iterdir():
+    for path in (p for p in DEPLOY.rglob("*") if p.is_file()):
         text = path.read_text()
         # No real IP addresses; the unspecified listening address is not one.
         for address in re.findall(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", text):
