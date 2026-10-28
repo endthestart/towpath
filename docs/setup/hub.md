@@ -6,16 +6,13 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `66014b9` (background model work yields to everyone else using the model: a busy or failing model ends
-the call at once, background calls never wait in line, take at most a quarter of any hour and back off together;
-memories are gathered once a year's reading finishes), publishing run
-[40134731818](https://github.com/endthestart/towpath/actions/runs/40134731818). No store changes. Keeping the
+Revision `2150ed2` (certifi 2026.10.23, clearing GHSA-6q48-6c7w-9gw2 in both images), publishing run
+[40765101424](https://github.com/endthestart/towpath/actions/runs/40765101424). No store changes. Keeping the
 evidence is off. On Hub, Fastmail is allowed for the life story and finding events by itself is on (the owner's
-answers of October 17). The connector was stopped from October 23 until this release, after its back-to-back model
-calls had occupied a shared model; the first hour after the release stayed within the quarter-hour share.
+answers of October 17). Background model work has yielded to other users of the model since `66014b9`.
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:95759b1ecaa11ac14c87d49dc386721f9185bc3e95820bf2b84b4fd89fde7084`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:a2b3d3f24e5c091cc5a071718ea8ee2ab6363ea765ff597f3f89a4f0792ebf21`
+- `web`: `ghcr.io/endthestart/towpath@sha256:46e51ed768b990c5ffbd7d5e2622d83dc0a5564ad9143527737b96da1faa9bac`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:57d9955e62e815dd89ae8410a1d9bb6192d0a6b9923ef67ff9cf759f2ec52597`
 
 Database dumps: nightly at 03:20 into `/mnt/tank/storage/backup/db-dumps/towpath/`, with a restore check each
 night ([backups](backups.md)).
@@ -33,6 +30,7 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `66014b9` | Background model work yields: fast-fail on a busy model, a quarter-hour share, shared back-off | `towpath@sha256:95759b1e…`, `towpath-recoll@sha256:a2b3d3f2…` |
 | `33ec167` | Inbox Zero's rules rewritten as a switched-off set on each account's Rules page | `towpath@sha256:7310e6b3…`, `towpath-recoll@sha256:b7000a64…` |
 | `a19cbcd` | New providers, birthdays and calendar on the Overview, faster catalog | `towpath@sha256:d58f8202…`, `towpath-recoll@sha256:d56ca51f…` |
 | `3fd33fe` | Items 14–18 before the calendar review's fixes | `towpath@sha256:d3fedc67…`, `towpath-recoll@sha256:c390e0a1…` |
