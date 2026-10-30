@@ -1,6 +1,6 @@
 # Towpath architecture
 
-Status: **design, partly built.** Read-only CLI roles and an optional local email UI exist. A full Gmail metadata index has completed in local acceptance; remaining live validation gates are tracked separately. Other adapters and workflows have synthetic/stub evidence as documented. The action runner, life stream and service Compose layout remain design. See the [vision](vision.md), [roadmap](roadmap.md) and [decisions](decisions.md).
+Status: **design, partly built.** CLI roles, a web UI behind a single-account login, connector services and a mail action runner exist and run from published images under a service Compose layout; the life stream's first layers are built. Remaining Gmail live validation gates are tracked separately. Other adapters and workflows have synthetic/stub evidence as documented. Deliveries to document systems and photo libraries remain design. See the [vision](vision.md), [roadmap](roadmap.md) and [decisions](decisions.md).
 
 ## What Towpath is
 

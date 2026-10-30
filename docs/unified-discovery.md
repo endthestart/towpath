@@ -1,6 +1,6 @@
 # Unified discovery
 
-Status: **in development on a feature branch; see [the specification](specs/unified-discovery-foundation.md).** This page describes what the code in `src/towpath/unified/` and `src/towpath/adapters/imap.py` does now. The [acceptance guide](setup/unified-discovery-acceptance.md) lists exact local checks and what is still synthetic.
+Status: **built on the main line and deployed; see [the specification](specs/unified-discovery-foundation.md).** This page describes what the code in `src/towpath/unified/` and `src/towpath/adapters/imap.py` does now. The [acceptance guide](setup/unified-discovery-acceptance.md) lists exact local checks and what is still synthetic.
 
 Unified discovery puts one source-aware search and evidence surface over the sources Towpath already reads: Gmail and IMAP indexes in the source store, and file occurrences from an existing file-search provider ([file discovery](file-discovery.md)). Each source keeps its own store, connector and provider contract. The unified layer adds shared shapes, federation and honest reporting. It does not add a crawler, a parser suite, a full-text engine or a vector database.
 

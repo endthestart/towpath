@@ -1,6 +1,6 @@
 # Local quickstart: test Towpath against your own accounts
 
-Status: **instructions for code that is built but not yet run against real services.** Everything here reads only. Towpath has no code that can change a mailbox, a document system, or a photo library.
+Status: **instructions for code that is built but not yet run against real services.** Everything here reads only. The only Towpath code that can change a mailbox is the mail action runner, which these steps do not set up; nothing changes a document system or a photo library.
 
 Start with a **dedicated test Google account** that has a little mail and a few PDF and image attachments. Move to a primary account only after the checks in parts C and D pass.
 

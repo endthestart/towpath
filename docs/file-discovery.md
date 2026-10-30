@@ -4,7 +4,7 @@ File discovery finds documents in folders, archives, and old mail backups by ask
 
 It is optional and separate from mail. It works without Gmail, model endpoints, or the life stream. Later, permitted results can become agent context or life-stream evidence. That needs separate grants, and the [context packet](#context-packet) is the only route.
 
-Status: **synthetic slice and Recoll adapter built**, tested on synthetic files. Nothing here has run on personal data. Neither provider is adopted ([D17](decisions.md#d17-file-discovery-boundary)).
+Status: **synthetic slice and Recoll adapter built**, tested on synthetic files; the Recoll adapter also indexes the owner's folders on the home server. Neither provider is formally adopted ([D17](decisions.md#d17-file-discovery-boundary)).
 
 ## Boundary
 

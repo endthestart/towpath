@@ -1,6 +1,6 @@
 # Services, stores, and permissions
 
-Status: **design, partly built.** Service names are working names. The connect and worker roles exist as CLI command groups sharing SQLite stores (source index, work queue, derived, decisions, ledger); `towpath-web` and `towpath-act` do not exist yet. Built pieces are listed in the [roadmap](roadmap.md); everything else here is design.
+Status: **design, partly built.** Service names are working names. The connect and worker roles exist as CLI command groups sharing SQLite stores (source index, work queue, derived, decisions, ledger); `towpath-web` runs as its own service. The `act` role exists for mail changes and runs inside the connector's worker loop, not as a separate `towpath-act` service; deliveries to other tools are not built. Built pieces are listed in the [roadmap](roadmap.md); everything else here is design.
 
 ## Services
 

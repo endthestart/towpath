@@ -2,12 +2,12 @@
 
 Towpath is an open-source, self-hosted workspace to discover your digital life, organize and reuse its contents, and build an evidence-linked timeline and portfolio. Email is the first working source. See the [product vision](docs/vision.md).
 
-**Status: read-only command-line tools and an optional local email UI.** The CLI can index Gmail read-only (with your own OAuth client) and other mailboxes over read-only IMAP, find attachments, check whether Paperless-ngx or Immich already holds them, call explicitly configured model endpoints under policy, read Inbox Zero statistics, and optionally search folders, archives, and old mail backups through Recoll. The [local UI](docs/setup/local-ui.md) browses and searches the saved email metadata without credentials or mailbox access. There is no action runner yet. Portable acceptance tests use synthetic data and stubs; live deployment checks stay private. Container images of the CLI (with optional Recoll) are built and tested in GitHub Actions; publication to GHCR has additional [release gates](docs/evaluations/container-release-followup.md). The UI currently runs natively in Python. Follow the [local quickstart](docs/setup/local-quickstart.md) to connect your own sources.
+**Status: a web service and connector services, installed from container images ([install guide](docs/setup/install.md)).** Behind a single-account login, accounts are added in the browser: Gmail (read-only, with your own OAuth client), IMAP mail (Fastmail, iCloud, Yahoo, or Gmail with an app password), CardDAV/CalDAV contacts and calendars, Facebook and Apple Messages exports, and folders, archives and old mail backups searched through Recoll. Paperless-ngx and Immich are read for lookups, and Inbox Zero for statistics and rules. Mail management over IMAP proposes changes; a separate action runner carries out only what the owner asked for or approved, and runs each action type as a dry run until the owner turns it on ([mail management](docs/mail-management.md)). The life stream finds events in allowed mail, gathers them into memories and answers questions with cited sources ([life stream](docs/life-stream.md)). Model features use explicitly configured endpoints under policy. The same UI also runs locally over a saved index ([local UI](docs/setup/local-ui.md)). Acceptance tests here use synthetic data and stubs; live deployment checks stay private. Images are built, tested and published by GitHub Actions under [release gates](docs/setup/containers.md).
 
 ## What it will do
 
 - **Discovery and reuse:** search connected accounts, files, exports and existing inventories; curate reference collections and source-linked packets for other applications or agents. See the [project rediscovery pilot](docs/specs/project-rediscovery-pilot.md).
-- **Mail management:** unsubscribing, important mail still waiting for your reply, draft replies, categories, and smart rules come from an integrated mail-management tool (Inbox Zero first) running in Towpath's Compose setup with its own Gmail access. Towpath adds routing attachments to your document system or photo library, through a separately permissioned action runner after you approve.
+- **Mail management:** unsubscribing, important mail still waiting for your reply, draft replies, categories, and smart rules, built into Towpath over IMAP ([ADR 0002](docs/adrs/0002-towpath-native-mail-management.md)), with Inbox Zero as the interim tool for Gmail. Towpath adds routing attachments to your document system or photo library, through the separately permissioned action runner after you approve.
 - **Life stream:** find people, events, places, photos, and documents across connected sources and turn them into reviewable claims with citations, uncertain dates, and visible contradictions. Ask questions and get cited answers. In the long term, curate a story to share with family. It starts from mail but works with any source.
 
 ## How it is built
@@ -35,7 +35,7 @@ towpath scan run                        # presence checks and delivery proposals
 towpath proposals list
 ```
 
-Proposals cannot be executed; there is no write path. See [first slice](docs/first-slice.md) for what it tests and what it taught, and `towpath --help` for every command.
+These delivery proposals cannot be executed; there is no delivery path yet. See [first slice](docs/first-slice.md) for what it tests and what it taught, and `towpath --help` for every command.
 
 ## Install on a home server
 
@@ -70,7 +70,7 @@ Open `http://127.0.0.1:8790/` and create the instance's one account with the set
 | [Local quickstart](docs/setup/local-quickstart.md) | Exact steps to test against your own Gmail, Paperless, Immich, and a local model |
 | [Container images and releases](docs/setup/containers.md) | Images built and tested in GitHub Actions, published to GHCR, pulled by digest; pull, deploy, verify, roll back |
 | [File discovery handoff](docs/setup/file-discovery-handoff.md) | Numbered steps for a local agent to validate file discovery on real archives |
-| [Unified discovery](docs/unified-discovery.md) and [local acceptance](docs/setup/unified-discovery-acceptance.md) | One source-aware search and evidence surface over Gmail, IMAP and file sources (in development) |
+| [Unified discovery](docs/unified-discovery.md) and [local acceptance](docs/setup/unified-discovery-acceptance.md) | One source-aware search and evidence surface over Gmail, IMAP and file sources |
 | [Local agent handoff](docs/setup/local-agent-handoff.md) | A prompt for a coding agent on your machine to continue the verification |
 | [Tooling review, October 2026](docs/research/2026-10-tooling-review.md) | Research on existing tools, licenses, Gmail access rules, and model servers, with sources |
 | [Inbox Zero evaluation plan](docs/evaluations/inbox-zero-plan.md) | Checks to run on a dedicated test mailbox before relying on the integration |
