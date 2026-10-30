@@ -16,8 +16,6 @@ from pathlib import Path
 from towpath import fieldmask
 from towpath.adapters.errors import CursorExpired, Interrupted, InvalidPageToken, NotFound, RequestStop
 
-READ_CALLS = ("get_profile", "list_messages", "get_message", "get_attachment", "list_history")
-
 
 def b64url_decode(data: str) -> bytes:
     return base64.urlsafe_b64decode(data + "=" * (-len(data) % 4))
