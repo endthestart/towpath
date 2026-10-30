@@ -138,14 +138,3 @@ class Occurrence:
         data["location"] = self.locator.display()
         data["extraction"]["truncated"] = self.extraction.truncated
         return data
-
-
-@dataclass(frozen=True)
-class Coverage:
-    """What one provider run actually looked at. A partial or failed run cannot establish absence."""
-
-    provider_id: str
-    complete: bool
-    scanned: int
-    by_status: dict
-    reason: str | None = None
