@@ -42,7 +42,6 @@ def _epoch(value) -> int | None:
 
 class Provider(BaseProvider):
     adapter = "manifest"
-    search_depth = "catalog"
     capabilities = {"probe": "verified", "search": "verified", "describe": "verified", "excerpt": "not-implemented",
                     "recover": "not-implemented", "enumerate": "verified", "root-scoped-query": "verified"}
 
