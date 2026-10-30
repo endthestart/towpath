@@ -12,7 +12,6 @@ export is changed.
 """
 
 import json
-import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -159,7 +158,3 @@ def looks_like_export(path: Path) -> bool:
     """Whether a folder holds a Facebook JSON export (a posts file or a message thread)."""
     path = Path(path)
     return any(path.rglob("your_posts*.json")) or any(path.rglob("message_1.json"))
-
-
-def safe_name(text: str) -> str:
-    return re.sub(r"[^\w .-]", "", text)[:80]
