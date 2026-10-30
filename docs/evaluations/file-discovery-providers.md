@@ -19,7 +19,7 @@ What was checked, against which version, and how. Everything here was run in a c
   - `url` (`file://` of the outer file) and `ipath` (`mail/backup.mbox:1:0`: ZIP member, message 1, attachment 0);
   - `mtype`, `filename`, `fbytes`, `dbytes`;
   - `fmtime` (outer file mtime) and `dmtime` (the message Date header);
-  - `sig` (outer size + mtime) and `title`, `author`.
+  - `sig` (outer size + whole-second ctime) and `title`, `author`.
 - `rclextract.Extractor(doc).textextract(ipath)` returns a doc whose `text` is `text/plain` or `text/html` (per its `mimetype`). For the `.docx` it was HTML.
 - `Extractor(doc).idoctofile(ipath, mimetype, ofilename=...)` wrote the nested `.docx`; its SHA-256 matched the attachment's.
 - Query language: `dir:"<path>"` restricts results to a folder, and works alone to list it; `filename:` matches the attachment's name.

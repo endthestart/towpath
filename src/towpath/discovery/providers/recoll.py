@@ -6,7 +6,7 @@ files (docs/evaluations/file-discovery-providers.md).
 
 How Recoll rows become Towpath records:
 
-- ``native_id`` is Recoll's ``rcludi``; the version is ``sig`` (outer file size and mtime).
+- ``native_id`` is Recoll's ``rcludi``; the version is ``sig`` (outer file size and whole-second ctime).
 - Members come from ``ipath`` components (``mail/backup.mbox:1:0``). A component whose own record
   is ``message/rfc822`` is a mail message; one inside a message is an attachment; one inside a ZIP,
   TAR, or 7z record or at the first level of such a file is an archive member; anything else is
