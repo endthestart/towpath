@@ -10,13 +10,12 @@ Messages get the same protections as mail: only models the owner allowed read th
 conversation's senders, and they reach the life story only once the owner allows this source for it.
 """
 
-import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from towpath.adapters.errors import NotFound
+from towpath.adapters.export import ExportConnector
 
 STAMP = re.compile(r"^([A-Z][a-z]{2} \d{1,2}, \d{4}\s+\d{1,2}:\d{2}:\d{2}\s*[AP]M)\b")
 OWNER = "Me"
@@ -49,20 +48,10 @@ def parse(text: str) -> list[tuple[datetime, str, str]]:
     return out
 
 
-class MessagesExportConnector:
-    kind = "mail-provider"
+class MessagesExportConnector(ExportConnector):
+    connector = "imessage-export/0"
 
-    def __init__(self, source_id: str, root: Path):
-        self.source_id = source_id
-        self.root = Path(root)
-        self._items: dict[str, dict] | None = None
-
-    def describe(self) -> dict:
-        return {"schema": "towpath.source/0", "source_id": self.source_id, "kind": self.kind,
-                "connector": "imessage-export/0", "authority": "read", "capabilities": ["enumerate", "fetch_part"],
-                "retention": "export"}
-
-    def _conversations(self):
+    def _read(self):
         for path in sorted(self.root.rglob("*.txt")):
             try:
                 messages = parse(path.read_text(encoding="utf-8", errors="replace"))
@@ -83,47 +72,6 @@ class MessagesExportConnector:
                        "subject": f"Messages with {name}", "text": body, "thread": f"chat:{name}",
                        "from": next((s for _, s, _ in msgs if s != OWNER), None),
                        "labels": ["Messages", *(["SENT"] if mine else [])]}
-
-    def _load(self) -> dict[str, dict]:
-        if self._items is None:
-            if not self.root.is_dir():
-                raise NotFound(f"the export folder {self.root} isn't there")
-            self._items = {i["native_id"]: i for i in self._conversations()}
-        return self._items
-
-    def _record(self, item: dict) -> dict:
-        size = len(item["text"].encode("utf-8"))
-        return {"native_id": item["native_id"], "thread_id": item["thread"], "labels": item["labels"],
-                "internal_date": None, "size_estimate": size, "rfc_message_id": None, "subject": item["subject"],
-                "from_addr": item["from"], "date_header": item["date"], "date_utc": item["date"],
-                "parts": [{"part_id": "1", "depth": 0, "mime_type": "text/plain", "charset": "utf-8",
-                           "filename": None, "disposition": None, "size": size, "attachment_id": None}],
-                "structure_truncated": False, "inline_data_discarded": 0, "problems": []}
-
-    def enumerate(self, cursor, full_state=None, already_seen=None, **_):
-        items = self._load()
-        seen = set(already_seen or ())
-        if not full_state:
-            yield ("full_start", datetime.now(timezone.utc).isoformat(timespec="seconds"))
-        for native_id, item in items.items():
-            if native_id not in seen:
-                yield ("item", self._record(item))
-        yield ("listed", "reconcile", list(items))
-        yield ("confirm", None)
-        yield ("done", {"kind": "full", "cursor": json.dumps({"items": len(items)}), "complete": True})
-
-    def confirm(self, native_id: str) -> dict | None:
-        item = self._load().get(native_id)
-        return self._record(item) if item else None
-
-    def fetch(self, native_id: str, part_id: str) -> bytes:
-        item = self._load().get(native_id)
-        if item is None or part_id != "1":
-            raise NotFound(native_id)
-        return item["text"].encode("utf-8")
-
-    def close(self) -> None:
-        self._items = None
 
 
 def looks_like_export(path: Path) -> bool:

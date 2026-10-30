@@ -15,7 +15,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from towpath.adapters.errors import NotFound
+from towpath.adapters.export import ExportConnector
 
 MESSAGE_DIRS = ("inbox", "archived_threads", "e2ee_cutover", "filtered_threads", "message_requests")
 
@@ -34,19 +34,12 @@ def _iso(seconds: float) -> str:
     return datetime.fromtimestamp(seconds, timezone.utc).isoformat()
 
 
-class FacebookConnector:
-    kind = "mail-provider"
+class FacebookConnector(ExportConnector):
+    connector = "facebook-export/0"
 
     def __init__(self, source_id: str, root: Path):
-        self.source_id = source_id
-        self.root = Path(root)
-        self._items: dict[str, dict] | None = None
+        super().__init__(source_id, root)
         self.owner: str | None = None
-
-    def describe(self) -> dict:
-        return {"schema": "towpath.source/0", "source_id": self.source_id, "kind": self.kind,
-                "connector": "facebook-export/0", "authority": "read", "capabilities": ["enumerate", "fetch_part"],
-                "retention": "export"}
 
     # -- reading the export -------------------------------------------------------------------------------------
 
@@ -109,49 +102,10 @@ class FacebookConnector:
                                "from": next((s for _, s, _ in msgs if s != self.owner), None), "text": text,
                                "labels": ["Messages", *(["SENT"] if mine else [])], "thread": f"chat:{convo.name}"}
 
-    def _load(self) -> dict[str, dict]:
-        if self._items is None:
-            if not self.root.is_dir():
-                raise NotFound(f"the export folder {self.root} isn't there")
-            self.owner = self._owner_name()
-            self._items = {i["native_id"]: i for i in (*self._posts(), *self._messages())}
-        return self._items
-
-    def _record(self, item: dict) -> dict:
-        size = len(item["text"].encode("utf-8"))
-        return {"native_id": item["native_id"], "thread_id": item["thread"], "labels": item["labels"],
-                "internal_date": None, "size_estimate": size, "rfc_message_id": None, "subject": item["subject"],
-                "from_addr": item["from"], "date_header": item["date"], "date_utc": item["date"],
-                "parts": [{"part_id": "1", "depth": 0, "mime_type": "text/plain", "charset": "utf-8",
-                           "filename": None, "disposition": None, "size": size, "attachment_id": None}],
-                "structure_truncated": False, "inline_data_discarded": 0, "problems": []}
-
-    # -- the sync engine's interface ----------------------------------------------------------------------------
-
-    def enumerate(self, cursor, full_state=None, already_seen=None, **_):
-        items = self._load()
-        seen = set(already_seen or ())
-        if not full_state:
-            yield ("full_start", datetime.now(timezone.utc).isoformat(timespec="seconds"))
-        for native_id, item in items.items():
-            if native_id not in seen:
-                yield ("item", self._record(item))
-        yield ("listed", "reconcile", list(items))
-        yield ("confirm", None)
-        yield ("done", {"kind": "full", "cursor": json.dumps({"items": len(items)}), "complete": True})
-
-    def confirm(self, native_id: str) -> dict | None:
-        item = self._load().get(native_id)
-        return self._record(item) if item else None
-
-    def fetch(self, native_id: str, part_id: str) -> bytes:
-        item = self._load().get(native_id)
-        if item is None or part_id != "1":
-            raise NotFound(native_id)
-        return item["text"].encode("utf-8")
-
-    def close(self) -> None:
-        self._items = None
+    def _read(self):
+        self.owner = self._owner_name()
+        yield from self._posts()
+        yield from self._messages()
 
 
 def looks_like_export(path: Path) -> bool:
