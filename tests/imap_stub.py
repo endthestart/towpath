@@ -571,7 +571,8 @@ class Server:
         self.port = self.server.server_address[1]
 
     def __enter__(self):
-        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        # Runs standalone too, so it does not import tests.stubs.serve; the same short poll applies.
+        threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True).start()
         return self
 
     def __exit__(self, *exc):

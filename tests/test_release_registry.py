@@ -4,7 +4,6 @@ import hashlib
 import json
 import socket
 import sys
-import threading
 import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -12,6 +11,8 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import pytest
+
+from tests.stubs import serve
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "packaging" / "release"))
 
@@ -160,8 +161,7 @@ def server():
     state, port = State(), []
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), handler_for(state, port))
     port.append(httpd.server_address[1])
-    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
-    thread.start()
+    serve(httpd)
     yield state, f"127.0.0.1:{port[0]}/owner/towpath"
     httpd.shutdown()
 

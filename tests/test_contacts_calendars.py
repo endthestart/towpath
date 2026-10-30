@@ -4,12 +4,12 @@ mail, and past calendar events as life-story evidence. A synthetic server on loo
 import json
 import re
 import sys
-import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
 
+from tests.stubs import serve
 from towpath import config as config_mod, connections, dav_sync, life, life_calendar
 from towpath.adapters import dav
 from towpath.stores import open_store
@@ -108,7 +108,7 @@ class Server:
                 self.end_headers()
 
         self.http = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        threading.Thread(target=self.http.serve_forever, daemon=True).start()
+        serve(self.http)
         base = f"http://127.0.0.1:{self.http.server_address[1]}"
         self.urls = {"contacts": f"{base}/dav/addressbooks/user/{USER}/",
                      "calendars": f"{base}/dav/calendars/user/{USER}/"}

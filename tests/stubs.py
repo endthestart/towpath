@@ -13,6 +13,11 @@ from urllib.parse import parse_qs, urlparse
 PROBE_HINT = "Return the JSON object"
 
 
+def serve(server) -> None:
+    """Serve in a daemon thread. A short poll keeps ``shutdown()`` from waiting up to half a second."""
+    threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True).start()
+
+
 class Stub:
     def __init__(self, route):
         self.requests: list[dict] = []
@@ -45,7 +50,7 @@ class Stub:
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self.port = self.server.server_address[1]
         self.url = f"http://127.0.0.1:{self.port}"
-        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        serve(self.server)
 
     def close(self):
         self.server.shutdown()
