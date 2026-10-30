@@ -8,6 +8,7 @@ docs/setup/local-quickstart.md.
 
 import base64
 import json
+import time
 
 import pytest
 
@@ -15,6 +16,7 @@ pytest.importorskip("googleapiclient")
 import httplib2  # noqa: E402
 from googleapiclient.errors import HttpError  # noqa: E402
 
+from tests.fake_clock import FakeClock  # noqa: E402
 from towpath import connect, fieldmask  # noqa: E402
 from towpath.adapters import google_gmail  # noqa: E402
 from towpath.adapters.gmail import GmailConnector  # noqa: E402
@@ -332,8 +334,12 @@ def test_provider_search_uses_q_under_the_same_scope_client_and_budget(gmail_ws,
     service = gmail_ws.service
     monkeypatch.setattr(GoogleGmailClient, "from_token",
                         classmethod(lambda cls, path, **kw: cls(service, page_size=10, limiter=kw.get("limiter"))))
+    clock = FakeClock(time.time())
+    monkeypatch.setattr("towpath.quota.CLOCK", clock)
+    monkeypatch.setattr("towpath.quota.SLEEP", clock.sleep)
     connect.sync(gmail_ws.config, "src_a")
     service.calls.clear()
+    waits = len(clock.sleeps)
     adapters = {"src_a": sources.MailAdapter(gmail_ws.config, gmail_ws.config.sources["src_a"], connect=True)}
     try:
         resp = federation.search(adapters, Filters.parse("statement"), limit=3).to_dict()
@@ -353,3 +359,4 @@ def test_provider_search_uses_q_under_the_same_scope_client_and_budget(gmail_ws,
     finally:
         quota.close()
     assert methods[-1] == ("users.messages.list", 5)  # accounted and paced like every other call
+    assert len(clock.sleeps) > waits

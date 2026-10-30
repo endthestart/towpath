@@ -17,6 +17,7 @@ import httplib2  # noqa: E402
 from googleapiclient.errors import HttpError  # noqa: E402
 from typer.testing import CliRunner  # noqa: E402
 
+from tests.fake_clock import FakeClock  # noqa: E402
 from tests.test_gmail_client import Call, FakeService  # noqa: E402
 from towpath import config as config_mod  # noqa: E402
 from towpath import connect, fieldmask, quota  # noqa: E402
@@ -31,22 +32,6 @@ START = datetime(2026, 10, 2, 19, 0, tzinfo=timezone.utc).timestamp()  # 12:00 i
 CALL_METHOD = {"getProfile": "users.getProfile", "messages.list": "users.messages.list",
                "messages.get": "users.messages.get", "attachments.get": "users.messages.attachments.get",
                "history.list": "users.history.list"}
-
-
-class FakeClock:
-    def __init__(self, now=START):
-        self.now = now
-        self.sleeps: list[float] = []
-        self.cancel_on_sleep: int | None = None
-
-    def __call__(self):
-        return self.now
-
-    def sleep(self, seconds):
-        self.sleeps.append(seconds)
-        if self.cancel_on_sleep is not None and len(self.sleeps) >= self.cancel_on_sleep:
-            raise KeyboardInterrupt
-        self.now += seconds
 
 
 def http_error(status, reason=None, retry_after=None):
@@ -72,7 +57,7 @@ def paced(ws, monkeypatch):
                 "token_b.json": FakeService(ws.root / "account_b.json")}
     monkeypatch.setattr(GoogleGmailClient, "from_token", classmethod(
         lambda cls, path, **kw: cls(services[path.name], page_size=10, rng=random.Random(0), **kw)))
-    clock = FakeClock()
+    clock = FakeClock(START)
     monkeypatch.setattr(quota, "CLOCK", clock)
     monkeypatch.setattr(quota, "SLEEP", clock.sleep)
     ws.service, ws.services, ws.clock = services["token_a.json"], services, clock
