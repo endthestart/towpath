@@ -23,7 +23,6 @@ PROVIDERS = {
                      "help_url": "https://www.fastmail.help/hc/en-us/articles/360058752854-App-passwords"},
     "icloud_dav": {"label": "iCloud contacts and calendars", "service": "iCloud",
                    "help_url": "https://support.apple.com/en-us/102654"}}
-PROVIDER = PROVIDERS["fastmail_dav"]
 
 
 def now() -> str:
