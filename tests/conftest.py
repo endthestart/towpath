@@ -18,6 +18,16 @@ REPO = Path(__file__).resolve().parents[1]
 collect_ignore_glob = [] if os.environ.get("TOWPATH_IMAGE") else ["container/*"]
 
 
+@pytest.fixture(autouse=True)
+def fast_password_hashes(monkeypatch):
+    """Real PBKDF2 hashes in the stored format, with 1,000 rounds instead of a million for each sign-in."""
+    try:
+        from django.contrib.auth.hashers import PBKDF2PasswordHasher
+    except ImportError:  # the web extra is optional
+        return
+    monkeypatch.setattr(PBKDF2PasswordHasher, "iterations", 1000)
+
+
 class Files:
     """A synthetic file discovery corpus with the fixture provider and its example config."""
 
