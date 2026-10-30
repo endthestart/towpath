@@ -19,7 +19,7 @@ SCHEMA = "towpath.mail.action/1"
 KEYWORD = re.compile(r"^\$?[A-Za-z0-9_.-]{1,64}$")
 MAX_APPEND_BYTES = 1_000_000
 
-# type: label shown to the owner, tier, whether a rule may ever do it without asking, the inverse type.
+# Per action type: label shown to the owner, tier, whether a rule may ever do it without asking, the inverse type.
 TYPES = {
     "mark_read": {"label": "Mark as read", "tier": 1, "auto": True, "inverse": "mark_unread"},
     "mark_unread": {"label": "Mark as unread", "tier": 1, "auto": True, "inverse": "mark_read"},
