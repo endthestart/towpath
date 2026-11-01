@@ -1,111 +1,24 @@
-"""The ``towpath-connect`` role: the only code that reads sources.
+"""Indexing a source: a full sync first, incremental after, stopping cleanly and resuming."""
 
-It writes the source index and reads the work queue. It never calls a model
-and has no way to change a source.
-"""
-
-import base64
-import hashlib
 import json
-from datetime import datetime, timezone
 
 from towpath.adapters import build_connector
-from towpath.adapters.errors import Interrupted, NotFound, SyncStop
-from towpath.canonical import short_id
+from towpath.adapters.errors import Interrupted, SyncStop
+from towpath.connect.records import (
+    ROLE,
+    Capped,
+    _full_state,
+    item_id,
+    _latest_labels,
+    _new_run,
+    now,
+    _observe,
+    _sanitized,
+    _update_matches,
+    _upsert_item,
+)
 from towpath.progress import Progress
 from towpath.stores import open_store
-
-ROLE = "connect"
-
-
-def now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
-
-
-def item_id(source_id: str, native_id: str) -> str:
-    return short_id("itm", source_id, native_id)
-
-
-def _new_run(db, source_id: str, kind: str, cursor_before: str | None) -> str:
-    cur = db.execute("INSERT INTO runs (source_id, kind, started_at, cursor_before) VALUES (?, ?, ?, ?)",
-                     (source_id, kind, now(), cursor_before))
-    run_id = f"run_{cur.lastrowid:04d}"
-    db.execute("UPDATE runs SET run_id = ? WHERE seq = ?", (run_id, cur.lastrowid))
-    return run_id
-
-
-def _latest_labels(db, iid: str):
-    row = db.execute("SELECT o.labels FROM observations o JOIN runs r ON r.run_id = o.run_id "
-                     "WHERE o.item_id = ? ORDER BY r.seq DESC LIMIT 1",
-                     (iid,)).fetchone()
-    return json.loads(row["labels"]) if row else None
-
-
-def _observe(db, iid: str, run_id: str, labels: list[str]) -> None:
-    if _latest_labels(db, iid) != labels:
-        db.execute("INSERT OR REPLACE INTO observations (item_id, run_id, observed_at, labels) VALUES (?, ?, ?, ?)",
-                   (iid, run_id, now(), json.dumps(labels)))
-
-
-def _upsert_item(db, source_id: str, run_id: str, rec: dict) -> bool:
-    iid = item_id(source_id, rec["native_id"])
-    existing = db.execute("SELECT item_id FROM items WHERE item_id = ?", (iid,)).fetchone()
-    fields = (rec["thread_id"], rec["rfc_message_id"], rec["subject"], rec["from_addr"], rec["date_header"],
-              rec["date_utc"], rec["internal_date"], rec["size_estimate"], int(rec["structure_truncated"]),
-              rec["inline_data_discarded"], json.dumps(rec["problems"]))
-    if existing:
-        db.execute("""UPDATE items SET thread_id=?, rfc_message_id=?, subject=?, from_addr=?, date_header=?,
-                      date_utc=?, internal_date=?, size_estimate=?, structure_truncated=?, inline_data_discarded=?,
-                      problems=?, last_seen_run=?, absent_since_run=NULL WHERE item_id=?""",
-                   (*fields, run_id, iid))
-    else:
-        db.execute("""INSERT INTO items (thread_id, rfc_message_id, subject, from_addr, date_header, date_utc,
-                      internal_date, size_estimate, structure_truncated, inline_data_discarded, problems,
-                      item_id, source_id, native_id, first_seen_run, last_seen_run)
-                      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                   (*fields, iid, source_id, rec["native_id"], run_id, run_id))
-    for p in rec["parts"]:
-        db.execute("""INSERT INTO parts (item_id, part_id, depth, mime_type, charset, filename, disposition, size,
-                      attachment_id) VALUES (?,?,?,?,?,?,?,?,?)
-                      ON CONFLICT (item_id, part_id) DO UPDATE SET depth=excluded.depth, mime_type=excluded.mime_type,
-                      charset=excluded.charset, filename=excluded.filename, disposition=excluded.disposition,
-                      size=excluded.size, attachment_id=excluded.attachment_id""",
-                   (iid, p["part_id"], p["depth"], p["mime_type"], p["charset"], p["filename"], p["disposition"],
-                    p["size"], p["attachment_id"]))
-    _observe(db, iid, run_id, rec["labels"])
-    return not existing
-
-
-def _update_matches(db, run_id: str) -> None:
-    rows = db.execute("""SELECT rfc_message_id, item_id, source_id FROM items
-                         WHERE rfc_message_id IS NOT NULL AND absent_since_run IS NULL""").fetchall()
-    by_id: dict[str, list] = {}
-    for r in rows:
-        by_id.setdefault(r["rfc_message_id"], []).append(r)
-    for group in by_id.values():
-        for i, left in enumerate(group):
-            for right in group[i + 1:]:
-                if left["source_id"] == right["source_id"]:
-                    continue
-                a, b = sorted([left["item_id"], right["item_id"]])
-                db.execute("""INSERT OR IGNORE INTO matches (left_item, right_item, strength, basis, run_id)
-                              VALUES (?, ?, 'message-id-only', '["rfc_message_id"]', ?)""", (a, b, run_id))
-
-
-class Capped(Interrupted):
-    """The run reached --max-items. Never a completed run."""
-
-
-def _sanitized(exc: BaseException) -> str:
-    """For unexpected errors: the type only, since messages can carry URLs or mail data."""
-    return f"unexpected {exc.__class__.__name__}; progress is saved; see `towpath connect status`"
-
-
-def _full_state(state) -> dict | None:
-    if not (state and state["full_sync_history_id"]):
-        return None
-    return {"history_id": state["full_sync_history_id"], "phase": state["full_sync_phase"] or "scan",
-            "page_token": state["full_sync_page_token"]}
 
 
 def sync(config, source_id: str, max_items: int | None = None, progress=None, **adapter_options) -> dict:
@@ -305,148 +218,3 @@ def sync(config, source_id: str, max_items: int | None = None, progress=None, **
     counts.pop("reads")
     return {"run_id": run_id, "source_id": source_id, **outcome, **counts, "indexed_total": total,
             "unparseable": unparseable}
-
-
-def _hashes(data: bytes) -> dict:
-    return {"sha256": hashlib.sha256(data).hexdigest(),
-            "sha1_b64": base64.b64encode(hashlib.sha1(data).digest()).decode("ascii"),
-            "md5": hashlib.md5(data).hexdigest()}
-
-
-def fetch_requests(config) -> dict:
-    """Fulfill content requests from the work queue, one part at a time. Runs only on explicit request.
-
-    A clean stop (quota, budget, authorization) ends the batch early; finished
-    fetches are kept and the rest wait for the next run.
-    """
-    db = open_store(config.store_dir, "source", ROLE)
-    queue = open_store(config.store_dir, "queue", ROLE)
-    connectors: dict[str, object] = {}
-    run_ids: dict[str, str] = {}
-    result = {"fetched": 0, "failed": 0, "skipped": 0, "termination": "complete"}
-    try:
-        done = {r["request_id"] for r in db.execute("SELECT request_id FROM fetches")}
-        try:
-            for req in queue.execute("SELECT * FROM content_requests ORDER BY seq").fetchall():
-                request_id = f"req_{req['seq']:06d}"
-                if request_id in done:
-                    continue
-                item = db.execute("SELECT source_id, native_id, absent_since_run FROM items WHERE item_id = ?",
-                                  (req["item_id"],)).fetchone()
-                if item is None or item["absent_since_run"]:
-                    db.execute("INSERT INTO fetches VALUES (?,?,?,?,?,?)",
-                               (request_id, req["item_id"], req["part_id"], "skipped", "item absent", now()))
-                    result["skipped"] += 1
-                    continue
-                source_id = item["source_id"]
-                if source_id not in connectors:
-                    connectors[source_id] = build_connector(config.sources[source_id], config)
-                    run_ids[source_id] = _new_run(db, source_id, "fetch", None)
-                try:
-                    data = connectors[source_id].fetch(item["native_id"], req["part_id"])
-                except NotFound as exc:
-                    db.execute("INSERT INTO fetches VALUES (?,?,?,?,?,?)",
-                               (request_id, req["item_id"], req["part_id"], "failed",
-                                getattr(exc, "detail", "not found"), now()))
-                    result["failed"] += 1
-                    continue
-                h = _hashes(data)
-                db.execute("INSERT OR IGNORE INTO cache (sha256, bytes, cached_at) VALUES (?, ?, ?)",
-                           (h["sha256"], data, now()))
-                db.execute("UPDATE parts SET sha256=?, sha1_b64=?, md5=?, fetched_run=? WHERE item_id=? AND part_id=?",
-                           (h["sha256"], h["sha1_b64"], h["md5"], run_ids[source_id], req["item_id"], req["part_id"]))
-                db.execute("INSERT INTO fetches VALUES (?,?,?,?,?,?)",
-                           (request_id, req["item_id"], req["part_id"], "fetched", h["sha256"], now()))
-                result["fetched"] += 1
-                db.commit()
-            result.update(_presence_lookups(config, db, queue, connectors, run_ids))
-        except SyncStop as exc:
-            result.update(termination=exc.code, reason=exc.reason, exit_code=exc.exit_code)
-        for run_id in run_ids.values():
-            db.execute("UPDATE runs SET finished_at = ?, complete = ?, termination = ?, reason = ? WHERE run_id = ?",
-                       (now(), int(result["termination"] == "complete"), result["termination"],
-                        result.get("reason"), run_id))
-        db.commit()
-    finally:
-        db.close()
-        queue.close()
-        for connector in connectors.values():
-            if hasattr(connector, "close"):
-                connector.close()
-    return result
-
-
-def _presence_lookups(config, db, queue, connectors, run_ids) -> dict:
-    """Ask lookup destinations whether they already hold requested checksums.
-
-    Results are observations at a run, not guarantees: a delivery must check again.
-    """
-    answered = {(r["source_id"], r["algorithm"], r["checksum"]) for r in db.execute(
-        "SELECT source_id, algorithm, checksum FROM destination_lookups")}
-    pending: dict[tuple[str, str], list[str]] = {}
-    for req in queue.execute("SELECT * FROM presence_requests ORDER BY seq"):
-        key = (req["destination_id"], req["algorithm"], req["checksum"])
-        if key not in answered:
-            pending.setdefault((req["destination_id"], req["algorithm"]), []).append(req["checksum"])
-    counts = {"presence_checked": 0}
-    for (dest_id, algorithm), checksums in pending.items():
-        if dest_id not in connectors:
-            connectors[dest_id] = build_connector(config.sources[dest_id], config)
-            run_ids[dest_id] = _new_run(db, dest_id, "lookup", None)
-        for checksum, (present, remote_id) in connectors[dest_id].lookup(algorithm, checksums).items():
-            db.execute("""INSERT OR REPLACE INTO destination_lookups (source_id, algorithm, checksum, present,
-                          remote_id, checked_run, checked_at) VALUES (?,?,?,?,?,?,?)""",
-                       (dest_id, algorithm, checksum, int(present), remote_id, run_ids[dest_id], now()))
-            counts["presence_checked"] += 1
-        db.commit()
-    return counts
-
-
-def coverage(config, source_id: str) -> list[dict]:
-    db = open_store(config.store_dir, "source", ROLE)
-    rows = [dict(r) for r in db.execute(
-        """SELECT c.*, r.kind FROM coverage c JOIN runs r USING (run_id) WHERE c.source_id = ?
-           ORDER BY c.run_id""", (source_id,))]
-    db.close()
-    for r in rows:
-        r["unparseable"] = json.loads(r["unparseable"])
-    return rows
-
-
-def status(config, source_id: str, runs: int = 5) -> dict:
-    """Recent runs, resume state, and budget use. No message data, IDs, cursors, or page tokens."""
-    from towpath import quota as quota_mod
-    from towpath.quota import BudgetLock, budget_usage
-
-    source = config.sources[source_id]
-    db = open_store(config.store_dir, "source", ROLE)
-    try:
-        recent = [dict(r) for r in db.execute(
-            """SELECT r.run_id, r.kind, r.started_at, r.finished_at, r.complete, r.termination, r.reason,
-                      r.items_processed, c.items_new, c.items_absent, c.items_indexed_total
-               FROM runs r LEFT JOIN coverage c USING (run_id) WHERE r.source_id = ? ORDER BY r.seq DESC LIMIT ?""",
-            (source_id, runs))]
-        state = db.execute("SELECT * FROM sync_state WHERE source_id = ?", (source_id,)).fetchone()
-        indexed = db.execute("SELECT COUNT(*) FROM items WHERE source_id = ? AND absent_since_run IS NULL",
-                             (source_id,)).fetchone()[0]
-        seen = db.execute("SELECT COUNT(*) FROM full_sync_seen WHERE source_id = ?", (source_id,)).fetchone()[0]
-    finally:
-        db.close()
-    report = {"source": source_id, "indexed": indexed, "runs": recent,
-              "full_sync_in_progress": bool(state and state["full_sync_history_id"]),
-              "full_sync_phase": state["full_sync_phase"] if state else None,
-              "full_sync_read_so_far": seen,
-              "resume_page_saved": bool(state and state["full_sync_page_token"]),
-              "incremental_cursor_saved": bool(state and state["cursor"])}
-    if source.adapter == "gmail":
-        pacing = config.gmail_pacing
-        quota = open_store(config.store_dir, "quota", ROLE)
-        try:
-            report["budget"] = budget_usage(quota, pacing, source_id, quota_mod.CLOCK())
-        finally:
-            quota.close()
-        report["budget"]["lock_held_by_another_command"] = BudgetLock.is_held_elsewhere(config.store_dir,
-                                                                                         pacing.budget_id)
-        report["pacing"] = {"min_interval_seconds": pacing.min_interval_seconds,
-                            "units_per_minute": pacing.units_per_minute, "daily_units": pacing.daily_units}
-    return report
