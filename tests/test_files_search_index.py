@@ -9,7 +9,7 @@ import string
 
 import pytest
 
-from towpath.stores import SCHEMAS, open_store
+from towpath.stores import SCHEMAS, _add_columns, open_store, store_path
 from towpath.unified.sources import _fts_query, _like
 
 TEXT = "lower(o.rel_path || ' ' || o.members)"
@@ -88,6 +88,46 @@ def test_a_catalog_written_before_the_index_is_backfilled_once(tmp_path):
         assert db.execute("SELECT count(*) FROM occurrences_text").fetchone()[0] == 1
     with closing(open_store(tmp_path, "files", "connect")) as db:  # opening again adds nothing twice
         assert db.execute("SELECT count(*) FROM occurrences_text").fetchone()[0] == 1
+
+
+def open_while_another_writer_commits(tmp_path, check: str, commit) -> None:
+    """Open the store as if ``commit`` happened just after the open's first look at the table ``check``."""
+    class Interleaved(sqlite3.Connection):
+        committed = False
+
+        def execute(self, sql, *args):
+            result = super().execute(sql, *args)
+            if sql.startswith(f"SELECT 1 FROM {check}") and not self.committed:
+                self.committed = True
+                with closing(open_store(tmp_path, "files", "connect")) as other:
+                    commit(other)
+            return result
+
+    with closing(sqlite3.connect(store_path(tmp_path, "files"), factory=Interleaved)) as conn:
+        _add_columns(conn, "files")
+
+
+def test_an_import_committing_during_the_open_is_not_indexed_twice(tmp_path):
+    open_store(tmp_path, "files", "connect").close()
+
+    def first_import(other):
+        add(other, 1, "documents/taxes/2003.pdf")
+        other.commit()
+
+    open_while_another_writer_commits(tmp_path, "occurrences_text", first_import)
+    with closing(open_store(tmp_path, "files", "connect")) as db:
+        assert db.execute("SELECT count(*) FROM occurrences_text").fetchone()[0] == 1
+
+
+def test_counts_kept_during_the_open_are_not_counted_again(tmp_path):
+    from towpath.discovery import store as fstore
+
+    with closing(open_store(tmp_path, "files", "connect")) as db:
+        add(db, 1, "documents/taxes/2003.pdf")
+        db.commit()
+    open_while_another_writer_commits(tmp_path, "catalog_counts", lambda other: fstore.refresh_counts(other, "p", "r"))
+    with closing(open_store(tmp_path, "files", "connect")) as db:
+        assert fstore.counts(db, "p", "r") == [[None, 1]]
 
 
 def test_searches_use_the_index_and_never_sort_every_match(db):

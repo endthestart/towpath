@@ -565,17 +565,29 @@ def _add_columns(conn: sqlite3.Connection, store: str) -> None:
         for name, kind in columns.items():
             if name not in present:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {kind}")
-    if store == "files" and not conn.execute("SELECT 1 FROM occurrences_text LIMIT 1").fetchone():
-        # A catalog written before the search index existed: index what it already holds, once.
+    if store == "files":
+        _fill_catalog_tables(conn)
+    conn.commit()
+
+
+def _empty(conn: sqlite3.Connection, table: str) -> bool:
+    return not conn.execute(f"SELECT 1 FROM {table} LIMIT 1").fetchone()
+
+
+def _fill_catalog_tables(conn: sqlite3.Connection) -> None:
+    """A catalog written before the search index or the counts existed: index and count what it holds, once. Another
+    writer may commit after a first look, so the look that decides is repeated holding the write lock."""
+    if not (_empty(conn, "occurrences_text") or _empty(conn, "catalog_counts")):
+        return
+    conn.execute("BEGIN IMMEDIATE")
+    if _empty(conn, "occurrences_text"):
         conn.execute("INSERT INTO occurrences_text (rowid, text) SELECT rowid, rel_path || ' ' || members "
                      "FROM occurrences")
-    if store == "files" and not conn.execute("SELECT 1 FROM catalog_counts LIMIT 1").fetchone():
-        # A catalog written before the counts existed: count what it already holds, once.
+    if _empty(conn, "catalog_counts"):
         conn.execute(f"INSERT INTO catalog_counts (provider_id, root_alias, counts, updated_at) "
                      f"SELECT provider_id, root_alias, json_group_array(json_array(status, n)), "
                      f"strftime('%Y-%m-%dT%H:%M:%SZ', 'now') FROM ({CATALOG_COUNTS} GROUP BY provider_id, root_alias, "
                      f"status) GROUP BY provider_id, root_alias")
-    conn.commit()
 
 
 def require_writer(store: str, role: str) -> None:
