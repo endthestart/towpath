@@ -86,6 +86,6 @@ def test_decisions_for_an_account_not_connected_here_wait_until_it_is(world, tmp
 def test_packages_beyond_the_limits_or_from_another_version_are_refused(tmp_path, monkeypatch, files, limits,
                                                                          message):
     for name, value in limits.items():
-        monkeypatch.setattr(restore, name, value)
+        monkeypatch.setattr(restore.reading, name, value)
     with pytest.raises(restore.RestoreError, match=message):
         restore.plan(tmp_path, _zip(files))
