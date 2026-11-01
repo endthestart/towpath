@@ -15,6 +15,7 @@ from django.test import Client, override_settings
 from towpath import config as config_mod
 from towpath import connect, connections, decisions
 from towpath.mail import analysis, executor, settings, threads
+from towpath.mail.threads import worker as thread_worker
 from towpath.unified import grants
 from towpath.web import auth
 from towpath.web.application import configure
@@ -235,9 +236,9 @@ def test_a_further_model_on_the_same_server_can_be_chosen_per_task(world):
 def test_recent_conversations_are_sorted_and_drafted_before_the_history(world, monkeypatch):
     calls = []
     real_classify, real_draft = threads._classify, threads._draft
-    monkeypatch.setattr(threads, "_classify", lambda *a, **k: calls.append(("classify", k.get("days"))) or
+    monkeypatch.setattr(thread_worker, "_classify", lambda *a, **k: calls.append(("classify", k.get("days"))) or
                         real_classify(*a, **k))
-    monkeypatch.setattr(threads, "_draft", lambda *a, **k: calls.append(("draft", None)) or real_draft(*a, **k))
+    monkeypatch.setattr(thread_worker, "_draft", lambda *a, **k: calls.append(("draft", None)) or real_draft(*a, **k))
     world.track()
     assert calls == [("classify", threads.DRAFT_DAYS), ("draft", None), ("classify", None)]
 
