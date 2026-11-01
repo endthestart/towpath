@@ -194,7 +194,7 @@ def test_capped_run_resumes_without_duplicates(env):
 
 def test_fetch_batches_respect_server_limits(env, monkeypatch):
     env.state.max_fetch_ids = 1
-    monkeypatch.setattr("towpath.adapters.imap.FETCH_BATCH", 1)
+    monkeypatch.setattr("towpath.adapters.imap.connector.FETCH_BATCH", 1)
     env.config = config_mod.load(env.path)
     connector = build_connector(env.config.sources["imap-test"], env.config)
     connector.batch = 1

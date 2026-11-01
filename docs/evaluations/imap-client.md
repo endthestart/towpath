@@ -4,7 +4,7 @@ Status: chosen for the read-only IMAP adapter on 2026-10-06, from a cloud sessio
 
 ## Decision
 
-Use **IMAPClient 4.1.0**, installed as an optional dependency (`pip install 'towpath[imap]'`, pinned `>=4.1,<5`). Towpath wraps it in a narrow read-only facade, `ReadOnlySession` in `src/towpath/adapters/imap.py`, and never hands the client object to other code.
+Use **IMAPClient 4.1.0**, installed as an optional dependency (`pip install 'towpath[imap]'`, pinned `>=4.1,<5`). Towpath wraps it in a narrow read-only facade, `ReadOnlySession` in `src/towpath/adapters/imap/`, and never hands the client object to other code.
 
 ## Evidence
 
