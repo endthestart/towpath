@@ -76,7 +76,7 @@ unique at every level, so they make 5 million folders, far more than real trees.
 
 ## Next, in order
 
-1. **Space view** (built; see `towpath/space.py` and the Space page). The reason everything is indexed is to
+1. **Space view** (built; see `towpath/space/` and the Space page). The reason everything is indexed is to
    find what can be deleted. After each import the
    connector computes, from the catalog alone and without touching files: folder sizes rolled up the tree,
    largest files, space by type, and common clutter (package folders such as `node_modules`, `.git` history,

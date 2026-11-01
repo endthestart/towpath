@@ -12,7 +12,7 @@ from towpath.web.application import configure
 def test_space_is_measured_after_indexing_and_shown_for_searchable_folders(inst, monkeypatch):
     from towpath import space
 
-    monkeypatch.setattr(space, "DUPLICATE_MIN_BYTES", 1)
+    monkeypatch.setattr(space.rebuilding, "DUPLICATE_MIN_BYTES", 1)
     lib = inst.library
     (lib / "documents/letters/canal.jpg").write_bytes(b"jpeg")  # the same name and size as a photo
     folders.choose(inst.config, [str(lib / "documents"), str(lib / "photos")])
