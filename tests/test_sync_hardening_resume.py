@@ -5,7 +5,7 @@ import json
 import pytest
 
 from tests.gmail_pacing import fail_get, http_error, target
-from tests.test_gmail_client import Call
+from tests.gmail_fake import Call
 from towpath import connect, fieldmask
 from towpath.fixtures import generator
 from towpath.quota import BudgetLock

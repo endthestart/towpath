@@ -14,7 +14,7 @@ import httplib2  # noqa: E402
 from googleapiclient.errors import HttpError  # noqa: E402
 
 from tests.fake_clock import FakeClock  # noqa: E402
-from tests.test_gmail_client import Call, FakeService  # noqa: E402
+from tests.gmail_fake import Call, FakeService  # noqa: E402
 from towpath import config as config_mod  # noqa: E402
 from towpath import quota  # noqa: E402
 from towpath.adapters.google_gmail import GoogleGmailClient  # noqa: E402
