@@ -6,13 +6,13 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `377dc7c` (opentelemetry-api 1.45.2, with cleanup and tests), publishing run
-[41336367922](https://github.com/endthestart/towpath/actions/runs/41336367922). No store changes. Keeping the
+Revision `bd40db3` (pyasn1 0.6.5, and the web image on Ubuntu 24.04), publishing run
+[41338731800](https://github.com/endthestart/towpath/actions/runs/41338731800). No store changes. Keeping the
 evidence is off. On Hub, Fastmail is allowed for the life story and finding events by itself is on (the owner's
 answers of October 17). Background model work has yielded to other users of the model since `66014b9`.
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:0796ed90d8df9335f56a1e4332bd2c15abd799f1a5820804503c14e8f533c297`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:0489712d91bcb7e301f910037bda1933aabd7542757c383d330efa19f3106bd3`
+- `web`: `ghcr.io/endthestart/towpath@sha256:7ba181435129dfb417678610559048b61bea569e94d3257bfb8e6fc5db64cf8a`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:5d65391e48b0f8c7fed85b8a679a563c846d3ebd8cf67f70e4d1c221d9a44266`
 
 Database dumps: nightly at 03:20 into `/mnt/tank/storage/backup/db-dumps/towpath/`, with a restore check each
 night ([backups](backups.md)).
@@ -30,6 +30,7 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `377dc7c` | opentelemetry-api 1.45.2, with cleanup and tests | `towpath@sha256:0796ed90…`, `towpath-recoll@sha256:0489712d…` |
 | `2150ed2` | certifi 2026.10.23, clearing GHSA-6q48-6c7w-9gw2 in both images | `towpath@sha256:46e51ed7…`, `towpath-recoll@sha256:57d9955e…` |
 | `66014b9` | Background model work yields: fast-fail on a busy model, a quarter-hour share, shared back-off | `towpath@sha256:95759b1e…`, `towpath-recoll@sha256:a2b3d3f2…` |
 | `33ec167` | Inbox Zero's rules rewritten as a switched-off set on each account's Rules page | `towpath@sha256:7310e6b3…`, `towpath-recoll@sha256:b7000a64…` |
