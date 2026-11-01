@@ -119,7 +119,7 @@ def test_proposals_run_only_with_an_approval_of_exactly_what_was_proposed(env):
     assert env.receipts() == {}  # not approved: nothing happens
     settings.answer(env.store, pid, "0" * 64, "approved")  # an approval of something else
     with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(executor, "EXPIRES_DAYS", 10_000)
+        mp.setattr(executor.checks, "EXPIRES_DAYS", 10_000)
         env.run()
     assert env.receipts()[pid]["outcome"] == "refused"
     assert env.state.writes == []

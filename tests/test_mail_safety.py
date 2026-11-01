@@ -91,7 +91,7 @@ def test_a_dropped_connection_after_the_command_is_recorded_not_repeated(world, 
         act.sent = True
         raise ServerStop("the connection dropped")
 
-    monkeypatch.setattr(executor, "_execute", dropped)
+    monkeypatch.setattr(executor.runner, "_execute", dropped)
     executor.run_pending(world.worker(), world.credentials, pause=0)
     assert executor.receipts(world.store)[0]["outcome"] == "uncertain"
     assert executor.pending(world.store) == []  # not tried again
