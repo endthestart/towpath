@@ -214,7 +214,7 @@ def test_a_category_the_owner_gives_one_sender_is_learned_for_its_domain(world, 
 
     world.state.mailboxes["INBOX"].messages[9] = mail(9, "Shop Orders <orders@shop.example>", "reader@example.com",
                                                       "Your order", "Thanks for your order.", 1)
-    monkeypatch.setattr(senders, "SHARED_DOMAINS", {"mail.example"})  # a personal mail provider, as gmail is
+    monkeypatch.setattr(senders.rebuilding, "SHARED_DOMAINS", {"mail.example"})  # a personal mail provider, as gmail is
     world.state.mailboxes["INBOX"].messages[10] = mail(10, "Friend <friend@mail.example>", "reader@example.com",
                                                        "hi", "hello", 1)
     connect.sync(world.worker(), world.sid)
