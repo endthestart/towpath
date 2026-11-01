@@ -1,7 +1,7 @@
 # ADR 0002: Towpath-native mail management over IMAP
 
 - Date: 2026-10-16
-- Status: Proposed; owner review of this ADR and the [build plan](../plans/2026-10-16-native-mail-management.md) comes before code
+- Status: Accepted 2026-11-01
 - Basis: Owner's twelve-answer interview of 2026-10-16; the Oct 12 week plan's "next mail milestone"
 - Supersedes: [D15](../decisions.md#d15-role-of-inbox-zero) once Gmail parity is qualified; revises [D1](../decisions.md#d1-mailbox-and-destination-execution)
 

@@ -1,6 +1,6 @@
 # Mail management
 
-Status: **changing, per [ADR 0002](adrs/0002-towpath-native-mail-management.md) (proposed 2026-10-16).** Towpath is building its own mail management over IMAP, Fastmail first, following the [build plan](plans/2026-10-16-native-mail-management.md). Inbox Zero keeps the owner's Gmail until Towpath reaches parity there. The foundation (milestone 1) is described [below](#towpath-native-mail-management); the rest of this page records the Inbox Zero integration that applies until then.
+Status: **changing, per [ADR 0002](adrs/0002-towpath-native-mail-management.md) (accepted 2026-11-01).** Towpath is building its own mail management over IMAP, Fastmail first, following the [build plan](plans/2026-10-16-native-mail-management.md). Inbox Zero keeps the owner's Gmail until Towpath reaches parity there. The foundation (milestone 1) is described [below](#towpath-native-mail-management); the rest of this page records the Inbox Zero integration that applies until then.
 
 ## Approach
 
