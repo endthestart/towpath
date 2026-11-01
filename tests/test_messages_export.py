@@ -97,7 +97,7 @@ def test_a_kept_sender_is_named_to_the_gateway(export, monkeypatch, openai_stub)
     grants.grant(config.store_dir, sid, "life-evidence", author="owner")
     life_propose.set_request(config.store_dir, sid, "2009-01-01", "2009-12-31", author="owner")
     worker = connections.merged(config, creds)
-    monkeypatch.setattr(life_propose, "blocked", lambda *a, **k: None)
+    monkeypatch.setattr(life_propose.worker, "blocked", lambda *a, **k: None)
     life_propose.propose_pending(worker, creds)
     assert any(sender_target(sid, "Sam Rivera") in items for items in seen)
 

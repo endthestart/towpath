@@ -184,7 +184,8 @@ def test_a_new_prompt_reads_again_but_leaves_what_the_owner_decided(world, monke
     life_propose.propose_pending(worker, credentials)
     first = {c.statement: c for c in life.claims(config.store_dir)}
     life.review(config.store_dir, first["Ordered a red bicycle"].claim_id, "reject")
-    monkeypatch.setattr(life_propose, "PROMPT_VERSION", "life.propose/next")
+    for part in (life_propose.choices, life_propose.worker):
+        monkeypatch.setattr(part, "PROMPT_VERSION", "life.propose/next")
     model.answers[:] = [answer(event("Booked a stay at Example Junction", "plan", "2009-05-14", "2009-05-17",
                                      "range", BOOKING))]
     before = len(email_prompts(model))
