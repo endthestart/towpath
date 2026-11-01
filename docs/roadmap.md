@@ -35,7 +35,7 @@ Recorded for planning; none is scheduled yet.
   verification step before adoption.
 - **Photo metadata (EXIF) search.** Built 2026-10-17: the connector reads image headers with ExifTool (read-only,
   headers only) into typed fields, and photos are searched by camera, lens, date taken and whether a place is
-  recorded ([`photos.py`](../src/towpath/photos.py)). sist2 remains a candidate for thumbnails and other media.
+  recorded ([`photos`](../src/towpath/photos/)). sist2 remains a candidate for thumbnails and other media.
 - **Rust for hot paths** (owner direction, 2026-10-09). Python stays for the web app, orchestration and
   integrations. Work that doesn't need Python and has to be fast should be written in Rust (or a native tool)
   where possible. This is a note, not a rewrite: move a piece when measurement shows it is a bottleneck, behind

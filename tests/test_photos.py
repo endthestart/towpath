@@ -58,7 +58,7 @@ def library(tmp_path):
 
 def test_headers_are_read_once_and_the_hidden_export_never(library, monkeypatch):
     config, fake, log = library
-    monkeypatch.setattr(photos, "BATCH", 2)
+    monkeypatch.setattr(photos.extraction, "BATCH", 2)
     assert photos.extract_pending(config, exiftool=fake)[0]["read"] == 3
     assert "Hidden" not in log.read_text() and "readme" not in log.read_text()
     assert photos.extract_pending(config, exiftool=fake) == []  # the cursor has passed them all
