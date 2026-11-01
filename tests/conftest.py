@@ -144,6 +144,22 @@ def fx(tmp_path):
 
 
 @pytest.fixture
+def inst(tmp_path, monkeypatch):
+    from tests.folders_instance import Instance
+    from towpath import folders
+
+    yield Instance(tmp_path, monkeypatch)
+    (tmp_path / "library" / "private").chmod(0o700)
+    for proc in folders._running.values():
+        folders._stop(proc)
+    folders._running.clear()
+    for job in folders._jobs.values():
+        job.join(10)
+    folders._jobs.clear()
+    folders._outcomes.clear()
+
+
+@pytest.fixture
 def paced(ws, monkeypatch):
     from tests.gmail_pacing import pace
 
