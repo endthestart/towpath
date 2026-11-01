@@ -12,6 +12,7 @@ import sys
 import pytest
 
 from towpath import config as config_mod, connections, request_worker
+from towpath.connections import indexing
 from towpath.stores import open_store
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -150,11 +151,11 @@ def test_pause_stops_within_the_slice_and_resume_continues(env):
             connections.pause_indexing(store_dir, source_id)
         return real_get(store_dir, source_id, role)
 
-    connections.get, saved = owner_pauses, connections.get
+    indexing.get, saved = owner_pauses, indexing.get
     try:
         result = connections.index_pending(env.config, env.credentials, clock=lambda: next(clock))
     finally:
-        connections.get = saved
+        indexing.get = saved
     assert result[0]["slice"] == "paused" and connections.get(env.store, sid)["indexing"] == "paused"
     assert result[0]["indexed_total"] < 7
     assert connections.index_pending(env.config, env.credentials) == []  # paused stays paused
