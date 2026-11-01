@@ -43,7 +43,7 @@ Mail sync, scans, adapters, quota pacing, and the model gateway never import `to
 | `discovery/run.py` | Runs external tools: argument lists only, time limit, output cap, kill |
 | `discovery/evaluate.py` | Native evaluation harness over a generated corpus |
 | `discovery/context.py` | Versioned, bounded context packet |
-| `discovery/corpus.py` | Generated synthetic corpus and its expected catalog |
+| `discovery/corpus/` | Generated synthetic corpus and its expected catalog |
 
 ## Configuration
 
@@ -304,7 +304,7 @@ The `towpath-recoll` image holds Towpath, Recoll 1.36.1 with its binding, and th
 
 ## Synthetic acceptance plan
 
-The generated corpus (`discovery/corpus.py`) contains:
+The generated corpus (`discovery/corpus/`) contains:
 
 - A ZIP holding an mbox whose message carries the "college paper" `.docx`.
 - The same attachment bytes in a second message (duplicate occurrences).
