@@ -20,14 +20,12 @@ from towpath.web import auth
 from towpath.web.application import configure
 
 sys.path.insert(0, str(Path(__file__).parent))
-import test_life_memories  # noqa: E402
-
-OWNER = test_life_memories.OWNER
+from tests.life_world import OWNER, make_world  # noqa: E402
 
 
 @pytest.fixture
 def world(tmp_path, openai_stub):
-    yield from test_life_memories.world.__wrapped__(tmp_path, openai_stub)
+    yield from make_world(tmp_path, openai_stub)
 
 
 def decided(w):

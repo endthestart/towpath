@@ -16,8 +16,13 @@ from towpath.models import gateway, pacing  # noqa: E402
 from towpath.stores import open_store  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).parent))
-from test_life_memories import world  # noqa: E402, F401 - the memories fixture
+from tests.life_world import make_world  # noqa: E402
 from test_models import SCHEMA, bind, endpoint  # noqa: E402
+
+
+@pytest.fixture
+def world(tmp_path, openai_stub):
+    yield from make_world(tmp_path, openai_stub)
 
 
 def local(ws, stub):
