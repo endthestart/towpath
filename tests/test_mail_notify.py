@@ -186,7 +186,8 @@ def test_reply_labels_come_back_after_being_turned_off_and_on(world, monkeypatch
     saturday = world.state.mailboxes["INBOX"].messages[1]
     assert "To-reply" in saturday.flags
     clock = [datetime.now(timezone.utc)]
-    monkeypatch.setattr(notify, "now", lambda: clock[0])
+    for part in (notify.common, notify.watching):
+        monkeypatch.setattr(part, "now", lambda: clock[0])
     for on in (False, True):
         clock[0] += timedelta(minutes=10)
         notify.set_reply_labels(world.store, world.sid, on)
