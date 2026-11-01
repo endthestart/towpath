@@ -6,13 +6,13 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Revision `2150ed2` (certifi 2026.10.23, clearing GHSA-6q48-6c7w-9gw2 in both images), publishing run
-[40765101424](https://github.com/endthestart/towpath/actions/runs/40765101424). No store changes. Keeping the
+Revision `377dc7c` (opentelemetry-api 1.45.2, with cleanup and tests), publishing run
+[41336367922](https://github.com/endthestart/towpath/actions/runs/41336367922). No store changes. Keeping the
 evidence is off. On Hub, Fastmail is allowed for the life story and finding events by itself is on (the owner's
 answers of October 17). Background model work has yielded to other users of the model since `66014b9`.
 
-- `web`: `ghcr.io/endthestart/towpath@sha256:46e51ed768b990c5ffbd7d5e2622d83dc0a5564ad9143527737b96da1faa9bac`
-- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:57d9955e62e815dd89ae8410a1d9bb6192d0a6b9923ef67ff9cf759f2ec52597`
+- `web`: `ghcr.io/endthestart/towpath@sha256:0796ed90d8df9335f56a1e4332bd2c15abd799f1a5820804503c14e8f533c297`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:0489712d91bcb7e301f910037bda1933aabd7542757c383d330efa19f3106bd3`
 
 Database dumps: nightly at 03:20 into `/mnt/tank/storage/backup/db-dumps/towpath/`, with a restore check each
 night ([backups](backups.md)).
@@ -30,6 +30,7 @@ Earlier deployments, newest first (web digest, connector digest):
 
 | Revision | Change | Images |
 | --- | --- | --- |
+| `2150ed2` | certifi 2026.10.23, clearing GHSA-6q48-6c7w-9gw2 in both images | `towpath@sha256:46e51ed7…`, `towpath-recoll@sha256:57d9955e…` |
 | `66014b9` | Background model work yields: fast-fail on a busy model, a quarter-hour share, shared back-off | `towpath@sha256:95759b1e…`, `towpath-recoll@sha256:a2b3d3f2…` |
 | `33ec167` | Inbox Zero's rules rewritten as a switched-off set on each account's Rules page | `towpath@sha256:7310e6b3…`, `towpath-recoll@sha256:b7000a64…` |
 | `a19cbcd` | New providers, birthdays and calendar on the Overview, faster catalog | `towpath@sha256:d58f8202…`, `towpath-recoll@sha256:d56ca51f…` |
