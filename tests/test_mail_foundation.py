@@ -61,7 +61,7 @@ def test_changed_flags_are_picked_up_with_condstore(env, monkeypatch):
     env.index()
     env.manage()
     env.analyze()
-    monkeypatch.setattr(analysis, "FLAGS_EVERY_SECONDS", 0)
+    monkeypatch.setattr(analysis.worker, "FLAGS_EVERY_SECONDS", 0)
     env.analyze()  # the first flag read of a mailbox reads every message's flags and remembers its MODSEQ
     msg = env.state.mailboxes["INBOX"].messages[1]
     msg.flags.add("\\Flagged")
