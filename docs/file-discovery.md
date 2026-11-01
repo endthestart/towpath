@@ -37,7 +37,7 @@ Mail sync, scans, adapters, quota pacing, and the model gateway never import `to
 | `discovery/refs.py` | Path safety: roots, exclusions, traversal, symlink escape, URL schemes |
 | `discovery/policy.py` | Fail-closed grants per root and feature |
 | `discovery/store.py` | `files.db`: runs, coverage, occurrences, versions, citations, recoveries |
-| `discovery/service.py` | Probe, status, bounded search, describe, excerpt, recover, import |
+| `discovery/service/` | Probe, status, bounded search, describe, excerpt, recover, import |
 | `discovery/providers/` | `base` contract; `fixture` (test aid); `recoll`; `sist2` (capability slot); `manifest` (inventory references, no text) |
 | `discovery/bridges/recoll_bridge.py` | Standalone script run by the interpreter that has Recoll's binding; JSON over stdin/stdout |
 | `discovery/run.py` | Runs external tools: argument lists only, time limit, output cap, kill |

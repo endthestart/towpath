@@ -86,7 +86,7 @@ def test_local_mode_never_builds_a_connector_or_starts_a_provider(uni, monkeypat
         raise AssertionError("local mode must not contact a source")
 
     monkeypatch.setattr("towpath.adapters.build_connector", refuse)
-    monkeypatch.setattr("towpath.discovery.service.provider", refuse)
+    monkeypatch.setattr("towpath.discovery.service.common.build", refuse)
     uni.state.transcript.clear()
     resp = uni.search("canal", connect_mode=False)
     assert all(s["status"] == "ok" and s["depth"] == "catalog" for s in resp["sources"])

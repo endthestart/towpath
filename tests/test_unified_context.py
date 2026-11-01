@@ -131,7 +131,7 @@ def test_packets_from_collections_and_local_mode(uni, monkeypatch):
         pytest.fail("local mode contacted a provider")
 
     monkeypatch.setattr("towpath.adapters.build_connector", forbidden)
-    monkeypatch.setattr("towpath.discovery.service.provider", forbidden)
+    monkeypatch.setattr("towpath.discovery.service.common.build", forbidden)
     local = context.build(uni.config, "agent-context", collection="Photos", connect=False)
     files_item = next(i for i in local["items"] if i["source_id"] == "files-inventory")
     assert files_item["state"] == "not-checked" and files_item["excerpt"] is None

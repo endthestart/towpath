@@ -49,7 +49,7 @@ def connect_role(uni):
 def web(uni, monkeypatch):
     """A client of the UI in local mode, with every path to a provider made to fail loudly."""
     import towpath.adapters
-    import towpath.discovery.service as files_service
+    from towpath.discovery.service import common as files_service
 
     def guarded(real):
         def call(*args, **kwargs):
@@ -62,7 +62,7 @@ def web(uni, monkeypatch):
     with override_settings(TOWPATH_STORE_DIR=uni.config.store_dir, TOWPATH_CONFIG=uni.config,
                            TOWPATH_LOGIN_REQUIRED=False, ALLOWED_HOSTS=["testserver"], MIDDLEWARE=MIDDLEWARE):
         monkeypatch.setattr(towpath.adapters, "build_connector", guarded(towpath.adapters.build_connector))
-        monkeypatch.setattr(files_service, "provider", guarded(files_service.provider))
+        monkeypatch.setattr(files_service, "build", guarded(files_service.build))
         uni.state.transcript.clear()
         UI_ONLY["active"] = True
         try:

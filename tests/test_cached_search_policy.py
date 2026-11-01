@@ -49,7 +49,7 @@ def ui_provider_refs(uni, query: str, config, monkeypatch) -> tuple[set, str]:
         pytest.fail("the UI attempted to contact a source")
 
     monkeypatch.setattr("towpath.adapters.build_connector", forbidden)
-    monkeypatch.setattr("towpath.discovery.service.provider", forbidden)
+    monkeypatch.setattr("towpath.discovery.service.common.build", forbidden)
     uni.state.transcript.clear()
     configure(uni.config.store_dir, config)
     with override_settings(TOWPATH_LOGIN_REQUIRED=False, TOWPATH_STORE_DIR=uni.config.store_dir, TOWPATH_CONFIG=config,
