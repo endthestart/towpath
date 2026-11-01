@@ -11,8 +11,8 @@ network access to the distribution's archive):
 The bundle (``manifest.json``, ``SHA256SUMS``, ``sources/``, ``licenses/``) is published next to
 the image before the image itself (see publish.py). Nothing here trusts a file it has not checked.
 
-Also checks that no binary outside the distribution's packages (for example CPython in
-``/usr/local``) links a library whose license obliges source for the program using it.
+Also checks that no binary outside the distribution's packages (for example a Python extension
+in ``/opt/towpath``) links a library whose license obliges source for the program using it.
 """
 
 import argparse

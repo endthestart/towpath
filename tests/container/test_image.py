@@ -288,22 +288,6 @@ def test_license_records_cover_every_package(box):
     assert "notice separates: 1" in out and "towpath license: MIT License" in out
 
 
-@pytest.mark.skipif(KIND != "core", reason="CPython from source exists only in the core image")
-def test_core_cpython_links_no_source_obliging_library(box):
-    script = textwrap.dedent("""
-        import importlib.util, pathlib, subprocess
-        print("modules", [m for m in ("readline", "_gdbm", "_dbm") if importlib.util.find_spec(m)])
-        links = []
-        for so in pathlib.Path("/usr/local/lib").rglob("*.so*"):
-            out = subprocess.run(["ldd", str(so)], capture_output=True, text=True).stdout
-            links += [line for line in out.splitlines() if any(x in line for x in ("libreadline", "libgdbm", "libdb-"))]
-        print("links", links)
-        print("cpython license", pathlib.Path("/usr/share/licenses/python/CPython-LICENSE.txt").is_file())
-    """)
-    out = box.run("-c", script, entrypoint="python3").stdout
-    assert "modules []" in out and "links []" in out and "cpython license True" in out
-
-
 SORT_CHECK = """
 import sqlite3
 db = sqlite3.connect("/data/scratch/sort-check.db")

@@ -28,7 +28,7 @@ RUN --mount=type=secret,id=build_ca,required=false \
     pip wheel --no-cache-dir --no-deps --wheel-dir /wheels .
 
 # ---------------------------------------------------------------- core
-FROM ${PYTHON_IMAGE} AS core
+FROM ${UBUNTU_IMAGE} AS core
 ARG REVISION=unknown
 ARG VERSION=dev
 ARG CREATED=unknown
@@ -41,16 +41,12 @@ LABEL org.opencontainers.image.title="towpath" \
       org.opencontainers.image.created="${CREATED}" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.documentation="Third-party software and its licenses: /usr/share/licenses/NOTICE.md"
-# DISTRO_UPGRADE=false is for offline development builds only. CI never sets it, and an image built
-# without the upgrade fails the corresponding-source check, so it cannot be published.
-ARG DISTRO_UPGRADE=true
-RUN if [ "$DISTRO_UPGRADE" = true ]; then \
-      apt-get update && apt-get upgrade -y --no-install-recommends && rm -rf /var/lib/apt/lists/*; fi
-# CPython here is built from source, not a distribution package. Drop the modules that link GNU
-# readline, gdbm (GPL-3) or Berkeley DB 5.3 (Sleepycat), whose licenses would extend to CPython;
-# a non-interactive CLI does not use them. sources.py fails the build if such a link reappears.
-RUN removed="$(find /usr/local/lib -path '*/lib-dynload/*' \( -name 'readline.*.so' -o -name '_gdbm.*.so' \
-      -o -name '_dbm.*.so' \) -print -delete | wc -l)" && test "$removed" -eq 3
+# Python 3.12 and the data it reads (CA certificates, time zones, service names) come unmodified from Ubuntu's archive.
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+ && apt-get upgrade -y --no-install-recommends \
+ && apt-get install -y --no-install-recommends python3-venv ca-certificates tzdata netbase \
+ && rm -rf /var/lib/apt/lists/*
 RUN groupadd --system --gid 10001 towpath \
  && useradd --system --uid 10001 --gid 10001 --home-dir /state --no-create-home --shell /usr/sbin/nologin towpath \
  && mkdir -p /state /recovered /config /data && chown 10001:10001 /state /recovered
@@ -58,18 +54,19 @@ COPY --from=wheel /wheels /tmp/wheels
 COPY packaging/requirements-image.txt /tmp/requirements-image.txt
 RUN --mount=type=secret,id=build_ca,required=false \
     if [ -f /run/secrets/build_ca ]; then export PIP_CERT=/run/secrets/build_ca; fi; \
-    pip install --no-cache-dir --require-hashes --no-deps -r /tmp/requirements-image.txt \
- && pip install --no-cache-dir --no-deps /tmp/wheels/*.whl \
- && pip check \
+    python3 -m venv /opt/towpath \
+ && /opt/towpath/bin/pip install --no-cache-dir --require-hashes --no-deps -r /tmp/requirements-image.txt \
+ && /opt/towpath/bin/pip install --no-cache-dir --no-deps /tmp/wheels/*.whl \
+ && /opt/towpath/bin/pip check \
  && rm -rf /tmp/wheels /tmp/requirements-image.txt
 COPY packaging/licenses/ /usr/local/lib/towpath/
-RUN sh /usr/local/lib/towpath/collect-licenses.sh python3 \
+RUN sh /usr/local/lib/towpath/collect-licenses.sh /opt/towpath/bin/python \
  && cp /usr/local/lib/towpath/NOTICE-core.md /usr/share/licenses/NOTICE.md && rm -rf /usr/local/lib/towpath
 COPY LICENSE /usr/share/licenses/towpath/LICENSE
 RUN mkdir -p /usr/share/towpath \
  && printf '{"image": "core", "revision": "%s", "version": "%s", "created": "%s", "source": "%s"}\n' \
       "${REVISION}" "${VERSION}" "${CREATED}" "${SOURCE}" > /usr/share/towpath/build-info.json
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 HOME=/state
+ENV PATH=/opt/towpath/bin:$PATH PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 HOME=/state
 USER 10001:10001
 WORKDIR /state
 ENTRYPOINT ["towpath"]

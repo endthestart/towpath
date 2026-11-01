@@ -1,14 +1,11 @@
 # Third-party software in the towpath image
 
-Towpath's own code (`/usr/local/lib/python3.12/site-packages/towpath`) is MIT licensed: `/usr/share/licenses/towpath/LICENSE`. Everything else in this image keeps its own license, as recorded below. Towpath's MIT license does not apply to it.
+Towpath's own code (`/opt/towpath/lib/python3.12/site-packages/towpath`) is MIT licensed: `/usr/share/licenses/towpath/LICENSE`. Everything else in this image keeps its own license, as recorded below. Towpath's MIT license does not apply to it.
 
 | Component | Where its license is recorded |
 | --- | --- |
-| Debian 13 base system: about 90 unmodified packages, including the GNU C library (LGPL-2.1+), bash and coreutils (GPL-3+), OpenSSL (Apache-2.0), and others | `/usr/share/licenses/bundled/<package>/copyright`; versions in `/usr/share/licenses/bundled/packages.tsv`; license texts in `/usr/share/common-licenses/` |
-| CPython 3.12, built from source by the `python` base image (PSF-2.0) | `/usr/share/licenses/python/CPython-LICENSE.txt` |
+| Ubuntu 24.04 base system and Python 3.12: unmodified packages, including the GNU C library (LGPL-2.1+), bash and coreutils (GPL-3+), OpenSSL (Apache-2.0), and others | `/usr/share/licenses/bundled/<package>/copyright`; versions in `/usr/share/licenses/bundled/packages.tsv`; license texts in `/usr/share/common-licenses/` |
 | Python distributions (pip, Typer, Click, Rich, Pygments, and others; permissive licenses) | `/usr/share/licenses/python/packages.tsv` and `/usr/share/licenses/python/<name>-<version>/` |
-
-The Python modules that would link GNU readline, gdbm, or Berkeley DB (`readline`, `_gdbm`, `_dbm`) are removed from this image, so CPython links no library whose license extends to it. The release workflow checks this on every build.
 
 ## Corresponding source
 

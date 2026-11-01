@@ -43,9 +43,6 @@ def main(out: Path) -> int:
                     shutil.copyfile(source, target / "-".join(parts[1:] if len(parts) > 1 else parts))
                     copied += 1
         rows.append(f"{name}\t{version}\t{license_text(dist)}\t{copied}\t{dist.locate_file('')}")
-    cpython = Path(sys.base_prefix) / "lib" / f"python{sys.version_info.major}.{sys.version_info.minor}" / "LICENSE.txt"
-    if cpython.is_file():  # CPython built from source (python:* images), not a distribution package
-        shutil.copyfile(cpython, out / "CPython-LICENSE.txt")
     (out / "packages.tsv").write_text("name\tversion\tlicense\tlicense_files\tlocation\n" + "\n".join(rows) + "\n")
     return 0
 

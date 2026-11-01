@@ -72,12 +72,10 @@ def test_the_connector_image_keeps_sqlite_temporary_files_on_the_data_folder():
     assert "SQLITE_TMPDIR" not in DOCKERFILE.split(" AS recoll", 1)[0]  # the web service mounts only state/
 
 
-def test_images_record_licenses_and_drop_source_obliging_cpython_modules():
+def test_images_record_licenses():
     assert DOCKERFILE.count("collect-licenses.sh") == 2
     assert "NOTICE-core.md" in DOCKERFILE and "NOTICE-recoll.md" in DOCKERFILE
     assert DOCKERFILE.count("apt-get upgrade") == 2
-    assert "readline.*.so" in DOCKERFILE and "_gdbm.*.so" in DOCKERFILE and "_dbm.*.so" in DOCKERFILE
-    assert "DISTRO_UPGRADE" not in WORKFLOW  # the offline-development switch is never used by CI
 
 
 def test_images_are_pinned_unprivileged_clis():

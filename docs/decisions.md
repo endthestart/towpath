@@ -154,7 +154,7 @@ These are built into the current documents. The owner can accept or overturn eac
   - **Release tags:** aliases of the canonical manifest (same digest). An existing canonical image is promoted only after its labels, its source artifact, and the GitHub run that built and tested it are verified.
   - **Corresponding source:** the exact source of every distribution package in each image is fetched, verified against `.dsc` checksums and the image's package list, and published to GHCR (`towpath-sources:sha256-<image config>`) before the image. Missing or mismatched source stops publication.
   - **Source retention (owner approved 2026-10-04):** published corresponding-source artifacts are retained indefinitely, including after matching images are retired. They have no expiry and are excluded from automated cleanup.
-  - **Core image:** drops CPython's readline, gdbm, and Berkeley DB modules.
+  - **Core image:** built on Ubuntu 24.04 with its packaged Python since 2026-11-01, like the recoll image. It no longer builds CPython from source or removes its readline, gdbm, and Berkeley DB modules.
 
 ### D19. Reference-first discovery and phased ownership
 
@@ -213,3 +213,4 @@ These are built into the current documents. The owner can accept or overturn eac
 | 2026-10-04 | D18 source-retention policy: published corresponding-source artifacts are retained indefinitely, including after matching images are retired | Accepted (owner review) |
 | 2026-10-05 | D19: reference-first digital-life discovery and phased ownership; reuse existing inventories | Accepted product direction; delivery priorities pending interview |
 | 2026-10-05 | D20: cross-source foundation before AI; D9/D10 priorities revised; shared agent/MCP/RAG retrieval direction | Accepted product direction; implementation/live qualification pending |
+| 2026-11-01 | D18: the core image moves to Ubuntu 24.04 and its packaged Python, one base for both images | Accepted |

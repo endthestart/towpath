@@ -6,7 +6,7 @@ GitHub Actions tests Towpath, builds its container images, tests the built image
 
 | Image | Contents | Use |
 | --- | --- | --- |
-| `ghcr.io/<owner>/towpath` | Towpath CLI on `python:3.12-slim`, with the local UI, Gmail and IMAP clients; no model client libraries | UI, explicitly queued requests, metadata sync, fixture file discovery and tooling |
+| `ghcr.io/<owner>/towpath` | Towpath CLI on Ubuntu 24.04, with the local UI, Gmail and IMAP clients; no model client libraries | UI, explicitly queued requests, metadata sync, fixture file discovery and tooling |
 | `ghcr.io/<owner>/towpath-recoll` | Towpath CLI on Ubuntu 24.04 with Recoll 1.36.1, its Python binding, Xapian's Python binding (`python3-xapian`, for listing large indexes), and document helpers (`python3-lxml` for DOCX and ODT, `poppler-utils` for PDF, `antiword` for legacy DOC, `unrtf` for RTF, `pff-tools` for PST, `file` for files without an extension, `python3-mutagen` for audio tags, `libimage-exiftool-perl` for image metadata, `python3-rarfile` with `libarchive-tools` for RAR, `ghostscript` for PostScript, `python3-chm` for CHM, and `zstd`, `xz-utils` and `bzip2` for compressed files) | File discovery through Recoll: index, search, excerpt, recover |
 
 Both images:
@@ -25,15 +25,13 @@ sync/index profiles are selected explicitly in Compose.
 
 Towpath's own code is MIT licensed (`/usr/share/licenses/towpath/LICENSE`). Each image also carries third-party software under its own licenses. Towpath's MIT license does not apply to those components, and each image's `/usr/share/licenses/NOTICE.md` says so.
 
-**What the images contain** (reviewed 2026-10-04 from the built images' copyright files):
+**What the images contain** (from the built images' copyright files: `towpath-recoll` reviewed 2026-10-04, `towpath` 2026-11-01):
 
 | | `towpath` (core) | `towpath-recoll` |
 | --- | --- | --- |
-| Distribution packages | Debian 13, 87 packages | Ubuntu 24.04, 174 packages |
-| Copyleft among them | 70 name a GPL license and 37 an LGPL license in their copyright files (for example bash, coreutils, glibc, util-linux). Berkeley DB 5.3 (`libdb5.3t64`) is under the Sleepycat license | 98 name a GPL license and 57 an LGPL license (Recoll, Xapian, Poppler, Antiword, UnRTF, and the base system). `pff-tools` is LGPL |
-| Software outside the distribution | CPython 3.12, built from source by the `python` image (PSF-2.0); pip and Towpath's Python dependencies (MIT, BSD, ISC) | Towpath's Python dependencies in `/opt/towpath` (MIT, BSD, ISC) |
-
-The core image removes CPython's `readline`, `_gdbm`, and `_dbm` modules. They link GNU readline and gdbm (GPL-3) and Berkeley DB (Sleepycat), whose licenses would extend to CPython itself. The source check fails if any binary outside the distribution packages links those libraries again.
+| Distribution packages | Ubuntu 24.04, 112 packages | Ubuntu 24.04, 174 packages |
+| Copyleft among them | Most name a GPL or LGPL license in their copyright files (for example bash, coreutils, glibc, util-linux). Berkeley DB 5.3 (`libdb5.3t64`) is under the Sleepycat license | 98 name a GPL license and 57 an LGPL license (Recoll, Xapian, Poppler, Antiword, UnRTF, and the base system). `pff-tools` is LGPL |
+| Software outside the distribution | Towpath's Python dependencies in `/opt/towpath` (MIT, BSD, ISC) | Towpath's Python dependencies in `/opt/towpath` (MIT, BSD, ISC) |
 
 **License records inside each image:**
 
@@ -41,7 +39,7 @@ The core image removes CPython's `readline`, `_gdbm`, and `_dbm` modules. They l
 - `/usr/share/licenses/bundled/packages.tsv`: every distribution package with its version, source package, and source version;
 - `/usr/share/licenses/bundled/<package>/copyright`: each package's copyright file;
 - `/usr/share/common-licenses/`: the license texts;
-- `/usr/share/licenses/python/`: Python distributions, their license files, and CPython's license (core only).
+- `/usr/share/licenses/python/`: Python distributions and their license files.
 
 Python dependencies are not upgraded at build time: both images install exactly the hash-pinned versions in `packaging/requirements-image.txt`, exported from `uv.lock` (the same lock CI tests against), then run `pip check`. CI fails if the export is stale.
 
@@ -97,7 +95,6 @@ Defined in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml). All Act
   - File discovery works without Gmail or model libraries.
   - Fixture search, excerpt, and recovery work, and the sources are unchanged afterwards.
   - License records cover every installed package.
-  - Core only: CPython links no source-obliging library.
 - **Recoll image only:**
   - The binding and helpers are present.
   - In-container `recollindex` works, then search, excerpt, and recovery of the nested attachment (hash-checked).
@@ -198,7 +195,7 @@ All of this is manual and local to the server. Nothing in CI reaches the server.
 
 ## Building locally (optional)
 
-`docker build --target core -t towpath:local .` and `docker build --target recoll -t towpath-recoll:local .` build the same images. Offline, `--build-arg DISTRO_UPGRADE=false` skips the core image's package upgrade. Such an image fails the source check, so it can never be published. Behind a TLS-intercepting proxy, pass its CA as a build secret: `--secret id=build_ca,src=/path/to/ca.crt`. The secret is never stored in a layer.
+`docker build --target core -t towpath:local .` and `docker build --target recoll -t towpath-recoll:local .` build the same images. Behind a TLS-intercepting proxy, pass its CA as a build secret: `--secret id=build_ca,src=/path/to/ca.crt`. The secret is never stored in a layer.
 
 To run the image tests against a local build:
 
