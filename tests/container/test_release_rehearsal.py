@@ -23,7 +23,7 @@ sys.path.insert(0, str(REPO / "packaging" / "release"))
 sys.path.insert(0, str(REPO / "tests"))
 
 import sources  # noqa: E402
-from test_release import make_work  # noqa: E402
+from release_world import make_work  # noqa: E402
 
 IMAGE = os.environ.get("TOWPATH_IMAGE", "")
 KIND = os.environ.get("TOWPATH_IMAGE_KIND", "core")
