@@ -21,7 +21,7 @@ from towpath.web.application import configure
 def test_progress_shows_what_search_holds_and_a_measured_pace(monkeypatch):
     clock = iter(["2026-10-08T12:00:00+00:00", "2026-10-08T12:00:10+00:00", "2026-10-08T12:01:00+00:00",
                   "2026-10-08T12:02:00+00:00", "2026-10-08T12:03:00+00:00"])
-    monkeypatch.setattr(folders, "_now", lambda: next(clock))
+    monkeypatch.setattr(folders.indexing, "_now", lambda: next(clock))
     status = {"filesdone": 1000, "dbtotdocs": 4_000_000}  # Recoll's entries, folders and members included
     first = folders._progress(status, "reading", previous=folders._carried({"progress": {"in_search": 250}}))
     assert (first["indexed"], first["rate"]) == (250, None)  # never Recoll's own count
@@ -40,7 +40,7 @@ def test_status_keeps_counts_but_never_the_current_file_name(tmp_path):
 
 
 def test_indexing_runs_in_the_background_then_files_become_searchable(inst, monkeypatch):
-    monkeypatch.setattr(folders, "PAGE", 2)  # several pages for four files
+    monkeypatch.setattr(folders.indexing, "PAGE", 2)  # several pages for four files
     lib = inst.library
     folders.choose(inst.config, [str(lib / "documents"), str(lib / "photos")])
     inst.recoll_holds("documents/letters/lock-keeper.txt", "documents/taxes/2003.pdf", "photos/2003/canal.jpg",
@@ -92,7 +92,7 @@ def test_adding_to_search_runs_beside_the_worker_loop(inst, monkeypatch):
     folders.choose(inst.config, [str(inst.library / "documents")])
     inst.recoll_holds("documents/letters/lock-keeper.txt")
     release, real = threading.Event(), folders._import
-    monkeypatch.setattr(folders, "_import", lambda *a: (release.wait(10), real(*a))[1])
+    monkeypatch.setattr(folders.indexing, "_import", lambda *a: (release.wait(10), real(*a))[1])
     connections.start_indexing(inst.config.store_dir, inst.layout.credentials, folders.SID)
     deadline = time.monotonic() + 10
     while time.monotonic() < deadline:
@@ -116,7 +116,7 @@ def test_a_restart_while_adding_carries_on_adding_without_reading_again(inst, mo
     inst.poll_until_idle()
     connections._update(inst.config.store_dir, folders.SID, indexing="running",  # as a restart leaves it
                         progress=folders._progress(folders.read_status(inst.conf), "adding", 0))
-    monkeypatch.setattr(folders, "_start", lambda *a: pytest.fail("Recoll started again"))
+    monkeypatch.setattr(folders.indexing, "_start", lambda *a: pytest.fail("Recoll started again"))
     assert request_worker.run_once(inst.config, inst.layout.credentials)["indexing"][0]["step"] == "adding"
     inst.poll_until_idle()
     c = connections.get(inst.config.store_dir, folders.SID)
@@ -126,7 +126,7 @@ def test_a_restart_while_adding_carries_on_adding_without_reading_again(inst, mo
 def test_a_failure_while_adding_is_reported(inst, monkeypatch):
     folders.choose(inst.config, [str(inst.library / "documents")])
     inst.recoll_holds("documents/letters/lock-keeper.txt")
-    monkeypatch.setattr(folders, "_import", lambda *a: 1 / 0)
+    monkeypatch.setattr(folders.indexing, "_import", lambda *a: 1 / 0)
     connections.start_indexing(inst.config.store_dir, inst.layout.credentials, folders.SID)
     inst.poll_until_idle()
     c = connections.get(inst.config.store_dir, folders.SID)
@@ -142,12 +142,12 @@ def test_continuing_after_a_failure_while_adding_skips_reading_again(inst, monke
     folders.choose(inst.config, [str(inst.library / "documents")])
     inst.recoll_holds("documents/letters/lock-keeper.txt")
     real = folders._import
-    monkeypatch.setattr(folders, "_import", lambda *a: 1 / 0)
+    monkeypatch.setattr(folders.indexing, "_import", lambda *a: 1 / 0)
     connections.start_indexing(inst.config.store_dir, inst.layout.credentials, folders.SID)
     inst.poll_until_idle()
     assert "Continue to try again" in connections.get(inst.config.store_dir, folders.SID)["last_error"]
-    monkeypatch.setattr(folders, "_import", real)
-    monkeypatch.setattr(folders, "_start", lambda *a: pytest.fail("Recoll started again"))
+    monkeypatch.setattr(folders.indexing, "_import", real)
+    monkeypatch.setattr(folders.indexing, "_start", lambda *a: pytest.fail("Recoll started again"))
     connections.start_indexing(inst.config.store_dir, inst.layout.credentials, folders.SID)
     assert request_worker.run_once(inst.config, inst.layout.credentials)["indexing"][0]["step"] == "adding"
     inst.poll_until_idle()

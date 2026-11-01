@@ -142,11 +142,10 @@ def test_discovery_imports_only_shared_core():
 def test_mail_code_does_not_import_discovery_statically():
     src = REPO / "src" / "towpath"
     unified = src / "unified"
-    cli = src / "cli"
+    allowed = (DISCOVERY, src / "cli", src / "folders")
     for path in src.rglob("*.py"):
-        # folders.py connects the Connections page to discovery, importing it only once folders are chosen.
-        if DISCOVERY in path.parents or cli in path.parents or path.parent == src and path.name in {"config.py",
-                                                                                                    "folders.py"}:
+        # The folders package connects the Connections page to discovery, importing it only once folders are chosen.
+        if any(a in path.parents for a in allowed) or path == src / "config.py":
             continue
         if unified in path.parents:  # the cross-source layer; checked below
             continue
