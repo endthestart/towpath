@@ -13,6 +13,7 @@ from typer.testing import CliRunner
 
 from towpath import stores
 from towpath.cli import app
+from towpath.stores import upgrades
 from towpath.web.application import configure
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -117,7 +118,7 @@ def test_upgrade_opens_each_store_only_with_its_writer_role(legacy, monkeypatch)
         seen.append((store, role))
         return real(store_dir, store, role)
 
-    monkeypatch.setattr(stores, "open_store", spy)
+    monkeypatch.setattr(upgrades, "open_store", spy)
     stores.upgrade(legacy)
     writes = [(s, r) for s, r in seen if r in stores.WRITERS[s]]
     assert sorted(writes) == [("decisions", "web"), ("queue", "web"), ("source", "connect")]
