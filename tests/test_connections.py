@@ -17,7 +17,7 @@ from towpath.stores import open_store
 
 sys.path.insert(0, str(Path(__file__).parent))
 import imap_stub as stub  # noqa: E402
-from test_imap import WRITES  # noqa: E402
+from tests.imap_env import WRITES  # noqa: E402
 
 PASSWORD = "synthetic-app-password"
 
