@@ -141,3 +141,11 @@ def openai_stub():
 def fx(tmp_path):
     """Synthetic file discovery corpus with the fixture provider."""
     return Files(tmp_path)
+
+
+@pytest.fixture
+def rw(tmp_path, monkeypatch):
+    """The Recoll adapter's workspace, over a stub of Recoll's Python binding."""
+    from tests.recoll_stub import RecollWorkspace
+
+    return RecollWorkspace(tmp_path, monkeypatch)

@@ -17,14 +17,12 @@ from django.test import Client, override_settings
 import pytest
 
 from towpath import config as config_mod, connections, folders, layout as layout_mod, request_worker
+from tests.recoll_stub import STUB, _doc
 from towpath.stores import open_store
 from towpath.unified import federation, sources
 from towpath.unified.contracts import Filters
 from towpath.web import auth
 from towpath.web.application import configure
-
-sys.path.insert(0, str(Path(__file__).parent))
-from test_discovery_recoll import STUB, _doc  # noqa: E402
 
 FAKE_RECOLLINDEX = """#!/bin/sh
 # Stand-in for recollindex: writes Recoll-style progress, then waits as long as fake-duration says.
