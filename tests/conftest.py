@@ -144,6 +144,13 @@ def fx(tmp_path):
 
 
 @pytest.fixture
+def paced(ws, monkeypatch):
+    from tests.gmail_pacing import pace
+
+    return pace(ws, monkeypatch)
+
+
+@pytest.fixture
 def rw(tmp_path, monkeypatch):
     """The Recoll adapter's workspace, over a stub of Recoll's Python binding."""
     from tests.recoll_stub import RecollWorkspace
