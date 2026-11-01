@@ -20,6 +20,7 @@ from towpath.connections.base import (
 )
 from towpath.stores import open_store
 
+
 def _setting(store_dir: Path, key: str, role: str = ROLE):
     import sqlite3
 

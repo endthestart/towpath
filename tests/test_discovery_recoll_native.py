@@ -15,6 +15,7 @@ from towpath.discovery import corpus, evaluate, policy, service
 from towpath.discovery.providers import recoll as recoll_provider
 from towpath.discovery.providers.base import Unavailable
 
+
 def test_source_stamp_follows_observed_recoll_fields():
     nested = {"ipath": "mail/backup.mbox:1:0", "pcbytes": "5359", "fbytes": "1298", "fmtime": "01073001600",
               "sig": "53591791074692"}

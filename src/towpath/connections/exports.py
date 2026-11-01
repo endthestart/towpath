@@ -7,6 +7,7 @@ from pathlib import Path
 from towpath.connections.base import ROLE, ConnectionProblem, _new_id, _now
 from towpath.stores import open_store
 
+
 def add_messages(store_dir: Path, path: Path, taken: set[str] = frozenset()) -> str:
     """Record an Apple Messages export folder (imessage-exporter, text format) as a source; nothing is read yet."""
     from towpath import folders

@@ -10,6 +10,7 @@ from towpath import config as config_mod
 from towpath.discovery import corpus, service
 from towpath.discovery.providers.base import Unavailable
 
+
 def test_probe_reports_binding_and_capabilities(rw):
     probe, = service.probe(rw.config)
     assert probe["available"] and probe["binding"] is True and probe["tool"] == "recoll"

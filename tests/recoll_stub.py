@@ -24,6 +24,7 @@ STUB = {
     "recoll/recoll.py": '''
 import json, os, re, time
 
+
 class Doc:
     def __init__(self, data):
         self._d = data

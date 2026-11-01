@@ -18,6 +18,7 @@ from towpath.unified.contracts.base import (
     check_source_id,
 )
 
+
 @dataclass(frozen=True)
 class Match:
     """Why a result is here. ``fields`` names what matched (subject, body, name, text, ...)."""

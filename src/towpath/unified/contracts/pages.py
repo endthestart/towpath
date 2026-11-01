@@ -23,6 +23,7 @@ from towpath.unified.contracts.base import (
 from towpath.unified.contracts.filters import Filters
 from towpath.unified.contracts.results import Result
 
+
 @dataclass(frozen=True)
 class CoverageSummary:
     """What a source has actually looked at, kept apart by stage.

@@ -8,6 +8,7 @@ from towpath.connections.base import ROLE, all_connections, secret_path, token_p
 from towpath.connections.gmail import gmail_pacing
 from towpath.connections.imap import _imap_source
 
+
 def merged(config, credentials_dir: Path | None, role: str = ROLE):
     """``config`` with every connection added as a source, and the instance's Gmail pacing if it was set in the
     UI. A connection imported from the configuration file replaces that entry. Without a credentials folder

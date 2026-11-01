@@ -11,6 +11,7 @@ from towpath.discovery import context, corpus, service
 from towpath.discovery.providers import recoll as recoll_provider
 from towpath.discovery.providers.base import Unavailable
 
+
 def _paper(rw):
     return next(r for r in service.search(rw.config, "zebrafinch economy")["results"]
                 if r["location"].endswith("message 1 > paper.docx"))

@@ -4,6 +4,7 @@ from towpath import config as config_mod
 from towpath.discovery import service
 from towpath.discovery.providers import recoll as recoll_provider
 
+
 def _raw_rows(rw, root: str = "archive") -> int:
     base = f"file://{rw.root / 'roots' / root}/"
     return sum(1 for row in rw.index if row.get("url", "").startswith(base))
