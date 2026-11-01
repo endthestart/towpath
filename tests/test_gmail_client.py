@@ -221,7 +221,7 @@ def test_failed_token_replacement_preserves_previous_file(tmp_path, monkeypatch)
     def fail_replace(*args):
         raise OSError("synthetic replacement failure")
 
-    monkeypatch.setattr(google_gmail.os, "replace", fail_replace)
+    monkeypatch.setattr(google_gmail.authorizing.os, "replace", fail_replace)
     with pytest.raises(OSError, match="synthetic replacement failure"):
         google_gmail._write_private(path, '{"new":"synthetic"}')
     assert path.read_text() == '{"old":"synthetic"}'
