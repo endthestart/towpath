@@ -132,7 +132,7 @@ configuration and token.
 
 The single-owner deployment serves the UI through the host's existing TLS reverse proxy (SWAG) at
 its own name. The container publishes no port; the proxy terminates TLS, and every page requires
-the instance's one account ([login](local-ui.md)). The Mac remains the development machine; the storage host
+the instance's one account ([login](local-ui.md)). A separate machine does development; the storage host
 runs persistent services and indexers. GitHub builds and tests images, and Arcane pulls the
 verified digests. Neither Arcane nor the deployment host builds source.
 

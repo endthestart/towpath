@@ -1,10 +1,11 @@
-# Handoff: moving Towpath's development to the Mac Pro (2026-10-21)
+# Handoff: continuing Towpath's development (2026-11-01)
 
 ## Where things stand
 
-- **Hub runs Towpath** (Arcane deployment); deployed revision and image digests are in
+- **Towpath is deployed on Hub through Arcane**; the deployed revision and image digests are in
   [setup/hub.md](setup/hub.md). Every planned item is built, reviewed and deployed; nothing on the roadmap is left
-  without new scope ([plan](plans/2026-10-17-autonomous-build.md)).
+  without new scope ([plan](plans/2026-10-17-autonomous-build.md)). The project is being brought to a closing point:
+  no new features are planned.
 - **UAT is the owner's next step**, starting with section 0 of the [UAT guide](plans/2026-10-uat-guide.md): connect
   Gmail over IMAP with an app password and run Towpath beside Inbox Zero for a week, Towpath in **Dry runs only**.
   Inbox Zero's rules are rewritten as a switched-off set on each account's Rules page, for the owner to confirm.
@@ -12,41 +13,37 @@
   hidden photo export and photos hidden in Apple Photos are never read, shown or previewed.
 - Hub database dumps run nightly ([setup/backups.md](setup/backups.md)).
 
-## The checkouts (all under `~/Development/towpath/`, copied to the Mac Pro on 2026-10-21)
+## The checkouts (under `~/Development/towpath/`)
 
-The five worktrees share one git directory, inside `towpath-file-discovery-validation/.git`; paths are the same
-on both Macs, so they work as they are. Their virtual environments were not copied (see *Running*).
+Both worktrees share one git directory, inside `towpath-file-discovery-validation/.git`, so that folder has to move
+with the other. Virtual environments don't move (see *Running*).
 
 | Folder | Branch | What it is for | State |
 | --- | --- | --- | --- |
-| `towpath-mail-management` | `claude/native-mail-management` | The main line of work since 2026-10-16: mail management, life story, photos, sources, backups. Pushed as `codex/local-email-ui` too, which publishing builds from. | Clean, on GitHub |
-| `towpath-local-ui` | `codex/local-email-ui` | Older checkout of the publishing branch (the main line has moved on in `towpath-mail-management`) | Uncommitted roadmap note and a research note |
-| `towpath-file-discovery-validation` | `claude/file-discovery-foundation` | File discovery and Recoll validation (holds the shared git directory) | Uncommitted evaluation notes and a Recoll provider edit |
-| `towpath-release-review` | `codex/ghcr-publication-handoff` | Container publishing review (merged into `main`) | Uncommitted follow-up note and a handoff |
-| `towpath-unified-review` | `codex/unified-local-review-fixes` | Unified-review fixes; 4 commits not on GitHub | Clean |
-| `towpath` (separate clone) | `claude/happy-gauss-ugprmu` | Earliest Gmail-connector work | The Mac Pro already had this clone; its 4 unpushed commits and `codex/local-prevalidation-082b4b5` are in `~/Development/towpath/macbook-clone-branches.bundle` (`git fetch ../macbook-clone-branches.bundle '*:refs/remotes/macbook/*'`), its two untracked notes copied in |
+| `towpath-mail-management` | `claude/native-mail-management` | The main line of work. Pushed as `codex/local-email-ui` too, which publishing builds from. | On GitHub |
+| `towpath-file-discovery-validation` | `claude/file-discovery-foundation` | File discovery and Recoll validation, merged into the main line; holds the shared git directory | Uncommitted evaluation notes and a Recoll provider edit, also archived in `towpath-private` |
 
-The GitHub repository `endthestart/towpath` is **public**. The branches not on GitHub stay local, on both Macs
-(the owner's answer of 2026-10-21); push only reviewed work there.
+The older worktrees and the earlier separate clone were retired on 2026-11-01. Their uncommitted notes, and a bundle
+of the clone's unpushed commits, are in `towpath-private/cleanup/old-worktree-notes`.
+
+The GitHub repository `endthestart/towpath` is **public**; push only reviewed work there.
 
 ## Outside git
 
 | What | Where | Moving it |
 | --- | --- | --- |
-| `towpath-private` (Hub deployment files and env, secrets such as a Google OAuth client and an old Mac Gmail token, private notes, backups of the retired Mac stores) | `~/Development/towpath-private`, not a git repository | Copied to the Mac Pro as is on 2026-10-21 (the owner's choice; modes kept, secrets 600, checked by checksum) |
-| Gmail and quota configuration, Towpath's stores | On Hub (`/mnt/zssd/appfast/towpath`), the single writer since 2026-10-06 | Nothing to move; the Mac runs no Towpath stores |
-| Local databases | None in the checkouts; the retired Mac stores are in `towpath-private/backups` and `retired-handed-to-hub-20261006` | With `towpath-private` |
-| Apple Messages export | On the NAS (`storage/exports/messages`) once the owner runs imessage-exporter, see the UAT guide | Nothing to move |
-| Colima profile `towpath-files-validation` | Already deleted on the MacBook | Nothing to move |
-| Hub tools (release, smoke test) | Session scratch on the MacBook | Re-create from [setup/hub.md](setup/hub.md) if needed |
+| `towpath-private` (Hub deployment files and env, secrets, private notes, retired stores) | `~/Development/towpath-private`, not a git repository | Copy as is, keeping modes (secrets 600), and check by checksum |
+| The Arcane API key | The development machine's credential store | Set up again on a new machine; the deployment helper in `towpath-private` reads it from there |
+| Gmail and quota configuration, Towpath's stores | On Hub, the single writer since 2026-10-06 | Nothing to move; the development machine runs no Towpath stores |
+| Apple Messages export | On the NAS once the owner runs imessage-exporter, see the UAT guide | Nothing to move |
 
-## Running Towpath on the Mac Pro
+## Running Towpath on the development machine
 
-Development and tests (Python 3.13 with uv, from a checkout):
+Development and tests (Python 3.11 or newer with uv, from a checkout):
 
 ```bash
 cd ~/Development/towpath/towpath-mail-management
-uv venv .venv && uv pip install -e '.[dev]'
+uv sync --locked --extra dev
 .venv/bin/python -m pytest -q
 ```
 
