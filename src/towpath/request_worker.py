@@ -78,6 +78,8 @@ def run_once(config, credentials_dir=None):
         indexing += _owner_facing(config, credentials_dir)
         from towpath import life_propose  # life-story proposals, only once the owner allowed them
 
+        for line in life_propose.run_step(config):  # now, not at the poll's end: a long poll may never get there
+            print(json.dumps({"at": datetime.now(timezone.utc).isoformat(), **line}), flush=True)
         indexing += life_propose.propose_pending(config, credentials_dir)
         from towpath import life_calendar
 

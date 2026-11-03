@@ -6,6 +6,7 @@ from datetime import date
 
 from towpath.canonical import digest
 from towpath.life_propose.common import AUTO_KEY, AUTO_TARGET, PROMPT_VERSION, REQUEST_KEY, REQUEST_TARGET, TASK
+from towpath.models import bulk
 from towpath.stores import open_store, store_path
 
 
@@ -55,18 +56,30 @@ def _write(store_dir, value: dict, author: str) -> None:
 
 
 def auto(store_dir, role: str = "worker") -> bool:
-    """Whether the owner turned on finding events by itself, across every account the life story may use."""
+    """Whether finding events by itself is on, across every account the life story may use: the owner turned it on,
+    or their one bounded run is open."""
     if not store_path(store_dir, "decisions").exists():
         return False
     with closing(open_store(store_dir, "decisions", role)) as db:
         row = db.execute("SELECT value FROM settings WHERE target_id = ? AND key = ?",
                          (AUTO_TARGET, AUTO_KEY)).fetchone()
-    return bool(row and json.loads(row[0]) == "running")
+    return bool(row and json.loads(row[0]) == "running") or bulk.is_open(store_dir, role)
+
+
+def start_run(store_dir, author: str = "owner") -> dict | None:
+    """The owner's one bounded run, or None if it has been used. Finding by itself is switched off underneath it,
+    so nothing goes on when the run ends."""
+    if bulk.window(store_dir, "web") is not None:
+        return None
+    set_auto(store_dir, False, author)
+    return bulk.start(store_dir, author)
 
 
 def set_auto(store_dir, on: bool, author: str = "owner") -> None:
     from towpath.decisions import now
 
+    if not on:
+        bulk.stop(store_dir, author)
     value = json.dumps("running" if on else "paused")
     with closing(open_store(store_dir, "decisions", "web")) as db:
         db.execute("INSERT OR REPLACE INTO settings (target_id, key, value, author, at) VALUES (?,?,?,?,?)",

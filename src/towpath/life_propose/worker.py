@@ -44,24 +44,32 @@ def _years(config, source_id: str) -> list[str]:
                                          (source_id,))]
 
 
-def _next_auto(config, clock=time.monotonic) -> dict | None:
-    """Finding by itself: the newest year, in any account the life story may use, that still has unread likely
-    messages. Finished years are looked at again now and then for newly arrived mail."""
+def _allowed(config) -> list[str]:
+    """Accounts the life story may use: those whose text mail management already stores come first (no provider
+    calls), then the others."""
     from towpath.unified import grants
 
     granted = grants.granted(config.store_dir)
-    # Accounts whose text mail management already stores come first (no provider calls), then the others.
-    allowed = sorted((sid for sid, f in granted.items() if "life-evidence" in f and sid in config.sources),
-                     key=lambda sid: ("mail-manage" not in granted[sid], sid))
+    return sorted((sid for sid, f in granted.items() if "life-evidence" in f and sid in config.sources),
+                  key=lambda sid: ("mail-manage" not in granted[sid], sid))
+
+
+def _year_slice(source_id: str, year: str) -> dict:
+    return {"source_id": source_id, "after": f"{year}-01-01", "before": f"{year}-12-31", "state": "running",
+            "auto": True}
+
+
+def _next_auto(config, clock=time.monotonic) -> dict | None:
+    """Finding by itself: the newest year, in any account the life story may use, that still has unread likely
+    messages. Finished years are looked at again now and then for newly arrived mail."""
     done: dict[str, str] = {}
     if store_path(config.store_dir, "life").exists():
         with closing(open_store(config.store_dir, "life", "worker")) as db:
             done = {r[0]: r[1] for r in db.execute("SELECT run_id, state FROM runs")}
     current = str(date.today().year)
-    for sid in allowed:
+    for sid in _allowed(config):
         for year in _years(config, sid):
-            value = {"source_id": sid, "after": f"{year}-01-01", "before": f"{year}-12-31", "state": "running",
-                     "auto": True}
+            value = _year_slice(sid, year)
             rid = run_id(value)
             if done.get(rid) == "done":
                 if year != current or clock() - _rechecked.get(rid, float("-inf")) < RECHECK_SECONDS:
@@ -82,7 +90,8 @@ def propose_pending(config, credentials_dir, slice_seconds: float = SLICE_SECOND
     from towpath.models import gateway
 
     value = request(config.store_dir)
-    if not _pending_request(config, value):
+    # A request that is paused or can't go on holds nothing else up.
+    if not _pending_request(config, value) or blocked(config, value) is not None:
         value = _next_auto(config, clock) if auto(config.store_dir) else None
     if blocked(config, value) is not None or gateway.background_wait(config, TASK):
         return []  # not allowed, or background model work waits its turn: no mail is fetched
@@ -123,8 +132,8 @@ def propose_pending(config, credentials_dir, slice_seconds: float = SLICE_SECOND
         producer = f"model:{config.endpoints[endpoint_id].model}/{PROMPT_VERSION}"
         done = []
         for message in batch:
-            if clock() > deadline or (request(config.store_dir) or {}).get("state") == "paused" or \
-                    gateway.background_wait(config, TASK):
+            paused = not value.get("auto") and (request(config.store_dir) or {}).get("state") == "paused"
+            if clock() > deadline or paused or gateway.background_wait(config, TASK):
                 break
             outcome, proposed = "no-text", 0
             ref = f"{value['source_id']}:{message['native_id']}"

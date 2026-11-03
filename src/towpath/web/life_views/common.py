@@ -56,8 +56,13 @@ def _status() -> dict:
     reason = life_propose.blocked(config, value, role="web")
     running = reason is None and not (run and run["state"] == "done")
     on = life_propose.auto(settings.TOWPATH_STORE_DIR, role="web")
-    return {"request": value, "run": run, "blocked": reason, "running": running or on, "auto": on,
-            "auto_progress": life_propose.auto_progress(settings.TOWPATH_STORE_DIR) if on else None}
+    once = life_propose.run_summary(settings.TOWPATH_STORE_DIR)
+    if once["state"] == "ready":
+        once["can_start"] = life_propose.can_run(config)
+    awaiting_result = once["state"] == "ended" and not once.get("at_end")
+    return {"request": value, "run": run, "blocked": reason, "running": running or on or awaiting_result, "auto": on,
+            "auto_progress": life_propose.auto_progress(settings.TOWPATH_STORE_DIR) if on else None,
+            "run_once": once}
 
 
 def _row(claim) -> dict:

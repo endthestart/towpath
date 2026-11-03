@@ -54,26 +54,36 @@ def _style_examples(mail, source_id: str, me: dict, to: str | None, limit: int =
     return [r[0] for r in rows]
 
 
-def _draft(config, intel, mail, source_id: str, me: dict, deadline: float, clock) -> tuple[int, str | None]:
-    from towpath.models import gateway
-
+def _to_draft(store_dir, intel, source_id: str) -> list[tuple]:
+    """Conversations waiting on the owner with recent mail, then follow-ups due: (key, kind, current, drafted)."""
     from towpath.mail import notify
 
-    endpoint = config.endpoints[config.tasks[TASK_DRAFT]]
-    owner_marks = marks(config.store_dir, source_id)
+    owner_marks = marks(store_dir, source_id)
     since = (datetime.now(timezone.utc) - timedelta(days=DRAFT_DAYS)).isoformat()
     rows = [(key, "reply", current, drafted) for key, state, current, drafted in intel.execute(
         "SELECT t.thread_key, t.state, t.input_digest, d.input_digest FROM threads t LEFT JOIN drafts d USING "
         "(source_id, thread_key) WHERE t.source_id = ? AND t.kind = 'conversation' AND t.last_from_owner = 0 AND "
         "t.last_date >= ? ORDER BY t.last_date DESC", (source_id, since)).fetchall()
         if owner_marks.get(key, state) == "needs_owner_reply"]
-    days = notify.follow_up_days(config.store_dir, source_id)
+    days = notify.follow_up_days(store_dir, source_id)
     if days:
-        for key, _ in notify.follow_up_due(config.store_dir, source_id, intel, days):
+        for key, _ in notify.follow_up_due(store_dir, source_id, intel, days):
             current, drafted = intel.execute(
                 "SELECT t.input_digest, d.input_digest FROM threads t LEFT JOIN drafts d USING (source_id, "
                 "thread_key) WHERE t.source_id = ? AND t.thread_key = ?", (source_id, key)).fetchone()
             rows.append((key, "follow-up", current, drafted))
+    return rows
+
+
+def drafts_waiting(store_dir, intel, source_id: str) -> int:
+    return sum(drafted != current for _, _, current, drafted in _to_draft(store_dir, intel, source_id))
+
+
+def _draft(config, intel, mail, source_id: str, me: dict, deadline: float, clock) -> tuple[int, str | None]:
+    from towpath.models import gateway
+
+    endpoint = config.endpoints[config.tasks[TASK_DRAFT]]
+    rows = _to_draft(config.store_dir, intel, source_id)
     owner_notes = notes(config.store_dir, source_id)
     done = 0
     for key, kind, current, drafted in rows:

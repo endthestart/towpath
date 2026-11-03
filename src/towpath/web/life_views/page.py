@@ -1,7 +1,7 @@
 """The Life page and its settings: the account, the model, the owner's profile, and starting or pausing."""
 
 from django.conf import settings
-from django.http import HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_GET, require_POST
 
@@ -78,6 +78,16 @@ def profile(request):
 def auto(request):
     """Turn finding events by itself on or off."""
     life_propose.set_auto(settings.TOWPATH_STORE_DIR, request.POST.get("on") == "1")
+    return redirect("/life/?saved=started")
+
+
+@require_POST
+def run_once(request):
+    """The owner's one bounded run; it can't be started a second time, or while nothing could be read."""
+    if not life_propose.can_run(_config()):
+        return HttpResponse("Allow a mail account and the AI model first.", status=409)
+    if life_propose.start_run(settings.TOWPATH_STORE_DIR) is None:
+        return HttpResponse("Run once has already been used.", status=409)
     return redirect("/life/?saved=started")
 
 

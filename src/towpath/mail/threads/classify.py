@@ -109,6 +109,17 @@ def _settle_by_sender(config, intel, mail, source_id: str, me: dict) -> int:
     return changed
 
 
+WAITING = "FROM threads WHERE source_id = ? AND state_by = 'rule' AND kind = 'conversation' AND last_date >= ?"
+
+
+def _since(days: int) -> str:
+    return (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+
+
+def conversations_waiting(intel, source_id: str, days: int = OLD_DAYS) -> int:
+    return intel.execute(f"SELECT count(*) {WAITING}", (source_id, _since(days))).fetchone()[0]
+
+
 def _classify(config, intel, mail, source_id: str, me: dict, deadline: float, clock,
               days: int = OLD_DAYS) -> tuple[int, str | None]:
     from towpath.models import gateway
@@ -117,10 +128,8 @@ def _classify(config, intel, mail, source_id: str, me: dict, deadline: float, cl
     endpoint = config.endpoints[config.tasks[TASK_STATE]]
     examples = _owner_examples(intel, config.store_dir, source_id)
     while clock() < deadline:
-        rows = intel.execute("SELECT thread_key FROM threads WHERE source_id = ? AND state_by = 'rule' AND "
-                             "kind = 'conversation' AND last_date >= ? ORDER BY last_date DESC LIMIT ?",
-                             (source_id, (datetime.now(timezone.utc) - timedelta(days=days)).isoformat(),
-                              MODEL_BATCH)).fetchall()
+        rows = intel.execute(f"SELECT thread_key {WAITING} ORDER BY last_date DESC LIMIT ?",
+                             (source_id, _since(days), MODEL_BATCH)).fetchall()
         if not rows:
             return done, None
         for (key,) in rows:

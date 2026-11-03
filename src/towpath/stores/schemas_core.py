@@ -246,5 +246,8 @@ CREATE TABLE IF NOT EXISTS group_runs (key TEXT PRIMARY KEY, digest TEXT NOT NUL
 CREATE TABLE IF NOT EXISTS kept_evidence (
   claim_id TEXT PRIMARY KEY, ref TEXT NOT NULL, path TEXT, sha256 TEXT, size INTEGER, status TEXT NOT NULL,
   at TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, next_try TEXT);
+-- The owner's one bounded run: counts when it started and when it ended, no mail (towpath.life_propose.bounded_run).
+CREATE TABLE IF NOT EXISTS run_once (
+  started_at TEXT PRIMARY KEY, at_start TEXT NOT NULL, finished_at TEXT, at_end TEXT);
 """,
 }

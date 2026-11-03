@@ -50,6 +50,9 @@
 <form method="post" action="/life/auto" class="inline-form">{% csrf_token %}<input type="hidden" name="on" value="{% if status.auto %}0{% else %}1{% endif %}">
   <span>{% if status.auto %}Towpath works through all your allowed mail by itself, newest years first, and keeps up with new mail.{% else %}Let Towpath work through all your allowed mail by itself, newest years first.{% endif %}</span>
   <button class="button{% if status.auto %} secondary{% endif %}" type="submit">{% if status.auto %}Stop finding events{% else %}Find events by itself{% endif %}</button></form>
+{% if status.run_once.can_start %}<form method="post" action="/life/run-once" class="inline-form">{% csrf_token %}
+  <span>Or read it all in one go: for {{ status.run_once.hours }} hours Towpath uses the model as much as it can, newest years first, and then finding events stops by itself. It runs once and can't be started again.</span>
+  <button class="button secondary" type="submit">Run once</button></form>{% endif %}
 <details><summary>Or just one period</summary>
 <form method="post" action="/life/start" class="inline-form">{% csrf_token %}
   <label>Account <select name="source_id">{% for a in accounts %}{% if a.allowed %}<option value="{{ a.source_id }}"{% if status.request.source_id == a.source_id %} selected{% endif %}>{{ a.name }}</option>{% endif %}{% endfor %}</select></label>

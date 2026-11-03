@@ -51,25 +51,24 @@ def now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def _candidates(mail, intel, source_id: str, cats: dict, limit: int) -> list[dict]:
-    """The next candidates, newest first, judged on headers first and then on whether the text names an amount.
-    A message without one is recorded as not a purchase, so it isn't looked at again; so is another copy of a
-    message already looked at (the same Message-ID in a second folder). A message the model was refused for is
-    asked about again a day later."""
+def _judged(mail, intel, source_id: str, cats: dict):
+    """Each undecided message that passes the headers, newest first: (message, text, why it's set aside or None).
+    A message without an amount is set aside, and so is another copy of a message already looked at (the same
+    Message-ID in a second folder). A copy set aside says nothing about the message it copies, which may still be
+    waiting for the model. A message the model was refused for is asked about again a day later."""
     retry = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
-    done = {r[0] for r in intel.execute("SELECT item_id FROM purchases WHERE source_id = ? AND NOT (model = "
-                                        "'refused' AND at < ?)", (source_id, retry))}
+    done = {r[0]: r[1] for r in intel.execute("SELECT item_id, model FROM purchases WHERE source_id = ? AND NOT "
+                                              "(model = 'refused' AND at < ?)", (source_id, retry))}
     rows = mail.execute("SELECT item_id, message_id, from_addr, from_name, subject, date_utc FROM messages "
                         "WHERE source_id = ? AND text IS NOT NULL ORDER BY date_utc DESC, item_id",
                         (source_id,)).fetchall()
-    seen_ids = {m["message_id"] for m in rows if m["item_id"] in done and m["message_id"]}
-    out = []
+    seen_ids = {m["message_id"] for m in rows if m["message_id"] and m["item_id"] in done and
+                done[m["item_id"]] != "another-copy"}
     for m in rows:
         if m["item_id"] in done:
             continue
         if m["message_id"] and m["message_id"] in seen_ids:
-            intel.execute("INSERT OR REPLACE INTO purchases (source_id, item_id, purchase, model, at) VALUES "
-                          "(?, ?, 0, 'another-copy', ?)", (source_id, m["item_id"], now()))
+            yield m, None, "another-copy"
             continue
         subject, category = m["subject"] or "", cats.get(m["from_addr"] or "")
         if not (category == "receipt" or ORDER_SUBJECT.search(subject)) or NOT_A_PURCHASE.search(subject) or \
@@ -78,15 +77,27 @@ def _candidates(mail, intel, source_id: str, cats: dict, limit: int) -> list[dic
         if m["message_id"]:
             seen_ids.add(m["message_id"])
         text = mail.execute("SELECT text FROM messages WHERE item_id = ?", (m["item_id"],)).fetchone()[0] or ""
-        if not AMOUNT.search(text):
+        yield m, text, None if AMOUNT.search(text) else "no-amount"
+
+
+def _candidates(mail, intel, source_id: str, cats: dict, limit: int) -> list[dict]:
+    """The next messages for the model. What's set aside is recorded as not a purchase, so it isn't looked at again."""
+    out = []
+    for m, text, set_aside in _judged(mail, intel, source_id, cats):
+        if set_aside:
             intel.execute("INSERT OR REPLACE INTO purchases (source_id, item_id, purchase, model, at) VALUES "
-                          "(?, ?, 0, 'no-amount', ?)", (source_id, m["item_id"], now()))
+                          "(?, ?, 0, ?, ?)", (source_id, m["item_id"], set_aside, now()))
             continue
         out.append({**dict(m), "text": text})
         if len(out) >= limit:
             break
     intel.commit()
     return out
+
+
+def waiting(mail, intel, source_id: str, cats: dict) -> int:
+    """How many messages the model has still to read, without recording anything."""
+    return sum(set_aside is None for _, _, set_aside in _judged(mail, intel, source_id, cats))
 
 
 def _day(value) -> str | None:

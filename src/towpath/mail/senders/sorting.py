@@ -55,6 +55,13 @@ def _settle(intel, source_id: str, s: dict, category: str, reason: str, model: s
                   (category, f"{reason.strip()[:160]} ({model})", now(), source_id, s["address"]))
 
 
+WAITING = "FROM senders WHERE source_id = ? AND category_by = 'rule' AND owner_wrote = 0 AND category != 'notification'"
+
+
+def waiting(intel, source_id: str) -> int:
+    return intel.execute(f"SELECT count(*) {WAITING}", (source_id,)).fetchone()[0]
+
+
 def _categorize(config, intel, mail, source_id: str, deadline: float, clock) -> tuple[int, str | None]:
     from towpath.mail.threads import _failure, item_refused
     from towpath.models import gateway
@@ -63,8 +70,7 @@ def _categorize(config, intel, mail, source_id: str, deadline: float, clock) -> 
     done = 0
     while clock() < deadline:
         rows = [dict(r) for r in intel.execute(
-            "SELECT * FROM senders WHERE source_id = ? AND category_by = 'rule' AND owner_wrote = 0 AND category != "
-            "'notification' ORDER BY (messages >= 3) DESC, last_date DESC LIMIT ?", (source_id, MODEL_BATCH))]
+            f"SELECT * {WAITING} ORDER BY (messages >= 3) DESC, last_date DESC LIMIT ?", (source_id, MODEL_BATCH))]
         if not rows:
             return done, None
         from towpath.mail.privacy import targets

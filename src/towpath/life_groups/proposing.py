@@ -189,8 +189,9 @@ def _occasions(config, db, claims_, spans, deadline, clock) -> tuple[int, str | 
 
 def propose_groups(config, slice_seconds: float = SLICE_SECONDS, clock=time.monotonic) -> list[dict]:
     """One bounded slice: people and chapter groups by rule, then occasions through the model the owner allowed."""
-    from towpath import decisions as owner_decisions
+    from towpath import decisions as owner_decisions, life_propose
     from towpath.mail import threads
+    from towpath.models import bulk
 
     if not store_path(config.store_dir, "life").exists():
         return []
@@ -213,7 +214,8 @@ def propose_groups(config, slice_seconds: float = SLICE_SECONDS, clock=time.mono
             db.execute("INSERT OR REPLACE INTO group_runs VALUES ('rules', ?, ?)", (key, now()))
             db.commit()
         endpoint = config.tasks.get(TASK)
-        if endpoint and owner_decisions.model_granted(config, endpoint, "content", role=WRITER):
+        if endpoint and owner_decisions.model_granted(config, endpoint, "content", role=WRITER) and \
+                (life_propose.auto(config.store_dir) or not bulk.ended(config.store_dir)):  # it stops with the run
             if threads.ready(config, TASK):
                 made["occasions"], _ = _occasions(config, db, claims_, spans, deadline, clock)
         db.commit()

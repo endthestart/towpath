@@ -13,7 +13,7 @@ import json
 import time
 from datetime import datetime, timezone
 
-from towpath.models import pacing
+from towpath.models import bulk, pacing
 from towpath.models.profiles import LOCAL_DESTINATIONS, ProfileError, check_destination, fingerprint, make_client
 from towpath.stores import open_store
 
@@ -176,8 +176,12 @@ def check_policy(config, task: str, data_class: str, item_ids: list[str]) -> tup
 
 def background_wait(config, task: str) -> float:
     """Seconds before the task's model takes background work again (0: now), so a caller can skip preparing it."""
-    endpoint = config.endpoints[config.tasks[task]]
-    return pacing.wait(config.store_dir, endpoint.id, endpoint.timeout_seconds)
+    return _held(config, config.endpoints[config.tasks[task]])
+
+
+def _held(config, endpoint) -> float:
+    return pacing.wait(config.store_dir, endpoint.id, endpoint.timeout_seconds,
+                       share=not bulk.is_open(config.store_dir))
 
 
 def infer(config, task: str, prompt: str, data_class: str, output_schema: dict, item_ids: list[str] = (),
@@ -206,7 +210,7 @@ def infer(config, task: str, prompt: str, data_class: str, output_schema: dict, 
         return {"status": "disabled", "reason": reason}
 
     if background:
-        held = pacing.wait(config.store_dir, endpoint.id, endpoint.timeout_seconds)
+        held = _held(config, endpoint)
         if held:
             return {"status": "unavailable", "failure": "paced",
                     "reason": f"background model work waits {held:.0f} s more"}

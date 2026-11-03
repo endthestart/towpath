@@ -3,7 +3,8 @@
 Background calls ask the gateway not to keep them waiting in line (a busy model answers at once), take at most a
 quarter of any hour of the model, and after a busy or failed call every background task waits together, longer
 after each failure in a row. The owner's own questions are never held back. State lives in the worker's memory,
-per data folder and endpoint, so a restart starts afresh.
+per data folder and endpoint, so a restart starts afresh. Only the owner's one bounded run (``towpath.models.bulk``)
+lifts the share; it still yields to a busy model.
 """
 
 import time
@@ -20,7 +21,7 @@ def _entry(store_dir, endpoint_id: str) -> dict:
     return _state.setdefault((str(store_dir), endpoint_id), {"calls": [], "failures": 0, "until": float("-inf")})
 
 
-def wait(store_dir, endpoint_id: str, timeout: float, clock=time.monotonic) -> float:
+def wait(store_dir, endpoint_id: str, timeout: float, clock=time.monotonic, share: bool = True) -> float:
     """Seconds before the next background call may start, 0 when it may start now.
 
     A call may start only if, with the time background calls ended in the last hour, even a call that runs to its
@@ -28,7 +29,7 @@ def wait(store_dir, endpoint_id: str, timeout: float, clock=time.monotonic) -> f
     entry, now = _entry(store_dir, endpoint_id), clock()
     entry["calls"] = [(end, seconds) for end, seconds in entry["calls"] if end > now - WINDOW_SECONDS]
     used, share_wait = sum(seconds for _, seconds in entry["calls"]), 0.0
-    for end, seconds in entry["calls"]:
+    for end, seconds in entry["calls"] if share else ():
         if used + timeout <= SHARE_SECONDS:
             break
         used -= seconds

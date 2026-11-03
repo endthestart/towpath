@@ -36,6 +36,7 @@ urlpatterns = [
     path("life/start", life_views.start, name="life-start"),
     path("life/pause", life_views.pause, name="life-pause"),
     path("life/auto", life_views.auto, name="life-auto"),
+    path("life/run-once", life_views.run_once, name="life-run-once"),
     path("life/profile", life_views.profile, name="life-profile"),
     path("life/remember", life_views.remember, name="life-remember"),
     path("life/forget", life_views.forget, name="life-forget"),

@@ -140,6 +140,11 @@ owner's additions, removals and approval are decisions kept apart from regenerat
   story may use, a year at a time, newest first; the current year is looked at again every ten minutes for new mail.
   Likely messages now include mail with people the owner writes to and mail the owner sent, not only telling
   subjects; where mail management has read a message, its text (quotes removed) is used without fetching again.
+- **Run once** (`life_propose.bounded_run`, `models/bulk`, added 2026-11): one bounded run instead of weeks under the
+  background share. For 48 hours background work may use the model fully and finding events is on. Then it ends by
+  itself: finding events and the model's part of memories stay off, and the mail tasks are back under the share, unless
+  the owner turns finding events on again. Stopping finding events ends it early, and it can't be started a second time.
+  The Life page and the worker's log record what was left at the start and what it did by the end, as counts only.
 - **Memories** (`life_groups`): people (three or more events in mail with one person mail management counts as a
   person), life chapters by decade from the owner's birthday, and occasions, trips and projects that the model
   gathers from each month's events (with the days around it). The owner keeps (a snapshot in the decisions store),

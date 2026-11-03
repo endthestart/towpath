@@ -17,9 +17,9 @@ sender the owner never wrote to, selling or recruiting.
 from towpath.mail.senders.common import CATEGORIES, mark, marks
 from towpath.mail.senders.reading import accounts, categories, inbox, listing, message_category, totals
 from towpath.mail.senders.rebuilding import space
-from towpath.mail.senders.sorting import categorize_pending
+from towpath.mail.senders.sorting import categorize_pending, waiting
 
 __all__ = [
     "CATEGORIES", "accounts", "categories", "categorize_pending", "inbox", "listing", "mark", "marks",
-    "message_category", "space", "totals",
+    "message_category", "space", "totals", "waiting",
 ]

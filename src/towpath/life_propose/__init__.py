@@ -12,6 +12,7 @@ of its significance, so everyday purchases can wait under Minor on the Life page
 slice again: the owner's reviewed proposals stay as they are, and unreviewed ones are proposed afresh.
 """
 
+from towpath.life_propose.bounded_run import can_run, step as run_step, summary as run_summary
 from towpath.life_propose.candidates import _candidates, _likely, _stored_text, _text
 from towpath.life_propose.choices import (
     auto,
@@ -23,11 +24,13 @@ from towpath.life_propose.choices import (
     run_id,
     set_auto,
     set_request,
+    start_run,
 )
 from towpath.life_propose.common import PROMPT_VERSION
 from towpath.life_propose.worker import propose_pending
 
 __all__ = [
-    "PROMPT_VERSION", "_candidates", "_likely", "_stored_text", "_text", "auto", "auto_progress", "blocked", "pause",
-    "progress", "propose_pending", "request", "run_id", "set_auto", "set_request",
+    "PROMPT_VERSION", "_candidates", "_likely", "_stored_text", "_text", "auto", "auto_progress", "blocked", "can_run",
+    "pause", "progress", "propose_pending", "request", "run_id", "run_step", "run_summary", "set_auto", "set_request",
+    "start_run",
 ]
