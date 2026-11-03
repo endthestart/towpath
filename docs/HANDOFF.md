@@ -4,13 +4,13 @@
 
 - **Towpath is stopped on Hub.** The owner brought it down on 2026-11-01 and it stays down until they start it again.
   The last deployed revision is `bd40db3`, with its digests in [setup/hub.md](setup/hub.md).
-- **`a1d652b` is published, not deployed** (2026-11-02,
-  [run 41468454860](https://github.com/endthestart/towpath/actions/runs/41468454860)). Both images passed the anonymous
-  source check and a re-scan with no Critical or High findings:
-  - `web`: `ghcr.io/endthestart/towpath@sha256:e9b5a2c342aa3589ac0be66092543b6c53897bd11a6095b1d1c428c83343024f`
-  - `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:169077b5c49a23883cf6421b21c193bbec0633c772d93a3f8312b3f0d6472e4d`
+- **`96b0122` is published, not deployed** (2026-11-03,
+  [run 41727279927](https://github.com/endthestart/towpath/actions/runs/41727279927)). Both images passed the anonymous
+  source check and a scan with no Critical or High findings:
+  - `web`: `ghcr.io/endthestart/towpath@sha256:2105eee69533d6a68a96b82e13e82c8741ce08ecf1c8b5b38fb50f52df0de2f9`
+  - `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:3426cf5035edebf7058e289ba16c73dae0473346b58253984213585fa985a00c`
 - **GitHub:** `main` is at `a1d652b`; `codex/local-email-ui` and `claude/native-mail-management` are ahead of it with
-  *Run once* and these docs. No open pull requests.
+  *Run once* and these docs. No open pull requests, and the older branches were deleted on 2026-11-03.
 - **Local model:** the owner keeps the same machine as the host for finding events and the mail model tasks. Instead of
   weeks of background work, the owner approved one bounded batch: *Run once* on the Life page
   ([life stream](life-stream.md)), planned for 2026-11-06 to 11-08. Finding events by itself is still on in Hub's

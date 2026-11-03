@@ -6,7 +6,7 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Towpath has been stopped on Hub since 2026-11-01, by the owner. `a1d652b` is published but not deployed
+Towpath has been stopped on Hub since 2026-11-01, by the owner. `96b0122` is published but not deployed
 ([handoff](../HANDOFF.md)). The last deployed revision is below.
 
 Revision `bd40db3` (pyasn1 0.6.5, and the web image on Ubuntu 24.04), publishing run
