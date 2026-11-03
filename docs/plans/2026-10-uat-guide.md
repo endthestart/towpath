@@ -1,6 +1,6 @@
 # UAT guide: what was built October 16–17, and how to try it
 
-Everything below is deployed on Hub (towpath.andermic.net) unless marked otherwise. Nothing has changed your mail:
+Everything below is deployed on Hub unless marked otherwise. Nothing has changed your mail:
 Fastmail is in **Dry runs only**, there is no write password, and every change so far is a recorded dry run.
 Decisions I made for you to confirm or reverse are listed in the
 [autonomous build plan](2026-10-17-autonomous-build.md#decisions-made-for-review); open questions are there too.

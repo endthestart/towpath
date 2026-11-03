@@ -6,6 +6,9 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
+Towpath has been stopped on Hub since 2026-11-01, by the owner. `a1d652b` is published but not deployed
+([handoff](../HANDOFF.md)). The last deployed revision is below.
+
 Revision `bd40db3` (pyasn1 0.6.5, and the web image on Ubuntu 24.04), publishing run
 [41338731800](https://github.com/endthestart/towpath/actions/runs/41338731800). No store changes. Keeping the
 evidence is off. On Hub, Fastmail is allowed for the life story and finding events by itself is on (the owner's
@@ -14,8 +17,7 @@ answers of October 17). Background model work has yielded to other users of the 
 - `web`: `ghcr.io/endthestart/towpath@sha256:7ba181435129dfb417678610559048b61bea569e94d3257bfb8e6fc5db64cf8a`
 - `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:5d65391e48b0f8c7fed85b8a679a563c846d3ebd8cf67f70e4d1c221d9a44266`
 
-Database dumps: nightly at 03:20 into `/mnt/tank/storage/backup/db-dumps/towpath/`, with a restore check each
-night ([backups](backups.md)).
+Database dumps: nightly into the host's backup folder, with a restore check each night ([backups](backups.md)).
 
 Towpath's data folder (stores, sign-ins and the Recoll index) lives on a mirrored SSD pool since 2026-10-08,
 with hourly snapshots replicated to the main pool: Recoll's index writes had saturated the spinning disks. The

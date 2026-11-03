@@ -11,8 +11,8 @@ Left out on purpose: ``credentials/`` (passwords stay out of backups: re-enter t
 ``thumbs.db`` (photo previews, rebuilt by the worker) and the Recoll index (rebuilt by indexing). ``files.db``
 (the file catalog, large and slow to rebuild) is dumped on the weekly run only.
 
-    towpath-dump.py --dataset zssd/appfast/towpath --mount /mnt/zssd/appfast/towpath \
-        --dest /mnt/tank/storage/backup/db-dumps/towpath [--weekly]
+    towpath-dump.py --dataset pool/apps/towpath --mount /mnt/pool/apps/towpath \
+        --dest /mnt/pool/backup/db-dumps/towpath [--weekly]
     towpath-dump.py --verify --dest ...      # restore check of the newest dump
     towpath-dump.py --source DIR --dest ...  # no snapshot: DIR is already a stopped or snapshot copy (tests)
 """
