@@ -32,7 +32,7 @@ ones you want:
 
 Inbox Zero's other four (To Reply with a drafted reply, Awaiting Reply, FYI, Actioned) are Towpath's conversations:
 *To reply* (with a draft you save yourself), *Awaiting reply*, *FYI* and *Done*; turn on reply labels in the
-account's Settings to see them as Gmail labels. The 21 senders Inbox Zero had learned are listed privately
+account's Settings to see them as Gmail labels. The senders Inbox Zero had learned are listed privately
 (`towpath-private/inbox-zero/learned-senders-2026-10-18.md`), to mark on the Senders page if Towpath files any
 differently. Confirm or change these rules during the side-by-side week.
 
@@ -40,7 +40,7 @@ differently. Confirm or change these rules during the side-by-side week.
 
 1. **Overview** (`/`): the Today cards: conversations waiting for your reply, life events and memories to review,
    On this day, photos read.
-2. **Mail** (`/mail/`): Fastmail is managed; its whole history (114,924 messages) is read. Open *AI models for
+2. **Mail** (`/mail/`): Fastmail is managed; its whole history is read. Open *AI models for
    mail* (Mac Pro 35B for all three mail tasks, allowed to read mail text). The account's **Settings** page holds
    everything you set: what Towpath may change (all off, **Dry runs only** on), alerts, follow-ups, reply labels,
    the digest, notes for drafts, pausing.
@@ -82,8 +82,8 @@ password with full IMAP and SMTP access), then on Mail → Settings tick the kin
 1. **Life** (`/life/`): fill in **About you** (name, birthday). Fastmail is now allowed for the life story and
    *Find events by itself* is on (your answers of October 17): check what it proposes, newest year first. Allow a photo folder too:
    days with many photos become proposed events.
-2. **2025 events to review** (Life → events to review): the re-read of 2025 finished on October 15 and left 16 of
-   its 101 events for you to keep or reject.
+2. **2025 events to review** (Life → events to review): the re-read of 2025 finished on October 15 and left some of
+   its events for you to keep or reject.
 3. **Pairs to settle** (Life → *pairs to settle*, when there are any): events worded alike on about the same day,
    or a few months apart; keep the right one or say both are right.
 4. **Memories**: keep, rename or dismiss what Towpath gathered (people, decades, trips and occasions). Runs of
@@ -109,7 +109,7 @@ password with full IMAP and SMTP access), then on Mail → Settings tick the kin
 
 ## 4. Photos and files
 
-- **Photos** (`/photos/`): cameras and years from 40,000+ photos read; try "photos from my Fuji in 2019" in the
+- **Photos** (`/photos/`): cameras and years from the photos read; try "photos from my Fuji in 2019" in the
   plain-English box. Small previews appear as they're made (each photo's own camera thumbnail; none for the private
   export or photos hidden in Apple Photos; turn them off on the page). Few of your photos record a location.
   *Save as a collection* keeps a search (yours or a plain-English one); its collection lists what it finds each

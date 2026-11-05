@@ -40,8 +40,8 @@ Recorded for planning; none is scheduled yet.
   integrations. Work that doesn't need Python and has to be fast should be written in Rust (or a native tool)
   where possible. This is a note, not a rewrite: move a piece when measurement shows it is a bottleneck, behind
   the boundary it already has (the bridges' JSON over stdin and stdout, or the catalog tables). Candidates
-  measured on Hub's 7 M files:
-  - Adding Recoll's records to the catalog: one core at 100%, about 880 files/s before `bc0670b`, so each
+  measured on Hub:
+  - Adding Recoll's records to the catalog: one core at 100% before `bc0670b`, so each
     "Index again" spends hours re-adding unchanged files. Measured again on 2026-10-17: after two Python fixes
     it keeps pace with Recoll's own reads, so it stays in Python for now.
   - Space measurement and duplicates over the whole catalog.

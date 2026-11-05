@@ -28,13 +28,13 @@
 
 ## The checkouts (under `~/Development/towpath/`)
 
-Both worktrees share one git directory, inside `towpath-file-discovery-validation/.git`, so that folder has to move
-with the other. Virtual environments don't move (see *Running*).
+Both worktrees share one git directory, inside `towpath-file-discovery-validation/.git`. On a new machine, clone
+fresh from GitHub instead of moving them, and build the virtual environment there (see *Running*).
 
 | Folder | Branch | What it is for | State |
 | --- | --- | --- | --- |
 | `towpath-mail-management` | `claude/native-mail-management` | The main line of work. Pushed as `codex/local-email-ui` too, which publishing builds from. | On GitHub |
-| `towpath-file-discovery-validation` | `claude/file-discovery-foundation` | File discovery and Recoll validation, merged into the main line; holds the shared git directory | Uncommitted evaluation notes and a Recoll provider edit, also archived in `towpath-private` |
+| `towpath-file-discovery-validation` | `claude/file-discovery-foundation` | File discovery and Recoll validation, merged into the main line; holds the shared git directory | Branch deleted on GitHub. Uncommitted notes from early October, superseded by the main line's reviews and archived in `towpath-private`; not needed on a new machine |
 
 The older worktrees and the earlier separate clone were retired on 2026-11-01. Their uncommitted notes, and a bundle
 of the clone's unpushed commits, are in `towpath-private/cleanup/old-worktree-notes`.

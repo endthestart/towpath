@@ -6,8 +6,15 @@ a time; there is no Friday deadline.
 
 ## Current deployment
 
-Towpath has been stopped on Hub since 2026-11-01, by the owner. `96b0122` is published but not deployed
-([handoff](../HANDOFF.md)). The last deployed revision is below.
+Towpath has been stopped on Hub since 2026-11-01, by the owner. The last deployed revision is below.
+
+Published, not yet deployed: `96b0122` (*Run once* on the Life page, [life stream](../life-stream.md)), publishing
+run [41727279927](https://github.com/endthestart/towpath/actions/runs/41727279927). connect-setup adds the life
+store's `run_once` table; older images ignore it. Both images passed the anonymous source check and a scan with no
+Critical or High findings.
+
+- `web`: `ghcr.io/endthestart/towpath@sha256:2105eee69533d6a68a96b82e13e82c8741ce08ecf1c8b5b38fb50f52df0de2f9`
+- `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:3426cf5035edebf7058e289ba16c73dae0473346b58253984213585fa985a00c`
 
 Revision `bd40db3` (pyasn1 0.6.5, and the web image on Ubuntu 24.04), publishing run
 [41338731800](https://github.com/endthestart/towpath/actions/runs/41338731800). No store changes. Keeping the

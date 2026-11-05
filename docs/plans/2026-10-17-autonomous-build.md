@@ -166,7 +166,7 @@ rules, the side-by-side Gmail test before retiring Inbox Zero, Outlook.com, and 
 8. **Rule patterns:** text without `*` matches anywhere ignoring case; with `*` it's a wildcard over the whole
    value. A rule with a condition in words waits (rather than skipping mail) while no model may read mail text.
 9. **A message Towpath can't read** (malformed headers) is kept with its identity and the problem named, so one
-   message can't stop reading again (this stopped reading Fastmail at 55,650 messages on 2026-10-17).
+   message can't stop reading again (one stopped reading Fastmail on 2026-10-17).
 10. **Archive files** are `archive/mail/<account>/<request>.mbox` (mboxrd) in the data folder, as agreed. The web
     service sees only `state/`, so the pages show where a file is but can't offer it as a download yet.
 11. **Unsubscribing** uses one-click where offered, else email over Fastmail's SMTP with the write password; a
@@ -200,7 +200,7 @@ rules, the side-by-side Gmail test before retiring Inbox Zero, Outlook.com, and 
 23. **iCloud contacts and calendars** are found the standard way (principal, then home sets); a home on another
     service than the one asked is refused.
 24. **Duplicates over 2 GB are compared by samples** (the first, middle and last 64 MB, with the size), and the
-    Space page says so: hashing a 77 GB file in full held up the connector for minutes each poll.
+    Space page says so: hashing a very large file in full held up the connector for minutes each poll.
 25. **Unsubscribing by email goes only to the sender's own domain** (or its List-Id's); otherwise only their page
     is offered. The address is shown before you tick.
 26. **A move into a Trash folder counts as Move to Trash**: it needs that switch on and your own approval, never a
@@ -282,9 +282,8 @@ rules, the side-by-side Gmail test before retiring Inbox Zero, Outlook.com, and 
 - 2026-10-17: `1d06040` deployed. The owner answered all four open questions through the Project Manager session:
   attachment filing built (`44d310e`, dry run first); Fastmail allowed for the life story and finding events turned
   on, on Hub; photo previews built (decision 29).
-- 2026-10-17: `ffae7c4` deployed. On Hub the Apple Photos check read the main library (91,083 files: about 18,500
-  visible originals, 9,567 photos hidden or deleted) and left out every file of the libraries it couldn't read
-  (mostly libraries' own copies in backups); 137 previews were made in the first pass. Finding life events by
+- 2026-10-17: `ffae7c4` deployed. On Hub the Apple Photos check read the main library and left out every file of
+  the libraries it couldn't read (mostly libraries' own copies in backups); previews began in the first pass. Finding life events by
   itself is reading Fastmail's 2026 mail.
 - 2026-10-17: `a53f6c8` deployed (items 5–7: trips from photos, bookings from receipts, Messages in Search all and
   on People pages); all 34 pages answered on Hub. Items 8–10 built and under review before release.
