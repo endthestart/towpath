@@ -2,24 +2,21 @@
 
 ## Where things stand
 
-- **Towpath is stopped on Hub.** The owner brought it down on 2026-11-01 and it stays down until they start it again.
-  The last deployed revision is `bd40db3`, with its digests in [setup/hub.md](setup/hub.md).
-- **`96b0122` is published, not deployed** (2026-11-03,
-  [run 41727279927](https://github.com/endthestart/towpath/actions/runs/41727279927)). Both images passed the anonymous
-  source check and a scan with no Critical or High findings:
-  - `web`: `ghcr.io/endthestart/towpath@sha256:2105eee69533d6a68a96b82e13e82c8741ce08ecf1c8b5b38fb50f52df0de2f9`
-  - `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:3426cf5035edebf7058e289ba16c73dae0473346b58253984213585fa985a00c`
+- **`96b0122` is deployed on Hub** (2026-11-06, after a stop since 2026-11-01;
+  [run 41727279927](https://github.com/endthestart/towpath/actions/runs/41727279927)), with its digests in
+  [setup/hub.md](setup/hub.md). Both images passed the anonymous source check and a scan with no Critical or High
+  findings.
 - **GitHub:** `main` is at `a1d652b`; `codex/local-email-ui` and `claude/native-mail-management` are ahead of it with
   *Run once* and these docs. No open pull requests, and the older branches were deleted on 2026-11-03.
 - **Local model:** the owner keeps the same machine as the host for finding events and the mail model tasks. Instead of
   weeks of background work, the owner approved one bounded batch: *Run once* on the Life page
-  ([life stream](life-stream.md)), planned for 2026-11-06 to 11-08. Finding events by itself is still on in Hub's
-  settings, so it starts again after a restart until the owner presses *Stop finding events*.
+  ([life stream](life-stream.md)), pressed on 2026-11-06 and ending by itself 48 hours later. Finding events by itself
+  stays off after that until the owner turns it on again.
 - **Over the 300-line limit, by the owner's decision of 2026-11-03:** `tests/imap_stub.py`,
   `tests/container/test_image.py`, `packaging/release/sources.py` and `packaging/release/publish.py`.
 - **Closing point:** every planned item is built and reviewed, and nothing on the roadmap is left without new scope
   ([plan](plans/2026-10-17-autonomous-build.md)). No new features are planned.
-- **UAT is the owner's next step once Towpath is back**, starting with section 0 of the [UAT guide](plans/2026-10-uat-guide.md): connect
+- **UAT is the owner's next step after the batch**, starting with section 0 of the [UAT guide](plans/2026-10-uat-guide.md): connect
   Gmail over IMAP with an app password and run Towpath beside Inbox Zero for a week, Towpath in **Dry runs only**.
   Inbox Zero's rules are rewritten as a switched-off set on each account's Rules page, for the owner to confirm.
 - Mail stays in dry runs; nothing has changed real mail. Private-content rules hold: no cloud model on photos; the
