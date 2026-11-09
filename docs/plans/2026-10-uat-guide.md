@@ -79,9 +79,10 @@ password with full IMAP and SMTP access), then on Mail → Settings tick the kin
 
 ## 3. Life story
 
-1. **Life** (`/life/`): fill in **About you** (name, birthday). Fastmail is now allowed for the life story and
-   *Find events by itself* is on (your answers of October 17): check what it proposes, newest year first. Allow a photo folder too:
-   days with many photos become proposed events.
+1. **Life** (`/life/`): fill in **About you** (name, birthday). Fastmail is allowed for the life story (your answers
+   of October 17). The *Run once* batch of November 6 to 8 has ended, so *Find events by itself* is now off: check
+   what it proposed, newest year first, and turn it on again only if you want background work back. Allow a photo
+   folder too: days with many photos become proposed events.
 2. **2025 events to review** (Life → events to review): the re-read of 2025 finished on October 15 and left some of
    its events for you to keep or reject.
 3. **Pairs to settle** (Life → *pairs to settle*, when there are any): events worded alike on about the same day,

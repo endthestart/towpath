@@ -6,17 +6,18 @@
   [run 41727279927](https://github.com/endthestart/towpath/actions/runs/41727279927)), with its digests in
   [setup/hub.md](setup/hub.md). Both images passed the anonymous source check and a scan with no Critical or High
   findings.
-- **GitHub:** `main` is at `a1d652b`; `codex/local-email-ui` and `claude/native-mail-management` are ahead of it with
-  *Run once* and these docs. No open pull requests, and the older branches were deleted on 2026-11-03.
+- **GitHub:** `main`, `codex/local-email-ui` and `claude/native-mail-management` are level, `main` fast-forwarded on
+  2026-11-08 when the batch ended. Only docs changed after `96b0122`, so the images `main` published then are not
+  deployed. No open pull requests, and the older branches were deleted on 2026-11-03.
 - **Local model:** the owner keeps the same machine as the host for finding events and the mail model tasks. Instead of
   weeks of background work, the owner approved one bounded batch: *Run once* on the Life page
-  ([life stream](life-stream.md)), pressed on 2026-11-06 and ending by itself 48 hours later. Finding events by itself
-  stays off after that until the owner turns it on again.
+  ([life stream](life-stream.md)), pressed on 2026-11-06 and ended on 2026-11-08, with a pause the owner made on
+  2026-11-07. Finding events by itself stays off until the owner turns it on again.
 - **Over the 300-line limit, by the owner's decision of 2026-11-03:** `tests/imap_stub.py`,
   `tests/container/test_image.py`, `packaging/release/sources.py` and `packaging/release/publish.py`.
 - **Closing point:** every planned item is built and reviewed, and nothing on the roadmap is left without new scope
   ([plan](plans/2026-10-17-autonomous-build.md)). No new features are planned.
-- **UAT is the owner's next step after the batch**, starting with section 0 of the [UAT guide](plans/2026-10-uat-guide.md): connect
+- **UAT is the owner's next step now that the batch is over**, starting with section 0 of the [UAT guide](plans/2026-10-uat-guide.md): connect
   Gmail over IMAP with an app password and run Towpath beside Inbox Zero for a week, Towpath in **Dry runs only**.
   Inbox Zero's rules are rewritten as a switched-off set on each account's Rules page, for the owner to confirm.
 - Mail stays in dry runs; nothing has changed real mail. Private-content rules hold: no cloud model on photos; the
