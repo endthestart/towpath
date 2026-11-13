@@ -12,7 +12,8 @@ Revision `96b0122` (*Run once* on the Life page, [life stream](../life-stream.md
 `run_once` table; older images ignore it. Both images passed the anonymous source check and a scan with no Critical or
 High findings. The owner pressed *Run once* the same evening; it ended on 2026-11-08 (with the project stopped on
 2026-11-07 and deployed again the next morning), and finding events by itself is off since. Keeping
-the evidence is off; Fastmail is allowed for the life story (the owner's answers of October 17).
+the evidence is off; Fastmail is allowed for the life story (the owner's answers of October 17). The owner stopped the
+project on 2026-11-12, keeping its data folder; redeploying these digests brings it back.
 
 - `web`: `ghcr.io/endthestart/towpath@sha256:2105eee69533d6a68a96b82e13e82c8741ce08ecf1c8b5b38fb50f52df0de2f9`
 - `connect` and `connect-setup`: `ghcr.io/endthestart/towpath-recoll@sha256:3426cf5035edebf7058e289ba16c73dae0473346b58253984213585fa985a00c`
