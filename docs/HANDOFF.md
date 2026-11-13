@@ -101,7 +101,7 @@ git. On a new machine, clone fresh from GitHub instead of moving the checkouts.
 ## Running, testing and deploying
 
 ```bash
-git clone git@github.com:endthestart/towpath.git && cd towpath
+git clone https://github.com/endthestart/towpath.git && cd towpath
 git switch claude/native-mail-management
 uv sync --locked --extra dev
 .venv/bin/python -m pytest -q
