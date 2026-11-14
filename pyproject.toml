@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "towpath"
-version = "0.0.1"
+version = "0.1.0"
 description = "Self-hosted tools for managing your digital life and building an evidence-linked life stream"
 readme = "README.md"
 license = { text = "MIT" }
@@ -25,7 +25,7 @@ towpath = "towpath.cli:app"
 where = ["src"]
 
 [tool.setuptools.package-data]
-"towpath.web" = ["templates/*.html", "assets/*.css", "assets/*.js", "assets/*.LICENSE"]
+"towpath.web" = ["templates/*.html", "assets/*.css", "assets/*.js", "assets/*.LICENSE", "assets/*.svg", "assets/*.png"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

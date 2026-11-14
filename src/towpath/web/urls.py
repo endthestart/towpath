@@ -108,4 +108,6 @@ urlpatterns = [
     path("collections/<str:cid>/accept", unified_views.collection_accept, name="collection-accept"),
     path("assets/app.css", views.stylesheet, name="stylesheet"),
     path("assets/htmx.min.js", views.htmx_script, name="htmx"),
+    path("assets/icon.svg", views.icon, name="icon"),
+    path("assets/touch-icon.png", views.touch_icon, name="touch-icon"),
 ]

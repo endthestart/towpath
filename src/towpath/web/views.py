@@ -82,16 +82,30 @@ def email(request, item_id):
     return render(request, "email.html", {"nav": "email", "item": item})
 
 
+def _asset(name: str, content_type: str) -> HttpResponse:
+    return HttpResponse((Path(__file__).parent / "assets" / name).read_bytes(), content_type=content_type)
+
+
 @require_GET
 def stylesheet(request):
-    return HttpResponse((Path(__file__).parent / "assets" / "app.css").read_text(), content_type="text/css")
+    return _asset("app.css", "text/css")
 
 
 @require_GET
 def htmx_script(request):
     """htmx, vendored and pinned (see htmx.LICENSE): parts of a page that track background work fetch their own
     fragment every few seconds, and nothing else on the page changes."""
-    return HttpResponse((Path(__file__).parent / "assets" / "htmx.min.js").read_text(), content_type="text/javascript")
+    return _asset("htmx.min.js", "text/javascript")
+
+
+@require_GET
+def icon(request):
+    return _asset("icon.svg", "image/svg+xml")
+
+
+@require_GET
+def touch_icon(request):
+    return _asset("touch-icon.png", "image/png")
 
 
 @require_GET

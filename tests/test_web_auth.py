@@ -50,7 +50,9 @@ def test_every_page_leads_to_setup_until_the_account_exists(store, capsys):
             response = method(path)
             assert response.status_code == 302 and response["Location"] == "/setup", path
     assert client.get("/setup").status_code == 200
-    assert client.get("/assets/app.css").status_code == 200
+    for asset in ("/assets/app.css", "/assets/icon.svg", "/assets/touch-icon.png"):
+        assert client.get(asset).status_code == 200
+    assert b'<link rel="icon"' in client.get("/setup").content
     assert f"setup code: {auth.setup_code(store)}" in capsys.readouterr().out
 
 

@@ -29,7 +29,7 @@ SECRET_FILE = "web-secret.key"
 COOKIE = "towpath_session"
 SESSION_SECONDS = 30 * 24 * 3600
 MIN_PASSWORD = 12
-OPEN_PATHS = {"/setup", "/login", "/assets/app.css"}
+OPEN_PATHS = {"/setup", "/login", "/assets/app.css", "/assets/icon.svg", "/assets/touch-icon.png"}
 # Failed logins slow every attempt and pause the form after a burst, whatever the client claims to be.
 FAIL_DELAY_SECONDS = 1.0
 FAIL_LIMIT, FAIL_WINDOW_SECONDS = 10, 600

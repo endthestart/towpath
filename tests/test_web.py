@@ -110,6 +110,11 @@ def test_routes_escape_mail_and_never_show_bodies(client):
     assert client.get("/email/", {"page": "bad"}).status_code == 200
     css = client.get("/assets/app.css")
     assert css.status_code == 200 and css["Content-Type"] == "text/css"
+    assert b'<link rel="icon" href="/assets/icon.svg"' in client.get("/").content
+    icon = client.get("/assets/icon.svg")
+    assert icon["Content-Type"] == "image/svg+xml" and icon.content.startswith(b"<svg ")
+    touch = client.get("/assets/touch-icon.png")
+    assert touch["Content-Type"] == "image/png" and touch.content.startswith(b"\x89PNG")
 
 
 def test_no_write_routes_or_untrusted_host(client):

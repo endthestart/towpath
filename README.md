@@ -1,3 +1,5 @@
+<img src="src/towpath/web/assets/icon.svg" alt="" width="64">
+
 # Towpath
 
 Towpath is an open-source, self-hosted workspace to discover your digital life, organize and reuse its contents, and build an evidence-linked timeline and portfolio. Email is the first working source. See the [product vision](docs/vision.md).
