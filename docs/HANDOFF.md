@@ -28,8 +28,8 @@ in `towpath-private`.
   is off until the owner turns it on again. Its proposals wait for review.
 - **Mail stays in dry runs**: nothing has ever changed real mail. Fastmail is the account that is read; the Gmail API
   connection stopped at sign-in during the batch.
-- **GitHub:** `main`, `codex/local-email-ui` and `claude/native-mail-management` hold the same work, at `v0.1.0`. No
-  open pull requests and no other branches.
+- **GitHub:** `main`, `codex/local-email-ui` and `claude/native-mail-management` hold the code of `v0.1.0`; later
+  commits change only this page. No open pull requests and no other branches.
 - **Roadmap:** every planned feature is built and reviewed; no new features are planned
   ([plan](plans/2026-10-17-autonomous-build.md)).
 
