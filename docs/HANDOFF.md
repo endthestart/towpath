@@ -39,8 +39,9 @@ in `towpath-private`.
    what each service does while it runs (CPU, memory, disk, the Recoll index, background model work), find what
    starves the server, and cap or schedule it so Towpath can stay on. Owner step: run Towpath on Hub while it is
    measured.
-2. **Owner: deploy `v0.1.0`** when bringing Towpath back, once Security's scan of its digests is clear: start the
-   stopped project in Arcane, set the two digests from the release page in its environment, and redeploy. Nothing else is needed; the stores and sign-ins are kept. Model
+2. **Owner: deploy `v0.1.0`** when bringing Towpath back (Security's scan of 2026-11-16 found no Critical or High
+   issues): start the stopped project in Arcane, set the two digests from the release page in its environment, and
+   redeploy. Nothing else is needed; the stores and sign-ins are kept. Model
    tasks wait until a model host answers (item 5). Best done together with item 1.
 3. **Owner: UAT**, following the [UAT guide](plans/2026-10-uat-guide.md): section 0 first (Gmail over IMAP with an app
    password, a week beside Inbox Zero in dry runs), then section 3: the *Run once* proposals newest year first, and the
